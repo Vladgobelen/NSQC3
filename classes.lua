@@ -1126,3 +1126,159 @@ end
 function UniversalInfoFrame:Hide()
     self.frame:Hide()
 end
+
+-- Класс ChatHandler для обработки сообщений чата
+ChatHandler = {}
+ChatHandler.__index = ChatHandler
+
+-- Конструктор класса ChatHandler
+-- @param triggerTable: Таблица триггеров (опционально)
+-- @param chatTypes: Типы чатов, которые нужно отслеживать (опционально)
+-- @return: Новый объект ChatHandler
+function ChatHandler:new(triggerTable, chatTypes)
+    local new_object = setmetatable({}, self)
+    self.__index = self
+
+    -- Инициализация таблицы триггеров
+    new_object.triggerTable = triggerTable or {}  -- Используем переданную таблицу или создаём пустую
+
+    -- Создаем фрейм для обработки событий
+    new_object.frame = CreateFrame("Frame")
+
+    -- Регистрируем события чата в зависимости от переданных chatTypes
+    if chatTypes then
+        for _, chatType in ipairs(chatTypes) do
+            if chatType == "ADDON" then
+                new_object.frame:RegisterEvent("CHAT_MSG_ADDON")
+            else
+                new_object.frame:RegisterEvent("CHAT_MSG_" .. chatType)
+            end
+        end
+    else
+        -- Если chatTypes не указан, регистрируем все события по умолчанию
+        new_object.frame:RegisterEvent("CHAT_MSG_CHANNEL")
+        new_object.frame:RegisterEvent("CHAT_MSG_SAY")
+        new_object.frame:RegisterEvent("CHAT_MSG_YELL")
+        new_object.frame:RegisterEvent("CHAT_MSG_WHISPER")
+        new_object.frame:RegisterEvent("CHAT_MSG_GUILD")
+        new_object.frame:RegisterEvent("CHAT_MSG_PARTY")
+        new_object.frame:RegisterEvent("CHAT_MSG_RAID")
+        new_object.frame:RegisterEvent("CHAT_MSG_RAID_WARNING")
+        new_object.frame:RegisterEvent("CHAT_MSG_BATTLEGROUND")
+        new_object.frame:RegisterEvent("CHAT_MSG_SYSTEM")
+        new_object.frame:RegisterEvent("CHAT_MSG_ADDON")
+    end
+
+    -- Устанавливаем обработчик событий
+    new_object.frame:SetScript("OnEvent", function(_, event, ...)
+        new_object:OnChatMessage(event, ...)
+    end)
+
+    return new_object
+end
+
+-- Вспомогательная функция для проверки ключевых слов в тексте
+-- @param text: Текст сообщения
+-- @param keywords: Таблица ключевых слов и их позиций
+-- @return: true, если все ключевые слова совпали, иначе false
+local function checkKeywords(text, keywords)
+    local words = mysplit(text)  -- Разбиваем текст на слова
+    for _, keywordData in ipairs(keywords) do
+        local word = keywordData.word
+        local position = keywordData.position
+        -- Проверяем, что слово на указанной позиции совпадает
+        if not (words[position] and words[position]:lower() == word:lower()) then
+            return false
+        end
+    end
+    return true  -- Все ключевые слова совпали
+end
+
+-- Метод для обработки сообщений чата
+-- @param event: Тип события (например, "CHAT_MSG_SAY")
+-- @param ...: Параметры события (текст, отправитель и т.д.)
+function ChatHandler:OnChatMessage(event, ...)
+    local text, sender, _, _, _, _, _, _, channel, channelName, _, prefix
+
+    -- Обработка событий ADDON (параметры идут в другом порядке)
+    if event == "CHAT_MSG_ADDON" then
+        prefix, text, channel, sender = ...
+    else
+        -- Обработка обычных сообщений чата
+        text, sender = ...
+    end
+
+    -- Разбиваем сообщение на слова
+    local msg = {}
+    local kodmsg = {}
+
+    if event == "CHAT_MSG_ADDON" then
+        -- Для событий ADDON разбиваем prefix и message
+        if prefix then
+            kodmsg = mysplit(prefix)
+        else
+            kodmsg = {}  -- Если prefix равен nil, используем пустую таблицу
+        end
+        msg = mysplit(text)
+    else
+        -- Для обычных сообщений чата разбиваем только text
+        msg = mysplit(text)
+    end
+
+    -- Проходим по таблице с триггерами
+    for _, trigger in ipairs(self.triggerTable) do
+        local keywords = trigger.keyword
+        local funcName = trigger.func
+        local conditions = trigger.conditions or {}  -- Таблица условий (может быть пустой)
+
+        -- Проверяем ключевые слова
+        local keywordsMatch = true
+        for _, keywordData in ipairs(keywords) do
+            local word = keywordData.word
+            local position = keywordData.position
+            local source = keywordData.source  -- "prefix" или "message"
+
+            -- Определяем, где искать слово: в prefix или message
+            local words = (source == "prefix") and kodmsg or msg
+
+            -- Проверяем, что слово на указанной позиции совпадает (регистрозависимо)
+            if not (words[position] and words[position] == word) then
+                keywordsMatch = false
+                break
+            end
+        end
+
+        -- Если ключевые слова совпали, проверяем условия
+        if keywordsMatch then
+            local allConditionsMet = true
+            for _, condition in ipairs(conditions) do
+                -- Если условие — это строка, получаем функцию по имени
+                if type(condition) == "string" then
+                    condition = _G[condition]
+                end
+
+                -- Если условие — это функция, вызываем её
+                if type(condition) == "function" then
+                    if not condition(text, sender, channel, prefix) then
+                        allConditionsMet = false
+                        break
+                    end
+                else
+                    print("Ошибка: условие не является функцией или именем функции.")
+                    allConditionsMet = false
+                    break
+                end
+            end
+
+            -- Если все условия выполнены, вызываем функцию
+            if allConditionsMet then
+                local func = _G[funcName]
+                if func then
+                    func(text, sender, channel, prefix)
+                else
+                    print("Ошибка: функция '" .. funcName .. "' не найдена.")
+                end
+            end
+        end
+    end
+end

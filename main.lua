@@ -1,11 +1,69 @@
 local function OnEvent(self, event, isLogin, isReload)
     NSQCMenu()
     set_miniButton()
+
 end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", OnEvent)
+
+local triggers = {
+    {
+        keyword = {
+            { word = "тест", position = 1 },  -- Первое слово должно быть "собираемся"
+            { word = "124", position = 3 }         -- Третье слово должно быть "рейд"
+        },
+        func = "OnRaidTrigger",
+        conditions = {
+            --"IsGuildLeader"  -- Дополнительные условия
+        }
+    },
+    {
+        keyword = {
+            { word = "MyAddon", position = 1, source = "prefix" },  -- Первое слово в prefix должно быть "MyAddon"
+            { word = "рейд", position = 2, source = "message" }     -- Второе слово в message должно быть "рейд"
+        },
+        func = "OnAddonRaidTrigger",
+        conditions = {
+            function(text, sender, channel, prefix) return sender == "Хефе" end  -- Отправитель должен быть "Хефе"
+        }
+    }
+}
+
+-- Функции для обработки триггеров
+function OnAddonRaidTrigger(text, sender, channel, prefix)
+    SendChatMessage("все работает123", "OFFICER")
+end
+
+function OnRaidTrigger(text, sender, channel, prefix)
+    SendChatMessage("все работает", "OFFICER")
+end
+
+-- Функция-условие
+function IsGuildLeader()
+    local playerName = UnitName("player")
+    for i = 1, GetNumGuildMembers() do
+        local name, _, rankIndex = GetGuildRosterInfo(i)
+        if name == playerName then
+            return rankIndex == 0
+        end
+    end
+    return false
+end
+
+-- Создаем экземпляр ChatHandler
+local chatHandler = ChatHandler:new(triggers, {"GUILD", "ADDON"})
+
+
+
+
+
+
+
+
+
+
 
 
 -- -- Создаем родительский фрейм
