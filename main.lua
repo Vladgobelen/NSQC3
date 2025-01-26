@@ -1,22 +1,28 @@
+-- Функция обработки события PLAYER_ENTERING_WORLD
+-- @param self: Фрейм, который вызвал событие
+-- @param event: Тип события (в данном случае "PLAYER_ENTERING_WORLD")
+-- @param isLogin: Флаг, указывающий, что игрок вошел в мир
+-- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
-    NSQCMenu()
-    set_miniButton()
-
+    NSQCMenu()          -- Вызов функции для отображения меню
+    set_miniButton()    -- Вызов функции для настройки мини-кнопки
 end
 
+-- Создаем фрейм и регистрируем событие PLAYER_ENTERING_WORLD
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", OnEvent)
 
+-- Таблица триггеров для обработки сообщений
 local triggers = {
     {
         keyword = {
-            { word = "тест", position = 1 },  -- Первое слово должно быть "собираемся"
-            { word = "124", position = 3 }         -- Третье слово должно быть "рейд"
+            { word = "тест", position = 1 },  -- Первое слово должно быть "тест"
+            { word = "124", position = 3 }    -- Третье слово должно быть "124"
         },
-        func = "OnRaidTrigger",
+        func = "OnRaidTrigger",               -- Функция, которая будет вызвана при срабатывании триггера
         conditions = {
-            --"IsGuildLeader"  -- Дополнительные условия
+            --"IsGuildLeader"                 -- Дополнительные условия (закомментировано)
         }
     },
     {
@@ -24,35 +30,45 @@ local triggers = {
             { word = "MyAddon", position = 1, source = "prefix" },  -- Первое слово в prefix должно быть "MyAddon"
             { word = "рейд", position = 2, source = "message" }     -- Второе слово в message должно быть "рейд"
         },
-        func = "OnAddonRaidTrigger",
+        func = "OnAddonRaidTrigger",                               -- Функция, которая будет вызвана при срабатывании триггера
         conditions = {
-            function(text, sender, channel, prefix) return sender == "Хефе" end  -- Отправитель должен быть "Хефе"
+            function(text, sender, channel, prefix) return sender == "Хефе" end  -- Условие: отправитель должен быть "Хефе"
         }
     }
 }
 
--- Функции для обработки триггеров
+-- Функция для обработки триггера с префиксом "MyAddon" и сообщением "рейд"
+-- @param text: Текст сообщения
+-- @param sender: Имя отправителя
+-- @param channel: Канал сообщения
+-- @param prefix: Префикс сообщения (для ADDON-сообщений)
 function OnAddonRaidTrigger(text, sender, channel, prefix)
-    SendChatMessage("все работает123", "OFFICER")
+    SendChatMessage("все работает123", "OFFICER")  -- Отправка сообщения в офицерский канал
 end
 
+-- Функция для обработки триггера с ключевыми словами "тест" и "124"
+-- @param text: Текст сообщения
+-- @param sender: Имя отправителя
+-- @param channel: Канал сообщения
+-- @param prefix: Префикс сообщения (для ADDON-сообщений)
 function OnRaidTrigger(text, sender, channel, prefix)
-    SendChatMessage("все работает", "OFFICER")
+    SendChatMessage("все работает", "OFFICER")  -- Отправка сообщения в офицерский канал
 end
 
--- Функция-условие
+-- Функция-условие: проверяет, является ли игрок лидером гильдии
+-- @return: true, если игрок является лидером гильдии, иначе false
 function IsGuildLeader()
-    local playerName = UnitName("player")
-    for i = 1, GetNumGuildMembers() do
+    local playerName = UnitName("player")  -- Получаем имя игрока
+    for i = 1, GetNumGuildMembers() do     -- Проходим по всем членам гильдии
         local name, _, rankIndex = GetGuildRosterInfo(i)
-        if name == playerName then
-            return rankIndex == 0
+        if name == playerName then         -- Если имя совпадает с именем игрока
+            return rankIndex == 0          -- Проверяем, является ли игрок лидером (ранг 0)
         end
     end
-    return false
+    return false  -- Если игрок не лидер гильдии
 end
 
--- Создаем экземпляр ChatHandler
+-- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
 local chatHandler = ChatHandler:new(triggers, {"GUILD", "ADDON"})
 
 
