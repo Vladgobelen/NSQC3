@@ -1,7 +1,5 @@
 local function OnEvent(self, event, isLogin, isReload)
     NSQCMenu()
-    nsqc_db_table = nsqc_db_table or nsqc_create_table:new("nsqc_db")
-    nsqcDb = nsqcDb or NsqcDb:new(nsqc_db_table:get_table(), nil, "settings", 32000, 100000)
     set_miniButton()
 end
 

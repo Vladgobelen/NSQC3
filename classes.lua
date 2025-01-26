@@ -9,13 +9,14 @@ local utf8sub = string.utf8sub
 local ipairs = ipairs
 local gmatch = string.gmatch
 local numeCod = numeCod
+local string_utf8sub = string.utf8sub
+local string_utf8len = string.utf8len
+-- Определяем класс NsDb
+NsDb = {}
+NsDb.__index = NsDb
 
--- Определяем класс NsqcDb
-NsqcDb = {}
-NsqcDb.__index = NsqcDb
-
--- Конструктор для создания нового объекта NsqcDb
-function NsqcDb:new(input_table, input_table_p, key, str_len, tbl_size)
+-- Конструктор для создания нового объекта NsDb
+function NsDb:new(input_table, input_table_p, key, str_len, tbl_size)
     local new_object = setmetatable({}, self)
     if input_table_p then
         input_table_p[key] = input_table_p[key] or {}
@@ -32,7 +33,7 @@ function NsqcDb:new(input_table, input_table_p, key, str_len, tbl_size)
 end
 
 -- Метод для получения строки по индексу
-function NsqcDb:getLine(line)
+function NsDb:getLine(line)
     local function getSum(line)
         local targetLength = line
         local totalLengths = 0
@@ -106,7 +107,7 @@ function NsqcDb:getLine(line)
 end
 
 -- Метод для создания бинарного представления сообщения
-function NsqcDb:create_bin(message, str)
+function NsDb:create_bin(message, str)
     local pointer = numCod(utf8len(message))
     pointer = (string.len(pointer) < 2) and " " .. pointer or pointer
     if str == 0 then
@@ -119,7 +120,7 @@ function NsqcDb:create_bin(message, str)
 end
 
 -- Метод для добавления сообщения в таблицу
-function NsqcDb:add_str(message)
+function NsDb:add_str(message)
     local num = #self.input_table
     if num < 1 or utf8len(self.input_table[num]) >= self.str_len then
         self:create_bin(message, 0)
@@ -128,8 +129,18 @@ function NsqcDb:add_str(message)
     end
 end
 
+function NsDb:add_line(message)
+    local num = #self.input_table
+    if num < 1 or #self.input_table[num] >= self.tbl_size then
+        self.input_table[num + 1] = {}
+        self.input_table[num + 1][#self.input_table[num + 1] + 1] = message
+    else
+        self.input_table[num][#self.input_table[num] + 1] = message
+    end
+end
+
 -- Метод для добавления словаря
-function NsqcDb:add_dict(message, kod)
+function NsDb:add_dict(message, kod)
     local num = #self.input_table
     if num < 1 or tablelength(self.input_table[num]) >= self.str_len then
         self.input_table[num + 1] = {}
@@ -140,7 +151,7 @@ function NsqcDb:add_dict(message, kod)
 end
 
 -- Метод для добавления сообщения в хэш-таблицу
-function NsqcDb:add_fdict(msg)
+function NsDb:add_fdict(msg)
     local num = #self.input_table
     local pointer = numCod(#msg)
     pointer = (string.len(pointer) < 2) and " " .. pointer or pointer
@@ -161,7 +172,7 @@ function NsqcDb:add_fdict(msg)
     end
 end
 
-function NsqcDb:get_fdict(index)
+function NsDb:get_fdict(index)
     -- Проверяем, что таблица с адресами существует
     if not self.input_table_p or not self.input_table_p[1] then
         return nil, "Таблица с адресами не найдена."
@@ -244,7 +255,7 @@ function NsqcDb:get_fdict(index)
 end
 
 -- Метод для проверки уникальности сообщения
-function NsqcDb:is_unique(message)
+function NsDb:is_unique(message)
     for i = 1, #self.input_table do
         if self.input_table[i][message] then
             return false
@@ -253,7 +264,7 @@ function NsqcDb:is_unique(message)
     return true
 end
 
-function NsqcDb:pLen()
+function NsDb:pLen()
     local pLen = 0
     if self.input_table_p then
         for i = 1, #self.input_table_p do
@@ -264,20 +275,27 @@ function NsqcDb:pLen()
         return nil
     end
 end
+function NsDb:Len()
+    local Len = 0
+    for i = 1, #self.input_table do
+        Len = Len + #self.input_table[i]
+    end
+    return Len
+end
 
 -- Метод для изменения ключа
-function NsqcDb:mod_key(change_key, message)
+function NsDb:mod_key(change_key, num, message)
     if self.str_len > 1 and self.unique and not self.input_table[change_key] then
         self.input_table[change_key] = message
     end
 end
 
--- Определяем класс nsqc_create_table
-nsqc_create_table = {}
-nsqc_create_table.__index = nsqc_create_table
+-- Определяем класс create_table
+create_table = {}
+create_table.__index = create_table
 
--- Конструктор для создания нового объекта nsqc_create_table
-function nsqc_create_table:new(input_table, is_pointer)
+-- Конструктор для создания нового объекта create_table
+function create_table:new(input_table, is_pointer)
     local new_object = setmetatable({}, self)
     if is_pointer then
         _G[input_table.."_p"] = _G[input_table.."_p"] or {}
@@ -289,22 +307,22 @@ function nsqc_create_table:new(input_table, is_pointer)
 end
 
 -- Метод для получения таблицы
-function nsqc_create_table:get_table()
+function create_table:get_table()
     return self.input_table
 end
 
 -- Метод для получения таблицы-указателя
-function nsqc_create_table:get_table_p()
+function create_table:get_table_p()
     return self.input_table_p
 end
 
--- Определяем класс nsqc_ButtonManager
-nsqc_ButtonManager = {}
-nsqc_ButtonManager.__index = nsqc_ButtonManager
+-- Определяем класс ButtonManager
+ButtonManager = {}
+ButtonManager.__index = ButtonManager
 
 -- Конструктор для создания новой кнопки
-function nsqc_ButtonManager:new(name, parent, width, height, text, texture, parentFrame)
-    local button = setmetatable({}, nsqc_ButtonManager)
+function ButtonManager:new(name, parent, width, height, text, texture, parentFrame)
+    local button = setmetatable({}, ButtonManager)
     
     -- Создаем фрейм кнопки
     if texture then
@@ -334,12 +352,12 @@ function nsqc_ButtonManager:new(name, parent, width, height, text, texture, pare
 end
 
 -- Метод для установки текста на кнопке
-function nsqc_ButtonManager:SetText(text)
+function ButtonManager:SetText(text)
     self.frame:SetText(text)
 end
 
 -- Метод для установки текста на кнопке через FontString
-function nsqc_ButtonManager:SetTextT(text)
+function ButtonManager:SetTextT(text)
     local fontString = self.frame:GetFontString()
     if not fontString then
         fontString = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -350,27 +368,27 @@ function nsqc_ButtonManager:SetTextT(text)
 end
 
 -- Метод для установки позиции кнопки
-function nsqc_ButtonManager:SetPosition(point, relativeTo, relativePoint, xOffset, yOffset)
+function ButtonManager:SetPosition(point, relativeTo, relativePoint, xOffset, yOffset)
     self.frame:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset)
 end
 
 -- Метод для скрытия кнопки
-function nsqc_ButtonManager:Hide()
+function ButtonManager:Hide()
     self.frame:Hide()
 end
 
 -- Метод для отображения кнопки
-function nsqc_ButtonManager:Show()
+function ButtonManager:Show()
     self.frame:Show()
 end
 
 -- Метод для установки обработчика нажатия на кнопку
-function nsqc_ButtonManager:SetOnClick(onClickFunction)
+function ButtonManager:SetOnClick(onClickFunction)
     self.frame:SetScript("OnClick", onClickFunction)
 end
 
 -- Метод для добавления всплывающей подсказки
-function nsqc_ButtonManager:SetTooltip(text)
+function ButtonManager:SetTooltip(text)
     self.frame:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(text)
@@ -382,7 +400,7 @@ function nsqc_ButtonManager:SetTooltip(text)
 end
 
 -- Метод для изменения размера кнопки
-function nsqc_ButtonManager:SetSize(width, height)
+function ButtonManager:SetSize(width, height)
     if self.frame then
         self.frame:SetSize(width, height)
     else
@@ -391,7 +409,7 @@ function nsqc_ButtonManager:SetSize(width, height)
 end
 
 -- Метод для перемещения кнопки
-function nsqc_ButtonManager:SetMovable(parentFrame)
+function ButtonManager:SetMovable(parentFrame)
     self.frame:SetScript("OnMouseDown", function(self, button)
         if button == "LeftButton" then
             parentFrame:StartMoving()

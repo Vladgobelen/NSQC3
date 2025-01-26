@@ -104,43 +104,12 @@ function log(...)
     end
 end
 
-function deCryptStr(tbl)
-    local result = ""
-    for i = 1, #tbl do
-        local element = tbl[i]
-        -- Заменяем 𐑏 на пробел
-        if element == "𐑏" then
-            result = result .. " "
-        else
-            for j = 1, #deCode do
-                if deCode[j][element] then
-                    result = result .. deCode[j][element]
-                    break
-                end
-            end
-        end
-    end
-    return result
-end
-
--- Функция для шифрования строки
-function cryptStr(msg)
-    local result = {}
-    for i = 1, #msg do
-        local word = string_lower(msg[i])  -- Приводим слово к нижнему регистру
-        if word == "𐑏" then
-            word = " "
-        end
-        local encryptedWord
-        for j = 1, #NSQS_dict["словарь"] do
-            encryptedWord = NSQS_dict["словарь"][j][word]
-            if encryptedWord then
-                break  -- Прерываем поиск, если слово найдено
-            end
-        end
-        result[#result + 1] = encryptedWord
-    end
-    return table.concat(result, "")  -- Возвращаем строку с кодами, разделенными пробелами
+function unixToDate(unixTime)
+    -- Unix-время начинается с 1 января 1970 года
+    local secondsInDay = 86400  -- Количество секунд в сутках
+    local daysSinceEpoch = math.floor(unixTime / secondsInDay)
+    local date = os.date("*t", unixTime)  -- Получаем таблицу с датой
+    return string.format("%04d-%02d-%02d %02d:%02d:%02d", date.year, date.month, date.day, date.hour, date.min, date.sec)
 end
 
 function NSQCMenu()
