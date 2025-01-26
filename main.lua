@@ -14,45 +14,37 @@ f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", OnEvent)
 
 -- Таблица триггеров для обработки сообщений
-local triggers = {
-    {
-        keyword = {
-            { word = "тест", position = 1 },  -- Первое слово должно быть "тест"
-            { word = "124", position = 3 }    -- Третье слово должно быть "124"
-        },
-        func = "OnRaidTrigger",               -- Функция, которая будет вызвана при срабатывании триггера
-        conditions = {
-            --"IsGuildLeader"                 -- Дополнительные условия (закомментировано)
+local triggersByAddress = {
+    ["message:тест"] = {
+        {
+            keyword = {
+                { word = "тест", position = 1, source = "message" }
+            },
+            func = "OnTestTrigger",
+            stopOnMatch = true  -- Прервать обработку после этого триггера
         }
     },
-    {
-        keyword = {
-            { word = "MyAddon", position = 1, source = "prefix" },  -- Первое слово в prefix должно быть "MyAddon"
-            { word = "рейд", position = 2, source = "message" }     -- Второе слово в message должно быть "рейд"
-        },
-        func = "OnAddonRaidTrigger",                               -- Функция, которая будет вызвана при срабатывании триггера
-        conditions = {
-            function(text, sender, channel, prefix) return sender == "Хефе" end  -- Условие: отправитель должен быть "Хефе"
+    ["prefix:MyAddon"] = {
+        {
+            keyword = {
+                { word = "MyAddon", position = 1, source = "prefix" },
+                { word = "рейд", position = 2, source = "message" }
+            },
+            func = "OnAddonRaidTrigger",
+            conditions = {
+                function(text, sender, channel, prefix) return sender == "Хефе" end  -- Отправитель должен быть "Хефе"
+            },
+            stopOnMatch = true  -- Прервать обработку после этого триггера
         }
     }
 }
 
--- Функция для обработки триггера с префиксом "MyAddon" и сообщением "рейд"
--- @param text: Текст сообщения
--- @param sender: Имя отправителя
--- @param channel: Канал сообщения
--- @param prefix: Префикс сообщения (для ADDON-сообщений)
-function OnAddonRaidTrigger(text, sender, channel, prefix)
-    SendChatMessage("все работает123", "OFFICER")  -- Отправка сообщения в офицерский канал
+function OnTestTrigger(text, sender, channel, prefix)
+    SendChatMessage("Триггер 'тест' сработал!", "GUILD")
 end
 
--- Функция для обработки триггера с ключевыми словами "тест" и "124"
--- @param text: Текст сообщения
--- @param sender: Имя отправителя
--- @param channel: Канал сообщения
--- @param prefix: Префикс сообщения (для ADDON-сообщений)
-function OnRaidTrigger(text, sender, channel, prefix)
-    SendChatMessage("все работает", "OFFICER")  -- Отправка сообщения в офицерский канал
+function OnAddonRaidTrigger(text, sender, channel, prefix)
+    SendChatMessage("Триггер 'MyAddon:рейд' сработал!", "GUILD")
 end
 
 -- Функция-условие: проверяет, является ли игрок лидером гильдии
@@ -69,8 +61,7 @@ function IsGuildLeader()
 end
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
-local chatHandler = ChatHandler:new(triggers, {"GUILD", "ADDON"})
-
+local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON"})
 
 
 

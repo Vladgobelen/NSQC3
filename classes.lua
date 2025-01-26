@@ -1132,15 +1132,15 @@ ChatHandler = {}
 ChatHandler.__index = ChatHandler
 
 -- Конструктор класса ChatHandler
--- @param triggerTable: Таблица триггеров (опционально)
+-- @param triggersByAddress: Ассоциативная таблица триггеров, сгруппированных по адресу
 -- @param chatTypes: Типы чатов, которые нужно отслеживать (опционально)
 -- @return: Новый объект ChatHandler
-function ChatHandler:new(triggerTable, chatTypes)
+function ChatHandler:new(triggersByAddress, chatTypes)
     local new_object = setmetatable({}, self)
     self.__index = self
 
     -- Инициализация таблицы триггеров
-    new_object.triggerTable = triggerTable or {}  -- Используем переданную таблицу или создаём пустую
+    new_object.triggersByAddress = triggersByAddress or {}
 
     -- Создаем фрейм для обработки событий
     new_object.frame = CreateFrame("Frame")
@@ -1177,23 +1177,6 @@ function ChatHandler:new(triggerTable, chatTypes)
     return new_object
 end
 
--- Вспомогательная функция для проверки ключевых слов в тексте
--- @param text: Текст сообщения
--- @param keywords: Таблица ключевых слов и их позиций
--- @return: true, если все ключевые слова совпали, иначе false
-local function checkKeywords(text, keywords)
-    local words = mysplit(text)  -- Разбиваем текст на слова
-    for _, keywordData in ipairs(keywords) do
-        local word = keywordData.word
-        local position = keywordData.position
-        -- Проверяем, что слово на указанной позиции совпадает
-        if not (words[position] and words[position]:lower() == word:lower()) then
-            return false
-        end
-    end
-    return true  -- Все ключевые слова совпали
-end
-
 -- Метод для обработки сообщений чата
 -- @param event: Тип события (например, "CHAT_MSG_SAY")
 -- @param ...: Параметры события (текст, отправитель и т.д.)
@@ -1225,60 +1208,91 @@ function ChatHandler:OnChatMessage(event, ...)
         msg = mysplit(text)
     end
 
-    -- Проходим по таблице с триггерами
-    for _, trigger in ipairs(self.triggerTable) do
-        local keywords = trigger.keyword
-        local funcName = trigger.func
-        local conditions = trigger.conditions or {}  -- Таблица условий (может быть пустой)
+    -- Определяем адрес (первое слово сообщения или префикса)
+    local addressPrefix = (event == "CHAT_MSG_ADDON" and "prefix:" .. (kodmsg[1] or "")) or nil
+    local addressMessage = "message:" .. (msg[1] or "")
 
-        -- Проверяем ключевые слова
-        local keywordsMatch = true
-        for _, keywordData in ipairs(keywords) do
-            local word = keywordData.word
-            local position = keywordData.position
-            local source = keywordData.source  -- "prefix" или "message"
+    -- Проверяем триггеры для префикса (если это ADDON-сообщение)
+    if addressPrefix and self.triggersByAddress[addressPrefix] then
+        for _, trigger in ipairs(self.triggersByAddress[addressPrefix]) do
+            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix) then
+                return  -- Прерываем дальнейшую обработку, если триггер выполнен
+            end
+        end
+    end
 
-            -- Определяем, где искать слово: в prefix или message
-            local words = (source == "prefix") and kodmsg or msg
+    -- Проверяем триггеры для сообщения
+    if self.triggersByAddress[addressMessage] then
+        for _, trigger in ipairs(self.triggersByAddress[addressMessage]) do
+            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix) then
+                return  -- Прерываем дальнейшую обработку, если триггер выполнен
+            end
+        end
+    end
+end
 
-            -- Проверяем, что слово на указанной позиции совпадает (регистрозависимо)
-            if not (words[position] and words[position] == word) then
-                keywordsMatch = false
+-- Метод для проверки триггера
+-- @param trigger: Триггер, который нужно проверить
+-- @param msg: Таблица слов из сообщения
+-- @param kodmsg: Таблица слов из префикса (для ADDON-сообщений)
+-- @param text: Полный текст сообщения
+-- @param sender: Имя отправителя
+-- @param channel: Канал сообщения
+-- @param prefix: Префикс сообщения (для ADDON-сообщений)
+-- @return: true, если дальнейшая обработка должна быть прервана, иначе false
+function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix)
+    local keywords = trigger.keyword
+    local funcName = trigger.func
+    local conditions = trigger.conditions or {}
+    local stopOnMatch = trigger.stopOnMatch or false  -- Параметр для прерывания обработки
+
+    -- Проверяем ключевые слова
+    local keywordsMatch = true
+    for _, keywordData in ipairs(keywords) do
+        local word = keywordData.word
+        local position = keywordData.position
+        local source = keywordData.source
+        local words = (source == "prefix") and kodmsg or msg
+
+        if not (words[position] and words[position] == word) then
+            keywordsMatch = false
+            break
+        end
+    end
+
+    -- Если ключевые слова совпали, проверяем условия
+    if keywordsMatch then
+        local allConditionsMet = true
+        for _, condition in ipairs(conditions) do
+            if type(condition) == "string" then
+                condition = _G[condition]
+            end
+
+            if type(condition) == "function" then
+                if not condition(text, sender, channel, prefix) then
+                    allConditionsMet = false
+                    break
+                end
+            else
+                print("Ошибка: условие не является функцией или именем функции.")
+                allConditionsMet = false
                 break
             end
         end
 
-        -- Если ключевые слова совпали, проверяем условия
-        if keywordsMatch then
-            local allConditionsMet = true
-            for _, condition in ipairs(conditions) do
-                -- Если условие — это строка, получаем функцию по имени
-                if type(condition) == "string" then
-                    condition = _G[condition]
+        -- Если все условия выполнены, вызываем функцию
+        if allConditionsMet then
+            local func = _G[funcName]
+            if func then
+                func(text, sender, channel, prefix)
+                if stopOnMatch then
+                    return true  -- Прерываем дальнейшую обработку
                 end
-
-                -- Если условие — это функция, вызываем её
-                if type(condition) == "function" then
-                    if not condition(text, sender, channel, prefix) then
-                        allConditionsMet = false
-                        break
-                    end
-                else
-                    print("Ошибка: условие не является функцией или именем функции.")
-                    allConditionsMet = false
-                    break
-                end
-            end
-
-            -- Если все условия выполнены, вызываем функцию
-            if allConditionsMet then
-                local func = _G[funcName]
-                if func then
-                    func(text, sender, channel, prefix)
-                else
-                    print("Ошибка: функция '" .. funcName .. "' не найдена.")
-                end
+            else
+                print("Ошибка: функция '" .. funcName .. "' не найдена.")
             end
         end
     end
+
+    return false  -- Продолжаем обработку
 end
