@@ -1,0 +1,14 @@
+# Ignore everything:
+*
+
+# Do not ignore these files:
+!libs/
+!libs/*
+!libs/UTF8/*
+!guild_chat.lua
+!functions.lua
+!NSQS.toc
+!.gitignore
+!classes.lua
+!main.lua
+!emblem.tga
