@@ -166,6 +166,18 @@ function set_miniButton()
     miniMapButton:SetPushedTexture("Interface\\AddOns\\NSQC\\emblem.tga")
     miniMapButton:SetHighlightTexture("Interface\\AddOns\\NSQC\\emblem.tga")
 
+    -- Добавляем обработчики для тултипа
+    miniMapButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText("NSQC - Настройки очереди", 1, 1, 1)  -- Белый цвет текста
+        GameTooltip:AddLine("ЛКМ - Открыть настройки", 0.5, 0.5, 0.5)  -- Серый цвет подсказки
+        GameTooltip:Show()
+    end)
+
+    miniMapButton:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+    end)
+
     -- Инициализация таблицы для сохранения позиции
     local position = {
         angle = 0,  -- Угол по умолчанию
@@ -180,27 +192,27 @@ function set_miniButton()
 
     -- Функция для обновления позиции иконки
     local function UpdateMapBtn()
-    local cursorX, cursorY = GetCursorPosition()
-    local minimapX, minimapY = Minimap:GetCenter()
-    local scale = Minimap:GetEffectiveScale()
+        local cursorX, cursorY = GetCursorPosition()
+        local minimapX, minimapY = Minimap:GetCenter()
+        local scale = Minimap:GetEffectiveScale()
 
-    -- Вычисляем координаты курсора относительно центра миникарты
-    local relativeX = (cursorX / scale) - minimapX
-    local relativeY = (cursorY / scale) - minimapY
+        -- Вычисляем координаты курсора относительно центра миникарты
+        local relativeX = (cursorX / scale) - minimapX
+        local relativeY = (cursorY / scale) - minimapY
 
-    -- Вычисляем угол относительно центра миникарты
-    position.angle = math.atan2(relativeY, relativeX)
+        -- Вычисляем угол относительно центра миникарты
+        position.angle = math.atan2(relativeY, relativeX)
 
-    -- Устанавливаем новую позицию иконки
-    miniMapButton:ClearAllPoints()
-    miniMapButton:SetPoint(
-        "CENTER",
-        Minimap,
-        "CENTER",
-        position.radius * math.cos(position.angle),
-        position.radius * math.sin(position.angle)
-    )
-end
+        -- Устанавливаем новую позицию иконки
+        miniMapButton:ClearAllPoints()
+        miniMapButton:SetPoint(
+            "CENTER",
+            Minimap,
+            "CENTER",
+            position.radius * math.cos(position.angle),
+            position.radius * math.sin(position.angle)
+        )
+    end
 
     -- Обработчик начала перемещения
     miniMapButton:RegisterForDrag("LeftButton")

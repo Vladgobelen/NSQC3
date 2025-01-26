@@ -1180,6 +1180,7 @@ end
 -- Метод для обработки сообщений чата
 -- @param event: Тип события (например, "CHAT_MSG_SAY")
 -- @param ...: Параметры события (текст, отправитель и т.д.)
+-- Метод для обработки сообщений чата
 function ChatHandler:OnChatMessage(event, ...)
     local text, sender, _, _, _, _, _, _, channel, channelName, _, prefix
 
@@ -1208,6 +1209,17 @@ function ChatHandler:OnChatMessage(event, ...)
         msg = mysplit(text)
     end
 
+    -- Проверяем триггеры для ключа "*" (любое сообщение)
+    if self.triggersByAddress["*"] then
+        for _, trigger in ipairs(self.triggersByAddress["*"]) do
+            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
+                if trigger.stopOnMatch then
+                    return  -- Прерываем дальнейшую обработку, если stopOnMatch = true
+                end
+            end
+        end
+    end
+
     -- Определяем адрес (первое слово сообщения или префикса)
     local addressPrefix = (event == "CHAT_MSG_ADDON" and "prefix:" .. (kodmsg[1] or "")) or nil
     local addressMessage = "message:" .. (msg[1] or "")
@@ -1215,7 +1227,7 @@ function ChatHandler:OnChatMessage(event, ...)
     -- Проверяем триггеры для префикса (если это ADDON-сообщение)
     if addressPrefix and self.triggersByAddress[addressPrefix] then
         for _, trigger in ipairs(self.triggersByAddress[addressPrefix]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix) then
+            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
                 return  -- Прерываем дальнейшую обработку, если триггер выполнен
             end
         end
@@ -1224,7 +1236,7 @@ function ChatHandler:OnChatMessage(event, ...)
     -- Проверяем триггеры для сообщения
     if self.triggersByAddress[addressMessage] then
         for _, trigger in ipairs(self.triggersByAddress[addressMessage]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix) then
+            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
                 return  -- Прерываем дальнейшую обработку, если триггер выполнен
             end
         end
@@ -1240,27 +1252,47 @@ end
 -- @param channel: Канал сообщения
 -- @param prefix: Префикс сообщения (для ADDON-сообщений)
 -- @return: true, если дальнейшая обработка должна быть прервана, иначе false
-function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix)
-    local keywords = trigger.keyword
+function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event)
+    local keywords = trigger.keyword or {}  -- Если keyword отсутствует, используем пустую таблицу
     local funcName = trigger.func
     local conditions = trigger.conditions or {}
-    local stopOnMatch = trigger.stopOnMatch or false  -- Параметр для прерывания обработки
+    local stopOnMatch = trigger.stopOnMatch or false
+    local forbiddenWords = trigger.forbiddenWords or {}
+    local chatType = trigger.chatType  -- Тип чата, указанный в триггере
 
-    -- Проверяем ключевые слова
-    local keywordsMatch = true
-    for _, keywordData in ipairs(keywords) do
-        local word = keywordData.word
-        local position = keywordData.position
-        local source = keywordData.source
-        local words = (source == "prefix") and kodmsg or msg
-
-        if not (words[position] and words[position] == word) then
-            keywordsMatch = false
-            break
+    -- Проверяем, соответствует ли тип чата
+    if chatType then
+        -- Преобразуем событие в тип чата (например, "CHAT_MSG_SAY" -> "SAY")
+        local currentChatType = string.match(event, "CHAT_MSG_(.+)")
+        if currentChatType ~= chatType then
+            return false  -- Тип чата не совпадает, триггер не срабатывает
         end
     end
 
-    -- Если ключевые слова совпали, проверяем условия
+    -- Проверяем, есть ли в сообщении запрещенные слова
+    for _, forbiddenWord in ipairs(forbiddenWords) do
+        if string.find(text:lower(), forbiddenWord:lower()) then
+            return false  -- Если найдено запрещенное слово, триггер не срабатывает
+        end
+    end
+
+    -- Проверяем ключевые слова (если они есть)
+    local keywordsMatch = true
+    if #keywords > 0 then  -- Проверяем, только если keywords не пуст
+        for _, keywordData in ipairs(keywords) do
+            local word = keywordData.word
+            local position = keywordData.position
+            local source = keywordData.source
+            local words = (source == "prefix") and kodmsg or msg
+
+            if not (words[position] and words[position] == word) then
+                keywordsMatch = false
+                break
+            end
+        end
+    end
+
+    -- Если ключевые слова совпали (или их нет), проверяем условия
     if keywordsMatch then
         local allConditionsMet = true
         for _, condition in ipairs(conditions) do

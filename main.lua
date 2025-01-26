@@ -15,12 +15,24 @@ f:SetScript("OnEvent", OnEvent)
 
 -- Таблица триггеров для обработки сообщений
 local triggersByAddress = {
+    ["*"] = {  -- Триггер для любого сообщения
+        {
+            func = "OnAnyMessageTrigger",  -- Функция для любого сообщения
+            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
+            conditions = {
+            },
+            chatType = "GUILD",
+            stopOnMatch = false,  -- Не прерывать обработку других триггеров
+            forbiddenWords = { "запрет", "стоп", "нельзя" }  -- Триггер не сработает, если в сообщении есть эти слова
+        }
+    },
     ["message:тест"] = {
         {
             keyword = {
                 { word = "тест", position = 1, source = "message" }
             },
             func = "OnTestTrigger",
+            chatType = "GUILD",
             stopOnMatch = true  -- Прервать обработку после этого триггера
         }
     },
@@ -34,11 +46,15 @@ local triggersByAddress = {
             conditions = {
                 function(text, sender, channel, prefix) return sender == "Хефе" end  -- Отправитель должен быть "Хефе"
             },
+            chatType = "ADDON",
             stopOnMatch = true  -- Прервать обработку после этого триггера
         }
     }
 }
 
+function OnAnyMessageTrigger()
+    print('111')
+end
 function OnTestTrigger(text, sender, channel, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
 end
