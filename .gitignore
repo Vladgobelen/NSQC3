@@ -5,13 +5,11 @@
 !libs/
 !libs/*
 !libs/UTF8/*
-!guild_chat.lua
 !functions.lua
 !NSQS.toc
 !.gitignore
 !classes.lua
 !main.lua
 !emblem.tga
-!addon_chat.lua
 !readme.md
 !example.lua
