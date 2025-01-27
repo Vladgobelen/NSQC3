@@ -1269,8 +1269,30 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
         end
     end
 
+    -- Собираем все запрещенные слова, включая те, что указаны в переменных
+    local allForbiddenWords = {}
+    for _, wordOrVar in ipairs(forbiddenWords) do
+        if type(wordOrVar) == "string" and wordOrVar:sub(1, 1) == "$" then
+            -- Это переменная, извлекаем её значение
+            local varName = wordOrVar:sub(2)  -- Убираем "$"
+            local varValue = _G[varName]  -- Получаем значение переменной из глобальной таблицы
+            if type(varValue) == "table" then
+                -- Если переменная содержит таблицу, добавляем все её элементы
+                for _, forbiddenWord in ipairs(varValue) do
+                    table.insert(allForbiddenWords, forbiddenWord)
+                end
+            elseif type(varValue) == "string" then
+                -- Если переменная содержит строку, добавляем её как одно слово
+                table.insert(allForbiddenWords, varValue)
+            end
+        else
+            -- Это обычное слово, добавляем его
+            table.insert(allForbiddenWords, wordOrVar)
+        end
+    end
+
     -- Проверяем, есть ли в сообщении запрещенные слова
-    for _, forbiddenWord in ipairs(forbiddenWords) do
+    for _, forbiddenWord in ipairs(allForbiddenWords) do
         if string.find(text:lower(), forbiddenWord:lower()) then
             return false  -- Если найдено запрещенное слово, триггер не срабатывает
         end
