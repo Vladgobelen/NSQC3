@@ -1750,7 +1750,7 @@ local function OnAddonLoaded(event, addonName)
         end
 
         -- Хук на клик по вкладкам
-        for i = 1, 2 do222222
+        for i = 1, 2 do
             local tab = _G["AchievementFrameTab" .. i]
             if tab then
                 tab:HookScript("OnClick", OnTabChanged)
