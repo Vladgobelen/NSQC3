@@ -341,7 +341,7 @@ function ButtonManager:new(name, parent, width, height, text, texture, parentFra
     
     -- Устанавливаем размер и текст кнопки
     button.frame:SetSize(width, height)
-    button.frame:SetText(text)
+    button:SetText(text)
 
     -- Делаем кнопку перемещаемой
     if parentFrame then
@@ -351,9 +351,53 @@ function ButtonManager:new(name, parent, width, height, text, texture, parentFra
     return button
 end
 
+function ButtonManager:SetTexture(texture, highlightTexture)
+    if texture then
+        self.frame:SetNormalTexture('Interface\\AddOns\\NSQC3\\libs\\' .. texture .. '.tga')
+    end
+    if highlightTexture then
+        self.frame:SetHighlightTexture('Interface\\AddOns\\NSQC3\\libs\\' .. highlightTexture .. '.tga') -- Устанавливаем текстуру подсветки
+    end
+end
+
 -- Метод для установки текста на кнопке
 function ButtonManager:SetText(text)
-    self.frame:SetText(text)
+    if texture then
+        self.frame:SetText(text)
+    else
+        local fontString = self.frame:GetFontString()
+        if not fontString then
+            fontString = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            self.frame:SetFontString(fontString)
+        end
+
+        -- Устанавливаем текст
+        fontString:SetText(text)
+
+        -- Получаем размеры кнопки
+        local buttonWidth, buttonHeight = self.frame:GetSize()
+
+        -- Начальный размер шрифта (60% от высоты кнопки)
+        local fontSize = math.floor(buttonHeight * 0.6)
+
+        -- Устанавливаем шрифт
+        fontString:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE", "MONOCHROME")
+
+        -- Проверяем, помещается ли текст в кнопку
+        while fontString:GetStringWidth() > buttonWidth and fontSize > 6 do
+            fontSize = fontSize - 1 -- Уменьшаем размер шрифта
+            fontString:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE", "MONOCHROME")
+        end
+
+        -- Выравниваем текст по центру кнопки
+        fontString:SetPoint("CENTER", self.frame, "CENTER", 0, 0) -- Центрируем текст
+        fontString:SetJustifyH("CENTER") -- Горизонтальное выравнивание по центру
+        fontString:SetJustifyV("MIDDLE") -- Вертикальное выравнивание по центру
+
+        -- Убедимся, что текст не выходит за границы кнопки
+        fontString:SetWordWrap(false) -- Отключаем перенос слов
+        fontString:SetNonSpaceWrap(false) -- Отключаем перенос по пробелам
+    end
 end
 
 -- Метод для установки текста на кнопке через FontString
@@ -408,18 +452,50 @@ function ButtonManager:SetSize(width, height)
     end
 end
 
+-- Метод для получения последних трех символов пути текстуры (с выбором типа текстуры)
+function ButtonManager:GetTxt(textureType)
+    local texture
+    if textureType == "N" then
+        texture = self.frame:GetNormalTexture()
+    elseif textureType == "P" then
+        texture = self.frame:GetPushedTexture()
+    elseif textureType == "H" then
+        texture = self.frame:GetHighlightTexture()
+    else
+        return "Неверный тип текстуры."
+    end
+
+    if texture then
+        local texturePath = texture:GetTexture()
+        if texturePath then
+            return texturePath:sub(-3)
+        else
+            return "Текстура не установлена."
+        end
+    else
+        return "Текстура не установлена."
+    end
+end
+
 -- Метод для перемещения кнопки
-function ButtonManager:SetMovable(parentFrame)
-    self.frame:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" then
-            parentFrame:StartMoving()
-        end
-    end)
-    self.frame:SetScript("OnMouseUp", function(self, button)
-        if button == "LeftButton" then
-            parentFrame:StopMovingOrSizing()
-        end
-    end)
+function ButtonManager:SetMovable(isMovable)
+    if isMovable then
+        -- Разрешаем перемещение кнопки
+        self.frame:SetMovable(true)
+        self.frame:RegisterForDrag("LeftButton") -- Разрешаем перетаскивание левой кнопкой мыши
+        self.frame:SetScript("OnDragStart", function(self)
+            self:StartMoving() -- Начинаем перемещение
+        end)
+        self.frame:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing() -- Завершаем перемещение
+        end)
+    else
+        -- Запрещаем перемещение кнопки
+        self.frame:SetMovable(false)
+        self.frame:RegisterForDrag(nil) -- Отключаем перетаскивание
+        self.frame:SetScript("OnDragStart", nil) -- Убираем обработчики
+        self.frame:SetScript("OnDragStop", nil)
+    end
 end
 
 -- Определяем класс AdaptiveFrame
@@ -550,6 +626,24 @@ function AdaptiveFrame:Create(parent, initialWidth, initialHeight)
 
     return frame
 end
+
+function AdaptiveFrame:new()
+    local private = {}
+
+    local obj = {
+        getArg = function(self, index)
+            return private[index]
+        end,
+        setArg = function(self, index, value)
+            private[index] = value
+        end
+    }
+
+    setmetatable(obj, self)
+    self.__index = self
+    return obj
+end
+
 
 -- Метод для изменения размера кнопок в зависимости от размера фрейма
 function AdaptiveFrame:ResizeButtons()
@@ -1130,11 +1224,6 @@ end
 -- Класс ChatHandler для обработки сообщений чата
 ChatHandler = {}
 ChatHandler.__index = ChatHandler
-
--- Конструктор класса ChatHandler
--- @param triggersByAddress: Ассоциативная таблица триггеров, сгруппированных по адресу
--- @param chatTypes: Типы чатов, которые нужно отслеживать (опционально)
--- @return: Новый объект ChatHandler
 function ChatHandler:new(triggersByAddress, chatTypes)
     local new_object = setmetatable({}, self)
     self.__index = self
@@ -1350,3 +1439,330 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
 
     return false  -- Продолжаем обработку
 end
+
+-- Класс CustomAchievements
+CustomAchievements = {}
+CustomAchievements.__index = CustomAchievements
+
+-- Конструктор
+function CustomAchievements:new(achievementsTable)
+    local obj = {
+        achievements = achievementsTable or {},  -- Таблица с ачивками
+        frame = nil,  -- Фрейм для отображения ачивок
+        buttons = {},  -- Таблица для хранения кнопок ачивок
+        tabCreated = false,  -- Флаг для отслеживания создания вкладки
+        nightWatchTab = nil,  -- Ссылка на вкладку "Ночная стража"
+        selectedButton = nil  -- Текущая выбранная ачивка
+    }
+    setmetatable(obj, self)
+    return obj
+end
+
+-- Метод для создания фрейма
+function CustomAchievements:CreateFrame(parent)
+    -- Создаем фрейм для отображения ачивок
+    self.frame = CreateFrame("Frame", nil, parent)
+    self.frame:SetSize(400, 500)
+    self.frame:SetPoint("CENTER")
+    self.frame:Hide()  -- Скрываем фрейм по умолчанию
+
+    -- Заголовок раздела
+    local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    title:SetText("Ночная стража")
+    title:SetPoint("TOP", self.frame, "TOP", 0, -10)
+
+    -- Создаем скроллфрейм вручную
+    self.achievementList = CreateFrame("ScrollFrame", nil, self.frame)
+    self.achievementList:SetSize(720, 450)  -- Ширина скроллфрейма
+    self.achievementList:SetPoint("TOP", title, "BOTTOM", 0, -10)
+
+    -- Контейнер для ачивок
+    self.achievementContainer = CreateFrame("Frame", nil, self.achievementList)
+    self.achievementContainer:SetSize(720, 450)  -- Ширина контейнера равна ширине скроллфрейма
+    self.achievementList:SetScrollChild(self.achievementContainer)
+
+    -- Устанавливаем слой для контейнера
+    self.achievementContainer:SetFrameStrata("MEDIUM")  -- Убедимся, что контейнер находится на верхнем слое
+
+    -- Добавляем текстуру для фона контейнера
+    local background = self.achievementContainer:CreateTexture(nil, "BACKGROUND")
+    background:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock")  -- Стандартная текстура
+    background:SetAllPoints(self.achievementContainer)  -- Растягиваем текстуру на весь контейнер
+    background:SetVertexColor(1, 1, 1, 1)  -- Устанавливаем цвет и прозрачность
+
+    -- Создаем скроллбар вручную
+    local scrollBar = CreateFrame("Slider", nil, self.achievementList, "UIPanelScrollBarTemplate")
+    scrollBar:SetPoint("TOPLEFT", self.achievementList, "TOPRIGHT", -20, -16)
+    scrollBar:SetPoint("BOTTOMLEFT", self.achievementList, "BOTTOMRIGHT", -20, 16)
+    scrollBar:SetWidth(16)
+    scrollBar:SetMinMaxValues(0, 100)
+    scrollBar:SetValueStep(1)
+    scrollBar:SetValue(0)
+
+    -- Настраиваем обработчик изменения значения скроллбара
+    scrollBar:SetScript("OnValueChanged", function(self, value)
+        self:GetParent():SetVerticalScroll(value)
+    end)
+
+    -- Настраиваем прокрутку колесом мыши
+    self.achievementList:SetScript("OnMouseWheel", function(self, delta)
+        local currentValue = scrollBar:GetValue()
+        scrollBar:SetValue(currentValue - delta * 20)
+    end)
+
+    -- Привязываем скроллбар к скроллфрейму
+    self.achievementList.scrollBar = scrollBar
+end
+
+-- Метод для добавления ачивки
+function CustomAchievements:AddAchievement(id, name, description, texture, progress)
+    -- Проверяем, существует ли ачивка с таким же ID
+    if self.achievements[id] then
+        return  -- Если ачивка уже существует, выходим
+    end
+
+    -- Добавляем ачивку в таблицу
+    self.achievements[id] = {
+        name = name,
+        description = description,
+        texture = texture,
+        progress = progress or 0
+    }
+
+    -- Обновляем интерфейс
+    self:UpdateUI()
+end
+
+-- Метод для обновления интерфейса
+function CustomAchievements:UpdateUI()
+    -- Проверяем, существует ли контейнер
+    if not self.achievementContainer then
+        return  -- Если контейнер не создан, выходим
+    end
+
+    -- Очищаем контейнер
+    for _, button in pairs(self.buttons) do
+        button:Hide()
+    end
+    self.buttons = {}
+
+    -- Если ачивок нет, показываем сообщение
+    if not next(self.achievements) then
+        local message = self.achievementContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        message:SetText("Ачивок пока нет.")
+        message:SetPoint("CENTER", self.achievementContainer, "CENTER", 0, 0)
+        return
+    end
+
+    -- Отображаем ачивки
+    local yOffset = 0  -- Начальное смещение по вертикали
+    local xOffset = -15  -- Начальное смещение по горизонтали
+    for id, achievement in pairs(self.achievements) do
+        local button = CreateFrame("Button", nil, self.achievementContainer)  -- Создаем кнопку для ачивки
+        button:SetSize(360, 50)
+        button:SetPoint("TOP", self.achievementContainer, "TOP", -xOffset, -yOffset)
+
+        -- Устанавливаем слой для кнопки ачивки
+        button:SetFrameStrata("HIGH")
+
+        -- Иконка ачивки
+        local icon = button:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(40, 40)
+        icon:SetPoint("LEFT", button, "LEFT", 5, 0)
+        icon:SetTexture(achievement.texture)
+
+        -- Название ачивки
+        local nameText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        nameText:SetText(achievement.name)
+        nameText:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+
+        -- Прогресс ачивки
+        local progressText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        progressText:SetText("Прогресс: " .. achievement.progress .. "%")
+        progressText:SetPoint("RIGHT", button, "RIGHT", 140, 0)
+
+        -- Подсветка при наведении
+        local highlight = button:CreateTexture(nil, "BACKGROUND")
+        highlight:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight2")  -- Текстура для подсветки
+        highlight:SetAllPoints(button)
+        highlight:SetAlpha(0)  -- Начально скрываем подсветку
+
+        -- Обработчик наведения курсора
+        button:SetScript("OnEnter", function()
+            highlight:SetAlpha(1)  -- Показываем подсветку
+            GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+            GameTooltip:SetText(achievement.name)
+            GameTooltip:AddLine(achievement.description, 1, 1, 1, true)
+            GameTooltip:AddLine("Прогресс: " .. achievement.progress .. "%", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+
+        -- Обработчик ухода курсора
+        button:SetScript("OnLeave", function()
+            if button ~= self.selectedButton then
+                highlight:SetAlpha(0)  -- Скрываем подсветку, если ачивка не выбрана
+            end
+            GameTooltip:Hide()
+        end)
+
+        -- Сохраняем ссылку на подсветку в кнопке
+        button.highlight = highlight
+
+        -- Сохраняем кнопку в таблице
+        self.buttons[id] = button
+
+        -- Скрываем кнопку сразу после создания
+        button:Hide()
+
+        yOffset = yOffset + 60  -- Увеличиваем смещение для следующей ачивки
+    end
+
+    -- Обновляем высоту контейнера в зависимости от количества ачивок
+    local totalHeight = yOffset + 60
+    self.achievementContainer:SetHeight(totalHeight)
+
+    -- Обновляем диапазон скроллбара
+    local scrollBar = self.achievementList.scrollBar
+    if scrollBar then
+        local scrollHeight = totalHeight - self.achievementList:GetHeight()
+        if scrollHeight < 0 then
+            scrollHeight = 0  -- Убедимся, что значение не отрицательное
+        end
+        scrollBar:SetMinMaxValues(0, scrollHeight)
+        scrollBar:SetValue(0)
+    end
+end
+
+-- Метод для скрытия ачивок
+function CustomAchievements:HideAchievements()
+    if self.frame then
+        self.frame:Hide()  -- Скрываем фрейм
+    end
+    for _, button in pairs(self.buttons) do
+        button:Hide()  -- Скрываем все кнопки ачивок
+    end
+end
+
+-- Метод для отображения ачивок
+function CustomAchievements:ShowAchievements()
+    for _, button in pairs(self.buttons) do
+        button:Show()  -- Показываем все кнопки ачивок
+    end
+end
+
+-- Метод для отображения фрейма
+function CustomAchievements:Show()
+    if self.frame then
+        self.frame:Show()
+        self:ShowAchievements()  -- Показываем ачивки, если фрейм видим
+    end
+end
+
+-- Метод для скрытия фрейма
+function CustomAchievements:Hide()
+    if self.frame then
+        self.frame:Hide()
+    end
+end
+
+-- Функция для создания третьей вкладки
+function CustomAchievements:CreateNightWatchTab()
+    -- Проверяем, существуют ли вкладки
+    if not AchievementFrameTab1 or not AchievementFrameTab2 then
+        return  -- Если вкладки не существуют, выходим
+    end
+
+    -- Создаем третью вкладку с уникальным именем
+    self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab3", AchievementFrame, "AchievementFrameTabButtonTemplate")
+    self.nightWatchTab:SetText("Ночная стража")
+
+    -- Привязываем новую вкладку к вкладке "Статистика"
+    self.nightWatchTab:SetPoint("LEFT", AchievementFrameTab2, "RIGHT", -6, 0)
+
+    -- Убедимся, что текст вкладки инициализирован
+    local fontString = self.nightWatchTab:GetFontString()
+    if fontString then
+        fontString:SetText("Ночная стража")
+    else
+        return  -- Если не удалось получить FontString, выходим
+    end
+
+    -- Автоматически подгоняем ширину вкладки под текст
+    PanelTemplates_TabResize(self.nightWatchTab, 0)
+
+    -- Обработчик клика для вкладки "Ночная стража"
+    self.nightWatchTab:SetScript("OnClick", function()
+        -- Скрываем стандартные разделы
+        AchievementFrameSummary:Hide()
+        AchievementFrameAchievements:Hide()
+        AchievementFrameStats:Hide()
+
+        -- Показываем наш кастомный фрейм
+        self:Show()
+
+        -- Показываем ачивки
+        self:ShowAchievements()
+
+        -- Обновляем состояние вкладок
+        PanelTemplates_SetTab(AchievementFrame, 3)
+    end)
+end
+
+-- Обработчик события ADDON_LOADED
+local function OnAddonLoaded(event, addonName)
+    -- Проверяем, загрузился ли аддон Blizzard_AchievementUI
+    if arg1 == "Blizzard_AchievementUI" then
+        -- Создаем фрейм, если он еще не создан
+        if not customAchievements.frame then
+            customAchievements:CreateFrame(AchievementFrame)
+        end
+
+        -- Навешиваем хук на событие OnShow для AchievementFrame
+        AchievementFrame:HookScript("OnShow", function()
+            -- Создаем кнопку только один раз
+            if not customAchievements.tabCreated then
+                customAchievements:CreateNightWatchTab()
+                customAchievements.tabCreated = true
+            end
+            -- Добавляем ачивки в раздел "Ночная стража"
+            for i = 1, 11 do
+                customAchievements:AddAchievement(
+                    i,  -- ID ачивки
+                    "Охотник на тени",  -- Название ачивки
+                    "Победите 100 теневых существ",  -- Описание ачивки
+                    "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                    50  -- Прогресс (в процентах)
+                )
+            end
+        end)
+
+        -- Отслеживаем закрытие окна достижений
+        AchievementFrame:HookScript("OnHide", function()
+            customAchievements:HideAchievements()  -- Скрываем ачивки при закрытии окна
+        end)
+
+        -- Отслеживаем переключение вкладок
+        local function OnTabChanged()
+            local selectedTab = PanelTemplates_GetSelectedTab(AchievementFrame)
+            if selectedTab ~= 3 then
+                customAchievements:HideAchievements()  -- Скрываем ачивки при переключении на другие вкладки
+            end
+        end
+
+        -- Хук на клик по вкладкам
+        for i = 1, 2 do222222
+            local tab = _G["AchievementFrameTab" .. i]
+            if tab then
+                tab:HookScript("OnClick", OnTabChanged)
+            end
+        end
+    end
+end
+
+-- Регистрируем обработчик события ADDON_LOADED
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("ADDON_LOADED")
+frame:SetScript("OnEvent", OnAddonLoaded)
+
+-- Создаем объект CustomAchievements
+customAchievements = CustomAchievements:new()

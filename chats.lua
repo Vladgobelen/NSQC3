@@ -21,21 +21,56 @@ local triggersByAddress = {
             stopOnMatch = true  -- Прервать обработку после этого триггера
         }
     },
-    ["prefix:MyAddon"] = {
+    ["prefix:nsqc_fld1"] = {
         {
             keyword = {
-                { word = "MyAddon", position = 1, source = "prefix" },
-                { word = "рейд", position = 2, source = "message" }
+                { word = "nsqc_fld1", position = 1, source = "prefix" },
             },
-            func = "OnAddonRaidTrigger",
+            func = "displayFld1",
             conditions = {
-                function(text, sender, channel, prefix) return sender == "Хефе" end  -- Отправитель должен быть "Хефе"
+                function(text, sender, channel, prefix)
+                    local kodMsg = mysplit(prefix)
+                    local myNome = GetUnitName("player")
+                    return kodMsg[2] == myNome
+                end
+            },
+            chatType = "ADDON",
+            stopOnMatch = true  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:nsqc_fld2"] = {
+        {
+            keyword = {
+                { word = "nsqc_fld2", position = 1, source = "prefix" },
+            },
+            func = "displayFld2",
+            conditions = {
+                function(text, sender, channel, prefix)
+                    local kodMsg = mysplit(prefix)
+                    local myNome = GetUnitName("player")
+                    return kodMsg[2] == myNome
+                end
             },
             chatType = "ADDON",
             stopOnMatch = true  -- Прервать обработку после этого триггера
         }
     }
 }
+
+function displayFld1(text, sender, channel, prefix)
+    mFld = AdaptiveFrame:new()
+    for i = 1, 50 do
+        mFld:setArg(i, text:sub((i*3)-2, i*3))
+        nsqc_fBtn[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+    end
+end
+function displayFld2(text, sender, channel, prefix)
+    for i = 1, 50 do
+        mFld:setArg(i+50, text:sub((i*3)-2, i*3))      
+        nsqc_fBtn[i+50]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+    end
+    fBtnFrame:Show()
+end
 
 function OnAnyTrigger()
     --print('111')
@@ -44,22 +79,9 @@ function OnTestTrigger(text, sender, channel, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
 end
 
-function OnAddonRaidTrigger(text, sender, channel, prefix)
-    SendChatMessage("Триггер 'MyAddon:рейд' сработал!", "GUILD")
-end
-
 -- Функция-условие: проверяет, является ли игрок лидером гильдии
 -- @return: true, если игрок является лидером гильдии, иначе false
-function IsGuildLeader()
-    local playerName = UnitName("player")  -- Получаем имя игрока
-    for i = 1, GetNumGuildMembers() do     -- Проходим по всем членам гильдии
-        local name, _, rankIndex = GetGuildRosterInfo(i)
-        if name == playerName then         -- Если имя совпадает с именем игрока
-            return rankIndex == 0          -- Проверяем, является ли игрок лидером (ранг 0)
-        end
-    end
-    return false  -- Если игрок не лидер гильдии
-end
+
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
 local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON"})

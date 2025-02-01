@@ -178,6 +178,11 @@ function set_miniButton()
         GameTooltip:Hide()
     end)
 
+    miniMapButton:SetScript("OnClick", function(self)
+        local myNome = GetUnitName("player")
+        SendAddonMessage("getFld " .. myNome .. " " .. myNome, "", "guild")
+    end)
+
     -- Инициализация таблицы для сохранения позиции
     local position = {
         angle = 0,  -- Угол по умолчанию
@@ -246,6 +251,122 @@ function set_miniButton()
     SetInitialPosition()  -- Устанавливаем начальную позицию
 end
 
+function CreateButtonsFromTable(buttonsTable)
+    for buttonName, buttonParams in pairs(buttonsTable) do
+        -- Создаем кнопку
+        local button = ButtonManager:new(
+            buttonName, -- Имя кнопки
+            buttonParams.parent, -- Родительский фрейм
+            buttonParams.size.width, -- Ширина
+            buttonParams.size.height, -- Высота
+            buttonParams.text, -- Текст
+            buttonParams.texture -- Текстура (если есть)
+        )
+
+        -- Устанавливаем позицию кнопки
+        if buttonParams.position then
+            button:SetPosition(
+                buttonParams.position[1], -- Точка привязки
+                buttonParams.position[2], -- Относительный фрейм
+                buttonParams.position[3], -- Относительная точка
+                buttonParams.position[4], -- Смещение по X
+                buttonParams.position[5]  -- Смещение по Y
+            )
+        end
+
+        -- Устанавливаем обработчик нажатия
+        if buttonParams.onClick then
+            button:SetOnClick(buttonParams.onClick)
+        end
+
+        -- Устанавливаем обработчик OnEnter, если он указан
+        if buttonParams.OnEnter then
+            button.frame:SetScript("OnEnter", buttonParams.OnEnter)
+            button.frame:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+        end
+
+        -- Делаем кнопку перемещаемой, если movable = true
+        if buttonParams.movable then
+            button:SetMovable(true)
+        else
+            button:SetMovable(false)
+        end
+    end
+end
+
+function IsGuildLeader()
+    local playerName = UnitName("player")  -- Получаем имя игрока
+    for i = 1, GetNumGuildMembers() do     -- Проходим по всем членам гильдии
+        local name, _, rankIndex = GetGuildRosterInfo(i)
+        if name == playerName then         -- Если имя совпадает с именем игрока
+            return rankIndex == 0          -- Проверяем, является ли игрок лидером (ранг 0)
+        end
+    end
+    return false  -- Если игрок не лидер гильдии
+end
+
+function createFld()
+    -- Создаем родительский фрейм
+    parentFrame = CreateFrame("Frame", nil, UIParent)
+    parentFrame:SetSize(800, 600)
+    parentFrame:SetPoint("CENTER")
+
+    --Создаем адаптивный фрейм
+    fBtnFrame = AdaptiveFrame:Create(parentFrame)
+    fBtnFrame:SetPoint("CENTER")
+
+    --Создаем 100 кнопок
+    nsqc_fBtn = {}
+    for i = 1, 100 do
+        nsqc_fBtn[i] = ButtonManager:new("Button" .. i, fBtnFrame, 64, 64, "", "")
+        --nsqc_fBtn[i]:SetTextT("|cffFF8C00" .. i)
+        --nsqc_fBtn[i]:SetTooltip("This is Button " .. i)
+    end
+
+    --Добавляем кнопки в сетку (10 кнопок в линии)
+    fBtnFrame:AddGrid(nsqc_fBtn, 100, 10, 0)
+
+    fBtnFrame:Hide()
+    -- Создаем фрейм для отслеживания движения
+    local movementFrame = CreateFrame("Frame")
+    movementFrame.targetAlpha = 1.0  -- Целевая прозрачность
+    movementFrame.currentAlpha = 1.0  -- Текущая прозрачность
+    movementFrame.alphaSpeed = 2.0  -- Скорость изменения прозрачности (чем больше, тем быстрее)
+
+    movementFrame:SetScript("OnUpdate", function(self, elapsed)
+        -- Получаем текущие координаты персонажа
+        local _, x, y = GetPlayerMapPosition("player")
+
+        -- Если координаты изменились, персонаж движется
+        if x ~= self.lastX or y ~= self.lastY then
+            if not self.isMoving then
+                -- Персонаж начал движение
+                self.isMoving = true
+                self.targetAlpha = 0.5 -- Устанавливаем целевую прозрачность 50%
+            end
+        else
+            if self.isMoving then
+                -- Персонаж остановился
+                self.isMoving = false
+                self.targetAlpha = 1.0  -- Устанавливаем целевую прозрачность 100%
+            end
+        end
+
+        -- Плавное изменение прозрачности
+        if self.currentAlpha ~= self.targetAlpha then
+            -- Вычисляем новое значение прозрачности
+            self.currentAlpha = self.currentAlpha + (self.targetAlpha - self.currentAlpha) * self.alphaSpeed * elapsed
+
+            -- Устанавливаем новую прозрачность
+            fBtnFrame:SetAlpha(self.currentAlpha)
+        end
+
+        -- Сохраняем текущие координаты для следующей проверки
+        self.lastX, self.lastY = x, y
+    end)
+end
 
 
 
@@ -258,6 +379,17 @@ end
 
 
 
+local lastName = nil -- Переменная для хранения предыдущего значения
 
+GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
+    if GuildMemberDetailFrame:IsVisible() then
+        local selectedName = GuildFrame.selectedName
+        if selectedName and selectedName ~= lastName then
+            lastName = selectedName -- Обновляем предыдущее значение
+            print("Имя изменилось на:", selectedName)
+            -- Ваш код для обработки изменения
+        end
+    end
+end)
 
 
