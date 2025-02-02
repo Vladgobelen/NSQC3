@@ -345,7 +345,46 @@ function createFld()
     end)
 end
 
+function setFrameAchiv()
+    -- Создаем объект CustomAchievements
+    customAchievements = CustomAchievements:new('nsqc3_ach')
+    -- Создаем фрейм, если он еще не создан
+    if not customAchievements.frame then
+        customAchievements:CreateFrame(AchievementFrame)
+    end
 
+    -- Навешиваем хук на событие OnShow для AchievementFrame
+    AchievementFrame:HookScript("OnShow", function()
+        -- Создаем кнопку только один раз
+        if not customAchievements.tabCreated then
+            customAchievements:CreateNightWatchTab()
+            customAchievements.tabCreated = true
+        end
+        
+    end)
+
+    -- Отслеживаем закрытие окна достижений
+    AchievementFrame:HookScript("OnHide", function()
+        customAchievements:HideAchievements()  -- Скрываем ачивки при закрытии окна
+    end)
+
+    -- Отслеживаем переключение вкладок
+    local function OnTabChanged()
+        local selectedTab = PanelTemplates_GetSelectedTab(AchievementFrame)
+        if selectedTab ~= 3 then
+            customAchievements:HideAchievements()  -- Скрываем ачивки при переключении на другие вкладки
+        end
+    end
+
+    -- Хук на клик по вкладкам
+    for i = 1, 2 do
+        local tab = _G["AchievementFrameTab" .. i]
+        if tab then
+            tab:HookScript("OnClick", OnTabChanged)
+        end
+    end
+    customAchievements:UpdateUI()
+end
 
 function test6()
     local button = AchievementFrameAchievementsContainer

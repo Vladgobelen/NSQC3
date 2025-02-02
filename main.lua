@@ -9,54 +9,18 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         createFld()
         nsqc3_ach = nsqc3_ach or {}
-        -- Создаем объект CustomAchievements
-        customAchievements = CustomAchievements:new('nsqc3_ach')
-
-        -- Добавляем ачивки в раздел "Ночная стража"
-            customAchievements:AddAchievement(
-                1,  -- ID ачивки
-                "Охотник на тени",  -- Название ачивки
-                "Победите 100 теневых существ",  -- Описание ачивки
-                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                100  -- Прогресс (в процентах)
-            )
-            customAchievements:AddAchievement(
-                2,  -- ID ачивки
-                "1Охотник на тени",  -- Название ачивки
-                "Победите 3 теневых существ",  -- Описание ачивки
-                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                3  -- Прогресс (в процентах)
-            )
-            customAchievements:AddAchievement(
-                3,  -- ID ачивки
-                "1Охотник на тени",  -- Название ачивки
-                "Победите 3 теневых существ",  -- Описание ачивки
-                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                3  -- Прогресс (в процентах)
-            )
-            customAchievements:AddAchievement(
-                4,  -- ID ачивки
-                "1Охотник на тени",  -- Название ачивки
-                "Победите 3 теневых существ",  -- Описание ачивки
-                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                3  -- Прогресс (в процентах)
-            )
-            customAchievements:AddAchievement(
-                5,  -- ID ачивки
-                "1Охотник на тени",  -- Название ачивки
-                "Победите 3 теневых существ",  -- Описание ачивки
-                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                3  -- Прогресс (в процентах)
-            )
-            customAchievements:AddAchievement(
-                6,  -- ID ачивки
-                "1Охотник на тени",  -- Название ачивки
-                "Победите 3 теневых существ",  -- Описание ачивки
-                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                3  -- Прогресс (в процентах)
-            )
     end
-    self:UnregisterEvent("ADDON_LOADED")
+    if arg1 == "Blizzard_AchievementUI" then
+        setFrameAchiv()
+        customAchievements:AddAchievement(
+            7,  -- ID ачивки
+            "Охотник на тениОхотник на тениОхотник на тени",  -- Название ачивки
+            "Победите 100 теневых существ",  -- Описание ачивки
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+            100  -- Прогресс (в процентах)
+        )
+    end
+    --self:UnregisterEvent("ADDON_LOADED")
 end
 
 -- Создаем фрейм и регистрируем событие PLAYER_ENTERING_WORLD

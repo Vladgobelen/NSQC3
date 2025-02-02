@@ -1537,7 +1537,6 @@ function CustomAchievements:AddAchievement(id, name, description, texture, progr
 end
 
 -- Метод для обновления интерфейса
--- Метод для обновления интерфейса
 function CustomAchievements:UpdateUI()
     -- Проверяем, существует ли контейнер
     if not self.achievementContainer then
@@ -1674,7 +1673,7 @@ function CustomAchievements:CreateNightWatchTab()
     if not AchievementFrameTab1 or not AchievementFrameTab2 then
         return  -- Если вкладки не существуют, выходим
     end
-    
+
     -- Создаем третью вкладку с уникальным именем
     self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab3", AchievementFrame, "AchievementFrameTabButtonTemplate")
     self.nightWatchTab:SetText("Ночная стража")
@@ -1713,49 +1712,6 @@ function CustomAchievements:CreateNightWatchTab()
         -- Обновляем состояние вкладок
         PanelTemplates_SetTab(AchievementFrame, 3)
     end)
-end
-
--- Обработчик события ADDON_LOADED
-local function OnAddonLoaded(event, addonName)
-    -- Проверяем, загрузился ли аддон Blizzard_AchievementUI
-    if arg1 == "Blizzard_AchievementUI" then
-        -- Создаем фрейм, если он еще не создан
-        if not customAchievements.frame then
-            customAchievements:CreateFrame(AchievementFrame)
-        end
-
-        -- Навешиваем хук на событие OnShow для AchievementFrame
-        AchievementFrame:HookScript("OnShow", function()
-            -- Создаем кнопку только один раз
-            if not customAchievements.tabCreated then
-                customAchievements:CreateNightWatchTab()
-                customAchievements.tabCreated = true
-            end
-            
-        end)
-
-        -- Отслеживаем закрытие окна достижений
-        AchievementFrame:HookScript("OnHide", function()
-            customAchievements:HideAchievements()  -- Скрываем ачивки при закрытии окна
-        end)
-
-        -- Отслеживаем переключение вкладок
-        local function OnTabChanged()
-            local selectedTab = PanelTemplates_GetSelectedTab(AchievementFrame)
-            if selectedTab ~= 3 then
-                customAchievements:HideAchievements()  -- Скрываем ачивки при переключении на другие вкладки
-            end
-        end
-
-        -- Хук на клик по вкладкам
-        for i = 1, 2 do
-            local tab = _G["AchievementFrameTab" .. i]
-            if tab then
-                tab:HookScript("OnClick", OnTabChanged)
-            end
-        end
-        customAchievements:UpdateUI()
-    end
 end
 
 function CustomAchievements:CreateCustomAlertFrame()
@@ -1807,40 +1763,8 @@ function CustomAchievements:CreateCustomAlertFrame()
         -- Устанавливаем новый размер фрейма
         self:SetSize(frameWidth, frameHeight)
     end
-
-    -- Анимация исчезновения
-    alertFrame.animOut = alertFrame:CreateAnimationGroup()
-    alertFrame.animOut:SetScript("OnPlay", function()
-        alertFrame:SetAlpha(1)  -- Начальная прозрачность
-    end)
-    alertFrame.animOut:SetScript("OnUpdate", function(self, elapsed)
-        local currentAlpha = alertFrame:GetAlpha()
-        if currentAlpha > 0 then
-            alertFrame:SetAlpha(currentAlpha - elapsed * 2)  -- Плавное исчезновение
-        else
-            alertFrame:SetAlpha(0)
-            alertFrame:Hide()  -- Скрываем фрейм
-            self:Stop()  -- Останавливаем анимацию
-            print("Анимация исчезновения завершена, фрейм скрыт")
-        end
-    end)
-
-    -- Таймер для автоматического скрытия
-    alertFrame.timer = 0
-    alertFrame:SetScript("OnUpdate", function(self, elapsed)
-        if self.timer > 0 then
-            self.timer = self.timer - elapsed
-            if self.timer <= 0 then
-                self.animOut:Play()  -- Запускаем анимацию исчезновения
-                self.timer = 0  -- Сбрасываем таймер
-            end
-        end
-    end)
-
-    alertFrame:Hide()
     return alertFrame
 end
-
 
 -- Метод для отображения уведомления о новой ачивке
 function CustomAchievements:ShowAchievementAlert(achievementID)
@@ -1892,11 +1816,5 @@ function CustomAchievements:ShowAchievementAlert(achievementID)
         end
     end)
 end
-
-
--- Регистрируем обработчик события ADDON_LOADED
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:SetScript("OnEvent", OnAddonLoaded)
 
 
