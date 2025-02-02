@@ -1439,359 +1439,383 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
     return false  -- Продолжаем обработку
 end
 
--- Класс CustomAchievements
+--[[
+    Класс для работы с кастомными достижениями
+    Автор: [Ваше имя]
+    Версия: 1.0
+    Дата: [Текущая дата]
+--]]
+
 CustomAchievements = {}
 CustomAchievements.__index = CustomAchievements
 
+-- Константы
+local DEFAULT_ICON_SIZE = 40
+local REWARD_ICON_SIZE = 48
+local COLLAPSED_HEIGHT = 50
+local EXPANDED_BASE_HEIGHT = 100
+local SCROLL_BAR_WIDTH = 16
+local TOOLTIP_ANCHOR = "ANCHOR_RIGHT"
+local MAX_ICONS_PER_ROW = 10
+
+-- Текстуры
+local TEXTURE_BACKGROUND = "Interface\\FrameGeneral\\UI-Background-Rock"
+local TEXTURE_HIGHLIGHT = "Interface\\Buttons\\UI-Listbox-Highlight"
+local TEXTURE_INCOMPLETE = "Interface\\AchievementFrame\\UI-Achievement-Parchment-Horizontal-Desaturated"
+local TEXTURE_COMPLETE = "Interface\\AchievementFrame\\UI-Achievement-AchievementBackground"
+local TEXTURE_SHIELD = "Interface\\AchievementFrame\\UI-Achievement-Shields"
+
+-- Вспомогательные функции
+local function CreateFontString(parent, template, justify)
+    local fs = parent:CreateFontString(nil, "OVERLAY", template)
+    fs:SetJustifyH(justify or "LEFT")
+    return fs
+end
+
+local function CreateTexture(parent, layer, texture)
+    local tex = parent:CreateTexture(nil, layer)
+    tex:SetTexture(texture)
+    return tex
+end
+
 -- Конструктор
 function CustomAchievements:new(achievementsTable)
-    -- Проверяем, является ли achievementsTable таблицей
-    print(_G[achievementsTable], '123')
-    _G[achievementsTable] = _G[achievementsTable] or {}
     local obj = {
-        achievements = _G[achievementsTable],  -- Таблица с ачивками
-        frame = nil,  -- Фрейм для отображения ачивок
-        buttons = {},  -- Таблица для хранения кнопок ачивок
-        tabCreated = false,  -- Флаг для отслеживания создания вкладки
-        nightWatchTab = nil,  -- Ссылка на вкладку "Ночная стража"
-        selectedButton = nil  -- Текущая выбранная ачивка
+        achievements = _G[achievementsTable] or {},
+        frame = nil,
+        buttons = {},
+        tabCreated = false,
+        nightWatchTab = nil,
+        selectedButton = nil,
+        customAlertFrame = nil
     }
     setmetatable(obj, self)
     return obj
 end
 
--- Метод для создания фрейма
+-- Создание основного фрейма
 function CustomAchievements:CreateFrame(parent)
-    -- Создаем фрейм для отображения ачивок
     self.frame = CreateFrame("Frame", nil, parent)
     self.frame:SetSize(400, 500)
     self.frame:SetPoint("CENTER")
-    self.frame:Hide()  -- Скрываем фрейм по умолчанию
+    self.frame:Hide()
 
-    -- Заголовок раздела
+    -- Заголовок
     local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOP", self.frame, "TOP", 0, -10)
+    title:SetPoint("TOP", 0, -10)
 
-    -- Создаем скроллфрейм вручную
+    -- Скроллируемая область
     self.achievementList = CreateFrame("ScrollFrame", nil, self.frame)
-    self.achievementList:SetSize(720, 450)  -- Ширина скроллфрейма
+    self.achievementList:SetSize(720, 450)
     self.achievementList:SetPoint("TOP", title, "BOTTOM", 0, -10)
 
-    -- Контейнер для ачивок
+    -- Контейнер для элементов
     self.achievementContainer = CreateFrame("Frame", nil, self.achievementList)
-    self.achievementContainer:SetSize(720, 450)  -- Ширина контейнера равна ширине скроллфрейма
+    self.achievementContainer:SetSize(720, 450)
     self.achievementList:SetScrollChild(self.achievementContainer)
 
-    -- Устанавливаем слой для контейнера
-    self.achievementContainer:SetFrameStrata("MEDIUM")  -- Убедимся, что контейнер находится на верхнем слое
+    -- Фон
+    local background = CreateTexture(self.achievementContainer, "BACKGROUND", TEXTURE_BACKGROUND)
+    background:SetAllPoints()
+    background:SetVertexColor(1, 1, 1, 1)
 
-    -- Добавляем текстуру для фона контейнера
-    local background = self.achievementContainer:CreateTexture(nil, "BACKGROUND")
-    background:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock")  -- Стандартная текстура
-    background:SetAllPoints(self.achievementContainer)  -- Растягиваем текстуру на весь контейнер
-    background:SetVertexColor(1, 1, 1, 1)  -- Устанавливаем цвет и прозрачность
-
-    -- Создаем скроллбар вручную
+    -- Скроллбар
     local scrollBar = CreateFrame("Slider", nil, self.achievementList, "UIPanelScrollBarTemplate")
     scrollBar:SetPoint("TOPLEFT", self.achievementList, "TOPRIGHT", -20, -16)
     scrollBar:SetPoint("BOTTOMLEFT", self.achievementList, "BOTTOMRIGHT", -20, 16)
-    scrollBar:SetWidth(16)
-    scrollBar:SetMinMaxValues(0, 100)
+    scrollBar:SetWidth(SCROLL_BAR_WIDTH)
     scrollBar:SetValueStep(1)
-    scrollBar:SetValue(0)
-    scrollBar:SetFrameStrata("DIALOG")  -- Высокий слой (над большинством элементов)
-
-    -- Настраиваем обработчик изменения значения скроллбара
-    scrollBar:SetScript("OnValueChanged", function(self, value)
-        self:GetParent():SetVerticalScroll(value)
-    end)
-
-    -- Настраиваем прокрутку колесом мыши
-    self.achievementList:SetScript("OnMouseWheel", function(self, delta)
-        local currentValue = scrollBar:GetValue()
-        scrollBar:SetValue(currentValue - delta * 20)
-    end)
-
-    -- Привязываем скроллбар к скроллфрейму
+    scrollBar:SetFrameStrata("DIALOG")
+    scrollBar:SetScript("OnValueChanged", function(s, value) s:GetParent():SetVerticalScroll(value) end)
+    
     self.achievementList.scrollBar = scrollBar
+    self.achievementList:SetScript("OnMouseWheel", function(_, delta)
+        scrollBar:SetValue(scrollBar:GetValue() - delta * 20)
+    end)
 end
 
--- Метод для добавления ачивки
+-- Добавление достижения
 function CustomAchievements:AddAchievement(id, name, description, texture, progress, dateEarned, dateCompleted, rewardPoints, requiredAchievements)
-    -- Проверяем, существует ли ачивка с таким же ID
-    if self.achievements[id] then
-        return  -- Если ачивка уже существует, выходим
-    end
+    if self.achievements[id] then return end
 
-    -- Добавляем ачивку в таблицу
     self.achievements[id] = {
         name = name,
         description = description,
         texture = texture,
         progress = progress or 0,
-        dateEarned = dateEarned or "Не получена",  -- Дата получения
-        dateCompleted = dateCompleted or "Не выполнена",  -- Дата выполнения на 100%
-        rewardPoints = rewardPoints or 0,  -- Очки награды
-        requiredAchievements = requiredAchievements or {},  -- Вложенные ачивки
-        isExpanded = false,  -- По умолчанию кнопка свернута
-        -- Координаты для свернутого состояния
+        dateEarned = dateEarned or "Не получена",
+        dateCompleted = dateCompleted or "Не выполнена",
+        rewardPoints = rewardPoints or 0,
+        requiredAchievements = requiredAchievements or {},
+        isExpanded = false,
         collapsedPositions = {
-            icon = { x = 5, y = 0 },  -- Иконка
-            name = { x = 50, y = -5 },  -- Заголовок
-            date = { x = 300, y = -5 },  -- Дата (справа от заголовка)
-            rewardPoints = { x = 440, y = -5 },  -- Иконка очков
+            icon = {x = 5, y = 0},
+            name = {x = 50, y = -5},
+            date = {x = 300, y = -5},
+            rewardPoints = {x = 440, y = -5}
         },
-        -- Координаты для развернутого состояния
         expandedPositions = {
-            icon = { x = 5, y = 0 },  -- Иконка
-            name = { x = 50, y = -5 },  -- Заголовок
-            description = { x = 50, y = -25 },  -- Описание
-            date = { x = 300, y = -5 },  -- Дата (справа от заголовка)
-            rewardPoints = { x = 440, y = -5 },  -- Иконка очков
-            requiredAchievements = { x = 50, y = -50 },  -- Вложенные ачивки
+            icon = {x = 5, y = 0},
+            name = {x = 50, y = -5},
+            description = {x = 50, y = -25},
+            date = {x = 300, y = -5},
+            rewardPoints = {x = 440, y = -5},
+            requiredAchievements = {x = 50, y = -50}
         }
     }
 
-    -- Обновляем интерфейс
     self:UpdateUI()
     self:ShowAchievementAlert(id)
 end
 
--- Метод для обновления интерфейса
+-- Обновление интерфейса
 function CustomAchievements:UpdateUI()
-    -- Проверяем, существует ли контейнер
-    if not self.achievementContainer then
-        return  -- Если контейнер не создан, выходим
-    end
+    if not self.achievementContainer then return end
 
-    -- Очищаем контейнер перед обновлением
+    -- Очистка предыдущих элементов
     for _, child in ipairs({self.achievementContainer:GetChildren()}) do
-        child:Hide()  -- Скрываем все дочерние элементы
-        child:ClearAllPoints()  -- Очищаем привязки
-        child:SetParent(nil)  -- Убираем родителя
+        child:Hide()
+        child:ClearAllPoints()
+        child:SetParent(nil)
     end
 
-    self.buttons = {}  -- Очищаем таблицу кнопок
+    self.buttons = {}
+    local yOffset = 0
 
-    -- Отображаем ачивки
-    local yOffset = 0  -- Начальное смещение по вертикали
     for id, achievement in pairs(self.achievements) do
-        local button = CreateFrame("Button", nil, self.achievementContainer)  -- Создаем кнопку для ачивки
-        button:SetSize(510, 50)  -- Начальная высота кнопки
-        button:SetPoint("TOP", self.achievementContainer, "TOP", 100, -yOffset)
-
-        -- Сохраняем позицию ачивки на скроллбаре
-        achievement.scrollPosition = yOffset
-
-        -- Устанавливаем слой для кнопки ачивки
-        button:SetFrameStrata("HIGH")
-
-        -- Иконка ачивки
-        local icon = button:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(40, 40)
-        icon:SetTexture(achievement.texture)
-
-        -- Название ачивки
-        local nameText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        nameText:SetText(achievement.name)
-
-        -- Дата (справа от заголовка)
-        local dateText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        dateText:SetText(achievement.dateEarned)  -- По умолчанию показываем дату получения
-
-        -- Иконка очков награды
-        local rewardPointsIcon = button:CreateTexture(nil, "ARTWORK")
-        rewardPointsIcon:SetSize(48, 48)
-        rewardPointsIcon:SetTexture("Interface\\AchievementFrame\\UI-Achievement-Shields")  -- Иконка очков
-
-        -- Устанавливаем текстуру в зависимости от выполнения ачивки
-        if achievement.progress == 100 then
-            rewardPointsIcon:SetTexCoord(0, 0.5, 0, 1)  -- Ачивка выполнена
-        else
-            rewardPointsIcon:SetTexCoord(0.5, 1, 0, 1)  -- Ачивка не выполнена
-        end
-
-        -- Текст очков награды (в центре иконки)
-        local rewardPointsText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        rewardPointsText:SetText(achievement.rewardPoints)
-        rewardPointsText:SetPoint("CENTER", rewardPointsIcon, "CENTER", 0, 0)  -- Центрируем текст на иконке
-
-        -- Краткое описание ачивки (видно только в развернутом состоянии)
-        local descriptionText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        descriptionText:SetText(achievement.description)
-        descriptionText:SetJustifyH("LEFT")
-        descriptionText:Hide()  -- По умолчанию скрываем
-
-        -- Подсветка при наведении
-        local highlight = button:CreateTexture(nil, "BACKGROUND")
-        highlight:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight")  -- Текстура для подсветки
-        highlight:SetAllPoints(button)
-        highlight:SetAlpha(0)  -- Начально скрываем подсветку
-
-        -- Текстура для фона кнопки (зависит от прогресса)
-        local normal = button:CreateTexture(nil, "BACKGROUND")
-        if achievement.progress < 100 then
-            normal:SetTexture("Interface\\AchievementFrame\\UI-Achievement-Parchment-Horizontal-Desaturated")  -- Текстура для незавершенных ачивок
-        else
-            normal:SetTexture("Interface\\AchievementFrame\\UI-Achievement-AchievementBackground")  -- Текстура для завершенных ачивок
-        end
-        normal:SetAllPoints(button)
-        normal:SetAlpha(1)  -- Показываем текстуру фона
-
-        -- Обработчик наведения курсора на кнопку
-        button:SetScript("OnEnter", function()
-            highlight:SetAlpha(1)  -- Показываем подсветку
-            normal:SetAlpha(0)  -- Скрываем текстуру фона
-
-            -- Показываем тултип с датами
-            GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Дата получения: " .. achievement.dateEarned)
-            if achievement.dateCompleted ~= "Не выполнена" then
-                GameTooltip:AddLine("Выполнено: " .. achievement.dateCompleted)
-            end
-            GameTooltip:Show()
-        end)
-
-        button:SetScript("OnLeave", function()
-            if button ~= self.selectedButton then
-                highlight:SetAlpha(0)  -- Скрываем подсветку, если ачивка не выбрана
-                normal:SetAlpha(1)  -- Показываем текстуру фона
-            end
-            GameTooltip:Hide()
-        end)
-
-        -- Обработчик клика для сворачивания/разворачивания
-        button:SetScript("OnClick", function()
-            achievement.isExpanded = not achievement.isExpanded
-            
-            -- Сохраняем текущее значение скроллбара перед обновлением интерфейса
-            local scrollBarValue = self.achievementList.scrollBar:GetValue()
-            self:UpdateUI()  -- Обновляем интерфейс
-            
-            -- Восстанавливаем значение скроллбара после обновления интерфейса
-            self.achievementList.scrollBar:SetValue(scrollBarValue)
-        end)
-
-        -- Сохраняем ссылки на элементы кнопки
-        button.icon = icon
-        button.nameText = nameText
-        button.dateText = dateText
-        button.rewardPointsIcon = rewardPointsIcon
-        button.rewardPointsText = rewardPointsText
-        button.descriptionText = descriptionText
-        button.highlight = highlight
-        button.normal = normal
-
-        -- Сохраняем кнопку в таблице
-        self.buttons[id] = button
-
-        -- Обновляем позиции элементов в зависимости от состояния
-        if achievement.isExpanded then
-            -- Развернутое состояние
-            icon:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.expandedPositions.icon.x, achievement.expandedPositions.icon.y)
-            nameText:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.expandedPositions.name.x, achievement.expandedPositions.name.y)
-            dateText:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.expandedPositions.date.x, achievement.expandedPositions.date.y)
-            rewardPointsIcon:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.expandedPositions.rewardPoints.x, achievement.expandedPositions.rewardPoints.y)
-            descriptionText:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.expandedPositions.description.x, achievement.expandedPositions.description.y)
-            descriptionText:Show()
-
-            -- Отображаем вложенные ачивки
-            local requiredYOffset = -80  -- Смещение для вложенных ачивок
-            local requiredXOffset = 50   -- Смещение по горизонтали для вложенных ачивок
-            local iconsPerRow = 10       -- Количество иконок в ряду
-            local iconSize = 30          -- Размер иконки
-            local iconSpacing = 5        -- Расстояние между иконками
-
-            for i, reqId in ipairs(achievement.requiredAchievements) do
-                local reqAchievement = self.achievements[reqId]
-                if reqAchievement then
-                    -- Создаем кнопку для вложенной иконки
-                    local reqIconButton = CreateFrame("Button", nil, button)
-                    reqIconButton:SetSize(iconSize, iconSize)
-                    reqIconButton:SetPoint(
-                        "TOPLEFT",
-                        button,
-                        "TOPLEFT",
-                        achievement.expandedPositions.requiredAchievements.x + ((i - 1) % iconsPerRow) * (iconSize + iconSpacing),
-                        requiredYOffset - math.floor((i - 1) / iconsPerRow) * (iconSize + iconSpacing)
-                    )
-
-                    -- Добавляем текстуру в кнопку
-                    local reqIcon = reqIconButton:CreateTexture(nil, "ARTWORK")
-                    reqIcon:SetAllPoints(reqIconButton)
-                    reqIcon:SetTexture(reqAchievement.texture)
-
-                    -- Затемняем иконку, если ачивка не выполнена
-                    if reqAchievement.progress < 100 then
-                        reqIcon:SetDesaturated(true)  -- Затемняем иконку
-                    end
-
-                    -- Обработчик клика на вложенную иконку
-                    reqIconButton:SetScript("OnMouseDown", function()
-                        -- Сворачиваем все ачивки
-                        for _, ach in pairs(self.achievements) do
-                            ach.isExpanded = false
-                        end
-
-                        -- Разворачиваем нужную ачивку
-                        self.achievements[reqId].isExpanded = true
-
-                        -- Обновляем интерфейс
-                        self:UpdateUI()
-
-                        -- Прокручиваем к позиции нужной ачивки
-                        local scrollBar = self.achievementList.scrollBar
-                        scrollBar:SetValue(self.achievements[reqId].scrollPosition or 0)
-                    end)
-
-                    -- Обработчик наведения курсора на вложенную иконку
-                    reqIconButton:SetScript("OnEnter", function()
-                        GameTooltip:SetOwner(reqIconButton, "ANCHOR_RIGHT")
-                        GameTooltip:SetText(reqAchievement.name)
-                        GameTooltip:AddLine(reqAchievement.description, 1, 1, 1, true)
-                        GameTooltip:AddLine("Дата получения: " .. reqAchievement.dateEarned, 1, 1, 1)
-                        if reqAchievement.dateCompleted ~= "Не выполнена" then
-                            GameTooltip:AddLine("Выполнено: " .. reqAchievement.dateCompleted, 1, 1, 1)
-                        end
-                        GameTooltip:Show()
-                    end)
-
-                    reqIconButton:SetScript("OnLeave", function()
-                        GameTooltip:Hide()
-                    end)
-                end
-            end
-
-            -- Увеличиваем высоту кнопки в зависимости от количества рядов вложенных ачивок
-            local numRows = math.ceil(#achievement.requiredAchievements / iconsPerRow)
-            button:SetHeight(100 + numRows * (iconSize + iconSpacing))
-        else
-            -- Свернутое состояние
-            icon:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.collapsedPositions.icon.x, achievement.collapsedPositions.icon.y)
-            nameText:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.collapsedPositions.name.x, achievement.collapsedPositions.name.y)
-            dateText:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.collapsedPositions.date.x, achievement.collapsedPositions.date.y)
-            rewardPointsIcon:SetPoint("TOPLEFT", button, "TOPLEFT", achievement.collapsedPositions.rewardPoints.x, achievement.collapsedPositions.rewardPoints.y)
-            descriptionText:Hide()
-            button:SetHeight(50)  -- Возвращаем стандартную высоту
-        end
-
-        yOffset = yOffset + button:GetHeight()  -- Увеличиваем смещение для следующей ачивки
+        local button = self:CreateAchievementButton(id, achievement, yOffset)
+        yOffset = yOffset + button:GetHeight()
     end
 
-    -- Обновляем высоту контейнера в зависимости от количества ачивок
-    local totalHeight = yOffset + 60
-    self.achievementContainer:SetHeight(totalHeight)
+    -- Обновляем скроллируемую область
+    self:UpdateScrollArea(yOffset)
+end
 
-    -- Обновляем диапазон скроллбара
+-- Обновление скроллинга
+function CustomAchievements:UpdateScrollArea(totalHeight)
     local scrollBar = self.achievementList.scrollBar
+    local containerHeight = totalHeight + 60
+    
+    -- Обновляем высоту контейнера
+    self.achievementContainer:SetHeight(containerHeight)
+    
+    -- Обновляем скроллбар
     if scrollBar then
-        local scrollHeight = totalHeight - self.achievementList:GetHeight()
-        if scrollHeight < 0 then
-            scrollHeight = 0  -- Убедимся, что значение не отрицательное
-        end
-        scrollBar:SetMinMaxValues(0, scrollHeight)
+        local scrollHeight = containerHeight - self.achievementList:GetHeight()
+        scrollBar:SetMinMaxValues(0, math.max(0, scrollHeight))
         scrollBar:SetValue(0)
     end
+end
+
+-- Создание кнопки достижения
+function CustomAchievements:CreateAchievementButton(id, achievement, yOffset)
+    local button = CreateFrame("Button", nil, self.achievementContainer)
+    button:SetSize(510, COLLAPSED_HEIGHT)
+    button:SetPoint("TOP", self.achievementContainer, "TOP", 100, -yOffset)
+    
+    -- Сохранение позиции для скролла
+    achievement.scrollPosition = yOffset
+
+    -- Базовые элементы
+    self:AddCommonElements(button, achievement)
+    self:AddDynamicElements(button, achievement)
+    self:SetupInteractivity(button, achievement)
+
+    self.buttons[id] = button
+    return button
+end
+
+-- Добавление статических элементов
+function CustomAchievements:AddCommonElements(button, achievement)
+    -- Иконка
+    local icon = CreateTexture(button, "ARTWORK", achievement.texture)
+    icon:SetSize(DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE)
+    icon:SetPoint("TOPLEFT", achievement.collapsedPositions.icon.x, achievement.collapsedPositions.icon.y)
+    button.icon = icon
+
+    -- Название
+    button.nameText = CreateFontString(button, "GameFontHighlight")
+    button.nameText:SetPoint("TOPLEFT", icon, "RIGHT", 10, 0)
+    button.nameText:SetText(achievement.name)
+
+    -- Дата
+    button.dateText = CreateFontString(button, "GameFontNormal")
+    button.dateText:SetPoint("TOPLEFT", achievement.collapsedPositions.date.x, achievement.collapsedPositions.date.y)
+    button.dateText:SetText(achievement.dateEarned)
+
+    -- Иконка очков
+    button.rewardPointsIcon = CreateTexture(button, "ARTWORK", TEXTURE_SHIELD)
+    button.rewardPointsIcon:SetSize(REWARD_ICON_SIZE, REWARD_ICON_SIZE)
+    button.rewardPointsIcon:SetPoint("TOPLEFT", achievement.collapsedPositions.rewardPoints.x, achievement.collapsedPositions.rewardPoints.y)
+    
+    if achievement.progress == 100 then
+        button.rewardPointsIcon:SetTexCoord(0, 0.5, 0, 1)
+    else
+        button.rewardPointsIcon:SetTexCoord(0.5, 1, 0, 1)
+    end
+
+    -- Текст очков
+    button.rewardPointsText = CreateFontString(button, "GameFontNormal")
+    button.rewardPointsText:SetPoint("CENTER", button.rewardPointsIcon)
+    button.rewardPointsText:SetText(achievement.rewardPoints)
+end
+
+-- Добавление динамических элементов
+function CustomAchievements:AddDynamicElements(button, achievement)
+    -- Описание
+    button.descriptionText = CreateFontString(button, "GameFontNormal")
+    button.descriptionText:SetText(achievement.description)
+    button.descriptionText:Hide()
+
+    -- Подсветка
+    button.highlight = CreateTexture(button, "BACKGROUND", TEXTURE_HIGHLIGHT)
+    button.highlight:SetAllPoints()
+    button.highlight:SetAlpha(0)
+
+    -- Фон
+    button.normal = CreateTexture(button, "BACKGROUND", 
+        achievement.progress < 100 and TEXTURE_INCOMPLETE or TEXTURE_COMPLETE)
+    button.normal:SetAllPoints()
+    button.normal:SetAlpha(1)
+end
+
+-- Настройка интерактивности
+function CustomAchievements:SetupInteractivity(button, achievement)
+    -- Обработчики событий
+    button:SetScript("OnEnter", function()
+        button.highlight:SetAlpha(1)
+        button.normal:SetAlpha(0)
+        self:ShowAchievementTooltip(button, achievement)
+    end)
+
+    button:SetScript("OnLeave", function()
+        if button ~= self.selectedButton then
+            button.highlight:SetAlpha(0)
+            button.normal:SetAlpha(1)
+        end
+        GameTooltip:Hide()
+    end)
+
+    button:SetScript("OnClick", function()
+        achievement.isExpanded = not achievement.isExpanded
+        local scrollBarValue = self.achievementList.scrollBar:GetValue()
+        self:UpdateUI()
+        self.achievementList.scrollBar:SetValue(scrollBarValue)
+    end)
+
+    -- Обработка развернутого состояния
+    if achievement.isExpanded then
+        self:ExpandAchievement(button, achievement)
+    end
+end
+
+-- Показать тултип достижения
+function CustomAchievements:ShowAchievementTooltip(button, achievement)
+    GameTooltip:SetOwner(button, TOOLTIP_ANCHOR)
+    GameTooltip:SetText(achievement.name)
+    GameTooltip:AddLine(achievement.description, 1, 1, 1, true)
+    GameTooltip:AddLine("Дата получения: "..achievement.dateEarned)
+    
+    if achievement.dateCompleted ~= "Не выполнена" then
+        GameTooltip:AddLine("Выполнено: "..achievement.dateCompleted)
+    end
+    
+    GameTooltip:Show()
+end
+
+-- Развернуть достижение
+function CustomAchievements:ExpandAchievement(button, achievement)
+    -- Позиционирование элементов с явным указанием координат
+    button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 
+        achievement.expandedPositions.icon.x, 
+        achievement.expandedPositions.icon.y)
+    
+    button.nameText:SetPoint("TOPLEFT", button, "TOPLEFT", 
+        achievement.expandedPositions.name.x, 
+        achievement.expandedPositions.name.y)
+    
+    button.dateText:SetPoint("TOPLEFT", button, "TOPLEFT", 
+        achievement.expandedPositions.date.x, 
+        achievement.expandedPositions.date.y)
+    
+    button.rewardPointsIcon:SetPoint("TOPLEFT", button, "TOPLEFT", 
+        achievement.expandedPositions.rewardPoints.x, 
+        achievement.expandedPositions.rewardPoints.y)
+    
+    button.descriptionText:SetPoint("TOPLEFT", button, "TOPLEFT", 
+        achievement.expandedPositions.description.x, 
+        achievement.expandedPositions.description.y)
+    button.descriptionText:Show()
+
+    -- Вложенные достижения
+    local requiredYOffset = -80
+    local iconSize = 30
+    local iconSpacing = 5
+    
+    for i, reqId in ipairs(achievement.requiredAchievements) do
+        local reqAchievement = self.achievements[reqId]
+        if reqAchievement then
+            self:CreateNestedAchievementIcon(button, reqAchievement, i, 
+                achievement.expandedPositions.requiredAchievements.x,
+                requiredYOffset, iconSize, iconSpacing)
+        end
+    end
+
+    -- Высота кнопки
+    local numRows = math.ceil(#achievement.requiredAchievements / MAX_ICONS_PER_ROW)
+    button:SetHeight(EXPANDED_BASE_HEIGHT + numRows * (iconSize + iconSpacing))
+end
+
+-- Создание иконки вложенного достижения
+function CustomAchievements:CreateNestedAchievementIcon(parent, achievement, index, x, y, size, spacing)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(size, size)
+    
+    local col = (index - 1) % MAX_ICONS_PER_ROW
+    local row = math.floor((index - 1) / MAX_ICONS_PER_ROW)
+    
+    button:SetPoint("TOPLEFT", parent, "TOPLEFT", 
+        x + col * (size + spacing), 
+        y - row * (size + spacing)
+    )
+
+    local icon = CreateTexture(button, "ARTWORK", achievement.texture)
+    icon:SetAllPoints()
+    
+    if achievement.progress < 100 then
+        icon:SetDesaturated(true)
+    end
+
+    -- Обработчики событий
+    button:SetScript("OnMouseDown", function()
+        self:NavigateToAchievement(achievement)
+    end)
+
+    button:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+        GameTooltip:SetText(achievement.name)
+        GameTooltip:AddLine(achievement.description, 1, 1, 1, true)
+        GameTooltip:AddLine("Дата получения: " .. achievement.dateEarned)
+        if achievement.dateCompleted ~= "Не выполнена" then
+            GameTooltip:AddLine("Выполнено: " .. achievement.dateCompleted)
+        end
+        GameTooltip:Show()
+    end)
+
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+end
+
+-- Навигация к достижению
+function CustomAchievements:NavigateToAchievement(achievement)
+    for _, ach in pairs(self.achievements) do
+        ach.isExpanded = false
+    end
+    
+    achievement.isExpanded = true
+    self:UpdateUI()
+    self.achievementList.scrollBar:SetValue(achievement.scrollPosition or 0)
 end
 
 -- Метод для перехода к ачивке
