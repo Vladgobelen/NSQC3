@@ -1580,6 +1580,9 @@ function CustomAchievements:UpdateUI()
         button:SetSize(510, 50)  -- Начальная высота кнопки
         button:SetPoint("TOP", self.achievementContainer, "TOP", 100, -yOffset)
 
+        -- Сохраняем позицию ачивки на скроллбаре
+        achievement.scrollPosition = yOffset
+
         -- Устанавливаем слой для кнопки ачивки
         button:SetFrameStrata("HIGH")
 
@@ -1725,9 +1728,20 @@ function CustomAchievements:UpdateUI()
 
                     -- Обработчик клика на вложенную иконку
                     reqIconButton:SetScript("OnMouseDown", function()
-                        self:ScrollToAchievement(reqId)  -- Переходим к ачивке
-                        self.achievements[reqId].isExpanded = true  -- Разворачиваем ачивку
-                        self:UpdateUI()  -- Обновляем интерфейс
+                        -- Сворачиваем все ачивки
+                        for _, ach in pairs(self.achievements) do
+                            ach.isExpanded = false
+                        end
+
+                        -- Разворачиваем нужную ачивку
+                        self.achievements[reqId].isExpanded = true
+
+                        -- Обновляем интерфейс
+                        self:UpdateUI()
+
+                        -- Прокручиваем к позиции нужной ачивки
+                        local scrollBar = self.achievementList.scrollBar
+                        scrollBar:SetValue(self.achievements[reqId].scrollPosition or 0)
                     end)
 
                     -- Обработчик наведения курсора на вложенную иконку
