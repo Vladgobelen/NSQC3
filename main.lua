@@ -13,11 +13,135 @@ local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "Blizzard_AchievementUI" then
         setFrameAchiv()
         customAchievements:AddAchievement(
-            7,  -- ID ачивки
-            "Охотник на тениОхотник на тениОхотник на тени",  -- Название ачивки
-            "Победите 100 теневых существ",  -- Описание ачивки
-            "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-            100  -- Прогресс (в процентах)
+            1,
+            "Охотник на тени1",
+            "Победите 100 теневых существ\nДополнительная строка\nЕще одна строка",
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            100,
+            "2023-10-01",
+            "2023-10-05",
+            100
+        )
+        customAchievements:AddAchievement(
+            2,
+            "Охотник на тени2",
+            "Победите 100 теневых существ\nДополнительная строка\nЕще одна строка",
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            10,
+            "2023-10-01",
+            nil,
+            100
+        )
+        customAchievements:AddAchievement(
+            3,
+            "Охотник на тени1",
+            "Победите 100 теневых существ\nДополнительная строка\nЕще одна строка",
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            88,
+            "2023-10-01",
+            nil,
+            150
+        )
+        customAchievements:AddAchievement(
+            4,
+            "Охотник на тени1",
+            "Победите 100 теневых существ\nДополнительная строка\nЕще одна строка",
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            100,
+            "2023-10-01",
+            "2023-10-05",
+            100
+        )
+        customAchievements:AddAchievement(
+            5, 
+            "Охотник на тени5", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            6, 
+            "Охотник на тени6", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            7, 
+            "Охотник на тени7", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            8, 
+            "Охотник на тени8", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            9, 
+            "Охотник на тени9", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            10, 
+            "Охотник на тени10", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            11, 
+            "Охотник на тени11", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            50, 
+            "2023-10-01", 
+            nil, 
+            60
+        )
+        customAchievements:AddAchievement(
+            12, 
+            "Охотник на тени12", 
+            "Победите 100 теневых существ\nстрока номер два с описанием", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            100, 
+            "2023-10-01", 
+            "2023-10-01", 
+            60
+        )
+        customAchievements:AddAchievement(
+            13, 
+            "Получи первые ачивки13", 
+            "Все", 
+            "Interface\\Icons\\Ability_Rogue_ShadowStrikes", 
+            12, 
+            "2023-10-01", 
+            nil, 
+            300,
+            { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 }  -- Вложенные ачивки с ID 2 и 3
         )
     end
     --self:UnregisterEvent("ADDON_LOADED")

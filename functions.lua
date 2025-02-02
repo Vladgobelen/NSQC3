@@ -346,7 +346,7 @@ function createFld()
 end
 
 function setFrameAchiv()
-    -- Создаем объект CustomAchievements
+    -- Создаем объект CustomAchievements:ShowAchievementAlert(id)
     customAchievements = CustomAchievements:new('nsqc3_ach')
     -- Создаем фрейм, если он еще не создан
     if not customAchievements.frame then
@@ -438,25 +438,6 @@ end)
 
 
 
--- Функция для отправки сообщения в чат
-function SendAchievementMessage()
-    local achievementID = 2156  -- Замените на реальный ID ачивки
-    local playerGUID = UnitGUID("player")  -- GUID игрока
-    local isComplete = true  -- Указываем, что ачивка выполнена
-    local month = 12
-    local day = 31
-    local year = 2023
-    local criteria = "4294967295"  -- Параметры для критериев (обычно используется "4294967295" для всех критериев)
-
-    -- Создаем ссылку на ачивку
-    local achievementLink = CreateAchievementLink(achievementID, playerGUID, isComplete, month, day, year, criteria)
-
-    -- Формируем полное сообщение
-    local message = achievementLink .. " тест"
-
-    -- Отправляем сообщение в офицерский чат
-    SendChatMessage(message, "OFFICER")
-end
 
 
 
