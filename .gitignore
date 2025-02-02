@@ -6,7 +6,7 @@
 !libs/*
 !libs/UTF8/*
 !functions.lua
-!NSQS.toc
+!NSQC3.toc
 !.gitignore
 !classes.lua
 !main.lua

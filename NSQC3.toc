@@ -1,0 +1,14 @@
+## interface: 30300
+## Title: NSQC3
+## Notes: NSQC3
+## Author: Vladgobelen
+## Version: 3.0
+## SavedVariables: nsDbc, nsqc_fld, nsqc_quests, nsqc3_ach
+##SavedVariablesPerCharacter: 
+
+main.lua
+libs/
+functions.lua
+classes.lua
+emblem.tga
+chats.lua
