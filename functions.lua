@@ -105,11 +105,31 @@ function log(...)
 end
 
 function unixToDate(unixTime)
-    -- Unix-время начинается с 1 января 1970 года
-    local secondsInDay = 86400  -- Количество секунд в сутках
-    local daysSinceEpoch = math.floor(unixTime / secondsInDay)
-    local date = os.date("*t", unixTime)  -- Получаем таблицу с датой
-    return string.format("%04d-%02d-%02d %02d:%02d:%02d", date.year, date.month, date.day, date.hour, date.min, date.sec)
+    -- Проверяем, что unixTime является числом
+    if type(unixTime) ~= "number" then
+        return "Invalid input"
+    end
+
+    -- Получаем текущее время в формате таблицы
+    local dateTable = date("*t", unixTime)
+
+    -- Проверяем, что dateTable успешно создана
+    if not dateTable then
+        return "Invalid Unix time"
+    end
+
+    -- Форматируем дату и время в строку
+    local formattedDate = string.format(
+        "%04d-%02d-%02d %02d:%02d:%02d",
+        dateTable.year,
+        dateTable.month,
+        dateTable.day,
+        dateTable.hour,
+        dateTable.min,
+        dateTable.sec
+    )
+
+    return formattedDate
 end
 
 function NSQCMenu()
@@ -251,50 +271,7 @@ function set_miniButton()
     SetInitialPosition()  -- Устанавливаем начальную позицию
 end
 
-function CreateButtonsFromTable(buttonsTable)
-    for buttonName, buttonParams in pairs(buttonsTable) do
-        -- Создаем кнопку
-        local button = ButtonManager:new(
-            buttonName, -- Имя кнопки
-            buttonParams.parent, -- Родительский фрейм
-            buttonParams.size.width, -- Ширина
-            buttonParams.size.height, -- Высота
-            buttonParams.text, -- Текст
-            buttonParams.texture -- Текстура (если есть)
-        )
 
-        -- Устанавливаем позицию кнопки
-        if buttonParams.position then
-            button:SetPosition(
-                buttonParams.position[1], -- Точка привязки
-                buttonParams.position[2], -- Относительный фрейм
-                buttonParams.position[3], -- Относительная точка
-                buttonParams.position[4], -- Смещение по X
-                buttonParams.position[5]  -- Смещение по Y
-            )
-        end
-
-        -- Устанавливаем обработчик нажатия
-        if buttonParams.onClick then
-            button:SetOnClick(buttonParams.onClick)
-        end
-
-        -- Устанавливаем обработчик OnEnter, если он указан
-        if buttonParams.OnEnter then
-            button.frame:SetScript("OnEnter", buttonParams.OnEnter)
-            button.frame:SetScript("OnLeave", function()
-                GameTooltip:Hide()
-            end)
-        end
-
-        -- Делаем кнопку перемещаемой, если movable = true
-        if buttonParams.movable then
-            button:SetMovable(true)
-        else
-            button:SetMovable(false)
-        end
-    end
-end
 
 function IsGuildLeader()
     local playerName = UnitName("player")  -- Получаем имя игрока
@@ -370,8 +347,33 @@ end
 
 
 
-
-
+function test6()
+    local button = AchievementFrameAchievementsContainer
+    if button and button.icon and button.icon.texture then
+        local texturePath = button.icon.texture:GetTexture()
+        print("Текстура иконки:", texturePath)
+    else
+        print("Текстура иконки не найдена.")
+    end
+    local button = AchievementFrameAchievementsContainerButton1
+    if button then
+        local backdrop = button:GetBackdrop()
+        if backdrop and backdrop.bgFile then
+            print("Текстура фона кнопки:", backdrop.bgFile)
+        else
+            print("Текстура фона кнопки не найдена.")
+        end
+    else
+        print("Кнопка не найдена.")
+    end
+    local button = AchievementFrameAchievementsContainerButton1
+    if button and button.shield and button.shield.texture then
+        local shieldTexture = button.shield.texture:GetTexture()
+        print("Текстура щита:", shieldTexture)
+    else
+        print("Текстура щита не найдена.")
+    end
+end
 
 
 
@@ -391,5 +393,31 @@ GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
         end
     end
 end)
+
+
+
+
+
+
+-- Функция для отправки сообщения в чат
+function SendAchievementMessage()
+    local achievementID = 2156  -- Замените на реальный ID ачивки
+    local playerGUID = UnitGUID("player")  -- GUID игрока
+    local isComplete = true  -- Указываем, что ачивка выполнена
+    local month = 12
+    local day = 31
+    local year = 2023
+    local criteria = "4294967295"  -- Параметры для критериев (обычно используется "4294967295" для всех критериев)
+
+    -- Создаем ссылку на ачивку
+    local achievementLink = CreateAchievementLink(achievementID, playerGUID, isComplete, month, day, year, criteria)
+
+    -- Формируем полное сообщение
+    local message = achievementLink .. " тест"
+
+    -- Отправляем сообщение в офицерский чат
+    SendChatMessage(message, "OFFICER")
+end
+
 
 

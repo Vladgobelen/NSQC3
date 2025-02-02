@@ -323,7 +323,6 @@ ButtonManager.__index = ButtonManager
 -- Конструктор для создания новой кнопки
 function ButtonManager:new(name, parent, width, height, text, texture, parentFrame)
     local button = setmetatable({}, ButtonManager)
-    
     -- Создаем фрейм кнопки
     if texture then
         button.frame = CreateFrame("Button", name, parent)
@@ -1446,8 +1445,11 @@ CustomAchievements.__index = CustomAchievements
 
 -- Конструктор
 function CustomAchievements:new(achievementsTable)
+    -- Проверяем, является ли achievementsTable таблицей
+    print(_G[achievementsTable], '123')
+    _G[achievementsTable] = _G[achievementsTable] or {}
     local obj = {
-        achievements = achievementsTable or {},  -- Таблица с ачивками
+        achievements = _G[achievementsTable],  -- Таблица с ачивками
         frame = nil,  -- Фрейм для отображения ачивок
         buttons = {},  -- Таблица для хранения кнопок ачивок
         tabCreated = false,  -- Флаг для отслеживания создания вкладки
@@ -1468,7 +1470,6 @@ function CustomAchievements:CreateFrame(parent)
 
     -- Заголовок раздела
     local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetText("Ночная стража")
     title:SetPoint("TOP", self.frame, "TOP", 0, -10)
 
     -- Создаем скроллфрейм вручную
@@ -1498,6 +1499,7 @@ function CustomAchievements:CreateFrame(parent)
     scrollBar:SetMinMaxValues(0, 100)
     scrollBar:SetValueStep(1)
     scrollBar:SetValue(0)
+    scrollBar:SetFrameStrata("DIALOG")  -- Высокий слой (над большинством элементов)
 
     -- Настраиваем обработчик изменения значения скроллбара
     scrollBar:SetScript("OnValueChanged", function(self, value)
@@ -1522,44 +1524,33 @@ function CustomAchievements:AddAchievement(id, name, description, texture, progr
     end
 
     -- Добавляем ачивку в таблицу
-    self.achievements[id] = {
-        name = name,
-        description = description,
-        texture = texture,
-        progress = progress or 0
-    }
-
+    self.achievements[id] = {}
+    self.achievements[id]["name"] = name
+    self.achievements[id]["description"] = description
+    self.achievements[id]["texture"] = texture
+    self.achievements[id]["progress"] = progress or 0
     -- Обновляем интерфейс
-    self:UpdateUI()
+    self:UpdateUI(self.achievements[1]['name'])
+
+    -- Показываем анимацию получения ачивки
+    --self:ShowAchievementAlert(id)
 end
 
+-- Метод для обновления интерфейса
 -- Метод для обновления интерфейса
 function CustomAchievements:UpdateUI()
     -- Проверяем, существует ли контейнер
     if not self.achievementContainer then
         return  -- Если контейнер не создан, выходим
     end
-
-    -- Очищаем контейнер
-    for _, button in pairs(self.buttons) do
-        button:Hide()
-    end
     self.buttons = {}
-
-    -- Если ачивок нет, показываем сообщение
-    if not next(self.achievements) then
-        local message = self.achievementContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        message:SetText("Ачивок пока нет.")
-        message:SetPoint("CENTER", self.achievementContainer, "CENTER", 0, 0)
-        return
-    end
 
     -- Отображаем ачивки
     local yOffset = 0  -- Начальное смещение по вертикали
-    local xOffset = -15  -- Начальное смещение по горизонтали
+    local xOffset = -100  -- Начальное смещение по горизонтали
     for id, achievement in pairs(self.achievements) do
         local button = CreateFrame("Button", nil, self.achievementContainer)  -- Создаем кнопку для ачивки
-        button:SetSize(360, 50)
+        button:SetSize(510, 50)
         button:SetPoint("TOP", self.achievementContainer, "TOP", -xOffset, -yOffset)
 
         -- Устанавливаем слой для кнопки ачивки
@@ -1579,17 +1570,28 @@ function CustomAchievements:UpdateUI()
         -- Прогресс ачивки
         local progressText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         progressText:SetText("Прогресс: " .. achievement.progress .. "%")
-        progressText:SetPoint("RIGHT", button, "RIGHT", 140, 0)
+        progressText:SetPoint("RIGHT", button, "RIGHT", -40, 0)
 
         -- Подсветка при наведении
         local highlight = button:CreateTexture(nil, "BACKGROUND")
-        highlight:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight2")  -- Текстура для подсветки
+        highlight:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight")  -- Текстура для подсветки
         highlight:SetAllPoints(button)
         highlight:SetAlpha(0)  -- Начально скрываем подсветку
+
+        -- Текстура для фона кнопки (зависит от прогресса)
+        local normal = button:CreateTexture(nil, "BACKGROUND")
+        if achievement.progress < 100 then
+            normal:SetTexture("Interface\\AchievementFrame\\UI-Achievement-Parchment-Horizontal-Desaturated")  -- Текстура для незавершенных ачивок
+        else
+            normal:SetTexture("Interface\\AchievementFrame\\UI-Achievement-AchievementBackground")  -- Текстура для завершенных ачивок
+        end
+        normal:SetAllPoints(button)
+        normal:SetAlpha(1)  -- Показываем текстуру фона
 
         -- Обработчик наведения курсора
         button:SetScript("OnEnter", function()
             highlight:SetAlpha(1)  -- Показываем подсветку
+            normal:SetAlpha(0)  -- Скрываем текстуру фона
             GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
             GameTooltip:SetText(achievement.name)
             GameTooltip:AddLine(achievement.description, 1, 1, 1, true)
@@ -1601,6 +1603,7 @@ function CustomAchievements:UpdateUI()
         button:SetScript("OnLeave", function()
             if button ~= self.selectedButton then
                 highlight:SetAlpha(0)  -- Скрываем подсветку, если ачивка не выбрана
+                normal:SetAlpha(1)  -- Показываем текстуру фона
             end
             GameTooltip:Hide()
         end)
@@ -1614,7 +1617,7 @@ function CustomAchievements:UpdateUI()
         -- Скрываем кнопку сразу после создания
         button:Hide()
 
-        yOffset = yOffset + 60  -- Увеличиваем смещение для следующей ачивки
+        yOffset = yOffset + 50  -- Увеличиваем смещение для следующей ачивки
     end
 
     -- Обновляем высоту контейнера в зависимости от количества ачивок
@@ -1671,7 +1674,7 @@ function CustomAchievements:CreateNightWatchTab()
     if not AchievementFrameTab1 or not AchievementFrameTab2 then
         return  -- Если вкладки не существуют, выходим
     end
-
+    
     -- Создаем третью вкладку с уникальным именем
     self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab3", AchievementFrame, "AchievementFrameTabButtonTemplate")
     self.nightWatchTab:SetText("Ночная стража")
@@ -1696,7 +1699,11 @@ function CustomAchievements:CreateNightWatchTab()
         AchievementFrameSummary:Hide()
         AchievementFrameAchievements:Hide()
         AchievementFrameStats:Hide()
-
+        for i = 1, 10 do
+            if _G['AchievementFrameCategoriesContainerButton'..i] then
+                _G['AchievementFrameCategoriesContainerButton'..i]:Hide()
+            end
+        end
         -- Показываем наш кастомный фрейм
         self:Show()
 
@@ -1724,16 +1731,7 @@ local function OnAddonLoaded(event, addonName)
                 customAchievements:CreateNightWatchTab()
                 customAchievements.tabCreated = true
             end
-            -- Добавляем ачивки в раздел "Ночная стража"
-            for i = 1, 11 do
-                customAchievements:AddAchievement(
-                    i,  -- ID ачивки
-                    "Охотник на тени",  -- Название ачивки
-                    "Победите 100 теневых существ",  -- Описание ачивки
-                    "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
-                    50  -- Прогресс (в процентах)
-                )
-            end
+            
         end)
 
         -- Отслеживаем закрытие окна достижений
@@ -1756,13 +1754,149 @@ local function OnAddonLoaded(event, addonName)
                 tab:HookScript("OnClick", OnTabChanged)
             end
         end
+        customAchievements:UpdateUI()
     end
 end
+
+function CustomAchievements:CreateCustomAlertFrame()
+    local alertFrame = CreateFrame("Frame", "CustomAchievementAlertFrame", UIParent)
+    alertFrame:SetFrameStrata("DIALOG")  -- Высокий слой
+    alertFrame:SetFrameLevel(100)  -- Высокий уровень
+    alertFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+    alertFrame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    alertFrame:SetBackdropColor(0, 0, 0, 0.8)
+    alertFrame:SetAlpha(1)  -- Начальная прозрачность
+
+    -- Иконка ачивки
+    alertFrame.Icon = alertFrame:CreateTexture(nil, "ARTWORK")
+    alertFrame.Icon:SetSize(40, 40)
+    alertFrame.Icon:SetPoint("LEFT", alertFrame, "LEFT", 10, 0)
+    alertFrame.Icon:SetTexture("Interface\\Icons\\Ability_Rogue_ShadowStrikes")
+
+    -- Текст названия ачивки
+    alertFrame.Name = alertFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    alertFrame.Name:SetPoint("TOPLEFT", alertFrame.Icon, "TOPRIGHT", 10, 0)  -- Отступ от иконки
+    alertFrame.Name:SetJustifyH("LEFT")  -- Выравнивание по левому краю
+    alertFrame.Name:SetText("Название ачивки")
+
+    -- Текст описания ачивки (многострочный)
+    alertFrame.Description = alertFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    alertFrame.Description:SetPoint("TOPLEFT", alertFrame.Name, "BOTTOMLEFT", 0, -5)  -- Отступ от названия
+    alertFrame.Description:SetJustifyH("LEFT")  -- Выравнивание по левому краю
+    alertFrame.Description:SetText("Описание ачивки")
+
+    -- Функция для обновления размера фрейма
+    alertFrame.UpdateSize = function(self)
+        -- Рассчитываем ширину текста
+        local nameWidth = self.Name:GetStringWidth()
+        local descriptionWidth = self.Description:GetStringWidth()
+        local maxTextWidth = math.max(nameWidth, descriptionWidth)
+
+        -- Минимальная ширина фрейма (чтобы он не был слишком узким)
+        local minWidth = 300
+        local frameWidth = math.max(minWidth, maxTextWidth + 70)  -- 60 = отступы (иконка + паддинги)
+
+        -- Рассчитываем высоту фрейма
+        local frameHeight = self.Name:GetHeight() + self.Description:GetHeight() + 30  -- Отступы
+
+        -- Устанавливаем новый размер фрейма
+        self:SetSize(frameWidth, frameHeight)
+    end
+
+    -- Анимация исчезновения
+    alertFrame.animOut = alertFrame:CreateAnimationGroup()
+    alertFrame.animOut:SetScript("OnPlay", function()
+        alertFrame:SetAlpha(1)  -- Начальная прозрачность
+    end)
+    alertFrame.animOut:SetScript("OnUpdate", function(self, elapsed)
+        local currentAlpha = alertFrame:GetAlpha()
+        if currentAlpha > 0 then
+            alertFrame:SetAlpha(currentAlpha - elapsed * 2)  -- Плавное исчезновение
+        else
+            alertFrame:SetAlpha(0)
+            alertFrame:Hide()  -- Скрываем фрейм
+            self:Stop()  -- Останавливаем анимацию
+            print("Анимация исчезновения завершена, фрейм скрыт")
+        end
+    end)
+
+    -- Таймер для автоматического скрытия
+    alertFrame.timer = 0
+    alertFrame:SetScript("OnUpdate", function(self, elapsed)
+        if self.timer > 0 then
+            self.timer = self.timer - elapsed
+            if self.timer <= 0 then
+                self.animOut:Play()  -- Запускаем анимацию исчезновения
+                self.timer = 0  -- Сбрасываем таймер
+            end
+        end
+    end)
+
+    alertFrame:Hide()
+    return alertFrame
+end
+
+
+-- Метод для отображения уведомления о новой ачивке
+function CustomAchievements:ShowAchievementAlert(achievementID)
+    -- Проверяем, существует ли таблица achievements
+
+    -- Получаем данные ачивки
+    local achievement = self.achievements[achievementID]
+    if not achievement then
+        print("Ачивка с ID " .. achievementID .. " не найдена.")
+        return
+    end
+
+    -- Создаем или используем кастомный фрейм
+    if not self.customAlertFrame then
+        self.customAlertFrame = self:CreateCustomAlertFrame()
+    end
+
+    -- Устанавливаем данные ачивки
+    self.customAlertFrame.Name:SetText(achievement.name)
+    self.customAlertFrame.Description:SetText(achievement.description)
+    self.customAlertFrame.Icon:SetTexture(achievement.texture)
+
+    -- Обновляем размер фрейма
+    self.customAlertFrame:UpdateSize()
+
+    -- Устанавливаем начальную прозрачность
+    self.customAlertFrame:SetAlpha(1)
+
+    -- Показываем фрейм
+    self.customAlertFrame:Show()
+
+    -- Сбрасываем таймер и состояние
+    self.customAlertFrame.timer = 5  -- Время в секундах до скрытия
+    self.customAlertFrame.elapsed = 0  -- Время, прошедшее с момента начала
+
+    -- Удаляем предыдущий обработчик OnUpdate, если он есть
+    self.customAlertFrame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= self.timer then
+            -- Постепенно уменьшаем прозрачность
+            local alpha = self:GetAlpha()
+            alpha = alpha - elapsed * 0.5  -- Скорость уменьшения прозрачности
+            if alpha <= 0 then
+                alpha = 0
+                self:Hide()
+                self:SetScript("OnUpdate", nil)  -- Удаляем обработчик
+            end
+            self:SetAlpha(alpha)
+        end
+    end)
+end
+
 
 -- Регистрируем обработчик события ADDON_LOADED
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", OnAddonLoaded)
 
--- Создаем объект CustomAchievements
-customAchievements = CustomAchievements:new()
+

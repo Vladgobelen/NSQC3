@@ -4,15 +4,114 @@
 -- @param isLogin: Флаг, указывающий, что игрок вошел в мир
 -- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
-    NSQCMenu()          -- Вызов функции для отображения меню
-    set_miniButton()    -- Вызов функции для настройки мини-кнопки
-    createFld()
+    if arg1 == "NSQC3" then
+        NSQCMenu()          -- Вызов функции для отображения меню
+        set_miniButton()    -- Вызов функции для настройки мини-кнопки
+        createFld()
+        nsqc3_ach = nsqc3_ach or {}
+        -- Создаем объект CustomAchievements
+        customAchievements = CustomAchievements:new('nsqc3_ach')
+
+        -- Добавляем ачивки в раздел "Ночная стража"
+            customAchievements:AddAchievement(
+                1,  -- ID ачивки
+                "Охотник на тени",  -- Название ачивки
+                "Победите 100 теневых существ",  -- Описание ачивки
+                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                100  -- Прогресс (в процентах)
+            )
+            customAchievements:AddAchievement(
+                2,  -- ID ачивки
+                "1Охотник на тени",  -- Название ачивки
+                "Победите 3 теневых существ",  -- Описание ачивки
+                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                3  -- Прогресс (в процентах)
+            )
+            customAchievements:AddAchievement(
+                3,  -- ID ачивки
+                "1Охотник на тени",  -- Название ачивки
+                "Победите 3 теневых существ",  -- Описание ачивки
+                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                3  -- Прогресс (в процентах)
+            )
+            customAchievements:AddAchievement(
+                4,  -- ID ачивки
+                "1Охотник на тени",  -- Название ачивки
+                "Победите 3 теневых существ",  -- Описание ачивки
+                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                3  -- Прогресс (в процентах)
+            )
+            customAchievements:AddAchievement(
+                5,  -- ID ачивки
+                "1Охотник на тени",  -- Название ачивки
+                "Победите 3 теневых существ",  -- Описание ачивки
+                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                3  -- Прогресс (в процентах)
+            )
+            customAchievements:AddAchievement(
+                6,  -- ID ачивки
+                "1Охотник на тени",  -- Название ачивки
+                "Победите 3 теневых существ",  -- Описание ачивки
+                "Interface\\Icons\\Ability_Rogue_ShadowStrikes",  -- Текстура для иконки
+                3  -- Прогресс (в процентах)
+            )
+    end
+    self:UnregisterEvent("ADDON_LOADED")
 end
 
 -- Создаем фрейм и регистрируем событие PLAYER_ENTERING_WORLD
 local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
+f:RegisterEvent("ADDON_LOADED")
 f:SetScript("OnEvent", OnEvent)
+
+
+
+
+
+function CreateButtonsFromTable(buttonsTable)
+    for buttonName, buttonParams in pairs(buttonsTable) do
+        -- Создаем кнопку
+        local button = ButtonManager:new(
+            buttonName, -- Имя кнопки
+            buttonParams.parent, -- Родительский фрейм
+            buttonParams.size.width, -- Ширина
+            buttonParams.size.height, -- Высота
+            buttonParams.text, -- Текст
+            buttonParams.texture -- Текстура (если есть)
+        )
+
+        -- Устанавливаем позицию кнопки
+        if buttonParams.position then
+            button:SetPosition(
+                buttonParams.position[1], -- Точка привязки
+                buttonParams.position[2], -- Относительный фрейм
+                buttonParams.position[3], -- Относительная точка
+                buttonParams.position[4], -- Смещение по X
+                buttonParams.position[5]  -- Смещение по Y
+            )
+        end
+
+        -- Устанавливаем обработчик нажатия
+        if buttonParams.onClick then
+            button:SetOnClick(buttonParams.onClick)
+        end
+
+        -- Устанавливаем обработчик OnEnter, если он указан
+        if buttonParams.OnEnter then
+            button.frame:SetScript("OnEnter", buttonParams.OnEnter)
+            button.frame:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+        end
+
+        -- Делаем кнопку перемещаемой, если movable = true
+        if buttonParams.movable then
+            button:SetMovable(true)
+        else
+            button:SetMovable(false)
+        end
+    end
+end
 
 addonButtons = {
     -- ["myButton"] = {
