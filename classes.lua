@@ -1945,13 +1945,13 @@ function CustomAchievements:CreateCustomAlertFrame()
 
         -- Минимальная ширина фрейма (чтобы он не был слишком узким)
         local minWidth = 300
-        local frameWidth = math.max(minWidth, maxTextWidth + 70)  -- 60 = отступы (иконка + паддинги)
+        local frameWidth = math.max(minWidth, maxTextWidth + 75)  -- 60 = отступы (иконка + паддинги)
 
         -- Рассчитываем высоту фрейма
-        local frameHeight = self.Name:GetHeight() + self.Description:GetHeight() + 30  -- Отступы
+        local frameHeight = self.Name:GetHeight() + self.Description:GetHeight() + 35  -- Отступы
 
         -- Устанавливаем новый размер фрейма
-        self:SetSize(frameWidth, frameHeight)
+        self:SetSize(frameWidth, frameHeight+10)
     end
     return alertFrame
 end
