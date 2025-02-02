@@ -1956,6 +1956,60 @@ function CustomAchievements:CreateCustomAlertFrame()
     return alertFrame
 end
 
+function CustomAchievements:UpdateAchievement(id, key, message)
+    if not self.achievements[id] then
+        print("Ачивка с ID " .. id .. " не найдена.")
+        return
+    end
+    
+    local validKeys = {
+        name = true,
+        description = true,
+        texture = true,
+        progress = true,
+        dateEarned = true,
+        dateCompleted = true,
+        rewardPoints = true,
+        requiredAchievements = true
+    }
+    
+    if not validKeys[key] then
+        print("Неизвестный ключ: " .. key)
+        return
+    end
+    
+    self.achievements[id][key] = message
+    
+    if self.frame and self.frame:IsShown() then
+        self:UpdateUI()
+    end
+    
+    print("Ачивка с ID " .. id .. " успешно обновлена.")
+end
+
+-- Метод для чтения данных об ачивке
+function CustomAchievements:GetAchievementData(id)
+    -- Проверяем, существует ли ачивка с таким ID
+    if not self.achievements[id] then
+        print("Ачивка с ID " .. id .. " не найдена.")
+        return nil
+    end
+
+    -- Возвращаем копию данных ачивки, чтобы избежать изменений исходной таблицы
+    local achievement = self.achievements[id]
+    return {
+        name = achievement.name,
+        description = achievement.description,
+        texture = achievement.texture,
+        progress = achievement.progress,
+        dateEarned = achievement.dateEarned,
+        dateCompleted = achievement.dateCompleted,
+        rewardPoints = achievement.rewardPoints,
+        requiredAchievements = achievement.requiredAchievements,
+        isExpanded = achievement.isExpanded
+    }
+end
+
 -- Метод для отображения уведомления о новой ачивке
 function CustomAchievements:ShowAchievementAlert(achievementID)
     -- Проверяем, существует ли таблица achievements
@@ -2006,5 +2060,3 @@ function CustomAchievements:ShowAchievementAlert(achievementID)
         end
     end)
 end
-
-

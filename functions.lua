@@ -348,6 +348,7 @@ end
 function setFrameAchiv()
     -- Создаем объект CustomAchievements:ShowAchievementAlert(id)
     customAchievements = CustomAchievements:new('nsqc3_ach')
+
     -- Создаем фрейм, если он еще не создан
     if not customAchievements.frame then
         customAchievements:CreateFrame(AchievementFrame)
