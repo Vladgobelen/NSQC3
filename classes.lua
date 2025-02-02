@@ -1888,7 +1888,7 @@ function CustomAchievements:CreateNightWatchTab()
         AchievementFrameSummary:Hide()
         AchievementFrameAchievements:Hide()
         AchievementFrameStats:Hide()
-        for i = 1, 10 do
+        for i = 1, 20 do
             if _G['AchievementFrameCategoriesContainerButton'..i] then
                 _G['AchievementFrameCategoriesContainerButton'..i]:Hide()
             end
