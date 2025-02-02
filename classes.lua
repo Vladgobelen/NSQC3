@@ -1439,12 +1439,8 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
     return false  -- Продолжаем обработку
 end
 
---[[
-    Класс для работы с кастомными достижениями
-    Автор: [Ваше имя]
-    Версия: 1.0
-    Дата: [Текущая дата]
---]]
+
+-- Класс для работы с кастомными достижениями
 
 CustomAchievements = {}
 CustomAchievements.__index = CustomAchievements
