@@ -347,7 +347,7 @@ end
 
 function setFrameAchiv()
     -- Создаем объект CustomAchievements:ShowAchievementAlert(id)
-    customAchievements = CustomAchievements:new('nsqc3_ach')
+    customAchievements = CustomAchievements:new("CustomAchievementsStatic", "nsqc3_ach")
 
     -- Создаем фрейм, если он еще не создан
     if not customAchievements.frame then
@@ -414,6 +414,34 @@ function test6()
         print("Текстура щита не найдена.")
     end
 end
+
+-- Функция для создания таймера
+function CreateTimer(duration, callback)
+    -- Создаем фрейм для таймера
+    local timerFrame = CreateFrame("Frame")
+    
+    -- Устанавливаем продолжительность таймера
+    timerFrame.duration = duration
+    timerFrame.elapsed = 0
+    
+    -- Обработчик OnUpdate для отслеживания времени
+    timerFrame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        
+        -- Проверяем, прошло ли нужное время
+        if self.elapsed >= self.duration then
+            -- Выполняем переданную функцию (callback)
+            if type(callback) == "function" then
+                callback()
+            end
+            
+            -- Уничтожаем фрейм после выполнения
+            self:SetScript("OnUpdate", nil)
+            self = nil
+        end
+    end)
+end
+
 
 
 
