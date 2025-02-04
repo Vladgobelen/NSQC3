@@ -11,7 +11,7 @@ local triggersByAddress = {
             forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
-    ["*"] = {  -- Триггер для любого сообщения
+    ["&"] = {  -- Триггер для любого сообщения
         {
             func = "OnAnyTrigger1",  -- Функция для любого сообщения
             keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
@@ -112,8 +112,7 @@ end
 function OnAnyTrigger1(text, sender, channel, prefix)
     local msg = mysplit(text)
     if string.lower(msg[1]) == "привет" then
-        SendChatMessage(sender .. " написал куда то в канал " .. arg9, "OFFICER", nil, 1)
-
+        SendChatMessage(sender .. " написал: " .. text, "CHANNEL", nil, 5)
     end
 end
 
