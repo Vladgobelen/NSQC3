@@ -23,10 +23,20 @@ local function OnEvent(self, event, isLogin, isReload)
                 requiredAchievements = {},
                 send_txt = "нашел кнопку гильдейского аддона и даже сам открыл ее. В первый раз!"
             },
+            [2] = {
+                name = "Копирайтер",
+                description = "Пишите в гильдчате",
+                texture = "Interface\\AddOns\\NSQC\\emblem.tga",
+                rewardPoints = 1,
+                requiredAchievements = {},
+                send_txt = ""
+            },
         }
         C_Timer(5, function()
-            AchievementMicroButton:Click()
-            AchievementFrameCloseButton:Click()
+            if AchievementMicroButton:IsEnabled() == 1 then
+                AchievementMicroButton:Click()
+                AchievementFrameCloseButton:Click()
+            end
         end)
     end
     if arg1 == "Blizzard_AchievementUI" then

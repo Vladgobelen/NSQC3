@@ -13,7 +13,7 @@ local triggersByAddress = {
     },
     ["&"] = {  -- Триггер для любого сообщения
         {
-            func = "OnAnyTrigger1",  -- Функция для любого сообщения
+            func = "OnAnyTrigger2",  -- Функция для любого сообщения
             keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
             conditions = {
             },
@@ -24,7 +24,7 @@ local triggersByAddress = {
     },
     ["^"] = {  -- Триггер для любого сообщения
         {
-            func = "OnAnyTrigger1",  -- Функция для любого сообщения
+            func = "OnAnyTrigger3",  -- Функция для любого сообщения
             keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
             conditions = {
             },
@@ -77,6 +77,28 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["message:\"стат"] = {
+        {
+            keyword = {  -- Ключевые слова, которые должны быть в сообщении
+                { word = "\"стат", position = 1, source = "message" },  -- Первое слово должно быть "\"стат"
+                { word = "ачивка", position = 2, source = "message" },  -- Второе слово должно быть "количество"
+            },
+            func = "sendAchRez",  -- Функция, которая будет вызвана при срабатывании триггера
+            conditions = {
+                function(text, sender, channel, prefix)
+                    local msg = mysplit(text)
+                    for i = 1, customAchievements:GetAchievementCount() do
+                        if string.find(customAchievements:GetAchievementData(i)["name"]:lower(), msg[3]:lower()) then
+                            customAchievements:SendAchievementCompletionMessage(i)
+                            return true
+                        end
+                    end
+                end
+            },
+            chatType = "GUILD",  -- Тип чата, на который реагирует триггер
+            stopOnMatch = false  -- Прервать обработку других триггеров после срабатывания этого222
+        }
+    },
     ["prefix:NSQC3_ach_сomp"] = {
         {
             keyword = {
@@ -98,11 +120,15 @@ local triggersByAddress = {
 
 function achive_complit(text, sender, channel, prefix)
     local msg = mysplit(text)
-    msg[1] = tonumber(msg[1])
-    msg[2] = tonumber(msg[2])
-    customAchievements:AddAchievement(msg[1])
-    customAchievements:UpdateAchievement(msg[1], "dateCompleted", date("%d/%m/%Y %H:%M"))
-    PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
+    msg[1] = tonumber(msg[1]) -- ID
+    msg[2] = tonumber(msg[2]) -- 
+    if msg[2] == -1 then
+        customAchievements:AddAchievement(msg[1])
+        customAchievements:UpdateAchievement(msg[1], "dateCompleted", date("%d/%m/%Y %H:%M"))
+        PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
+    else
+        customAchievements:UpdateAchievement(msg[1], "dateCompleted", msg[2])
+    end
 end
 
 function displayFld1(text, sender, channel, prefix)
@@ -121,19 +147,34 @@ function displayFld2(text, sender, channel, prefix)
 end
 
 function OnAnyTrigger1(text, sender, channel, prefix)
-    local msg = mysplit(text)
-    if string.lower(msg[1]) == "привет" then
-        SendChatMessage(sender .. " написал: " .. text, "CHANNEL", nil, 5)
+    local myNome = GetUnitName("player")
+    if myNome == sender then
+        sendAch(2, 1, 1)
     end
+    -- local msg = mysplit(text)
+    -- if string.find(string.lower(text), "привет") then
+    --     infoFrame1 = infoFrame1 or UniversalInfoFrame:new(5, testQ['uniFrame'])
+    --     infoFrame1:AddText("Клиент", 'GetAddOnMemoryUsage("NSQS")', true)
+    --     print(sender .. " написал: " .. text)
+    -- end
+end
+function OnAnyTrigger2(text, sender, channel, prefix)
+    -- local msg = mysplit(text)
+    -- if string.lower(msg[1]) == "привет" then
+    -- if string.find(string.lower(text), "привет") then
+    --     SendChatMessage(sender .. " написал: " .. text, "CHANNEL", nil, 5)
+    -- end
+end
+function OnAnyTrigger3(text, sender, channel, prefix)
+    -- local msg = mysplit(text)
+    -- if string.lower(msg[1]) == "привет" then
+    --     SendChatMessage(sender .. " написал: " .. text, "CHANNEL", nil, 5)
+    -- end
 end
 
 function OnTestTrigger(text, sender, channel, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
 end
 
--- Функция-условие: проверяет, является ли игрок лидером гильдии
--- @return: true, если игрок является лидером гильдии, иначе false
-
-
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
-local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON", "CHANNEL", "SAY"})
+local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON"})

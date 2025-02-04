@@ -481,34 +481,6 @@ function setFrameAchiv()
     customAchievements:UpdateUI()
 end
 
-function test6()
-    local button = AchievementFrameAchievementsContainer
-    if button and button.icon and button.icon.texture then
-        local texturePath = button.icon.texture:GetTexture()
-        print("Текстура иконки:", texturePath)
-    else
-        print("Текстура иконки не найдена.")
-    end
-    local button = AchievementFrameAchievementsContainerButton1
-    if button then
-        local backdrop = button:GetBackdrop()
-        if backdrop and backdrop.bgFile then
-            print("Текстура фона кнопки:", backdrop.bgFile)
-        else
-            print("Текстура фона кнопки не найдена.")
-        end
-    else
-        print("Кнопка не найдена.")
-    end
-    local button = AchievementFrameAchievementsContainerButton1
-    if button and button.shield and button.shield.texture then
-        local shieldTexture = button.shield.texture:GetTexture()
-        print("Текстура щита:", shieldTexture)
-    else
-        print("Текстура щита не найдена.")
-    end
-end
-
 -- Функция для создания таймера
 function C_Timer(duration, callback, isLooping)
     -- Создаем фрейм для таймера
@@ -542,13 +514,15 @@ function C_Timer(duration, callback, isLooping)
     end)
 end
 
-function sendAch(id, arg)
-    if not nsDBC_ach:get_key(id) then
+function sendAch(id, arg, re)
+    if not re then
+        if not nsDBC_ach:get_key(id) then
+            SendAddonMessage("NSQC3_ach ", id .. " " .. arg, "guild")
+        end
+    else
         SendAddonMessage("NSQC3_ach ", id .. " " .. arg, "guild")
     end
 end
-
-
 
 
 

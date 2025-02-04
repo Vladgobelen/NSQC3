@@ -308,14 +308,16 @@ function NsDb:mod_key(change_key, message, dop_key, id)
     end
 end
 function NsDb:get_key(change_key, dop_key, id)
-    if self.input_table[change_key] then
-        if dop_key then
+    if dop_key then
+        if self.input_table[dop_key] then
             if id then
                 return self.input_table[dop_key][change_key][id]
             else
                 return self.input_table[dop_key][change_key]
             end
-        else
+        end
+    else
+        if self.input_table[change_key] then
             if id then
                 return self.input_table[change_key][id]
             else
@@ -1681,6 +1683,19 @@ function CustomAchievements:UpdateScrollArea(totalHeight)
     end
 end
 
+-- Метод для отправки сообщения о выполнении ачивки в чат
+function CustomAchievements:SendAchievementCompletionMessage(id)
+    local achievementData = self:GetAchievementData(id)
+    if achievementData then
+        if type(achievementData.dateCompleted) == "string" then
+            SendChatMessage("Достижение " .. achievementData.name .. " выполнено", "OFFICER", nil, 1)
+        else
+            SendChatMessage("Достижение " .. achievementData.name .. ": " .. achievementData.dateCompleted, "OFFICER", nil, 1)
+        end
+    end
+end
+
+-- Метод для создания кнопки ачивки
 function CustomAchievements:CreateAchievementButton(id, yOffset)
     local achievementData = self:GetAchievementData(id)
     if not achievementData then return end
@@ -1690,6 +1705,9 @@ function CustomAchievements:CreateAchievementButton(id, yOffset)
     button:SetSize(510, COLLAPSED_HEIGHT)  -- Начальная высота
     button:SetPoint("TOP", self.achievementContainer, "TOP", 100, -yOffset)
     button.id = id  -- Сохраняем ID ачивки в кнопке
+
+    -- Регистрируем кнопку для обработки кликов правой и левой кнопкой мыши
+    button:RegisterForClicks("LeftButtonDown", "RightButtonDown")
 
     -- Сохранение позиции для скролла в динамических данных
     self.dynamicData[id].scrollPosition = yOffset
@@ -1769,12 +1787,19 @@ function CustomAchievements:CreateAchievementButton(id, yOffset)
         GameTooltip:Hide()
     end)
 
-    button:SetScript("OnClick", function()
-        -- Обновляем состояние в динамических данных
-        self.dynamicData[id].isExpanded = not self.dynamicData[id].isExpanded
-        local scrollBarValue = self.achievementList.scrollBar:GetValue()
-        self:UpdateUI()
-        self.achievementList.scrollBar:SetValue(scrollBarValue)
+    -- Левый клик - развернуть/свернуть ачивку
+    -- Правый клик - отправляем сообщение в чат
+    button:SetScript("OnClick", function(_, mouseButton)
+        if mouseButton == "LeftButton" then
+            -- Обновляем состояние в динамических данных
+            self.dynamicData[id].isExpanded = not self.dynamicData[id].isExpanded
+            local scrollBarValue = self.achievementList.scrollBar:GetValue()
+            self:UpdateUI()
+            self.achievementList.scrollBar:SetValue(scrollBarValue)
+        elseif mouseButton == "RightButton" then
+            -- Правый клик - отправляем сообщение в чат
+            self:SendAchievementCompletionMessage(id)
+        end
     end)
 
     -- Обработка начального состояния (свернуто/развернуто)
@@ -2253,3 +2278,29 @@ function CustomAchievements:IsAchievement(id)
     -- Возвращаем true, если хотя бы одни из данных существует
     return staticExists and dynamicExists
 end
+
+-- Метод для проверки количества добавленных ачивок
+function CustomAchievements:GetAchievementCount()
+    local count = 0
+    for id, _ in pairs(self.dynamicData) do
+        if self.staticData[id] then  -- Проверяем, что ачивка существует в статических данных
+            count = count + 1
+        end
+    end
+    return count
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
