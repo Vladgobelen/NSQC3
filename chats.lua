@@ -54,8 +54,34 @@ local triggersByAddress = {
             chatType = "ADDON",
             stopOnMatch = true  -- Прервать обработку после этого триггера
         }
+    },
+    ["prefix:NSQC3_ach_сomp"] = {
+        {
+            keyword = {
+                { word = "NSQC3_ach_сomp", position = 1, source = "prefix" },
+            },
+            func = "achive_complit",
+            conditions = {
+                function(text, sender, channel, prefix)
+                    local kodMsg = mysplit(prefix)
+                    local myNome = GetUnitName("player")
+                    return kodMsg[2] == myNome
+                end
+            },
+            chatType = "ADDON",
+            stopOnMatch = true  -- Прервать обработку после этого триггера
+        }
     }
 }
+
+function achive_complit(text, sender, channel, prefix)
+    local msg = mysplit(text)
+    msg[1] = tonumber(msg[1])
+    msg[2] = tonumber(msg[2])
+    customAchievements:AddAchievement(msg[1])
+    customAchievements:UpdateAchievement(msg[1], "dateCompleted", date("%d/%m/%Y %H:%M"))
+    PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
+end
 
 function displayFld1(text, sender, channel, prefix)
     mFld = AdaptiveFrame:new()

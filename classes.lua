@@ -22,8 +22,13 @@ function NsDb:new(input_table, input_table_p, key, str_len, tbl_size)
         input_table_p[key] = input_table_p[key] or {}
         new_object.input_table_p = input_table_p[key]
     end
-    input_table[key] = input_table[key] or {}
-    new_object.input_table = input_table[key]
+    if key then
+        input_table[key] = input_table[key] or {}
+        new_object.input_table = input_table[key]
+    else
+        input_table = input_table or {}
+        new_object.input_table = input_table
+    end
     new_object.str_len = str_len
     new_object.tbl_size = tbl_size
     if input_table_p then
@@ -284,9 +289,17 @@ function NsDb:Len()
 end
 
 -- Метод для изменения ключа
-function NsDb:mod_key(change_key, num, message)
-    if self.str_len > 1 and self.unique and not self.input_table[change_key] then
+function NsDb:mod_key(change_key, message, dop_key)
+    if dop_key then
+        self.input_table[dop_key] = self.input_table[dop_key] or {}
+        self.input_table[dop_key][change_key] = message
+    else
         self.input_table[change_key] = message
+    end
+end
+function NsDb:get_key(change_key)
+    if self.input_table[change_key] then
+        return self.input_table[change_key]
     end
 end
 

@@ -174,7 +174,51 @@ function NSQCMenu()
     InterfaceOptions_AddCategory(optionsFrame)
 end
 
+function CalculateAverageItemLevel(unit)
+    local totalIlvl = 0
+    local mainHandEquipLoc, offHandEquipLoc
+
+    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do -- For every slot,
+        if slot ~= INVSLOT_BODY and slot ~= INVSLOT_TABARD then -- If this isn't the shirt/tabard slot,
+            local id = GetInventoryItemID(unit, slot) -- Get the ID of the item in this slot
+            if id then -- If we have an item in this slot,
+                local _, _, _, itemLevel, _, _, _, _, itemEquipLoc = GetItemInfo(id) -- Get the item's ilvl and equip location
+                totalIlvl = totalIlvl + itemLevel -- Add it to the total
+
+                if slot == INVSLOT_MAINHAND then -- If this is the main or off hand, store the equip location for later use
+                    mainHandEquipLoc = itemEquipLoc
+                elseif slot == INVSLOT_OFFHAND then
+                    offHandEquipLoc = itemEquipLoc
+                end
+            end
+        end
+    end
+
+    local numSlots
+    if mainHandEquipLoc and offHandEquipLoc then -- The unit has something in both hands, set numSlots to 17
+        numSlots = 17
+    else -- The unit either has something in one hand or nothing in both hands
+        local equippedItemLoc = mainHandEquipLoc or offHandEquipLoc
+
+        local _, class = UnitClass(unit)
+        local isFury = class == "WARRIOR" and GetInspectSpecialization() == SPECID_FURY
+
+        -- If the user is holding a one-hand weapon, a main-hand weapon or a two-hand weapon as Fury, set numSlots to 17; otherwise set it to 16
+
+        numSlots = (
+            equippedItemLoc == "INVTYPE_WEAPON" or
+            equippedItemLoc == "INVTYPE_WEAPONMAINHAND" or
+            (equippedItemLoc == "INVTYPE_2HWWEAPON" and isFury)
+        ) and 17 or 16
+    end
+
+    return totalIlvl / numSlots -- Return the average
+end
+
 function set_miniButton()
+    C_Timer(10, function()
+        UpdateAddOnMemoryUsage()
+    end, true)
     -- Создаем фрейм для иконки
     local miniMapButton = CreateFrame("Button", nil, Minimap)
     miniMapButton:SetSize(32, 32)  -- Размер иконки
@@ -186,12 +230,53 @@ function set_miniButton()
     miniMapButton:SetPushedTexture("Interface\\AddOns\\NSQC\\emblem.tga")
     miniMapButton:SetHighlightTexture("Interface\\AddOns\\NSQC\\emblem.tga")
 
+    -- Переменная для хранения актуальной версии
+    local latestVersion = nil
+
+    -- Функция для обработки входящих сообщений
+    local function OnEvent(self, event, prefix, message, channel, sender)
+        if prefix == "NSQC_VERSION_RESPONSE" then
+            local msg = mysplit(message)
+            latestVersion = msg[2]  -- Сохраняем актуальную версию
+            latestSubVersion = msg[3]
+        end
+    end
+
+    -- Регистрируем обработчик событий
+    local eventFrame = CreateFrame("Frame")
+    eventFrame:RegisterEvent("CHAT_MSG_ADDON")
+    eventFrame:SetScript("OnEvent", OnEvent)
+
+    -- Функция для создания тултипа
+    local function CreateTooltip(self)
+        SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")  -- Отправляем запрос
+        local myNome = GetUnitName("player")
+
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("|cFF6495EDNSQC3|cFF808080-|cff00BFFF" .. NSQC3_version .. "." .. NSQC3_subversion .. " |cffbbbbbbОЗУ: |cff00BFFF" .. string.format("%.0f", GetAddOnMemoryUsage("NSQC3")) .. " |cffbbbbbbкб")
+        
+        -- Если есть информация о последней версии, добавляем её в тултип
+        if latestVersion then
+            GameTooltip:AddLine("|cFF6495EDАктуальная версия аддона: |cff00BFFF" .. latestVersion .. "." .. latestSubVersion)
+        else
+            GameTooltip:AddLine("|cFF6495EDАктуальная версия: |cffff0000Неизвестно")
+        end
+        
+        GameTooltip:AddLine("|cFF6495EDСредний уровень предметов: |cff00BFFF" .. string.format("%d", CalculateAverageItemLevel(myNome)))
+        
+        if GS_Data ~= nil and GS_Data[GetRealmName()] and GS_Data[GetRealmName()].Players[myNome] then
+            GameTooltip:AddLine("|cFF6495EDGearScore: |cff00BFFF" .. string.format("%d", GS_Data[GetRealmName()].Players[myNome].GearScore))
+        end
+        
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffFF8C00ЛКМ|cffFFFFE0 - открыть аддон")
+        GameTooltip:AddLine("|cffF4A460ПКМ|cffFFFFE0 - показать настройки")
+        GameTooltip:Show()
+    end
+
     -- Добавляем обработчики для тултипа
     miniMapButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("NSQC - Настройки очереди", 1, 1, 1)  -- Белый цвет текста
-        GameTooltip:AddLine("ЛКМ - Открыть настройки", 0.5, 0.5, 0.5)  -- Серый цвет подсказки
-        GameTooltip:Show()
+        CreateTooltip(self)
     end)
 
     miniMapButton:SetScript("OnLeave", function(self)
@@ -199,8 +284,8 @@ function set_miniButton()
     end)
 
     miniMapButton:SetScript("OnClick", function(self)
-        local myNome = GetUnitName("player")
-        SendAddonMessage("getFld " .. myNome .. " " .. myNome, "", "guild")
+        sendAch(1, -1)
+        SendAddonMessage("getFld ", "", "guild")
     end)
 
     -- Инициализация таблицы для сохранения позиции
@@ -250,28 +335,37 @@ function set_miniButton()
     miniMapButton:SetScript("OnDragStop", function()
         miniMapButton:SetScript("OnUpdate", nil)
         miniMapButton:SetAlpha(1)  -- Возвращаем непрозрачность
-        -- Сохраняем позицию
-        NSQC_SavedData = NSQC_SavedData or {}
-        NSQC_SavedData.angle = position.angle
-        NSQC_SavedData.radius = position.radius
+
+        -- Сохраняем позицию в базу данных
+        nsDBC_settings:mod_key("minibtn_x", position.radius * math.cos(position.angle))
+        nsDBC_settings:mod_key("minibtn_y", position.radius * math.sin(position.angle))
     end)
 
     -- Восстановление позиции иконки после перезагрузки
     local function SetInitialPosition()
-        miniMapButton:ClearAllPoints()
-        miniMapButton:SetPoint(
-            "CENTER",
-            Minimap,
-            "CENTER",
-            position.radius * math.cos(position.angle),
-            position.radius * math.sin(position.angle)
-        )
+        local savedX = nsDBC_settings:get_key("minibtn_x") or 0
+        local savedY = nsDBC_settings:get_key("minibtn_y") or 0
+        -- Загружаем сохранённые координаты
+
+        if savedX and savedY then
+            -- Если координаты существуют, устанавливаем кнопку в сохранённую позицию
+            miniMapButton:ClearAllPoints()
+            miniMapButton:SetPoint("CENTER", Minimap, "CENTER", savedX, savedY)
+        else
+            -- Иначе используем стандартную позицию
+            miniMapButton:ClearAllPoints()
+            miniMapButton:SetPoint(
+                "CENTER",
+                Minimap,
+                "CENTER",
+                position.radius * math.cos(position.angle),
+                position.radius * math.sin(position.angle)
+            )
+        end
     end
 
     SetInitialPosition()  -- Устанавливаем начальную позицию
 end
-
-
 
 function IsGuildLeader()
     local playerName = UnitName("player")  -- Получаем имя игрока
@@ -416,13 +510,14 @@ function test6()
 end
 
 -- Функция для создания таймера
-function CreateTimer(duration, callback)
+function C_Timer(duration, callback, isLooping)
     -- Создаем фрейм для таймера
     local timerFrame = CreateFrame("Frame")
     
     -- Устанавливаем продолжительность таймера
     timerFrame.duration = duration
     timerFrame.elapsed = 0
+    timerFrame.isLooping = isLooping or false  -- По умолчанию таймер не циклический
     
     -- Обработчик OnUpdate для отслеживания времени
     timerFrame:SetScript("OnUpdate", function(self, elapsed)
@@ -435,14 +530,23 @@ function CreateTimer(duration, callback)
                 callback()
             end
             
-            -- Уничтожаем фрейм после выполнения
-            self:SetScript("OnUpdate", nil)
-            self = nil
+            -- Если таймер циклический, сбрасываем время
+            if self.isLooping then
+                self.elapsed = 0
+            else
+                -- Уничтожаем фрейм после выполнения, если таймер не циклический
+                self:SetScript("OnUpdate", nil)
+                self = nil
+            end
         end
     end)
 end
 
-
+function sendAch(id, arg)
+    if not nsDBC_ach:get_key(id) then
+        SendAddonMessage("NSQC3_ach ", id .. " " .. arg, "guild")
+    end
+end
 
 
 

@@ -3,8 +3,8 @@
 ## Notes: NSQC3
 ## Author: Vladgobelen
 ## Version: 3.0
-## SavedVariables: nsDbc, nsqc_fld, nsqc_quests, nsqc3_ach
-##SavedVariablesPerCharacter: 
+## SavedVariables: nsqc_fld, nsqc_quests
+##SavedVariablesPerCharacter: nsDbc, nsqc3_ach
 
 main.lua
 libs/

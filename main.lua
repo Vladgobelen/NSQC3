@@ -1,3 +1,4 @@
+NSQC3_version = 1; NSQC3_subversion = 0 
 -- Функция обработки события PLAYER_ENTERING_WORLD
 -- @param self: Фрейм, который вызвал событие
 -- @param event: Тип события (в данном случае "PLAYER_ENTERING_WORLD")
@@ -6,28 +7,30 @@
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
         NSQCMenu()          -- Вызов функции для отображения меню
-        set_miniButton()    -- Вызов функции для настройки мини-кнопки
         createFld()
-        nsqc3_ach = nsqc3_ach or {}
+        nsDbc = nsDbc or {}
+        nsDBC_table = nsDBC_table or create_table:new("nsDbc")
+        nsDBC_settings = nsDBC_settings or NsDb:new(nsDBC_table:get_table(), nil, "настройки", nil, 100000)
+        nsDBC_ach_table = nsDBC_ach_table or create_table:new("nsqc3_ach")
+        nsDBC_ach = nsDBC_ach or NsDb:new(nsDBC_ach_table:get_table(), nil, nil, nil, 100000)
+        set_miniButton()    -- Вызов функции для настройки мини-кнопки
         CustomAchievementsStatic = {
             [1] = {
                 name = "Великий открыватор",
                 description = "Найдите кнопку аддона у миникарты и нажмите ее",
                 texture = "Interface\\AddOns\\NSQC\\emblem.tga",
                 rewardPoints = 1,
-                requiredAchievements = {}
+                requiredAchievements = {},
+                send_txt = "нашел кнопку гильдейского аддона и даже сам открыл ее. В первый раз!"
             },
         }
-        CreateTimer(5, function()
+        C_Timer(5, function()
             AchievementMicroButton:Click()
             AchievementFrameCloseButton:Click()
         end)
     end
     if arg1 == "Blizzard_AchievementUI" then
         setFrameAchiv()
-        customAchievements:AddAchievement(1)
-        customAchievements:UpdateAchievement(1, "dateCompleted", date("%d/%m/%Y %H:%M"))
-        PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
     end
     --self:UnregisterEvent("ADDON_LOADED")
 end
