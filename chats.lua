@@ -2,26 +2,24 @@
 local triggersByAddress = {
     ["*"] = {  -- Триггер для любого сообщения
         {
-            func = "OnAnyTrigger",  -- Функция для любого сообщения
+            func = "OnAnyTrigger1",  -- Функция для любого сообщения
             keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
             conditions = {
             },
             chatType = "GUILD",
             stopOnMatch = false,  -- Не прерывать обработку других триггеров
-            forbiddenWords = { "запрет", "стоп", "нельзя" }  -- Триггер не сработает, если в сообщении есть эти слова
+            forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
-    ["message:привет"] = {  -- Триггер для любого сообщения
+    ["*"] = {  -- Триггер для любого сообщения
         {
-            func = "OnChan",  -- Функция для любого сообщения
-            keyword = {
-                { word = "привет", position = 1, source = "message" }
-            },
+            func = "OnAnyTrigger1",  -- Функция для любого сообщения
+            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
             conditions = {
             },
             chatType = "CHANNEL",
-            stopOnMatch = true,  -- Не прерывать обработку других триггеров
-            forbiddenWords = {}  -- Триггер не сработает, если в сообщении есть эти слова
+            stopOnMatch = false,  -- Не прерывать обработку других триггеров
+            forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
     ["message:тест"] = {
@@ -31,7 +29,7 @@ local triggersByAddress = {
             },
             func = "OnTestTrigger",
             chatType = "GUILD",
-            stopOnMatch = true  -- Прервать обработку после этого триггера
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
     ["prefix:nsqc_fld1"] = {
@@ -48,7 +46,7 @@ local triggersByAddress = {
                 end
             },
             chatType = "ADDON",
-            stopOnMatch = true  -- Прервать обработку после этого триггера
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
     ["prefix:nsqc_fld2"] = {
@@ -65,7 +63,7 @@ local triggersByAddress = {
                 end
             },
             chatType = "ADDON",
-            stopOnMatch = true  -- Прервать обработку после этого триггера
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
     ["prefix:NSQC3_ach_сomp"] = {
@@ -82,7 +80,7 @@ local triggersByAddress = {
                 end
             },
             chatType = "ADDON",
-            stopOnMatch = true  -- Прервать обработку после этого триггера
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     }
 }
@@ -111,8 +109,12 @@ function displayFld2(text, sender, channel, prefix)
     fBtnFrame:Show()
 end
 
-function OnAnyTrigger(text, sender, channel, prefix)
-    
+function OnAnyTrigger1(text, sender, channel, prefix)
+    local msg = mysplit(text)
+    if string.lower(msg[1]) == "привет" then
+        SendChatMessage(sender .. " написал куда то в канал " .. arg9, "OFFICER", nil, 1)
+
+    end
 end
 
 function OnChan(text, sender, channel, prefix)

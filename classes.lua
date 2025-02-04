@@ -325,23 +325,6 @@ function NsDb:get_key(change_key, dop_key, id)
     end
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- Определяем класс create_table
 create_table = {}
 create_table.__index = create_table
