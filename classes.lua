@@ -1351,6 +1351,16 @@ function ChatHandler:OnChatMessage(event, ...)
             end
         end
     end
+    -- Проверяем триггеры для ключа "*" (любое сообщение)
+    if self.triggersByAddress["^"] then
+        for _, trigger in ipairs(self.triggersByAddress["^"]) do
+            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
+                if trigger.stopOnMatch then
+                    return  -- Прерываем дальнейшую обработку, если stopOnMatch = true
+                end
+            end
+        end
+    end
 
     -- Определяем адрес (первое слово сообщения или префикса)
     local addressPrefix = (event == "CHAT_MSG_ADDON" and "prefix:" .. (kodmsg[1] or "")) or nil
