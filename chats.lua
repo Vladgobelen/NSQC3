@@ -11,6 +11,17 @@ local triggersByAddress = {
             forbiddenWords = { "запрет", "стоп", "нельзя" }  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
+    ["*"] = {  -- Триггер для любого сообщения
+        {
+            func = "OnAnyTrigger",  -- Функция для любого сообщения
+            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
+            conditions = {
+            },
+            chatType = "CHANNEL",
+            stopOnMatch = false,  -- Не прерывать обработку других триггеров
+            forbiddenWords = {  }  -- Триггер не сработает, если в сообщении есть эти слова
+        }
+    },
     ["message:тест"] = {
         {
             keyword = {
@@ -98,8 +109,8 @@ function displayFld2(text, sender, channel, prefix)
     fBtnFrame:Show()
 end
 
-function OnAnyTrigger()
-    --print('111')
+function OnAnyTrigger(text, sender, channel, prefix)
+    print("[" .. arg9 .. "]" .. sender .. ": " .. text)
 end
 function OnTestTrigger(text, sender, channel, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
@@ -110,4 +121,4 @@ end
 
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
-local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON"})
+local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON", "CHANNEL"})

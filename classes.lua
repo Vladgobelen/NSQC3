@@ -289,19 +289,58 @@ function NsDb:Len()
 end
 
 -- Метод для изменения ключа
-function NsDb:mod_key(change_key, message, dop_key)
+function NsDb:mod_key(change_key, message, dop_key, id)
     if dop_key then
         self.input_table[dop_key] = self.input_table[dop_key] or {}
-        self.input_table[dop_key][change_key] = message
+        if id then
+            self.input_table[dop_key][change_key] = self.input_table[dop_key][change_key] or {}
+            self.input_table[dop_key][change_key][id] = message
+        else
+            self.input_table[dop_key][change_key] = message
+        end
     else
-        self.input_table[change_key] = message
+        if id then
+            self.input_table[change_key] = self.input_table[change_key] or {}
+            self.input_table[change_key][id] = message
+        else
+            self.input_table[change_key] = message
+        end
     end
 end
-function NsDb:get_key(change_key)
+function NsDb:get_key(change_key, dop_key, id)
     if self.input_table[change_key] then
-        return self.input_table[change_key]
+        if dop_key then
+            if id then
+                return self.input_table[dop_key][change_key][id]
+            else
+                return self.input_table[dop_key][change_key]
+            end
+        else
+            if id then
+                return self.input_table[change_key][id]
+            else
+                return self.input_table[change_key]
+            end
+        end
     end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- Определяем класс create_table
 create_table = {}
