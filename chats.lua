@@ -11,15 +11,17 @@ local triggersByAddress = {
             forbiddenWords = { "запрет", "стоп", "нельзя" }  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
-    ["*"] = {  -- Триггер для любого сообщения
+    ["message:привет"] = {  -- Триггер для любого сообщения
         {
-            func = "OnAnyTrigger",  -- Функция для любого сообщения
-            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
+            func = "OnChan",  -- Функция для любого сообщения
+            keyword = {
+                { word = "привет", position = 1, source = "message" }
+            },
             conditions = {
             },
             chatType = "CHANNEL",
-            stopOnMatch = false,  -- Не прерывать обработку других триггеров
-            forbiddenWords = {  }  -- Триггер не сработает, если в сообщении есть эти слова
+            stopOnMatch = true,  -- Не прерывать обработку других триггеров
+            forbiddenWords = {}  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
     ["message:тест"] = {
@@ -110,6 +112,11 @@ function displayFld2(text, sender, channel, prefix)
 end
 
 function OnAnyTrigger(text, sender, channel, prefix)
+    
+end
+
+function OnChan(text, sender, channel, prefix)
+    print(text)
     print("[" .. arg9 .. "]" .. sender .. ": " .. text)
 end
 function OnTestTrigger(text, sender, channel, prefix)
