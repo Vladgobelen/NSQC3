@@ -20,7 +20,7 @@ local function OnEvent(self, event, isLogin, isReload)
                     index = 1,
                     uniqueIndex = 1,  -- Уникальный индекс
                     name = "Великий открыватор",
-                    description = "Найдите кнопку аддона у миникарты и нажмите ее",
+                    description = "Найдите кнопку аддона у миникарты и нажмите ее jkfdjskfjdk jkfdjskfj;dskjf fjkdsjfk;dsjfk fjdksjfkdsjfk;ds fdkjsfk dskfjdsf",
                     texture = "Interface\\AddOns\\NSQC3\\emblem.tga",
                     rewardPoints = 1,
                     requiredAchievements = {},
