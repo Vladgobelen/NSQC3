@@ -442,7 +442,7 @@ end
 function setFrameAchiv()
     -- Создаем объект CustomAchievements:ShowAchievementAlert(id)
     customAchievements = CustomAchievements:new("CustomAchievementsStatic", "nsqc3_ach")
-
+    customAchievements:SyncDynamicData()  -- Синхронизируем динамические данные при создании
     -- Создаем фрейм, если он еще не создан
     if not customAchievements.frame then
         customAchievements:CreateFrame(AchievementFrame)
@@ -516,7 +516,7 @@ end
 
 function sendAch(id, arg, re)
     if not re then
-        if not nsDBC_ach:get_key(id) then
+        if nsDBC_ach:get_key(id)['dateEarned'] == "Не получена" then
             SendAddonMessage("NSQC3_ach ", id .. " " .. arg, "guild")
         end
     else

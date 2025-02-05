@@ -16,20 +16,31 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         CustomAchievementsStatic = {
             [1] = {
+                uniqueIndex = 1,  -- Уникальный индекс
                 name = "Великий открыватор",
                 description = "Найдите кнопку аддона у миникарты и нажмите ее",
                 texture = "Interface\\AddOns\\NSQC\\emblem.tga",
                 rewardPoints = 1,
                 requiredAchievements = {},
-                send_txt = "нашел кнопку гильдейского аддона и даже сам открыл ее. В первый раз!"
+                send_txt = "нашел кнопку гильдейского аддона и даже сам открыл ее. В первый раз!",
             },
             [2] = {
+                uniqueIndex = 2,  -- Уникальный индекс
                 name = "Копирайтер",
                 description = "Пишите в гильдчате",
                 texture = "Interface\\AddOns\\NSQC\\emblem.tga",
                 rewardPoints = 1,
                 requiredAchievements = {},
                 send_txt = ""
+            },
+            [3] = {
+                uniqueIndex = 3,  -- Уникальный индекс
+                name = "Третья",
+                description = "третья ачивка",
+                texture = "Interface\\AddOns\\NSQC\\libs\\bbbb.tga",
+                rewardPoints = 1,
+                requiredAchievements = {},
+                send_txt = "",
             },
         }
         C_Timer(5, function()

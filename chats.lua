@@ -123,7 +123,9 @@ function achive_complit(text, sender, channel, prefix)
     msg[1] = tonumber(msg[1]) -- ID
     msg[2] = tonumber(msg[2]) -- 
     if msg[2] == -1 then
-        customAchievements:AddAchievement(msg[1])
+        print('111111')
+        --customAchievements:AddAchievement(msg[1])
+        customAchievements:UpdateAchievement(msg[1], "dateEarned", date("%d/%m/%Y %H:%M"))
         customAchievements:UpdateAchievement(msg[1], "dateCompleted", date("%d/%m/%Y %H:%M"))
         PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
     else
