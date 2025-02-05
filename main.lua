@@ -15,33 +15,91 @@ local function OnEvent(self, event, isLogin, isReload)
         nsDBC_ach = nsDBC_ach or NsDb:new(nsDBC_ach_table:get_table(), nil, nil, nil, 100000)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         CustomAchievementsStatic = {
-            [1] = {
-                uniqueIndex = 1,  -- Уникальный индекс
-                name = "Великий открыватор",
-                description = "Найдите кнопку аддона у миникарты и нажмите ее",
-                texture = "Interface\\AddOns\\NSQC\\emblem.tga",
-                rewardPoints = 1,
-                requiredAchievements = {},
-                send_txt = "нашел кнопку гильдейского аддона и даже сам открыл ее. В первый раз!",
+            ["Общие"] = {
+                ["Великий открыватор"] = {
+                    index = 1,
+                    uniqueIndex = 1,  -- Уникальный индекс
+                    name = "Великий открыватор",
+                    description = "Найдите кнопку аддона у миникарты и нажмите ее",
+                    texture = "Interface\\AddOns\\NSQC3\\emblem.tga",
+                    rewardPoints = 1,
+                    requiredAchievements = {},
+                    send_txt = "нашел кнопку гильдейского аддона и даже сам открыл ее. В первый раз!",
+                    category = "Общие",
+                },
             },
-            [2] = {
-                uniqueIndex = 2,  -- Уникальный индекс
-                name = "Копирайтер",
-                description = "Пишите в гильдчате",
-                texture = "Interface\\AddOns\\NSQC\\emblem.tga",
-                rewardPoints = 1,
-                requiredAchievements = {},
-                send_txt = ""
+            ["Чат"] = {
+                ["Копирайтер"] = {
+                    index = 2,
+                    uniqueIndex = 2,  -- Уникальный индекс
+                    name = "Копирайтер",
+                    description = "Пишите в гильдчате",
+                    texture = "Interface\\AddOns\\NSQC3\\libs\\chat_master.tga",
+                    rewardPoints = 50,
+                    requiredAchievements = {},
+                    send_txt = "",
+                    subAchievements = {"Пассив", "Актив", "Не читатель", "Нейросеть"},
+                    category = "Чат"
+                },
+                ["Пассив"] = {
+                    index = 3,
+                    uniqueIndex = 3,  -- Уникальный индекс
+                    name = "Пассив",
+                    description = "Напишите 100 сообщений в гильдчате",
+                    texture = "Interface\\AddOns\\NSQC3\\libs\\100.tga",
+                    rewardPoints = 1,
+                    requiredAchievements = {},
+                    send_txt = "",
+                    category = "Чат"
+                },
+                ["Актив"] = {
+                    index = 4,
+                    uniqueIndex = 4,  -- Уникальный индекс
+                    name = "Актив",
+                    description = "Напишите 1000 сообщений в гильдчате",
+                    texture = "Interface\\AddOns\\NSQC3\\libs\\1000.tga",
+                    rewardPoints = 5,
+                    requiredAchievements = {},
+                    send_txt = "",
+                    category = "Чат"
+                },
+                ["Не читатель"] = {
+                    index = 5,
+                    uniqueIndex = 5,  -- Уникальный индекс
+                    name = "Не читатель",
+                    description = "Напишите 10000 сообщений в гильдчате",
+                    texture = "Interface\\AddOns\\NSQC3\\libs\\10000.tga",
+                    rewardPoints = 10,
+                    requiredAchievements = {},
+                    send_txt = "",
+                    category = "Чат"
+                },
+                ["Нейросеть"] = {
+                    index = 6,
+                    uniqueIndex = 6,  -- Уникальный индекс
+                    name = "Нейросеть",
+                    description = "Напишите 100000 сообщений в гильдчате",
+                    texture = "Interface\\AddOns\\NSQC3\\libs\\100000.tga",
+                    rewardPoints = 50,
+                    requiredAchievements = {},
+                    send_txt = "",
+                    category = "Чат"
+                },
             },
-            [3] = {
-                uniqueIndex = 3,  -- Уникальный индекс
-                name = "Третья",
-                description = "третья ачивка",
-                texture = "Interface\\AddOns\\NSQC\\libs\\bbbb.tga",
-                rewardPoints = 1,
-                requiredAchievements = {},
-                send_txt = "",
-            },
+            ["Поле"] = {
+                ["Медитация"] = {
+                    index = 7,
+                    uniqueIndex = 7,  -- Уникальный индекс
+                    name = "Медитация",
+                    description = "Кликайте всякое",
+                    texture = "Interface\\AddOns\\NSQC3\\libs\\click.tga",
+                    rewardPoints = 50,
+                    requiredAchievements = {},
+                    send_txt = "",
+                    category = "Поле",
+                    subAchievements = {3, 4, 5, 6},
+                },
+            }
         }
         C_Timer(5, function()
             if AchievementMicroButton:IsEnabled() == 1 then

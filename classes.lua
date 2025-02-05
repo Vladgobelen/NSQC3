@@ -1546,103 +1546,137 @@ local function CreateTexture(parent, layer, texture)
     return tex
 end
 
+-- Синхронизация динамических данных с новой структурой
 function CustomAchievements:SyncDynamicData()
     if not self:IsStructureChanged() then
         return
     end
-    local oldDataMap = {} -- [uniqueIndex] = data
-    -- Собираем старые данные по уникальным индексам
-    for oldId, data in pairs(self.dynamicData) do
-        if data.uniqueIndex then
-            oldDataMap[data.uniqueIndex] = data
+
+    -- Создаем временную таблицу для старых данных по уникальному индексу
+    local oldDataMap = {}
+
+    -- Собираем старые данные по уникальному индексу
+    for _, category in pairs(self.staticData) do
+        for name, staticData in pairs(category) do
+            local uniqueIndex = staticData.uniqueIndex
+            if uniqueIndex and self.dynamicData[name] then
+                oldDataMap[uniqueIndex] = self.dynamicData[name]
+            end
         end
     end
-    -- Строим новую структуру на основе статической
-    for newId, staticData in pairs(self.staticData) do
-        local uniqueIndex = staticData.uniqueIndex
-        if oldDataMap[uniqueIndex] then
-            -- Переносим существующие данные в новый индекс
-            self.dynamicData[newId] = oldDataMap[uniqueIndex]
-        else
-            -- Создаем новую запись с дефолтными значениями
-            self.dynamicData[newId] = {
-                uniqueIndex = uniqueIndex,
-                dateEarned = "Не получена",
-                dateCompleted = "Не выполнена",
-                progress = 0,
-                isExpanded = false,
-                scrollPosition = 0
-            }
+
+    -- Создаем новую структуру на основе статической таблицы
+    for categoryName, achievements in pairs(self.staticData) do
+        for name, staticData in pairs(achievements) do
+            local uniqueIndex = staticData.uniqueIndex
+            if uniqueIndex then
+                if oldDataMap[uniqueIndex] then
+                    -- Переносим существующие данные в новый индекс
+                    self.dynamicData[name] = oldDataMap[uniqueIndex]
+                else
+                    -- Создаем новую запись с дефолтными значениями
+                    self.dynamicData[name] = {
+                        uniqueIndex = uniqueIndex,
+                        dateEarned = "Не получена",
+                        dateCompleted = "Не выполнена",
+                        progress = 0,
+                        isExpanded = false,
+                        scrollPosition = 0
+                    }
+                end
+            end
         end
     end
+
     -- Удаляем устаревшие записи из dynamicData
     local idsToRemove = {}
-    for id, data in pairs(self.dynamicData) do
-        if not self.staticData[id] then
-            table.insert(idsToRemove, id)
+    for name, data in pairs(self.dynamicData) do
+        local found = false
+        for _, category in pairs(self.staticData) do
+            if category[name] then
+                found = true
+                break
+            end
+        end
+        if not found then
+            table.insert(idsToRemove, name)
         end
     end
+
     for _, id in ipairs(idsToRemove) do
         self.dynamicData[id] = nil
     end
 end
 
--- Конструктор
+-- Конструктор класса
 function CustomAchievements:new(staticDataTable, dynamicDataTable)
     local obj = setmetatable({}, self)
-    print(_G[dynamicDataTable], '999')
     obj.staticData = _G[staticDataTable]  -- Статичные данные
-    obj.dynamicData = _G[dynamicDataTable]  -- Динамические данные
+    obj.dynamicData = _G[dynamicDataTable] or {}  -- Динамические данные (если не существуют, создаем пустой таблицу)
     obj.frame = nil
     obj.buttons = {}
-    obj.tabCreated = falsed
+    obj.tabCreated = false
     obj.nightWatchTab = nil
     obj.selectedButton = nil
     obj.customAlertFrame = nil
-    print(obj.dynamicData, '111111111111111111111111')
+
+    -- Проверка корректности загрузки данных
+    if not obj.staticData or type(obj.staticData) ~= "table" then
+        error("Ошибка: статическая таблица данных не найдена или некорректна.")
+    end
+
+    if not obj.dynamicData or type(obj.dynamicData) ~= "table" then
+        error("Ошибка: динамическая таблица данных не найдена или некорректна.")
+    end
+
     return obj
 end
 
--- Проверка изменения структуры данных
 function CustomAchievements:IsStructureChanged()
-    -- Создаем таблицы для отслеживания соответствия индексов по уникальному индексу
     local staticIndexByUnique = {}
     local dynamicIndexByUnique = {}
+
     -- Собираем соответствие индексов из статической таблицы
-    for id, staticData in pairs(self.staticData) do
-        if staticData.uniqueIndex then
-            staticIndexByUnique[staticData.uniqueIndex] = id
+    for _, category in pairs(self.staticData) do
+        for name, staticData in pairs(category) do
+            if staticData.uniqueIndex then
+                staticIndexByUnique[staticData.uniqueIndex] = name
+            end
         end
     end
+
     -- Собираем соответствие индексов из динамической таблицы
-    for id, dynamicData in pairs(self.dynamicData) do
+    for name, dynamicData in pairs(self.dynamicData) do
         if dynamicData.uniqueIndex then
-            dynamicIndexByUnique[dynamicData.uniqueIndex] = id
+            dynamicIndexByUnique[dynamicData.uniqueIndex] = name
         end
     end
+
     -- Сравниваем соответствие индексов между статической и динамической таблицами
-    for uniqueIndex, staticId in pairs(staticIndexByUnique) do
-        local dynamicId = dynamicIndexByUnique[uniqueIndex]
-        if dynamicId ~= staticId then
-            -- Если индексы не совпадают, значит структура изменена
+    for uniqueIndex, staticName in pairs(staticIndexByUnique) do
+        local dynamicName = dynamicIndexByUnique[uniqueIndex]
+        if dynamicName ~= staticName then
             return true
         end
     end
+
     -- Проверяем наличие уникальных индексов в динамической таблице, которых нет в статической
     for uniqueIndex in pairs(dynamicIndexByUnique) do
         if not staticIndexByUnique[uniqueIndex] then
             return true
         end
     end
-    -- Если все проверки пройдены, структура не изменилась
+
     return false
 end
 
 -- Метод для поиска ID ачивки по уникальному индексу
 function CustomAchievements:FindAchievementIdByUniqueIndex(uniqueIndex)
-    for id, data in pairs(self.dynamicData) do
-        if data.uniqueIndex == uniqueIndex then
-            return id
+    for _, achievements in pairs(self.staticData) do
+        for name, data in pairs(achievements) do
+            if data.uniqueIndex == uniqueIndex then
+                return name
+            end
         end
     end
     return nil
@@ -1650,9 +1684,9 @@ end
 
 -- Метод для поиска ID ачивки по имени
 function CustomAchievements:FindAchievementIdByName(name)
-    for id, data in pairs(self.staticData) do
-        if data.name == name then
-            return id
+    for _, achievements in pairs(self.staticData) do
+        if achievements[name] then
+            return name
         end
     end
     return nil
@@ -1661,24 +1695,32 @@ end
 -- Создание основного фрейма
 function CustomAchievements:CreateFrame(parent)
     self.frame = CreateFrame("Frame", nil, parent)
-    self.frame:SetSize(400, 500)
+    self.frame:SetSize(850, 500)
     self.frame:SetPoint("CENTER")
     self.frame:Hide()
+
     -- Заголовок
     local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOP", 0, -10)
-    -- Скроллируемая область
+    title:SetPoint("TOP", 130, -10)
+
+    -- Контейнер для кнопок категорий
+    self:CreateCategoryButtons(self.frame)
+
+    -- Скроллируемая область для ачивок
     self.achievementList = CreateFrame("ScrollFrame", nil, self.frame)
     self.achievementList:SetSize(720, 450)
-    self.achievementList:SetPoint("TOP", title, "BOTTOM", 0, -10)
+    self.achievementList:SetPoint("TOPLEFT", self.categoryContainer, "TOPRIGHT", -100, 0)
+
     -- Контейнер для элементов
     self.achievementContainer = CreateFrame("Frame", nil, self.achievementList)
     self.achievementContainer:SetSize(720, 450)
     self.achievementList:SetScrollChild(self.achievementContainer)
+
     -- Фон
     local background = CreateTexture(self.achievementContainer, "BACKGROUND", TEXTURE_BACKGROUND)
     background:SetAllPoints()
     background:SetVertexColor(1, 1, 1, 1)
+
     -- Скроллбар
     local scrollBar = CreateFrame("Slider", nil, self.achievementList, "UIPanelScrollBarTemplate")
     scrollBar:SetPoint("TOPLEFT", self.achievementList, "TOPRIGHT", -20, -16)
@@ -1693,63 +1735,161 @@ function CustomAchievements:CreateFrame(parent)
     end)
 end
 
+function CustomAchievements:CreateCategoryButtons(parent)
+    if not parent then
+        error("Parent frame is required for creating category buttons.")
+    end
+
+    local categories = {}
+    for categoryName, _ in pairs(self.staticData) do
+        categories[#categories + 1] = categoryName
+    end
+
+    local buttonWidth = 100
+    local buttonHeight = 20
+    local yOffset = 0
+    self.categoryButtons = {}
+
+    -- Создаем контейнер для кнопок категорий
+    self.categoryContainer = CreateFrame("Frame", nil, parent)
+    self.categoryContainer:SetSize(buttonWidth, #categories * buttonHeight + 10)
+    self.categoryContainer:SetPoint("TOPLEFT", parent, "TOPLEFT", 70, -30)
+
+    -- Создаем кнопки для каждой категории
+    for _, category in ipairs(categories) do
+        local button = CreateFrame("Button", nil, self.categoryContainer)
+        button:SetSize(buttonWidth + 80, buttonHeight)
+        button:SetPoint("TOPLEFT", self.categoryContainer, "TOPLEFT", 0, -yOffset)
+
+        -- Создаем нормальную текстуру кнопки
+        local normalTexture = button:CreateTexture(nil, "BACKGROUND")
+        normalTexture:SetTexture("Interface\\AchievementFrame\\UI-Achievement-Category-Background")  -- Путь к текстуре
+        
+        -- Настройка координат текстуры
+        normalTexture:SetTexCoord(0.08, 0.6, 0.08, 0.6)  -- Выбираем центральную часть текстуры
+
+        -- Позиционируем текстуру
+        normalTexture:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
+        normalTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
+        normalTexture:SetAllPoints()
+        -- Добавляем текст на кнопку через FontString
+        local buttonText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        buttonText:SetPoint("CENTER", button, "CENTER")
+        buttonText:SetText(category)
+
+        -- Добавляем эффект наведения
+        local highlightTexture = button:CreateTexture(nil, "HIGHLIGHT")
+        highlightTexture:SetAllPoints()
+        highlightTexture:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight")
+        highlightTexture:SetBlendMode("ADD")
+
+        -- Обработчик клика
+        button:SetScript("OnClick", function()
+            self:FilterAchievementsByCategory(category)  -- Фильтруем ачивки по категории
+        end)
+
+        self.categoryButtons[category] = button
+        yOffset = yOffset + buttonHeight + 5
+    end
+end
+
+-- Метод для фильтрации ачивок по категории
+function CustomAchievements:FilterAchievementsByCategory(category)
+    if not self.achievementContainer then return end
+
+    -- Устанавливаем выбранную категорию
+    self.selectedCategory = category
+
+    -- Отладочный вывод: текущая выбранная категория
+    print("Категория выбрана:", self.selectedCategory or "Все категории")
+
+    -- Обновляем интерфейс с выбранной категорией
+    self:UpdateUI(category)  -- Передаем категорию как параметр
+end
+
 -- Метод для добавления ачивки
-function CustomAchievements:AddAchievement(id)
+function CustomAchievements:AddAchievement(name)
     -- Проверяем существование статичных данных
-    if not self.staticData[id] then
-        print("Ошибка: ачивка с ID " .. id .. " не найдена в статичных данных")
+    if not self.staticData[name] then
+        print("Ошибка: ачивка с ID " .. name .. " не найдена в статичных данных")
         return
     end
+
     -- Если уже есть динамические данные - выходим
-    if self.dynamicData[id] then return end
+    if self.dynamicData[name] then return end
+
     -- Получаем текущую дату и время
-    local currentDate = date("%d/%m/%Y %H:%M")  -- Используем функцию date из библиотеки date
+    local currentDate = date("%d/%m/%Y %H:%M")
+
     -- Создаем запись в динамических данных
-    print(self.dynamicData, '111')
-    self.dynamicData[id] = {
-        uniqueIndex = self.staticData[id].uniqueIndex,  -- Сохраняем уникальный индекс из статической таблицы
-        dateEarned = currentDate,  -- Устанавливаем текущую дату
+    self.dynamicData[name] = {
+        uniqueIndex = self.staticData[name].uniqueIndex,
+        dateEarned = currentDate,
         dateCompleted = "Не выполнена",
         progress = 0,
         isExpanded = false,
         scrollPosition = 0
     }
-    print(self.dynamicData, '222')
-    self:UpdateUI()
-    self:ShowAchievementAlert(id)
+
+    -- Обновляем интерфейс с учетом выбранной категории
+    self:UpdateUI(self.selectedCategory)
+    self:ShowAchievementAlert(name)
 end
 
--- Метод для обновления интерфейса
-function CustomAchievements:UpdateUI()
+-- Метод для обновления интерфейса с учетом выбранной категории
+function CustomAchievements:UpdateUI(selectedCategory)
     self:SyncDynamicData()  -- Синхронизируем динамические данные перед обновлением интерфейса
     if not self.achievementContainer then return end
-    -- Очистка предыдущих элементов
+
+    -- Очищаем предыдущие элементы
     for _, child in ipairs({self.achievementContainer:GetChildren()}) do
         child:Hide()
         child:ClearAllPoints()
         child:SetParent(nil)
     end
+
     self.buttons = {}
-    local yOffset = 0
-    -- Используем dynamicData вместо achievements
-    for id, dynamicData in pairs(self.dynamicData) do
-        local staticData = self.staticData[id]
-        if staticData then
-            local button = self:CreateAchievementButton(id, yOffset)
-            self.buttons[id] = button
+    local yOffset = 0  -- Инициализируем yOffset
+
+    -- Создаем временную таблицу для сортировки ачивок по индексу
+    local sortedAchievements = {}
+
+    -- Собираем ачивки в зависимости от выбранной категории
+    for category, achievements in pairs(self.staticData) do
+        if not selectedCategory or category == selectedCategory then
+            for name, staticData in pairs(achievements) do
+                table.insert(sortedAchievements, {name = name, index = staticData.index or 0})
+            end
+        end
+    end
+
+    -- Сортируем ачивки по индексу
+    table.sort(sortedAchievements, function(a, b)
+        return a.index < b.index
+    end)
+
+    -- Отображаем ачивки в отсортированном порядке
+    for _, achievement in ipairs(sortedAchievements) do
+        local name = achievement.name
+        local dynamicData = self.dynamicData[name] or {}
+        local button = self.buttons[name] or self:CreateAchievementButton(name, yOffset)
+        if button then
+            self.buttons[name] = button
             yOffset = yOffset + button:GetHeight()
         end
     end
+
     -- Обновляем скроллируемую область
     self:UpdateScrollArea(yOffset)
 end
 
--- Обновление скроллинга
 function CustomAchievements:UpdateScrollArea(totalHeight)
     local scrollBar = self.achievementList.scrollBar
     local containerHeight = totalHeight + 60
+
     -- Обновляем высоту контейнера
     self.achievementContainer:SetHeight(containerHeight)
+
     -- Обновляем скроллбар
     if scrollBar then
         local scrollHeight = containerHeight - self.achievementList:GetHeight()
@@ -1759,100 +1899,108 @@ function CustomAchievements:UpdateScrollArea(totalHeight)
 end
 
 -- Метод для отправки сообщения о выполнении ачивки в чат
-function CustomAchievements:SendAchievementCompletionMessage(id)
-    local achievementData = self:GetAchievementData(id)
+function CustomAchievements:SendAchievementCompletionMessage(name)
+    local achievementData = self:GetAchievementData(name)
     if achievementData then
         SendChatMessage("Достижение " .. achievementData.name .. ": " .. achievementData.dateCompleted, "OFFICER", nil, 1)
     end
 end
 
--- Метод для создания кнопки ачивки
-function CustomAchievements:CreateAchievementButton(id, yOffset)
-    local achievementData = self:GetAchievementData(id)
-    if not achievementData then return end
+function CustomAchievements:CreateAchievementButton(name, yOffset)
+    local achievementData = self:GetAchievementData(name)
+    if not achievementData then return nil end
+
     -- Создаем кнопку
     local button = CreateFrame("Button", nil, self.achievementContainer)
-    button:SetSize(510, COLLAPSED_HEIGHT)  -- Начальная высота
-    button:SetPoint("TOP", self.achievementContainer, "TOP", 100, -yOffset)
-    button.id = id  -- Сохраняем ID ачивки в кнопке
+    button:SetSize(510, COLLAPSED_HEIGHT)
+    button:SetPoint("TOPLEFT", self.achievementContainer, "TOPLEFT", 195, -yOffset)
+    button.id = name
+
     -- Иконка ачивки
     local icon = button:CreateTexture(nil, "ARTWORK")
     icon:SetSize(DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE)
     icon:SetPoint("TOPLEFT", self.COLLAPSED_POSITIONS.icon.x, self.COLLAPSED_POSITIONS.icon.y)
     icon:SetTexture(achievementData.texture)
     button.icon = icon
+
     -- Название ачивки
     button.nameText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    button.nameText:SetPoint("TOPLEFT", icon, "RIGHT", 10, 0)
+    button.nameText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 5, 0)
     button.nameText:SetText(achievementData.name)
     button.nameText:SetJustifyH("LEFT")
+
     -- Дата получения
     button.dateText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     button.dateText:SetPoint("TOPLEFT", self.COLLAPSED_POSITIONS.date.x, self.COLLAPSED_POSITIONS.date.y)
     button.dateText:SetText(achievementData.dateEarned)
     button.dateText:SetJustifyH("LEFT")
+
     -- Иконка очков награды
     button.rewardPointsIcon = button:CreateTexture(nil, "ARTWORK")
     button.rewardPointsIcon:SetSize(REWARD_ICON_SIZE, REWARD_ICON_SIZE)
     button.rewardPointsIcon:SetPoint("TOPLEFT", self.COLLAPSED_POSITIONS.rewardPoints.x, self.COLLAPSED_POSITIONS.rewardPoints.y)
     button.rewardPointsIcon:SetTexture(TEXTURE_SHIELD)
+
     -- Состояние щита в зависимости от выполнения ачивки
     if achievementData.dateCompleted ~= "Не выполнена" then
         button.rewardPointsIcon:SetTexCoord(0, 0.5, 0, 1)  -- Зеленый щит
     else
         button.rewardPointsIcon:SetTexCoord(0.5, 1, 0, 1)  -- Серый щит
     end
+
     -- Текст очков награды
     button.rewardPointsText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     button.rewardPointsText:SetPoint("CENTER", button.rewardPointsIcon)
     button.rewardPointsText:SetText(achievementData.rewardPoints)
-    -- Описание (скрыто в свернутом состоянии)
-    button.descriptionText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    button.descriptionText:SetWidth(400)  -- Ограничиваем ширину текста
-    button.descriptionText:SetWordWrap(true)  -- Включаем перенос строк
-    button.descriptionText:SetText(achievementData.description)
-    button.descriptionText:SetJustifyH("LEFT")
-    button.descriptionText:Hide()
+
     -- Подсветка при наведении
     button.highlight = button:CreateTexture(nil, "BACKGROUND")
     button.highlight:SetAllPoints()
     button.highlight:SetTexture(TEXTURE_HIGHLIGHT)
     button.highlight:SetAlpha(0)
+
     -- Фон в зависимости от статуса
     button.normal = button:CreateTexture(nil, "BACKGROUND")
     button.normal:SetAllPoints()
     button.normal:SetTexture(achievementData.dateCompleted ~= "Не выполнена" and TEXTURE_COMPLETE or TEXTURE_INCOMPLETE)
     button.normal:SetAlpha(1)
+
     -- Обработчики событий
-    button:SetScript("OnEnter", function()
-        button.highlight:SetAlpha(1)
-        button.normal:SetAlpha(0)
-        self:ShowAchievementTooltip(button, id)
-    end)
-    button:SetScript("OnLeave", function()
-        if button ~= self.selectedButton then
-            button.highlight:SetAlpha(0)
-            button.normal:SetAlpha(1)
-        end
-        GameTooltip:Hide()
-    end)
-    -- Левый клик - развернуть/свернуть ачивку
+    button:RegisterForClicks("RightButtonDown", "LeftButtonDown")
     button:SetScript("OnClick", function(_, mouseButton)
         if mouseButton == "LeftButton" then
-            -- Обновляем состояние в динамических данных
-            self.dynamicData[id].isExpanded = not self.dynamicData[id].isExpanded
+            -- Переключаем состояние разворачивания/сворачивания
+            self.dynamicData[name].isExpanded = not self.dynamicData[name].isExpanded
+            print("Клик на ачивку:", name, 
+                "Категория:", achievementData.category, 
+                "Развернута:", self.dynamicData[name].isExpanded,
+                "Выбранная категория:", self.selectedCategory or "Все категории")
             local scrollBarValue = self.achievementList.scrollBar:GetValue()
-            self:UpdateUI()
+            self:UpdateUI(self.selectedCategory)
             self.achievementList.scrollBar:SetValue(scrollBarValue)
         elseif mouseButton == "RightButton" then
-            -- Правый клик - отправляем сообщение в чат
-            self:SendAchievementCompletionMessage(id)
+            self:SendAchievementCompletionMessage(name)
+            print("Отправлено сообщение о выполнении ачивки:", name)
         end
     end)
-    -- Обработка начального состояния (свернуто/развернуто)
+
+    -- Обработчик события OnEnter (при наведении мыши)
+    button:SetScript("OnEnter", function()
+        button.highlight:SetAlpha(1)  -- Показываем подсветку
+        self:ShowAchievementTooltip(button, name)  -- Показываем тултип
+    end)
+
+    -- Обработчик события OnLeave (при убирании мыши)
+    button:SetScript("OnLeave", function()
+        button.highlight:SetAlpha(0)  -- Скрываем подсветку
+        GameTooltip:Hide()  -- Скрываем тултип
+    end)
+
+    -- Если ачивка уже развернута, вызываем метод раскрытия
     if achievementData.isExpanded then
-        self:ExpandAchievement(button, id)
+        self:ExpandAchievement(button, name)
     end
+
     return button
 end
 
@@ -1870,20 +2018,33 @@ function CustomAchievements:ShowAchievementTooltip(button, id)
     GameTooltip:Show()
 end
 
--- Метод для раскрытия ачивки с под-ачивками
-function CustomAchievements:ExpandAchievement(button, id)
-    local achievement = self:GetAchievementData(id)
+function CustomAchievements:ExpandAchievement(button, name)
+    local achievement = self:GetAchievementData(name)
     if not achievement then return end
-    -- Позиционирование элементов с явным указанием координат
+
+    -- Создаем descriptionText, если он не существует
+    if not button.descriptionText then
+        button.descriptionText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        button.descriptionText:SetWidth(400)
+        button.descriptionText:SetWordWrap(true)
+        button.descriptionText:SetText(achievement.description)
+        button.descriptionText:SetJustifyH("LEFT")
+        button.descriptionText:Hide() -- Скрываем по умолчанию
+    end
+
+    -- Позиционирование элементов
     button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.icon.x, self.EXPANDED_POSITIONS.icon.y)
     button.nameText:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.name.x, self.EXPANDED_POSITIONS.name.y)
     button.dateText:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.date.x, self.EXPANDED_POSITIONS.date.y)
     button.rewardPointsIcon:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.rewardPoints.x, self.EXPANDED_POSITIONS.rewardPoints.y)
-    -- Описание ачивки
+
+    -- Показываем описание
     button.descriptionText:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.description.x, self.EXPANDED_POSITIONS.description.y)
     button.descriptionText:Show()
+
     -- Рассчитываем высоту описания
     local descriptionHeight = button.descriptionText:GetHeight()
+
     -- Вложенные достижения
     local requiredYOffset = -80
     local iconSize = 30
@@ -1894,6 +2055,7 @@ function CustomAchievements:ExpandAchievement(button, id)
             self:CreateNestedAchievementIcon(button, reqAchievement, i, self.EXPANDED_POSITIONS.requiredAchievements.x, requiredYOffset, iconSize, iconSpacing)
         end
     end
+
     -- Высота кнопки
     local numRows = math.ceil(#achievement.subAchievements / MAX_ICONS_PER_ROW)
     local totalHeight = EXPANDED_BASE_HEIGHT + descriptionHeight + numRows * (iconSize + iconSpacing)
@@ -1974,6 +2136,7 @@ end
 function CustomAchievements:Show()
     if self.frame then
         self.frame:Show()
+        self:UpdateUI(self.selectedCategory)  -- Обновляем UI с текущей категорией
         self:ShowAchievements()  -- Показываем ачивки, если фрейм видим
     end
 end
@@ -1982,20 +2145,25 @@ end
 function CustomAchievements:Hide()
     if self.frame then
         self.frame:Hide()
+        self.selectedCategory = nil -- Сбрасываем выбранную категорию при закрытии окна
+        self:UpdateUI()  -- Обновляем UI без категории
     end
 end
 
--- Функция для создания третьей вкладки
+-- Модифицируем метод CreateNightWatchTab
 function CustomAchievements:CreateNightWatchTab()
     -- Проверяем, существуют ли вкладки
     if not AchievementFrameTab1 or not AchievementFrameTab2 then
         return  -- Если вкладки не существуют, выходим
     end
+
     -- Создаем третью вкладку с уникальным именем
     self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab3", AchievementFrame, "AchievementFrameTabButtonTemplate")
     self.nightWatchTab:SetText("Ночная стража")
+
     -- Привязываем новую вкладку к вкладке "Статистика"
     self.nightWatchTab:SetPoint("LEFT", AchievementFrameTab2, "RIGHT", -6, 0)
+
     -- Убедимся, что текст вкладки инициализирован
     local fontString = self.nightWatchTab:GetFontString()
     if fontString then
@@ -2003,23 +2171,30 @@ function CustomAchievements:CreateNightWatchTab()
     else
         return  -- Если не удалось получить FontString, выходим
     end
+
     -- Автоматически подгоняем ширину вкладки под текст
     PanelTemplates_TabResize(self.nightWatchTab, 0)
+
     -- Обработчик клика для вкладки "Ночная стража"
     self.nightWatchTab:SetScript("OnClick", function()
         -- Скрываем стандартные разделы
         AchievementFrameSummary:Hide()
         AchievementFrameAchievements:Hide()
         AchievementFrameStats:Hide()
+
+        -- Скрываем стандартные категории
         for i = 1, 20 do
-            if _G['AchievementFrameCategoriesContainerButton'..i] then
-                _G['AchievementFrameCategoriesContainerButton'..i]:Hide()
+            if _G['AchievementFrameCategoriesContainerButton' .. i] then
+                _G['AchievementFrameCategoriesContainerButton' .. i]:Hide()
             end
         end
+
         -- Показываем наш кастомный фрейм
         self:Show()
-        -- Показываем ачивки
-        self:ShowAchievements()
+
+        -- Обновляем интерфейс без категории (если не задана явно)
+        self:UpdateUI(self.selectedCategory)
+
         -- Обновляем состояние вкладок
         PanelTemplates_SetTab(AchievementFrame, 3)
     end)
@@ -2075,11 +2250,12 @@ function CustomAchievements:CreateCustomAlertFrame()
 end
 
 -- Метод для обновления данных ачивки
-function CustomAchievements:UpdateAchievement(id, key, value)
-    if not self.dynamicData[id] then
-        print("Ачивка с ID " .. id .. " не получена игроком")
+function CustomAchievements:UpdateAchievement(name, key, value)
+    if not self.dynamicData[name] then
+        print("Ачивка с ID " .. name .. " не получена игроком")
         return
     end
+
     local allowedKeys = {
         dateEarned = true,
         dateCompleted = true,
@@ -2087,36 +2263,37 @@ function CustomAchievements:UpdateAchievement(id, key, value)
         isExpanded = true,
         scrollPosition = true
     }
+
     if allowedKeys[key] then
-        self.dynamicData[id][key] = value
+        self.dynamicData[name][key] = value
         self:UpdateUI()  -- Перерисовываем интерфейс
     else
         print("Недопустимый ключ для динамических данных: " .. key)
     end
 end
 
--- Метод для получения данных ачивки
-function CustomAchievements:GetAchievementData(id)
-    local static = self.staticData[id]
-    local dynamic = self.dynamicData[id]
-    if not static then return nil end
-    return {
-        -- Статичные данные
-        name = static.name,
-        description = static.description,
-        texture = static.texture,
-        rewardPoints = static.rewardPoints,
-        requiredAchievements = static.requiredAchievements,
-        subAchievements = static.subAchievements or {},  -- Под-ачивки
-        collapsedPositions = static.collapsedPositions,
-        expandedPositions = static.expandedPositions,
-        -- Динамические данные
-        dateEarned = dynamic and dynamic.dateEarned or "Не получена",  -- Используем значение по умолчанию, если динамические данные отсутствуют
-        dateCompleted = dynamic and dynamic.dateCompleted or "Не выполнена",
-        progress = dynamic and dynamic.progress or 0,
-        isExpanded = dynamic and dynamic.isExpanded or false,
-        scrollPosition = dynamic and dynamic.scrollPosition or 0
-    }
+function CustomAchievements:GetAchievementData(name)
+    for category, achievements in pairs(self.staticData) do
+        local static = achievements[name]
+        if static then
+            local dynamic = self.dynamicData[name]
+            return {
+                name = static.name,
+                description = static.description,
+                texture = static.texture,
+                rewardPoints = static.rewardPoints,
+                requiredAchievements = static.requiredAchievements,
+                subAchievements = static.subAchievements or {},
+                dateEarned = dynamic and dynamic.dateEarned or "Не получена",
+                dateCompleted = dynamic and dynamic.dateCompleted or "Не выполнена",
+                progress = dynamic and dynamic.progress or 0,
+                isExpanded = dynamic and dynamic.isExpanded or false,
+                scrollPosition = dynamic and dynamic.scrollPosition or 0,
+                category = category  -- Добавляем категорию
+            }
+        end
+    end
+    return nil
 end
 
 -- Метод для отображения уведомления о новой ачивке
