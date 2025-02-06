@@ -1259,6 +1259,7 @@ end
 -- Класс ChatHandler для обработки сообщений чата
 ChatHandler = {}
 ChatHandler.__index = ChatHandler
+
 function ChatHandler:new(triggersByAddress, chatTypes)
     local new_object = setmetatable({}, self)
     self.__index = self
@@ -1302,9 +1303,6 @@ function ChatHandler:new(triggersByAddress, chatTypes)
 end
 
 -- Метод для обработки сообщений чата
--- @param event: Тип события (например, "CHAT_MSG_SAY")
--- @param ...: Параметры события (текст, отправитель и т.д.)
--- Метод для обработки сообщений чата
 function ChatHandler:OnChatMessage(event, ...)
     local text, sender, _, _, _, _, _, _, channel, channelName, _, prefix
 
@@ -1315,64 +1313,26 @@ function ChatHandler:OnChatMessage(event, ...)
         -- Обработка обычных сообщений чата
         text, sender = ...
     end
-
-    -- Разбиваем сообщение на слова
-    local msg = {}
-    local kodmsg = {}
-
-    if event == "CHAT_MSG_ADDON" then
-        -- Для событий ADDON разбиваем prefix и message
-        if prefix then
-            kodmsg = mysplit(prefix)
-        else
-            kodmsg = {}  -- Если prefix равен nil, используем пустую таблицу
-        end
-        msg = mysplit(text)
-    else
-        -- Для обычных сообщений чата разбиваем только text
-        msg = mysplit(text)
-    end
-
-    -- Проверяем триггеры для ключа "*" (любое сообщение)
+    -- Проверяем триггер для специального ключа "*"
     if self.triggersByAddress["*"] then
         for _, trigger in ipairs(self.triggersByAddress["*"]) do
             if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
                 if trigger.stopOnMatch then
-                    return  -- Прерываем дальнейшую обработку, если stopOnMatch = true
-                end
-            end
-        end
-    end
-    -- Проверяем триггеры для ключа "*" (любое сообщение)
-    if self.triggersByAddress["&"] then
-        for _, trigger in ipairs(self.triggersByAddress["&"]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
-                if trigger.stopOnMatch then
-                    return  -- Прерываем дальнейшую обработку, если stopOnMatch = true
-                end
-            end
-        end
-    end
-    -- Проверяем триггеры для ключа "*" (любое сообщение)
-    if self.triggersByAddress["^"] then
-        for _, trigger in ipairs(self.triggersByAddress["^"]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
-                if trigger.stopOnMatch then
-                    return  -- Прерываем дальнейшую обработку, если stopOnMatch = true
+                    return -- Прекращаем обработку, если указан stopOnMatch
                 end
             end
         end
     end
 
     -- Определяем адрес (первое слово сообщения или префикса)
-    local addressPrefix = (event == "CHAT_MSG_ADDON" and "prefix:" .. (kodmsg[1] or "")) or nil
-    local addressMessage = "message:" .. (msg[1] or "")
+    local addressPrefix = (event == "CHAT_MSG_ADDON" and "prefix:" .. (string.match(prefix, "^(%S+)") or "")) or nil
+    local addressMessage = "message:" .. (string.match(text, "^(%S+)") or "")
 
     -- Проверяем триггеры для префикса (если это ADDON-сообщение)
     if addressPrefix and self.triggersByAddress[addressPrefix] then
         for _, trigger in ipairs(self.triggersByAddress[addressPrefix]) do
             if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
-                return  -- Прерываем дальнейшую обработку, если триггер выполнен
+                return
             end
         end
     end
@@ -1381,91 +1341,92 @@ function ChatHandler:OnChatMessage(event, ...)
     if self.triggersByAddress[addressMessage] then
         for _, trigger in ipairs(self.triggersByAddress[addressMessage]) do
             if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
-                return  -- Прерываем дальнейшую обработку, если триггер выполнен
+                return
             end
         end
     end
 end
 
--- Метод для проверки триггера
--- @param trigger: Триггер, который нужно проверить
--- @param msg: Таблица слов из сообщения
--- @param kodmsg: Таблица слов из префикса (для ADDON-сообщений)
--- @param text: Полный текст сообщения
--- @param sender: Имя отправителя
--- @param channel: Канал сообщения
--- @param prefix: Префикс сообщения (для ADDON-сообщений)
--- @return: true, если дальнейшая обработка должна быть прервана, иначе false
 function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event)
-    local keywords = trigger.keyword or {}  -- Если keyword отсутствует, используем пустую таблицу
+    local keywords = trigger.keyword or {}
     local funcName = trigger.func
     local conditions = trigger.conditions or {}
     local stopOnMatch = trigger.stopOnMatch or false
-    local forbiddenWords = trigger.forbiddenWords or {}
-    local chatType = trigger.chatType  -- Тип чата, указанный в триггере
-
-    -- Проверяем, соответствует ли тип чата
-    if chatType then
-        -- Преобразуем событие в тип чата (например, "CHAT_MSG_SAY" -> "SAY")
+    local chatTypes = trigger.chatType
+    -- Проверяем тип чата
+    if chatTypes then
         local currentChatType = string.match(event, "CHAT_MSG_(.+)")
-        if currentChatType ~= chatType then
-            return false  -- Тип чата не совпадает, триггер не срабатывает
+        local chatTypeMatch = false
+        for _, allowedChatType in ipairs(chatTypes) do
+            if currentChatType == allowedChatType then
+                chatTypeMatch = true
+                break
+            end
         end
+        if not chatTypeMatch then
+            return false
+        end
+    else
+        print("No specific chat types defined for this trigger.")
     end
 
-    -- Собираем все запрещенные слова, включая те, что указаны в переменных
+    -- Проверяем запрещенные слова
     local allForbiddenWords = {}
-    for _, wordOrVar in ipairs(forbiddenWords) do
+    for _, wordOrVar in ipairs(trigger.forbiddenWords or {}) do
         if type(wordOrVar) == "string" and wordOrVar:sub(1, 1) == "$" then
-            -- Это переменная, извлекаем её значение
-            local varName = wordOrVar:sub(2)  -- Убираем "$"
-            local varValue = _G[varName]  -- Получаем значение переменной из глобальной таблицы
+            local varName = wordOrVar:sub(2)
+            local varValue = _G[varName]
             if type(varValue) == "table" then
-                -- Если переменная содержит таблицу, добавляем все её элементы
                 for _, forbiddenWord in ipairs(varValue) do
                     table.insert(allForbiddenWords, forbiddenWord)
                 end
             elseif type(varValue) == "string" then
-                -- Если переменная содержит строку, добавляем её как одно слово
                 table.insert(allForbiddenWords, varValue)
             end
         else
-            -- Это обычное слово, добавляем его
             table.insert(allForbiddenWords, wordOrVar)
         end
     end
 
-    -- Проверяем, есть ли в сообщении запрещенные слова
     for _, forbiddenWord in ipairs(allForbiddenWords) do
         if string.find(text:lower(), forbiddenWord:lower()) then
-            return false  -- Если найдено запрещенное слово, триггер не срабатывает
+            print("Found forbidden word:", forbiddenWord)
+            return false
         end
     end
 
-    -- Проверяем ключевые слова (если они есть)
+    -- Проверяем ключевые слова
     local keywordsMatch = true
-    if #keywords > 0 then  -- Проверяем, только если keywords не пуст
+    if #keywords > 0 then
         for _, keywordData in ipairs(keywords) do
             local word = keywordData.word
             local position = keywordData.position
             local source = keywordData.source
-            local words = (source == "prefix") and kodmsg or msg
-
-            if not (words[position] and words[position] == word) then
-                keywordsMatch = false
+            local targetText = (source == "prefix") and prefix or text
+            local currentIndex = 0
+            for match in targetText:gmatch("%S+") do
+                currentIndex = currentIndex + 1
+                if currentIndex == position then
+                    if match ~= word then
+                        keywordsMatch = false
+                        break
+                    end
+                    break
+                end
+            end
+            if not keywordsMatch then
                 break
             end
         end
     end
 
-    -- Если ключевые слова совпали (или их нет), проверяем условия
+    -- Проверяем условия
     if keywordsMatch then
         local allConditionsMet = true
         for _, condition in ipairs(conditions) do
             if type(condition) == "string" then
                 condition = _G[condition]
             end
-
             if type(condition) == "function" then
                 if not condition(text, sender, channel, prefix) then
                     allConditionsMet = false
@@ -1478,21 +1439,20 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
             end
         end
 
-        -- Если все условия выполнены, вызываем функцию
+        -- Вызываем функцию, если все условия выполнены
         if allConditionsMet then
             local func = _G[funcName]
             if func then
-                func(text, sender, channel, prefix)
+                func(event, text, sender, prefix, channel, channelName)
                 if stopOnMatch then
-                    return true  -- Прерываем дальнейшую обработку
+                    return true
                 end
             else
                 print("Ошибка: функция '" .. funcName .. "' не найдена.")
             end
         end
     end
-
-    return false  -- Продолжаем обработку
+    return false
 end
 
 
@@ -1862,13 +1822,15 @@ function CustomAchievements:CreateCategoryButtons(parent)
         -- Текстура фона кнопки
         local normalTexture = button:CreateTexture(nil, "BACKGROUND")
         normalTexture:SetTexture("Interface\\AchievementFrame\\UI-Achievement-Category-Background")
-        normalTexture:SetAllPoints()
+        normalTexture:SetPoint("CENTER", button, "CENTER")
+        normalTexture:SetSize(200, 35)
+
         -- Устанавливаем координаты текстуры (выбираем нужный участок)
-        normalTexture:SetTexCoord(0.5, 0.6, 0.5, 0.6)  -- Пример: используем верхнюю половину текстуры
+        normalTexture:SetTexCoord(0, 0.6640625, 0, 1)  -- Пример: используем верхнюю половину текстуры
 
         -- Текст кнопки
         local buttonText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        buttonText:SetPoint("CENTER", button, "CENTER")
+        buttonText:SetPoint("CENTER", button, "CENTER", 0, 3)
         buttonText:SetText(category)
 
         -- Подсветка при наведении
@@ -1882,6 +1844,7 @@ function CustomAchievements:CreateCategoryButtons(parent)
         -- Обработчик клика
         button:SetScript("OnClick", function()
             self:FilterAchievementsByCategory(category)
+            print(self.category,category)
         end)
 
         self.categoryButtons[category] = button

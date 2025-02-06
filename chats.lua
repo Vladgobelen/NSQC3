@@ -6,29 +6,7 @@ local triggersByAddress = {
             keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
             conditions = {
             },
-            chatType = "GUILD",
-            stopOnMatch = false,  -- Не прерывать обработку других триггеров
-            forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
-        }
-    },
-    ["&"] = {  -- Триггер для любого сообщения
-        {
-            func = "OnAnyTrigger2",  -- Функция для любого сообщения
-            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
-            conditions = {
-            },
-            chatType = "CHANNEL",
-            stopOnMatch = false,  -- Не прерывать обработку других триггеров
-            forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
-        }
-    },
-    ["^"] = {  -- Триггер для любого сообщения
-        {
-            func = "OnAnyTrigger3",  -- Функция для любого сообщения
-            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
-            conditions = {
-            },
-            chatType = "SAY",
+            chatType = { "GUILD"},
             stopOnMatch = false,  -- Не прерывать обработку других триггеров
             forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
         }
@@ -39,7 +17,18 @@ local triggersByAddress = {
                 { word = "тест", position = 1, source = "message" }
             },
             func = "OnTestTrigger",
-            chatType = "GUILD",
+            chatType = { "GUILD"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["message:тест2"] = {
+        {
+            keyword = {
+                { word = "тест2", position = 1, source = "message" },
+                { word = "тест2", position = 2, source = "message" }
+            },
+            func = "OnTestTrigger",
+            chatType = { "GUILD"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
@@ -50,13 +39,13 @@ local triggersByAddress = {
             },
             func = "displayFld1",
             conditions = {
-                function(text, sender, channel, prefix)
+                function(channel, text, sender, prefix)
                     local kodMsg = mysplit(prefix)
                     local myNome = GetUnitName("player")
                     return kodMsg[2] == myNome
                 end
             },
-            chatType = "ADDON",
+            chatType = { "ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
@@ -67,13 +56,13 @@ local triggersByAddress = {
             },
             func = "displayFld2",
             conditions = {
-                function(text, sender, channel, prefix)
+                function(channel, text, sender, prefix)
                     local kodMsg = mysplit(prefix)
                     local myNome = GetUnitName("player")
                     return kodMsg[2] == myNome
                 end
             },
-            chatType = "ADDON",
+            chatType = { "ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
@@ -85,7 +74,7 @@ local triggersByAddress = {
             },
             func = "sendAchRez",  -- Функция, которая будет вызвана при срабатывании триггера
             conditions = {
-                function(text, sender, channel, prefix)
+                function(channel, text, sender, prefix)
                     local msg = mysplit(text)
                     for i = 1, customAchievements:GetAchievementCount() do
                         if string.find(customAchievements:GetAchievementFullData(i)["name"]:lower(), msg[3]:lower()) then
@@ -95,7 +84,7 @@ local triggersByAddress = {
                     end
                 end
             },
-            chatType = "GUILD",  -- Тип чата, на который реагирует триггер
+            chatType = { "GUILD"},  -- Тип чата, на который реагирует триггер
             stopOnMatch = false  -- Прервать обработку других триггеров после срабатывания этого222
         }
     },
@@ -106,19 +95,19 @@ local triggersByAddress = {
             },
             func = "achive_complit",
             conditions = {
-                function(text, sender, channel, prefix)
+                function(channel, text, sender, prefix)
                     local kodMsg = mysplit(prefix)
                     local myNome = GetUnitName("player")
                     return kodMsg[2] == myNome
                 end
             },
-            chatType = "ADDON",
+            chatType = { "ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     }
 }
 
-function achive_complit(text, sender, channel, prefix)
+function achive_complit(channel, text, sender, prefix)
     local kodMsg = mysplit(prefix)
     kodMsg[3] = tonumber(kodMsg[3]) -- 
     if kodMsg[3] == -1 then
@@ -135,14 +124,14 @@ function achive_complit(text, sender, channel, prefix)
     end
 end
 
-function displayFld1(text, sender, channel, prefix)
+function displayFld1(channel, text, sender, prefix)
     mFld = AdaptiveFrame:new()
     for i = 1, 50 do
         mFld:setArg(i, text:sub((i*3)-2, i*3))
         nsqc_fBtn[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
     end
 end
-function displayFld2(text, sender, channel, prefix)
+function displayFld2(channel, text, sender, prefix)
     for i = 1, 50 do
         mFld:setArg(i+50, text:sub((i*3)-2, i*3))      
         nsqc_fBtn[i+50]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
@@ -150,7 +139,7 @@ function displayFld2(text, sender, channel, prefix)
     fBtnFrame:Show()
 end
 
-function OnAnyTrigger1(text, sender, channel, prefix)
+function OnAnyTrigger1(channel, text, sender, prefix)
     local myNome = GetUnitName("player")
     if myNome == sender then
         sendAch("Копирайтер", 1, 1)
@@ -162,21 +151,21 @@ function OnAnyTrigger1(text, sender, channel, prefix)
     --     print(sender .. " написал: " .. text)
     -- end
 end
-function OnAnyTrigger2(text, sender, channel, prefix)
+function OnAnyTrigger2(channel, text, sender, prefix)
     -- local msg = mysplit(text)
     -- if string.lower(msg[1]) == "привет" then
     -- if string.find(string.lower(text), "привет") then
     --     SendChatMessage(sender .. " написал: " .. text, "CHANNEL", nil, 5)
     -- end
 end
-function OnAnyTrigger3(text, sender, channel, prefix)
+function OnAnyTrigger3(channel, text, sender, prefix)
     -- local msg = mysplit(text)
     -- if string.lower(msg[1]) == "привет" then
     --     SendChatMessage(sender .. " написал: " .. text, "CHANNEL", nil, 5)
     -- end
 end
 
-function OnTestTrigger(text, sender, channel, prefix)
+function OnTestTrigger(channel, text, sender, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
 end
 
