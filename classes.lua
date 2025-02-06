@@ -2306,7 +2306,8 @@ function CustomAchievements:GetAchievementFullData(name)
                 progress = dynamicData.progress or 0,
                 isExpanded = dynamicData.isExpanded or false,
                 scrollPosition = dynamicData.scrollPosition or 0,
-                category = _  -- Возвращаем категорию, в которой находится ачивка
+                category = staticData.category,  -- Возвращаем категорию, в которой находится ачивка
+                send_txt = staticData.send_txt
             }
         end
     end
@@ -2373,4 +2374,34 @@ function CustomAchievements:GetAchievementCount()
         count = count + 1
     end
     return count
+end
+
+-- Метод для изменения данных динамической таблицы
+function CustomAchievements:setData(name, key, value)
+    -- Проверяем, существует ли ачивка в динамической таблице
+    if not self.dynamicData[name] then
+        print("Ошибка: ачивка с именем " .. name .. " не найдена в динамической таблице.")
+        return
+    end
+
+    -- Список допустимых ключей для изменения
+    local allowedKeys = {
+        dateEarned = true,
+        dateCompleted = true,
+        progress = true,
+        isExpanded = true,
+        scrollPosition = true
+    }
+
+    -- Проверяем, является ли ключ допустимым
+    if not allowedKeys[key] then
+        print("Ошибка: ключ " .. key .. " недопустим для изменения.")
+        return
+    end
+
+    -- Изменяем значение параметра
+    self.dynamicData[name][key] = value
+
+    -- Обновляем интерфейс, если ачивка видима
+    self:UpdateUI(self.selectedCategory)
 end

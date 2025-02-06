@@ -88,7 +88,7 @@ local triggersByAddress = {
                 function(text, sender, channel, prefix)
                     local msg = mysplit(text)
                     for i = 1, customAchievements:GetAchievementCount() do
-                        if string.find(customAchievements:GetAchievementData(i)["name"]:lower(), msg[3]:lower()) then
+                        if string.find(customAchievements:GetAchievementFullData(i)["name"]:lower(), msg[3]:lower()) then
                             customAchievements:SendAchievementCompletionMessage(i)
                             return true
                         end
@@ -119,19 +119,19 @@ local triggersByAddress = {
 }
 
 function achive_complit(text, sender, channel, prefix)
-    local msg = mysplit(text)
-    msg[1] = tonumber(msg[1]) -- ID
-    msg[2] = tonumber(msg[2]) -- 
-    if msg[2] == -1 then
+    local kodMsg = mysplit(prefix)
+    kodMsg[3] = tonumber(kodMsg[3]) -- 
+    if kodMsg[3] == -1 then
         --customAchievements:AddAchievement(msg[1])
-        customAchievements:UpdateAchievement(msg[1], "dateEarned", date("%d/%m/%Y %H:%M"))
-        customAchievements:UpdateAchievement(msg[1], "dateCompleted", date("%d/%m/%Y %H:%M"))
+        customAchievements:setData(text, "dateEarned", date("%d/%m/%Y %H:%M"))
+        customAchievements:setData(text, "dateCompleted", date("%d/%m/%Y %H:%M"))
+        customAchievements:ShowAchievementAlert(text)
         PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
     else
-        if customAchievements:GetAchievementData(msg[1])["dateEarned"] == "Не получена" then
-            customAchievements:UpdateAchievement(msg[1], "dateEarned", date("%d/%m/%Y %H:%M"))
+        if customAchievements:GetAchievementData(text)["dateEarned"] == "Не получена" then
+            customAchievements:setData(text, "dateEarned", date("%d/%m/%Y %H:%M"))
         end
-        customAchievements:UpdateAchievement(msg[1], "dateCompleted", msg[2])
+        customAchievements:setData(text, "dateCompleted", kodMsg[3])
     end
 end
 
@@ -153,7 +153,7 @@ end
 function OnAnyTrigger1(text, sender, channel, prefix)
     local myNome = GetUnitName("player")
     if myNome == sender then
-        sendAch(2, 1, 1)
+        sendAch("Копирайтер", 1, 1)
     end
     -- local msg = mysplit(text)
     -- if string.find(string.lower(text), "привет") then

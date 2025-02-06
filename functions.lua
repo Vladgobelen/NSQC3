@@ -284,7 +284,7 @@ function set_miniButton()
     end)
 
     miniMapButton:SetScript("OnClick", function(self)
-        sendAch(1, -1)
+        sendAch("Великий открыватор", -1)
         SendAddonMessage("getFld ", "", "guild")
     end)
 
@@ -514,13 +514,13 @@ function C_Timer(duration, callback, isLooping)
     end)
 end
 
-function sendAch(id, arg, re)
+function sendAch(name, arg, re)
     if not re then
-        if nsDBC_ach:get_key(id)['dateEarned'] == "Не получена" then
-            SendAddonMessage("NSQC3_ach ", id .. " " .. arg, "guild")
+        if customAchievements:GetAchievementData(name)['dateEarned'] == "Не получена" then
+            SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
         end
     else
-        SendAddonMessage("NSQC3_ach ", id .. " " .. arg, "guild")
+        SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
     end
 end
 
