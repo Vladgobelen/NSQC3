@@ -144,24 +144,23 @@ end
 function displayFld1(channel, text, sender, prefix)
     for i = 1, 50 do
         --mFld:setArg(i, text:sub((i*3)-2, i*3))
-        nsqc_fBtn[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
-        nsqc_fBtn[i]:SetMultiLineTooltip(ns_tooltips[nsqc_fBtn[i].frame:GetNormalTexture():GetTexture():sub(-3)].tooltips)
-        nsqc_fBtn[i]:SetOnClick(function()
-            fBtnClick(i, nsqc_fBtn[i].frame:GetNormalTexture():GetTexture():sub(-3))
+        adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        adaptiveFrame.children[i]:SetMultiLineTooltip(ns_tooltips[adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3)].tooltips)
+        adaptiveFrame.children[i]:SetOnClick(function()
+            fBtnClick(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
     end
 end
 function displayFld2(channel, text, sender, prefix)
     for i = 1, 50 do
-        --mFld:setArg(i+50, text:sub((i*3)-2, i*3))      
-        nsqc_fBtn[i+50]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
-        nsqc_fBtn[i+50]:SetMultiLineTooltip(ns_tooltips[nsqc_fBtn[i+50].frame:GetNormalTexture():GetTexture():sub(-3)].tooltips)
-        nsqc_fBtn[i+50]:SetTextT("999")
-        nsqc_fBtn[i+50]:SetOnClick(function()
-            fBtnClick(i+50, nsqc_fBtn[i+50].frame:GetNormalTexture():GetTexture():sub(-3))
+        --mFld:setArg(i, text:sub((i*3)-2, i*3))
+        adaptiveFrame.children[i+50]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        adaptiveFrame.children[i+50]:SetMultiLineTooltip(ns_tooltips[adaptiveFrame.children[i+50].frame:GetNormalTexture():GetTexture():sub(-3)].tooltips)
+        adaptiveFrame.children[i+50]:SetOnClick(function()
+            fBtnClick(i+50, adaptiveFrame.children[i+50].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
     end
-    fBtnFrame:Show()
+    adaptiveFrame:Show()
 end
 
 function OnAnyTrigger1(channel, text, sender, prefix)

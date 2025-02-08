@@ -382,7 +382,7 @@ function createFld()
     -- Создаем адаптивный фрейм
     adaptiveFrame = AdaptiveFrame:new(UIParent)
     adaptiveFrame:AddButtons(100, 10, adaptiveFrame:GetSize()/10, nil, nil)
-    
+    adaptiveFrame:Hide()
     adaptiveFrame:StartMovementAlphaTracking()
 
     local movementFrame = CreateFrame("Frame")
@@ -489,9 +489,25 @@ function sendAch(name, arg, re)
     end
 end
 
+local set = true
+
 function fBtnClick(id, obj)
-    print(arg1,arg2,arg3)
-    print(id, obj)
+    if not set then
+        return
+    end
+    set = false
+
+    if arg2 then
+        print("Функция запущена с параметрами:", id, obj)
+    end
+
+    if not arg2 then
+
+    end
+
+    C_Timer(.3, function()
+        set = true
+    end)
 end
 
 function getPoint()

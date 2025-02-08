@@ -599,7 +599,7 @@ local MIN_WIDTH = 200       -- Минимальная ширина фрейма
 local MIN_HEIGHT = 200      -- Минимальная высота фрейма
 local BUTTON_PADDING = 0    -- Расстояние между кнопками
 local F_PAD = 40
-local MOVE_ALPHA = .3
+local MOVE_ALPHA = .0
 
 -- Добавляем константы прозрачности
 local FRAME_ALPHA = 0.8     -- Прозрачность основного фрейма
@@ -618,10 +618,11 @@ function AdaptiveFrame:new(parent)
     self.initialAspectRatio = self.width / self.height  -- Сохраняем начальное соотношение сторон
     self.buttonsPerRow = 5  -- Количество кнопок в ряду (по умолчанию)
 
-    -- Создаем фрейм
+    -- Создаем фрейм2
     self.frame = CreateFrame("Frame", nil, self.parent)
     self.frame:SetSize(self.width, self.height)
-    self.frame:SetPoint("CENTER", self.parent, "CENTER", 0, 0)
+    self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
+    self.frame:SetFrameStrata("HIGH")
     self.frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -719,7 +720,7 @@ function AdaptiveFrame:new(parent)
     end)
     self.resizeHandle:SetScript("OnMouseUp", function()
         self.frame:StopMovingOrSizing()
-        self:AdjustSizeAndPosition()
+        --self:AdjustSizeAndPosition()
     end)
 
     -- Обработчик изменения размера фрейма
@@ -773,34 +774,23 @@ function AdaptiveFrame:GetSize()
     return width, height
 end
 
--- Метод для проверки и корректировки размеров фрейма
 function AdaptiveFrame:CheckFrameSize(width, height)
     local screenWidth, screenHeight = WorldFrame:GetWidth(), WorldFrame:GetHeight()
-    local maxFrameWidth = screenWidth - 100
-    local maxFrameHeight = screenHeight - 100
+    local maxFrameHeight = screenHeight + 200 -- Максимальная высота фрейма
+    local minFrameHeight = MIN_HEIGHT         -- Минимальная высота фрейма
 
-    if width < MIN_WIDTH then
-        width = MIN_WIDTH
-    elseif width > maxFrameWidth then
-        width = maxFrameWidth
-    end
-
-    if height < MIN_HEIGHT then
-        height = MIN_HEIGHT
-    elseif height > maxFrameHeight then
+    -- Ограничиваем высоту фрейма максимальной доступной высотой
+    if height > maxFrameHeight then
         height = maxFrameHeight
     end
 
-    local newAspectRatio = width / height
-    if newAspectRatio ~= self.initialAspectRatio then
-        if newAspectRatio > self.initialAspectRatio then
-            height = width / self.initialAspectRatio
-        else
-            width = height * self.initialAspectRatio
-        end
+    -- Проверяем минимальную высоту
+    if height < minFrameHeight then
+        height = minFrameHeight
     end
 
-    return width, height
+    -- Возвращаем высоту как ширину и высоту для сохранения пропорций
+    return height, height
 end
 
 -- Метод для позиционирования и размеров кнопок
@@ -858,6 +848,8 @@ function AdaptiveFrame:AddButtons(numButtons, buttonsPerRow, size, texture, high
     for i = 1, numButtons do
         local buttonName = "button"..i
         local button = ButtonManager:new(buttonName, self.frame, buttonWidth, buttonHeight, buttonText, 'Interface\\AddOns\\NSQC3\\libs\\00t.tga', nil)
+        button.frame:RegisterForClicks("LeftButtonUp", "LeftButtonDown", "RightButtonUp", "RightButtonDown", "MiddleButtonDown", "Button4Up", "Button5Up", "Button5Down")
+        button.frame:EnableMouseWheel(true)
         button.frame:SetAlpha(BUTTON_ALPHA)  -- Устанавливаем прозрачность кнопки
         table.insert(self.children, button)
     end
@@ -894,12 +886,14 @@ function AdaptiveFrame:StartMovementAlphaTracking()
         if shouldUpdate and math.abs(self.currentAlpha - self.targetAlpha) > 0.01 then
             self.currentAlpha = self.currentAlpha + (self.targetAlpha - self.currentAlpha) * self.alphaSpeed * elapsed
             self.currentAlpha = math.min(math.max(self.currentAlpha, 0), 1)
-            
-            -- Обновление кнопок
+            -- Обновление кнопок2
             for _, child in ipairs(self.parent.children) do
                 if child.frame and child.frame.SetAlpha then
                     child.frame:SetAlpha(self.currentAlpha)
                     child.frame:EnableMouse(self.currentAlpha > 0.1)
+                    if self.currentAlpha < .1 then
+                        self.parent:Hide()
+                    end
                 end
             end
         end
