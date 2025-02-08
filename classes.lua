@@ -358,7 +358,7 @@ ButtonManager = {}
 ButtonManager.__index = ButtonManager
 
 -- Конструктор для создания новой кнопки
-function ButtonManager:new(name, parent, width, height, text, texture, parentFrame)
+function ButtonManager:new(name, parent, width, height, text, texture, mv)
     local button = setmetatable({}, ButtonManager)
     -- Создаем фрейм кнопки
     if texture then
@@ -378,10 +378,10 @@ function ButtonManager:new(name, parent, width, height, text, texture, parentFra
     -- Устанавливаем размер и текст кнопки
     button.frame:SetSize(width, height)
     button:SetText(text)
-
+    
     -- Делаем кнопку перемещаемой
-    if parentFrame then
-        button:SetMovable(parentFrame)
+    if mv then
+        button:SetMovable(mv)
     end
     
     return button
@@ -479,10 +479,67 @@ function ButtonManager:SetTooltip(text)
     end)
 end
 
--- Метод для изменения размера кнопки
+function ButtonManager:SetMultiLineTooltip(tooltipsTable)
+    -- Проверяем, что tooltipsTable является таблицей
+    if type(tooltipsTable) ~= "table" or not tooltipsTable then
+        print("Ошибка: tooltipsTable должен быть таблицей!")
+        return
+    end
+
+    -- Проверяем, что таблица не пустая
+    if #tooltipsTable == 0 then
+        print("Предупреждение: tooltipsTable пуст!")
+        return
+    end
+
+    -- Устанавливаем обработчики событий OnEnter и OnLeave
+    self.frame:SetScript("OnEnter", function(selfFrame)
+        -- Создаем Tooltip и устанавливаем его владельца
+        GameTooltip:SetOwner(selfFrame, "ANCHOR_RIGHT")
+        
+        -- Перебираем все строки из переданной таблицы и добавляем их в Tooltip
+        for _, line in ipairs(tooltipsTable) do
+            GameTooltip:AddLine(line, 1, 1, 1) -- Добавляем строку с белым цветом (RGB: 1, 1, 1)
+        end
+        
+        -- Показываем Tooltip
+        GameTooltip:Show()
+    end)
+
+    -- Скрываем Tooltip при выходе курсора
+    self.frame:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+end
+
 function ButtonManager:SetSize(width, height)
     if self.frame then
-        self.frame:SetSize(width, height)
+        self.frame:SetWidth(width)  -- Используем SetWidth и SetHeight вместо SetSize
+        self.frame:SetHeight(height)
+    else
+        print("Ошибка: фрейм кнопки не существует!")
+    end
+end
+
+function ButtonManager:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset)
+    if self.frame then
+        self.frame:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset)
+    else
+        print("Ошибка: фрейм кнопки не существует!")
+    end
+end
+
+function ButtonManager:Hide()
+    if self.frame then
+        self.frame:Hide()
+    else
+        print("Ошибка: фрейм кнопки не существует!")
+    end
+end
+
+function ButtonManager:Show()
+    if self.frame then
+        self.frame:Show()
     else
         print("Ошибка: фрейм кнопки не существует!")
     end
@@ -534,135 +591,340 @@ function ButtonManager:SetMovable(isMovable)
     end
 end
 
+-- Константы
+local CLOSE_BUTTON_SIZE = 32
+local PADDING = 15
+local SCREEN_PADDING = -40  -- Отступ от краев экрана
+local MIN_WIDTH = 200       -- Минимальная ширина фрейма
+local MIN_HEIGHT = 200      -- Минимальная высота фрейма
+local BUTTON_PADDING = 0    -- Расстояние между кнопками
+local F_PAD = 40
+local MOVE_ALPHA = .3
+
+-- Добавляем константы прозрачности
+local FRAME_ALPHA = 0.8     -- Прозрачность основного фрейма
+local BUTTON_ALPHA = testQ['ns_temp_a'] or 1    -- Прозрачность дочерних кнопок
+
 -- Определяем класс AdaptiveFrame
 AdaptiveFrame = {}
 AdaptiveFrame.__index = AdaptiveFrame
 
--- Функция для проверки размеров кнопок и корректировки размеров фрейма
-local function CheckButtonSizes(frame)
-    local frameWidth, frameHeight = frame:GetSize()
-    local numColumns = 10
-    local numRows = math.ceil(#frame.children / numColumns)
-    local buttonWidth = frameWidth / numColumns
-    local buttonHeight = frameHeight / numRows
-
-    -- Проверяем размер текста на каждой кнопке
-    for _, buttonData in ipairs(frame.children) do
-        if buttonData and buttonData.child then
-            local fontString = buttonData.child:GetFontString()
-            if fontString then
-                local textWidth = fontString:GetStringWidth()
-                local textHeight = fontString:GetStringHeight()
-
-                -- Если текст не влезает, увеличиваем размер кнопки
-                if textWidth > buttonWidth or textHeight > buttonHeight then
-                    buttonWidth = math.max(buttonWidth, textWidth + 10)  -- Добавляем отступ
-                    buttonHeight = math.max(buttonHeight, textHeight + 10)
-                end
-            end
-        end
-    end
-
-    -- Возвращаем новые размеры фрейма на основе размеров кнопок
-    return buttonWidth * numColumns, buttonHeight * numRows
-end
-
--- Функция для проверки и корректировки размеров фрейма
-local function CheckFrameSize(frame, newWidth, newHeight)
-    -- Проверяем минимальный размер фрейма на основе размеров кнопок
-    local minWidth, minHeight = CheckButtonSizes(frame)
-    local widthWithMin = math.max(newWidth, minWidth)  -- Ограничиваем снизу
-    local heightWithMin = math.max(newHeight, minHeight)
-
-    -- Проверяем максимальный размер фрейма, чтобы он не выходил за пределы экрана
-    local worldWidth = WorldFrame:GetWidth()
-    local worldHeight = WorldFrame:GetHeight()
-    local maxWidth = worldWidth - 200
-    local maxHeight = worldHeight - 200
-    local finalWidth = math.min(widthWithMin, maxWidth)  -- Ограничиваем сверху
-    local finalHeight = math.min(heightWithMin, maxHeight)
-
-    return finalWidth, finalHeight
-end
-
 -- Конструктор для создания нового объекта AdaptiveFrame
-function AdaptiveFrame:Create(parent, initialWidth, initialHeight)
-    initialWidth = initialWidth or 512
-    initialHeight = initialHeight or 512
+function AdaptiveFrame:new(parent)
+    local self = setmetatable({}, AdaptiveFrame)
+    self.parent = parent or UIParent
+    self.width = 600        -- По умолчанию ширина
+    self.height = 600       -- По умолчанию высота
+    self.initialAspectRatio = self.width / self.height  -- Сохраняем начальное соотношение сторон
+    self.buttonsPerRow = 5  -- Количество кнопок в ряду (по умолчанию)
 
     -- Создаем фрейм
-    local frame = CreateFrame("Frame", nil, parent)
-    frame:SetSize(initialWidth, initialHeight)
-    frame:SetBackdrop({
+    self.frame = CreateFrame("Frame", nil, self.parent)
+    self.frame:SetSize(self.width, self.height)
+    self.frame:SetPoint("CENTER", self.parent, "CENTER", 0, 0)
+    self.frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    frame:SetBackdropColor(0.1, 0.1, 0.1, 0.0)
-    frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
-    -- Сохраняем начальное соотношение сторон
-    frame.initialAspectRatio = initialWidth / initialHeight
-    frame:SetResizable(true)
-    frame.children = {}
+    self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Устанавливаем прозрачность фрейма
+    self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
 
-    -- Добавляем методы к фрейму
-    frame.AddChild = AdaptiveFrame.AddChild
-    frame.UpdateSize = AdaptiveFrame.UpdateSize
-    frame.AddGrid = AdaptiveFrame.AddGrid
-    frame.ResizeButtons = AdaptiveFrame.ResizeButtons
+    -- Включаем возможность перемещения и изменения размера фрейма
+    self.frame:SetMovable(true)
+    self.frame:SetResizable(true)  -- Включаем возможность изменения размера
+    self.frame:EnableMouse(true)
+    self.frame:RegisterForDrag("LeftButton", "RightButton")  -- Регистрируем обработку левой и правой кнопок мыши
 
-    -- Включаем возможность перемещения фрейма
-    frame:SetMovable(true)
-    
+    -- Обработчик клика правой кнопкой мыши
+    self.frame:SetScript("OnMouseDown", function(_, button)
+        if button == "RightButton" then
+            self:ToggleFrameAlpha()
+        elseif button == "LeftButton" then
+            self:StartMoving()
+        end
+    end)
+
+    -- Обработчик перетаскивания правой кнопкой мыши
+    local startX = 0
+    local isDragging = false
+
+    self.frame:SetScript("OnMouseUp", function(_, button)
+        if button == "RightButton" then
+            isDragging = false
+            self.frame:SetScript("OnUpdate", nil) -- Удаляем OnUpdate, когда перетаскивание завершено
+        else
+            self:StopMovingOrSizing()
+        end
+    end)
+
+    self.frame:SetScript("OnDragStart", function(_, button)
+        if button == "RightButton" then
+            startX = GetCursorPosition()
+            isDragging = true
+            -- Устанавливаем OnUpdate только при начале перетаскивания
+            self.frame:SetScript("OnUpdate", function()
+                if isDragging then
+                    local currentX = GetCursorPosition()
+                    local deltaX = currentX - startX
+                    startX = currentX
+
+                    -- Изменяем прозрачность дочерних кнопок
+                    for _, child in ipairs(self.children) do
+                        local currentAlpha = child.frame:GetAlpha() -- Исправлено: child.frame -> child
+                        if deltaX > 0 then
+                            -- Увеличиваем прозрачность при движении вправо
+                            child.frame:SetAlpha(math.min(currentAlpha + math.abs(deltaX) / 1000, 1)) -- Исправлено: child.frame -> child
+                            testQ['ns_temp_a'] = math.min(currentAlpha + math.abs(deltaX) / 1000, 1)
+                        elseif deltaX < 0 then
+                            -- Уменьшаем прозрачность при движении влево
+                            child.frame:SetAlpha(math.max(currentAlpha - math.abs(deltaX) / 1000, 0)) -- Исправлено: child.frame -> child
+                            testQ['ns_temp_a'] = math.max(currentAlpha - math.abs(deltaX) / 1000, 0)
+                        end
+                    end
+                end
+            end)
+        else
+            self:StartMoving()
+        end
+    end)
+
+    self.frame:SetScript("OnDragStop", function(_, button)
+        if button == "RightButton" then
+            isDragging = false
+            self.frame:SetScript("OnUpdate", nil) -- Удаляем OnUpdate при остановке перетаскивания
+        else
+            self:StopMovingOrSizing()
+        end
+    end)
+
+    -- Создаем кнопку закрытия
+    self.closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
+    self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING, -PADDING)
+    self.closeButton:SetScript("OnClick", function()
+        self:Hide()
+    end)
 
     -- Создаем ручку для изменения размера фрейма
-    local resizeHandle = CreateFrame("Button", nil, frame)
-    resizeHandle:SetSize(16, 16)
-    resizeHandle:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-    resizeHandle:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    resizeHandle:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    resizeHandle:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    resizeHandle:SetScript("OnMouseDown", function(self)
-        frame:StartSizing("BOTTOMRIGHT")
+    self.resizeHandle = CreateFrame("Button", nil, self.frame)
+    self.resizeHandle:SetSize(16, 16)
+    self.resizeHandle:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -40, 40)
+    self.resizeHandle:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    self.resizeHandle:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    self.resizeHandle:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    self.resizeHandle:SetScript("OnMouseDown", function()
+        self.frame:StartSizing("BOTTOMRIGHT")
     end)
-    resizeHandle:SetScript("OnMouseUp", function(self)
-        frame:StopMovingOrSizing()
-        frame:ResizeButtons()
+    self.resizeHandle:SetScript("OnMouseUp", function()
+        self.frame:StopMovingOrSizing()
+        self:AdjustSizeAndPosition()
     end)
 
     -- Обработчик изменения размера фрейма
-    frame:SetScript("OnSizeChanged", function(self, width, height)
-        -- Проверяем размеры фрейма
-        width, height = CheckFrameSize(self, width, height)
-
-        -- Сохраняем пропорции сторон
-        local newAspectRatio = width / height
-        if newAspectRatio ~= self.initialAspectRatio then
-            if newAspectRatio > self.initialAspectRatio then
-                height = width / self.initialAspectRatio
-            else
-                width = height * self.initialAspectRatio
-            end
-            self:SetSize(width, height)
-        end
-
-        -- Обновляем размеры и позиции кнопок
-        self:ResizeButtons()
+    self.frame:SetScript("OnSizeChanged", function(_, width, height)
+        width, height = self:CheckFrameSize(width, height)
+        self.frame:SetSize(width, height)
+        self:AdjustSizeAndPosition()
     end)
 
-    -- Создаем кнопку закрытия фрейма
-    local closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeButton:SetSize(32, 32)
-    closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 25, 25)
-    closeButton:SetScript("OnClick", function()
-        frame:Hide()
-    end)
+    -- Инициализируем список дочерних элементов
+    self.children = {}
 
-    return frame
+    return self
 end
 
-function AdaptiveFrame:new()
+-- Метод для переключения прозрачности основного фрейма
+function AdaptiveFrame:ToggleFrameAlpha()
+    local currentAlpha = select(4, self.frame:GetBackdropColor())
+    if currentAlpha > 0.5 then
+        self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
+    elseif currentAlpha == 0 then
+        self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Возвращаем исходную прозрачность
+    end
+end
+
+-- Метод для начала перемещения фрейма
+function AdaptiveFrame:StartMoving()
+    self.frame:StartMoving()
+end
+
+-- Метод для остановки перемещения или изменения размера фрейма
+function AdaptiveFrame:StopMovingOrSizing()
+    self.frame:StopMovingOrSizing()
+    self:AdjustSizeAndPosition()
+end
+
+-- Метод для скрытия фрейма
+function AdaptiveFrame:Hide()
+    self.frame:Hide()
+end
+
+-- Метод для отображения фрейма
+function AdaptiveFrame:Show()
+    self.frame:Show()
+    self:AdjustSizeAndPosition()
+end
+
+-- Метод для получения размеров фрейма
+function AdaptiveFrame:GetSize()
+    local width, height = self.frame:GetSize()
+    return width, height
+end
+
+-- Метод для проверки и корректировки размеров фрейма
+function AdaptiveFrame:CheckFrameSize(width, height)
+    local screenWidth, screenHeight = WorldFrame:GetWidth(), WorldFrame:GetHeight()
+    local maxFrameWidth = screenWidth - 100
+    local maxFrameHeight = screenHeight - 100
+
+    if width < MIN_WIDTH then
+        width = MIN_WIDTH
+    elseif width > maxFrameWidth then
+        width = maxFrameWidth
+    end
+
+    if height < MIN_HEIGHT then
+        height = MIN_HEIGHT
+    elseif height > maxFrameHeight then
+        height = maxFrameHeight
+    end
+
+    local newAspectRatio = width / height
+    if newAspectRatio ~= self.initialAspectRatio then
+        if newAspectRatio > self.initialAspectRatio then
+            height = width / self.initialAspectRatio
+        else
+            width = height * self.initialAspectRatio
+        end
+    end
+
+    return width, height
+end
+
+-- Метод для позиционирования и размеров кнопок
+function AdaptiveFrame:AdjustSizeAndPosition()
+    local buttonsPerRow = 10  -- Фиксируем 10 столбцов
+    local numChildren = #self.children
+    local rows = math.ceil(numChildren / buttonsPerRow)
+
+    local frameWidth, frameHeight = self.frame:GetSize()
+    local buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
+    local buttonHeight = buttonWidth
+
+    local requiredWidth = 2 * F_PAD + buttonsPerRow * buttonWidth + (buttonsPerRow - 1) * BUTTON_PADDING
+    local requiredHeight = 2 * F_PAD + rows * buttonHeight + (rows - 1) * BUTTON_PADDING
+
+    if frameWidth < requiredWidth or frameHeight < requiredHeight then
+        self.frame:SetSize(requiredWidth, requiredHeight)
+        frameWidth, frameHeight = requiredWidth, requiredHeight
+        buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
+        buttonHeight = buttonWidth
+    end
+
+    for i, child in ipairs(self.children) do
+        local row = math.floor((i - 1) / buttonsPerRow)
+        local col = (i - 1) % buttonsPerRow
+        local x = F_PAD + col * (buttonWidth + BUTTON_PADDING)
+        local y = F_PAD + row * (buttonHeight + BUTTON_PADDING)
+
+        if ButtonManager.SetSize and ButtonManager.SetPoint then
+            ButtonManager.SetSize(child, buttonWidth, buttonHeight)
+            ButtonManager.SetPoint(child, "BOTTOMLEFT", self.frame, "BOTTOMLEFT", x, y)
+        else
+            print("Error: Child does not support required methods")
+        end
+    end
+
+    local screenWidth, screenHeight = UIParent:GetSize()
+    local x, y = self.frame:GetLeft(), self.frame:GetBottom()
+    x = math.max(SCREEN_PADDING, math.min(x, screenWidth - frameWidth - SCREEN_PADDING))
+    y = math.max(SCREEN_PADDING, math.min(y, screenHeight - frameHeight - SCREEN_PADDING))
+
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)
+end
+
+-- Метод для добавления массива кнопок на фрейм
+function AdaptiveFrame:AddButtons(numButtons, buttonsPerRow, size, texture, highlightTexture)
+    self.buttonsPerRow = buttonsPerRow or self.buttonsPerRow
+    local buttonWidth = size
+    local buttonHeight = size
+    local buttonTexture = texture
+    local buttonHighlightTexture = highlightTexture
+    local buttonText = ""
+
+    for i = 1, numButtons do
+        local buttonName = "button"..i
+        local button = ButtonManager:new(buttonName, self.frame, buttonWidth, buttonHeight, buttonText, 'Interface\\AddOns\\NSQC3\\libs\\00t.tga', nil)
+        button.frame:SetAlpha(BUTTON_ALPHA)  -- Устанавливаем прозрачность кнопки
+        table.insert(self.children, button)
+    end
+
+    self:AdjustSizeAndPosition()
+end
+
+-- Метод для управления прозрачностью дочерних кнопок при движении персонажа
+function AdaptiveFrame:StartMovementAlphaTracking()
+    if self.movementFrame then return end -- Уже отслеживается
+    local movementFrame = CreateFrame("Frame")
+    self.movementFrame = movementFrame
+    movementFrame.parent = self
+    movementFrame.targetAlpha = MOVE_ALPHA
+    movementFrame.currentAlpha = testQ['ns_temp_a']
+    movementFrame.alphaSpeed = 2
+    movementFrame.BUTTON_ALPHA = testQ['ns_temp_a']  -- Сохраняем исходное значение
+    
+    movementFrame:SetScript("OnUpdate", function(self, elapsed)
+        local isMoving = GetUnitSpeed("player") > 0
+        local shouldUpdate = false
+        
+        -- Определение целевой прозрачности
+        if isMoving then
+            self.targetAlpha = MOVE_ALPHA
+            self.parent.frame:EnableMouse(self.targetAlpha > 0.1)
+            shouldUpdate = true
+        else
+            self.targetAlpha = self.BUTTON_ALPHA  -- Возвращаемся к BUTTON_ALPHA при остановке
+            shouldUpdate = true
+        end
+        
+        -- Плавное изменение прозрачности
+        if shouldUpdate and math.abs(self.currentAlpha - self.targetAlpha) > 0.01 then
+            self.currentAlpha = self.currentAlpha + (self.targetAlpha - self.currentAlpha) * self.alphaSpeed * elapsed
+            self.currentAlpha = math.min(math.max(self.currentAlpha, 0), 1)
+            
+            -- Обновление кнопок
+            for _, child in ipairs(self.parent.children) do
+                if child.frame and child.frame.SetAlpha then
+                    child.frame:SetAlpha(self.currentAlpha)
+                    child.frame:EnableMouse(self.currentAlpha > 0.1)
+                end
+            end
+        end
+        
+        -- Автоматическая остановка при достижении цели
+        if not isMoving and math.abs(self.currentAlpha - self.targetAlpha) < 0.01 then
+            self.currentAlpha = testQ['ns_temp_a']  -- Точно устанавливаем конечное значение
+            self.parent.frame:EnableMouse(true)
+            self.parent.frame:StopMovingOrSizing()
+            self.parent:StopMovementAlphaTracking()
+        end
+    end)
+end
+
+-- Метод для остановки отслеживания движения и очистки скрипта
+function AdaptiveFrame:StopMovementAlphaTracking()
+    if self.movementFrame then
+        self.movementFrame:SetScript("OnUpdate", nil)  -- Удаляем обработчик OnUpdate
+        self.movementFrame = nil  -- Очищаем ссылку на movementFrame
+    end
+end
+
+mDB = {}
+mDB.__index = mDB
+function mDB:new()
     local private = {}
 
     local obj = {
@@ -677,126 +939,6 @@ function AdaptiveFrame:new()
     setmetatable(obj, self)
     self.__index = self
     return obj
-end
-
-
--- Метод для изменения размера кнопок в зависимости от размера фрейма
-function AdaptiveFrame:ResizeButtons()
-    local frameWidth, frameHeight = self:GetSize()
-    local numColumns = 10
-    local numRows = math.ceil(#self.children / numColumns)
-    local buttonWidth = frameWidth / numColumns
-    local buttonHeight = frameHeight / numRows
-
-    -- Обновляем размеры и позиции всех кнопок
-    for i, buttonData in ipairs(self.children) do
-        if buttonData and buttonData.child then
-            buttonData.child:SetSize(buttonWidth, buttonHeight)
-            local column = (i - 1) % numColumns
-            local row = math.floor((i - 1) / numColumns)
-            local xOffset = column * buttonWidth
-            local yOffset = row * buttonHeight
-            buttonData.child:ClearAllPoints()
-            buttonData.child:SetPoint("TOPLEFT", self, "TOPLEFT", xOffset, -yOffset)
-        end
-    end
-end
-
--- Метод для добавления элементов в сетку (grid)
-function AdaptiveFrame:AddGrid(buttons, num, columns, spacing)
-    spacing = spacing or 10
-    local xOffset = 10
-    local yOffset = 10
-    local currentColumn = 1
-
-    -- Добавляем кнопки в сетку
-    for i = 1, num do
-        local button = buttons[i]
-        if button and button.frame then
-            -- Добавляем кнопку в список дочерних элементов
-            table.insert(self.children, {child = button.frame, xOffset = xOffset, yOffset = yOffset})
-
-            -- Устанавливаем родителя для кнопки
-            button.frame:SetParent(self)
-            button.frame:ClearAllPoints()
-            button.frame:SetPoint("TOPLEFT", self, "TOPLEFT", xOffset, -yOffset)
-
-            -- Добавляем обработчики событий для перемещения фрейма
-            button.frame:SetScript("OnMouseDown", function(self, button)
-                if button == "LeftButton" then
-                    self:GetParent():StartMoving()
-                else
-                    -- Изменение прозрачности правой кнопкой мыши
-                    local frame = self:GetParent()
-                    local startX = GetCursorPosition()
-                    local startAlpha = frame:GetAlpha()
-
-                    -- Обработчик перемещения мыши для изменения прозрачности
-                    frame:SetScript("OnUpdate", function(self)
-                        local currentX = GetCursorPosition()
-                        local deltaX = currentX - startX
-                        local newAlpha = startAlpha + (deltaX / 500)  -- Меняем прозрачность на основе смещения мыши
-
-                        -- Ограничиваем прозрачность в пределах от 0.1 до 1.0
-                        newAlpha = math.max(0.1, math.min(1.0, newAlpha))
-
-                        -- Устанавливаем новую прозрачность для всех дочерних элементов
-                        self:SetAlpha(newAlpha)
-                        for _, childData in ipairs(self.children) do
-                            if childData and childData.child then
-                                childData.child:SetAlpha(newAlpha)
-                            end
-                        end
-                    end)
-                end
-            end)
-
-            button.frame:SetScript("OnMouseUp", function(self, button)
-                if button == "LeftButton" then
-                    local parentFrame = self:GetParent()
-                    parentFrame:StopMovingOrSizing()
-
-                    -- Ограничиваем позицию фрейма в пределах экрана
-                    local screenWidth = UIParent:GetWidth()
-                    local screenHeight = UIParent:GetHeight()
-                    local frameWidth = parentFrame:GetWidth()
-                    local frameHeight = parentFrame:GetHeight()
-                    local x, y = parentFrame:GetCenter()
-
-                    if x < frameWidth / 2 then
-                        x = frameWidth / 2
-                    elseif x > screenWidth - frameWidth / 2 then
-                        x = screenWidth - frameWidth / 2
-                    end
-
-                    if y < frameHeight / 2 then
-                        y = frameHeight / 2
-                    elseif y > screenHeight - frameHeight / 2 then
-                        y = screenHeight - frameHeight / 2
-                    end
-
-                    parentFrame:ClearAllPoints()
-                    parentFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
-                else
-                    -- Отмена изменения прозрачности при отпускании правой кнопки мыши
-                    local parentFrame = self:GetParent()
-                    parentFrame:SetScript("OnUpdate", nil)  -- Убираем обработчик изменения прозрачности
-                end
-            end)
-
-            -- Обновляем смещение для следующей кнопки
-            if currentColumn < columns then
-                xOffset = xOffset + button.frame:GetWidth() + spacing
-                currentColumn = currentColumn + 1
-            else
-                xOffset = 10
-                yOffset = yOffset + button.frame:GetHeight() + spacing
-                currentColumn = 1
-            end
-        else
-            print("Ошибка: кнопка или её frame не существует для индекса " .. i)
-        end
-    end
 end
 
 -- Класс UniversalInfoFrame
@@ -1455,7 +1597,6 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
     return false
 end
 
-
 -- Класс для работы с кастомными достижениями
 CustomAchievements = {}
 CustomAchievements.__index = CustomAchievements
@@ -1844,7 +1985,6 @@ function CustomAchievements:CreateCategoryButtons(parent)
         -- Обработчик клика
         button:SetScript("OnClick", function()
             self:FilterAchievementsByCategory(category)
-            print(self.category,category)
         end)
 
         self.categoryButtons[category] = button

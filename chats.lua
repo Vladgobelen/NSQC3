@@ -104,8 +104,25 @@ local triggersByAddress = {
             chatType = { "ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
+    },
+    ["prefix:sendPoint"] = {
+        {
+            keyword = {
+                { word = "sendPoint", position = 1, source = "prefix" },
+            },
+            func = "sendPoint",
+            conditions = {
+            },
+            chatType = { "ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
     }
 }
+
+function sendPoint(channel, text, sender, prefix)
+    local temp = mysplit(text)
+    mFld:setArg("gPoint", temp)
+end
 
 function achive_complit(channel, text, sender, prefix)
     local kodMsg = mysplit(prefix)
@@ -125,16 +142,24 @@ function achive_complit(channel, text, sender, prefix)
 end
 
 function displayFld1(channel, text, sender, prefix)
-    mFld = AdaptiveFrame:new()
     for i = 1, 50 do
-        mFld:setArg(i, text:sub((i*3)-2, i*3))
+        --mFld:setArg(i, text:sub((i*3)-2, i*3))
         nsqc_fBtn[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        nsqc_fBtn[i]:SetMultiLineTooltip(ns_tooltips[nsqc_fBtn[i].frame:GetNormalTexture():GetTexture():sub(-3)].tooltips)
+        nsqc_fBtn[i]:SetOnClick(function()
+            fBtnClick(i, nsqc_fBtn[i].frame:GetNormalTexture():GetTexture():sub(-3))
+        end)
     end
 end
 function displayFld2(channel, text, sender, prefix)
     for i = 1, 50 do
-        mFld:setArg(i+50, text:sub((i*3)-2, i*3))      
+        --mFld:setArg(i+50, text:sub((i*3)-2, i*3))      
         nsqc_fBtn[i+50]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        nsqc_fBtn[i+50]:SetMultiLineTooltip(ns_tooltips[nsqc_fBtn[i+50].frame:GetNormalTexture():GetTexture():sub(-3)].tooltips)
+        nsqc_fBtn[i+50]:SetTextT("999")
+        nsqc_fBtn[i+50]:SetOnClick(function()
+            fBtnClick(i+50, nsqc_fBtn[i+50].frame:GetNormalTexture():GetTexture():sub(-3))
+        end)
     end
     fBtnFrame:Show()
 end

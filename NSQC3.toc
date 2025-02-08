@@ -13,3 +13,4 @@ classes.lua
 emblem.tga
 chats.lua
 NSQC3.xml
+tooltips.lua
