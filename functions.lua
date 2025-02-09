@@ -526,78 +526,108 @@ function isMod(obj)
     return ns_tooltips[obj].mod
 end
 
--- Таблица для преобразования чисел в символы
+-- Локализация системных функций
+local abs, floor = math.abs, math.floor
+local byte, sub, char = string.byte, string.sub, string.char
+local tbl_insert, tbl_concat, error = table.insert, table.concat, error
+
+-- Таблица конвертации чисел в символы
 local _convertTable3 = {
-    [0] = "0", [1] = "2", [2] = "3", [3] = "4", [4] = "5",
-    [5] = "6", [6] = "7", [7] = "8", [8] = "9", [9] = ":",
-    [10] = ";", [11] = "<", [12] = "=", [13] = ">", [14] = "?",
-    [15] = "@", [16] = "A", [17] = "B", [18] = "C", [19] = "D",
-    [20] = "E", [21] = "F", [22] = "G", [23] = "H", [24] = "I",
-    [25] = "J", [26] = "K", [27] = "L", [28] = "M", [29] = "N",
-    [30] = "O", [31] = "P", [32] = "Q", [33] = "R", [34] = "S",
-    [35] = "T", [36] = "U", [37] = "V", [38] = "W", [39] = "X",
-    [40] = "Y", [41] = "Z", [42] = "[", [43] = "\\", [44] = "]",
-    [45] = "^", [46] = "_", [47] = "`", [48] = "a", [49] = "b",
-    [50] = "c", [51] = "d", [52] = "e", [53] = "f", [54] = "g",
-    [55] = "h", [56] = "i", [57] = "j", [58] = "k", [59] = "l",
-    [60] = "m", [61] = "n", [62] = "o", [63] = "p", [64] = "q",
-    [65] = "r", [66] = "s", [67] = "t", [68] = "u", [69] = "v",
-    [70] = "w", [71] = "x", [72] = "y", [73] = "z", [74] = "{",
-    [75] = "|", [76] = "}", [77] = "~", [78] = "!", [79] = "#",
-    [80] = "$", [81] = "%", [82] = "&", [83] = "'", [84] = "(",
-    [85] = ")", [86] = "*", [87] = "+", [88] = ",", [89] = "-",
+    [0] = "0", [1] = "1", [2] = "2", [3] = "3", [4] = "4",
+    [5] = "5", [6] = "6", [7] = "7", [8] = "8", [9] = "9",
+    [10] = "A", [11] = "B", [12] = "C", [13] = "D", [14] = "E",
+    [15] = "F", [16] = "G", [17] = "#", [18] = "$", [19] = "%",
+    [20] = "(", [21] = ")", [22] = "*", [23] = "+", [24] = "-",
+    [25] = ".", [26] = "/", [27] = ":", [28] = ";", [29] = "<",
+    [30] = "=", [31] = ">", [32] = "?", [33] = "@", [34] = "H",
+    [35] = "I", [36] = "J", [37] = "K", [38] = "L", [39] = "M",
+    [40] = "N", [41] = "O", [42] = "P", [43] = "Q", [44] = "R",
+    [45] = "S", [46] = "T", [47] = "U", [48] = "V", [49] = "W",
+    [50] = "X", [51] = "Y", [52] = "Z", [53] = "^", [54] = "_",
+    [55] = "`", [56] = "a", [57] = "b", [58] = "c", [59] = "d",
+    [60] = "e", [61] = "f", [62] = "g", [63] = "h", [64] = "i",
+    [65] = "j", [66] = "k", [67] = "l", [68] = "m", [69] = "n",
+    [70] = "o", [71] = "p", [72] = "q", [73] = "r", [74] = "s",
+    [75] = "t", [76] = "u", [77] = "v", [78] = "w", [79] = "x",
+    [80] = "y", [81] = "z", [82] = "!", [83] = "{", [84] = "|",
+    [85] = "}", [86] = "[", [87] = "]", [88] = "'", [89] = ",",
 }
 
--- Локализация часто используемых функций
-local abs = math.abs
-local floor = math.floor
-local sub = string.sub
+-- Предрасчет ASCII-символов (0-255)
+local char_cache = {}
+for i = 0, 255 do
+    char_cache[i] = char(i)
+end
 
--- Создание обратной таблицы один раз при инициализации
+-- Обратная таблица конвертации
 local _reverseConvertTable3 = {}
 for k, v in pairs(_convertTable3) do
     _reverseConvertTable3[v] = k
 end
 
+-- Максимальное поддерживаемое число (90^12)
+local MAX_NUMBER = 90^12
+local MIN_NUMBER = -MAX_NUMBER
+
 -- Кодирование числа в строку
 function en90(dec)
+    if type(dec) ~= "number" then error("Input must be a number") return end
     if dec == 0 then return "0" end
+
+    -- Проверка диапазона
+    if dec < MIN_NUMBER or dec > MAX_NUMBER then
+        error("Number out of range: " .. tostring(dec))
+    end
 
     local isNegative = dec < 0
     dec = abs(dec)
 
-    -- Используем таблицу для сборки символов
     local buffer = {}
+    local idx = 0  -- Индекс для заполнения
+
     repeat
         local remainder = dec % 90
         dec = floor(dec / 90)
-        table.insert(buffer, 1, _convertTable3[remainder]) -- Добавляем символ в начало
+        idx = idx + 1
+        buffer[idx] = _convertTable3[remainder]
     until dec == 0
 
+    -- Если число отрицательное, добавляем "-" в начало
     if isNegative then
-        table.insert(buffer, 1, "-") -- Добавляем знак "-" для отрицательных чисел
+        tbl_insert(buffer, 1, "-") -- Добавляем знак минус в начало
     end
 
-    -- Собираем строку из таблицы только один раз
-    return table.concat(buffer)
+    -- Сборка строки в правильном порядке
+    for i = 1, floor(idx / 2) do
+        buffer[i], buffer[idx - i + 1] = buffer[idx - i + 1], buffer[i] -- Разворачиваем таблицу
+    end
+
+    return tbl_concat(buffer) -- Собираем строку
 end
 
 -- Декодирование строки в число
 function en10(encoded)
-    if #encoded == 0 then return 0 end
+    if type(encoded) ~= "string" then return 0 end
+    if encoded == "0" then return 0 end
 
-    local isNegative = sub(encoded, 1, 1) == "-"
-    local cleanEncoded = isNegative and sub(encoded, 2) or encoded
+    local start = 1
+    local first_byte = byte(encoded, 1)
+    local isNegative = first_byte == 45  -- 45 = '-'
+    if isNegative then start = 2 end
 
     local number = 0
-    for i = 1, #cleanEncoded do
-        local char = sub(cleanEncoded, i, i)
-        local value = _reverseConvertTable3[char] or 0 -- Получаем значение из обратной таблицы
-        number = number * 90 + value
+    local len = #encoded
+
+    -- Быстрый проход по байтам
+    for i = start, len do
+        local c = byte(encoded, i)
+        local symbol = char_cache[c]  -- Используем кэш символов
+        number = number * 90 + (_reverseConvertTable3[symbol] or 0)
     end
 
     return isNegative and -number or number
 end
+
 
 
 
