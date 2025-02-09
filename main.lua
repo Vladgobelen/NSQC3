@@ -156,7 +156,7 @@ f:SetScript("OnEvent", OnEvent)
 --         buttonParams:SetScript("OnMouseWheel", function(self, delta)
 --             print(arg1,arg2,arg3,arg4)
 --         end)
-        
+
 --         -- Устанавливаем обработчик OnEnter, если он указан
 --         if buttonParams.OnEnter then
 --             button.frame:SetScript("OnEnter", buttonParams.OnEnter)

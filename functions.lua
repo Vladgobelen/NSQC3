@@ -27,60 +27,60 @@ function tablelength(inputTable)
     return elementCount  -- Возвращаем общее количество элементов
 end
 
--- Таблица для конвертации чисел в символы
-local _convertTable = {
-    [0] = "0", [1] = "1", [2] = "2", [3] = "3", [4] = "4",
-    [5] = "5", [6] = "6", [7] = "7", [8] = "8", [9] = "9",
-    [10] = "A", [11] = "B", [12] = "C", [13] = "D", [14] = "E",
-    [15] = "F", [16] = "G", [17] = "#", [18] = "$", [19] = "%",
-    [20] = "(", [21] = ")", [22] = "*", [23] = "+", [24] = "-",
-    [25] = "/", [26] = ";", [27] = "<", [28] = "=", [29] = ">",
-    [30] = "@", [31] = "H", [32] = "I", [33] = "J", [34] = "K",
-    [35] = "L", [36] = "M", [37] = "N", [38] = "O", [39] = "P",
-    [40] = "Q", [41] = "R", [42] = "S", [43] = "T", [44] = "U",
-    [45] = "V", [46] = "W", [47] = "X", [48] = "Y", [49] = "Z",
-    [50] = "^", [51] = "_", [52] = "`", [53] = "a", [54] = "b",
-    [55] = "c", [56] = "d", [57] = "e", [58] = "f", [59] = "g",
-    [60] = "h", [61] = "i", [62] = "j", [63] = "k", [64] = "l",
-    [65] = "m", [66] = "n", [67] = "o", [68] = "p", [69] = "q",
-    [70] = "r", [71] = "s", [72] = "t", [73] = "u", [74] = "v",
-    [75] = "w", [76] = "x", [77] = "y", [78] = "z", [79] = "{",
-    [80] = "|", [81] = "}", [82] = "[", [83] = "]", [84] = "'",
-}
+-- -- Таблица для конвертации чисел в символы
+-- local _convertTable = {
+--     [0] = "0", [1] = "1", [2] = "2", [3] = "3", [4] = "4",
+--     [5] = "5", [6] = "6", [7] = "7", [8] = "8", [9] = "9",
+--     [10] = "A", [11] = "B", [12] = "C", [13] = "D", [14] = "E",
+--     [15] = "F", [16] = "G", [17] = "#", [18] = "$", [19] = "%",
+--     [20] = "(", [21] = ")", [22] = "*", [23] = "+", [24] = "-",
+--     [25] = "/", [26] = ";", [27] = "<", [28] = "=", [29] = ">",
+--     [30] = "@", [31] = "H", [32] = "I", [33] = "J", [34] = "K",
+--     [35] = "L", [36] = "M", [37] = "N", [38] = "O", [39] = "P",
+--     [40] = "Q", [41] = "R", [42] = "S", [43] = "T", [44] = "U",
+--     [45] = "V", [46] = "W", [47] = "X", [48] = "Y", [49] = "Z",
+--     [50] = "^", [51] = "_", [52] = "`", [53] = "a", [54] = "b",
+--     [55] = "c", [56] = "d", [57] = "e", [58] = "f", [59] = "g",
+--     [60] = "h", [61] = "i", [62] = "j", [63] = "k", [64] = "l",
+--     [65] = "m", [66] = "n", [67] = "o", [68] = "p", [69] = "q",
+--     [70] = "r", [71] = "s", [72] = "t", [73] = "u", [74] = "v",
+--     [75] = "w", [76] = "x", [77] = "y", [78] = "z", [79] = "{",
+--     [80] = "|", [81] = "}", [82] = "[", [83] = "]", [84] = "'",
+-- }
 
--- Обратная таблица для быстрого поиска
-local _reverseConvertTable = {}
-for k, v in pairs(_convertTable) do
-    _reverseConvertTable[v] = k
-end
+-- -- Обратная таблица для быстрого поиска
+-- local _reverseConvertTable = {}
+-- for k, v in pairs(_convertTable) do
+--     _reverseConvertTable[v] = k
+-- end
 
--- Функция для преобразования десятичного числа в строку в 90-ричной системе
-local function Convert(dec, base)
-    local result = ""
-    repeat
-        local remainder = dec % base
-        result = _convertTable[remainder] .. result
-        dec = math_floor(dec / base)
-    until dec == 0
-    return result
-end
+-- -- Функция для преобразования десятичного числа в строку в 90-ричной системе
+-- local function Convert(dec, base)
+--     local result = ""
+--     repeat
+--         local remainder = dec % base
+--         result = _convertTable[remainder] .. result
+--         dec = math_floor(dec / base)
+--     until dec == 0
+--     return result
+-- end
 
--- Функция для кодирования числа в строку
-function numCod(dec)
-    dec = math_abs(dec)
-    return Convert(dec, 85)
-end
+-- -- Функция для кодирования числа в строку
+-- function numCod(dec)
+--     dec = math_abs(dec)
+--     return Convert(dec, 85)
+-- end
 
--- Функция для декодирования строки в число
-function numeCod(encoded)
-    local number = 0
-    for i = 1, #encoded do
-        local char = encoded:sub(i, i)
-        local value = _reverseConvertTable[char] or 0
-        number = number * 85 + value
-    end
-    return number
-end
+-- -- Функция для декодирования строки в число
+-- function numeCod(encoded)
+--     local number = 0
+--     for i = 1, #encoded do
+--         local char = encoded:sub(i, i)
+--         local value = _reverseConvertTable[char] or 0
+--         number = number * 85 + value
+--     end
+--     return number
+-- end
 
 -- Функция для инвертирования словаря
 function invert_dict(table)
@@ -522,7 +522,82 @@ function gPoint(name)
     end
 end
 
+function isMod(obj)
+    return ns_tooltips[obj].mod
+end
 
+-- Таблица для преобразования чисел в символы
+local _convertTable3 = {
+    [0] = "0", [1] = "2", [2] = "3", [3] = "4", [4] = "5",
+    [5] = "6", [6] = "7", [7] = "8", [8] = "9", [9] = ":",
+    [10] = ";", [11] = "<", [12] = "=", [13] = ">", [14] = "?",
+    [15] = "@", [16] = "A", [17] = "B", [18] = "C", [19] = "D",
+    [20] = "E", [21] = "F", [22] = "G", [23] = "H", [24] = "I",
+    [25] = "J", [26] = "K", [27] = "L", [28] = "M", [29] = "N",
+    [30] = "O", [31] = "P", [32] = "Q", [33] = "R", [34] = "S",
+    [35] = "T", [36] = "U", [37] = "V", [38] = "W", [39] = "X",
+    [40] = "Y", [41] = "Z", [42] = "[", [43] = "\\", [44] = "]",
+    [45] = "^", [46] = "_", [47] = "`", [48] = "a", [49] = "b",
+    [50] = "c", [51] = "d", [52] = "e", [53] = "f", [54] = "g",
+    [55] = "h", [56] = "i", [57] = "j", [58] = "k", [59] = "l",
+    [60] = "m", [61] = "n", [62] = "o", [63] = "p", [64] = "q",
+    [65] = "r", [66] = "s", [67] = "t", [68] = "u", [69] = "v",
+    [70] = "w", [71] = "x", [72] = "y", [73] = "z", [74] = "{",
+    [75] = "|", [76] = "}", [77] = "~", [78] = "!", [79] = "#",
+    [80] = "$", [81] = "%", [82] = "&", [83] = "'", [84] = "(",
+    [85] = ")", [86] = "*", [87] = "+", [88] = ",", [89] = "-",
+}
+
+-- Локализация часто используемых функций
+local abs = math.abs
+local floor = math.floor
+local sub = string.sub
+
+-- Создание обратной таблицы один раз при инициализации
+local _reverseConvertTable3 = {}
+for k, v in pairs(_convertTable3) do
+    _reverseConvertTable3[v] = k
+end
+
+-- Кодирование числа в строку
+function en90(dec)
+    if dec == 0 then return "0" end
+
+    local isNegative = dec < 0
+    dec = abs(dec)
+
+    -- Используем таблицу для сборки символов
+    local buffer = {}
+    repeat
+        local remainder = dec % 90
+        dec = floor(dec / 90)
+        table.insert(buffer, 1, _convertTable3[remainder]) -- Добавляем символ в начало
+    until dec == 0
+
+    if isNegative then
+        table.insert(buffer, 1, "-") -- Добавляем знак "-" для отрицательных чисел
+    end
+
+    -- Собираем строку из таблицы только один раз
+    return table.concat(buffer)
+end
+
+-- Декодирование строки в число
+function en10(encoded)
+    if #encoded == 0 then return 0 end
+
+    local isNegative = sub(encoded, 1, 1) == "-"
+    local cleanEncoded = isNegative and sub(encoded, 2) or encoded
+
+    local number = 0
+    for i = 1, #cleanEncoded do
+        local char = sub(cleanEncoded, i, i)
+        local value = _reverseConvertTable3[char] or 0 -- Получаем значение из обратной таблицы
+        number = number * 90 + value
+    end
+
+    return isNegative and -number or number
+end
 
 
 
