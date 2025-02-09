@@ -467,6 +467,28 @@ function ButtonManager:SetOnClick(onClickFunction)
     self.frame:SetScript("OnClick", onClickFunction)
 end
 
+-- Метод для установки обработчика наведения мыши на кнопку
+function ButtonManager:SetOnEnter(onEnterFunction)
+    local oldOnEnter = self.frame:GetScript("OnEnter")
+    
+    self.frame:SetScript("OnEnter", function(selfFrame, ...)
+        -- Вызываем предыдущий обработчик (например, для тултипа)
+        if oldOnEnter then oldOnEnter(selfFrame, ...) end
+        
+        -- Вызываем новый обработчик
+        onEnterFunction(selfFrame, ...)
+    end)
+end
+
+function ButtonManager:SetOnLeave(onLeaveFunction)
+    local oldOnLeave = self.frame:GetScript("OnLeave")
+    
+    self.frame:SetScript("OnLeave", function(...)
+        if oldOnLeave then oldOnLeave(...) end
+        onLeaveFunction(...)
+    end)
+end
+
 -- Метод для добавления всплывающей подсказки
 function ButtonManager:SetTooltip(text)
     self.frame:SetScript("OnEnter", function(self)
@@ -480,34 +502,26 @@ function ButtonManager:SetTooltip(text)
 end
 
 function ButtonManager:SetMultiLineTooltip(tooltipsTable)
-    -- Проверяем, что tooltipsTable является таблицей
-    if type(tooltipsTable) ~= "table" or not tooltipsTable then
-        print("Ошибка: tooltipsTable должен быть таблицей!")
-        return
-    end
-
-    -- Проверяем, что таблица не пустая
-    if #tooltipsTable == 0 then
-        print("Предупреждение: tooltipsTable пуст!")
-        return
-    end
-
-    -- Устанавливаем обработчики событий OnEnter и OnLeave
-    self.frame:SetScript("OnEnter", function(selfFrame)
-        -- Создаем Tooltip и устанавливаем его владельца
+    if type(tooltipsTable) ~= "table" then return end
+    
+    -- Сохраняем предыдущие обработчики
+    local oldOnEnter = self.frame:GetScript("OnEnter")
+    local oldOnLeave = self.frame:GetScript("OnLeave")
+    
+    self.frame:SetScript("OnEnter", function(selfFrame, ...)
+        -- Вызываем предыдущий обработчик, если он был
+        if oldOnEnter then oldOnEnter(selfFrame, ...) end
+        
         GameTooltip:SetOwner(selfFrame, "ANCHOR_RIGHT")
-        
-        -- Перебираем все строки из переданной таблицы и добавляем их в Tooltip
         for _, line in ipairs(tooltipsTable) do
-            GameTooltip:AddLine(line, 1, 1, 1) -- Добавляем строку с белым цветом (RGB: 1, 1, 1)
+            GameTooltip:AddLine(line, 1, 1, 1)
         end
-        
-        -- Показываем Tooltip
         GameTooltip:Show()
     end)
-
-    -- Скрываем Tooltip при выходе курсора
-    self.frame:SetScript("OnLeave", function()
+    
+    self.frame:SetScript("OnLeave", function(...)
+        -- Вызываем предыдущий обработчик, если он был
+        if oldOnLeave then oldOnLeave(...) end
         GameTooltip:Hide()
     end)
 end
@@ -906,6 +920,10 @@ function AdaptiveFrame:StartMovementAlphaTracking()
             self.parent:StopMovementAlphaTracking()
         end
     end)
+end
+
+function AdaptiveFrame:getTexture(id)
+    return self.children[id].frame:GetNormalTexture():GetTexture():sub(-3)
 end
 
 -- Метод для остановки отслеживания движения и очистки скрипта
@@ -2404,7 +2422,10 @@ function CustomAchievements:GetAchievementFullData(name)
                 isExpanded = dynamicData.isExpanded or false,
                 scrollPosition = dynamicData.scrollPosition or 0,
                 category = staticData.category,  -- Возвращаем категорию, в которой находится ачивка
-                send_txt = staticData.send_txt
+                send_txt = staticData.send_txt,
+                subAchievements_args = staticData.subAchievements_args,
+                achievement_args = staticData.achievement_args,
+                achFunc = staticData.achFunc
             }
         end
     end

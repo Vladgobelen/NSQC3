@@ -15,6 +15,7 @@ local function OnEvent(self, event, isLogin, isReload)
         nsDBC_settings = nsDBC_settings or NsDb:new(nsDBC_table:get_table(), nil, "настройки", nil, 100000)
         nsDBC_ach_table = nsDBC_ach_table or create_table:new("nsqc3_ach")
         nsDBC_ach = nsDBC_ach or NsDb:new(nsDBC_ach_table:get_table(), nil, nil, nil, 100000)
+        mFldObj = mFldObj or NsDb:new(ns_tooltips, nil, nil, nil, 100000)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         CustomAchievementsStatic = {
             ["Общие"] = {
@@ -41,7 +42,10 @@ local function OnEvent(self, event, isLogin, isReload)
                     requiredAchievements = {},
                     send_txt = "",
                     subAchievements = {"Пассив", "Актив", "Не читатель", "Нейросеть"},
-                    category = "Чат"
+                    category = "Чат",
+                    subAchievements_args = {100, 1000, 10000, 100000},
+                    achievement_args = 100000,
+                    achFunc = "copiwriter"
                 },
                 ["Пассив"] = {
                     index = 3,
@@ -100,6 +104,9 @@ local function OnEvent(self, event, isLogin, isReload)
                     send_txt = "",
                     category = "Поле",
                     subAchievements = {3, 4, 5, 6},
+                    achievement_args = 100000,
+                    subAchievements_args = {100, 1000, 10000, 100000},
+                    achFunc = "meditacia"
                 },
             }
         }

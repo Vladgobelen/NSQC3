@@ -510,6 +510,36 @@ function fBtnClick(id, obj)
     end)
 end
 
+function fBtnEnter(id, obj)
+    -- Проверка наличия модификатора для текущей текстуры
+    local textureKey = adaptiveFrame:getTexture(id)
+    if not mFldObj:get_key(textureKey).mod then 
+        return 
+    end
+
+    -- Логика управления флагом
+    local currentFlag = mFld:getArg("onEnterFlag")
+    local shouldSendRequest = false
+    
+    -- Обновляем флаг только при изменении объекта
+    if currentFlag ~= obj then
+        mFld:setArg("onEnterFlag", obj)
+        shouldSendRequest = true
+    end
+
+    -- Отправка запроса при необходимости
+    if shouldSendRequest then
+        local activeCount = 0
+        for i = 1, 100 do
+            if adaptiveFrame:getTexture(id) == adaptiveFrame:getTexture(i) then
+                activeCount = activeCount + 1
+            end
+        end
+
+        SendAddonMessage(activeCount <= 50 and "nsGetObj1" or "nsGetObj2", obj, "guild")
+    end
+end
+
 function getPoint()
     SendAddonMessage("getPoint","", "guild")
 end
@@ -646,7 +676,16 @@ GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
     end
 end)
 
-
+function testF(num)
+    local t = GetTime()
+    for i = 1, num do
+        for i = 1, 100 do
+            --mFld:setArg(i, text:sub((i*3)-2, i*3))
+            local j = adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3)
+        end
+    end
+    print("Прошло: " .. GetTime() - t)
+end
 
 
 
