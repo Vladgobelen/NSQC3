@@ -638,7 +638,7 @@ function AdaptiveFrame:new(parent)
     self.initialAspectRatio = self.width / self.height  -- Сохраняем начальное соотношение сторон
     self.buttonsPerRow = 5  -- Количество кнопок в ряду (по умолчанию)
 
-    -- Создаем фрейм2
+    -- Создаем фрейм
     self.frame = CreateFrame("Frame", nil, self.parent)
     self.frame:SetSize(self.width, self.height)
     self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
@@ -778,6 +778,9 @@ end
 
 -- Метод для остановки перемещения или изменения размера фрейма
 function AdaptiveFrame:StopMovingOrSizing()
+    local x, y = self:GetPosition()
+    ns_dbc:mod_key("mfldX", x, "настройки")
+    ns_dbc:mod_key("mfldY", y, "настройки")
     self.frame:StopMovingOrSizing()
     self:AdjustSizeAndPosition()
 end
@@ -946,6 +949,17 @@ function AdaptiveFrame:StopMovementAlphaTracking()
         self.movementFrame:SetScript("OnUpdate", nil)  -- Удаляем обработчик OnUpdate
         self.movementFrame = nil  -- Очищаем ссылку на movementFrame
     end
+end
+
+-- Метод для получения текущих координат фрейма относительно родителя
+function AdaptiveFrame:GetPosition()
+    return self.frame:GetCenter()
+end
+
+-- Метод для установки координат фрейма
+function AdaptiveFrame:SetPoint(x, y)
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
 end
 
 mDB = {}

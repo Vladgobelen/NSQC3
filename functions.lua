@@ -438,6 +438,7 @@ function createFld()
             end
         end
     end)
+    adaptiveFrame:SetPoint(ns_dbc:get_key("mfldX", "настройки") or 150, ns_dbc:get_key("mfldY", "настройки") or 100)
 end
 
 function setFrameAchiv()
