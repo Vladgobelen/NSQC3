@@ -6,13 +6,12 @@
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
         NSQC3_version = 1; NSQC3_subversion = 0
+        nsDbc = nsDbc or {}
+        ns_dbc = ns_dbc or NsDb:new(nsDbc)
         NS3Menu(NSQC3_version, NSQC3_subversion)         -- Вызов функции для отображения меню
         createFld()
         mFld = mDB:new()
         getPoint()
-        nsDbc = nsDbc or {}
-        nsDBC_table = nsDBC_table or create_table:new("nsDbc")
-        nsDBC_settings = nsDBC_settings or NsDb:new(nsDBC_table:get_table(), nil, "настройки", nil, 100000)
         nsDBC_ach_table = nsDBC_ach_table or create_table:new("nsqc3_ach")
         nsDBC_ach = nsDBC_ach or NsDb:new(nsDBC_ach_table:get_table(), nil, nil, nil, 100000)
         mFldObj = mFldObj or NsDb:new(ns_tooltips, nil, nil, nil, 100000)
@@ -24,6 +23,10 @@ local function OnEvent(self, event, isLogin, isReload)
                 AchievementFrameCloseButton:Click()
             end
         end)
+
+        C_Timer(10, function()
+            UpdateAddOnMemoryUsage()
+        end, true)
     end
     if arg1 == "Blizzard_AchievementUI" then
         setFrameAchiv()

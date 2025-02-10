@@ -140,13 +140,52 @@ function NS3Menu(ver, subver)
     menu:addSlider(generalSub, {
         name = "SizeSlider",
         label = "Window Size",
-        min = 100,
+        min = -500,
         max = 500,
         step = 10,
-        default = 200,
+        default = ns_dbc:get_key("SCREEN_PADDING", "настройки") or -40,
+        tooltip = "Максимальное расстояние от края экрана до края поля",
         onChange = function(value) 
-            print("Size changed to:", value) 
-            -- Здесь логика изменения размера
+            ns_dbc:mod_key("SCREEN_PADDING", value, "настройки")
+        end
+    })
+
+    menu:addSlider(generalSub, {
+        name = "SizeSlider",
+        label = "Window Size",
+        min = 0,
+        max = 1,
+        step = 0.1,
+        default = ns_dbc:get_key("MOVE_ALPHA", "настройки") or 0,
+        tooltip = "Максимальная прозрачности при движении",
+        onChange = function(value) 
+            ns_dbc:mod_key("MOVE_ALPHA", value, "настройки")
+        end
+    })
+
+    menu:addSlider(generalSub, {
+        name = "SizeSlider",
+        label = "Window Size",
+        min = 0,
+        max = 1,
+        step = 0.1,
+        default = ns_dbc:get_key("FRAME_ALPHA", "настройки") or 0,
+        tooltip = "Прозрачность основного фрейма в видимом режиме. Требует /reload для применения",
+        onChange = function(value) 
+            ns_dbc:mod_key("FRAME_ALPHA", value, "настройки")
+        end
+    })
+
+    menu:addSlider(generalSub, {
+        name = "SizeSlider",
+        label = "Window Size",
+        min = 0,
+        max = 1,
+        step = 0.1,
+        default = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or 1,
+        tooltip = "Прозрачность кнопок поля. Так же меняется перетаскиванием ПКМ по рамке поля: Перетащить за рамку влево или вправо и кликнуть по ней ПКМ. Если меняется здесь, требует /reload",
+        onChange = function(value) 
+            ns_dbc:mod_key("BUTTON_ALPHA", value, "настройки")
         end
     })
 
@@ -154,137 +193,14 @@ function NS3Menu(ver, subver)
         name = "LockCheckbox",
         label = "Lock Position",
         default = false,
+        tooltip = "Описание",
         onClick = function(checked)
             print("Lock state:", checked)
             -- Здесь логика блокировки позиции
         end
     })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
-    menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
-        default = false,
-        onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
-        end
-    })
+
+
     -- Добавляем информационные секции
     menu:addInfoSection(
         "Описание", 
@@ -339,9 +255,6 @@ function CalculateAverageItemLevel(unit)
 end
 
 function set_miniButton()
-    C_Timer(10, function()
-        UpdateAddOnMemoryUsage()
-    end, true)
     -- Создаем фрейм для иконки
     local miniMapButton = CreateFrame("Button", nil, Minimap)
     miniMapButton:SetSize(32, 32)  -- Размер иконки
@@ -460,14 +373,14 @@ function set_miniButton()
         miniMapButton:SetAlpha(1)  -- Возвращаем непрозрачность
 
         -- Сохраняем позицию в базу данных
-        nsDBC_settings:mod_key("minibtn_x", position.radius * math.cos(position.angle))
-        nsDBC_settings:mod_key("minibtn_y", position.radius * math.sin(position.angle))
+        ns_dbc:mod_key("minibtn_x", position.radius * math.cos(position.angle), "настройки")
+        ns_dbc:mod_key("minibtn_y", position.radius * math.sin(position.angle), "настройки")
     end)
 
     -- Восстановление позиции иконки после перезагрузки
     local function SetInitialPosition()
-        local savedX = nsDBC_settings:get_key("minibtn_x") or 0
-        local savedY = nsDBC_settings:get_key("minibtn_y") or 0
+        local savedX = ns_dbc:get_key("minibtn_x", "настройки") or 0
+        local savedY = ns_dbc:get_key("minibtn_y", "настройки") or 0
         -- Загружаем сохранённые координаты
 
         if savedX and savedY then

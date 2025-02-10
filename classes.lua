@@ -308,23 +308,29 @@ function NsDb:mod_key(change_key, message, dop_key, id)
     end
 end
 function NsDb:get_key(change_key, dop_key, id)
+    -- Проверяем существование основных таблиц и ключей на каждом уровне
     if dop_key then
-        if self.input_table[dop_key] then
-            if id then
-                return self.input_table[dop_key][change_key][id]
-            else
-                return self.input_table[dop_key][change_key]
+        local dop_table = self.input_table[dop_key]
+        if dop_table and dop_table[change_key] then
+            if id and dop_table[change_key][id] ~= nil then
+                return dop_table[change_key][id]
+            elseif not id then
+                return dop_table[change_key]
             end
         end
     else
-        if self.input_table[change_key] then
-            if id then
-                return self.input_table[change_key][id]
-            else
-                return self.input_table[change_key]
+        local change_table = self.input_table[change_key]
+        if change_table then
+            if id and change_table[id] ~= nil then
+                return change_table[id]
+            elseif not id then
+                return change_table
             end
         end
     end
+
+    -- Если что-то пошло не так, возвращаем nil
+    return nil
 end
 
 -- Определяем класс create_table
@@ -616,8 +622,8 @@ local F_PAD = 40
 local MOVE_ALPHA = .0
 
 -- Добавляем константы прозрачности
-local FRAME_ALPHA = 0.8     -- Прозрачность основного фрейма
-local BUTTON_ALPHA = testQ['ns_temp_a'] or 1    -- Прозрачность дочерних кнопок
+local FRAME_ALPHA = 0     -- Прозрачность основного фрейма
+local BUTTON_ALPHA = 1    -- Прозрачность дочерних кнопок
 
 -- Определяем класс AdaptiveFrame
 AdaptiveFrame = {}
@@ -643,7 +649,9 @@ function AdaptiveFrame:new(parent)
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Устанавливаем прозрачность фрейма
+    FRAME_ALPHA = ns_dbc:get_key("FRAME_ALPHA", "настройки") or FRAME_ALPHA
+    BUTTON_ALPHA = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
+    self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Устанавливаем прозрачность фрейма
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
 
     -- Включаем возможность перемещения и изменения размера фрейма
@@ -691,11 +699,13 @@ function AdaptiveFrame:new(parent)
                         if deltaX > 0 then
                             -- Увеличиваем прозрачность при движении вправо
                             child.frame:SetAlpha(math.min(currentAlpha + math.abs(deltaX) / 1000, 1)) -- Исправлено: child.frame -> child
-                            testQ['ns_temp_a'] = math.min(currentAlpha + math.abs(deltaX) / 1000, 1)
+                            ns_dbc:mod_key("BUTTON_ALPHA", math.min(currentAlpha + math.abs(deltaX) / 1000, 1), "настройки")
+                            BUTTON_ALPHA = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
                         elseif deltaX < 0 then
                             -- Уменьшаем прозрачность при движении влево
                             child.frame:SetAlpha(math.max(currentAlpha - math.abs(deltaX) / 1000, 0)) -- Исправлено: child.frame -> child
-                            testQ['ns_temp_a'] = math.max(currentAlpha - math.abs(deltaX) / 1000, 0)
+                            ns_dbc:mod_key("BUTTON_ALPHA", math.max(currentAlpha - math.abs(deltaX) / 1000, 0), "настройки")
+                            BUTTON_ALPHA = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
                         end
                     end
                 end
@@ -753,7 +763,8 @@ end
 -- Метод для переключения прозрачности основного фрейма
 function AdaptiveFrame:ToggleFrameAlpha()
     local currentAlpha = select(4, self.frame:GetBackdropColor())
-    if currentAlpha > 0.5 then
+    FRAME_ALPHA = ns_dbc:get_key("FRAME_ALPHA", "настройки") or FRAME_ALPHA
+    if currentAlpha > FRAME_ALPHA-0.05 then
         self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
     elseif currentAlpha == 0 then
         self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Возвращаем исходную прозрачность
@@ -843,6 +854,7 @@ function AdaptiveFrame:AdjustSizeAndPosition()
 
     local screenWidth, screenHeight = UIParent:GetSize()
     local x, y = self.frame:GetLeft(), self.frame:GetBottom()
+    SCREEN_PADDING = ns_dbc:get_key("SCREEN_PADDING", "настройки") or SCREEN_PADDING
     x = math.max(SCREEN_PADDING, math.min(x, screenWidth - frameWidth - SCREEN_PADDING))
     y = math.max(SCREEN_PADDING, math.min(y, screenHeight - frameHeight - SCREEN_PADDING))
 
@@ -877,10 +889,12 @@ function AdaptiveFrame:StartMovementAlphaTracking()
     local movementFrame = CreateFrame("Frame")
     self.movementFrame = movementFrame
     movementFrame.parent = self
+
+    MOVE_ALPHA = ns_dbc:get_key("MOVE_ALPHA", "настройки") or MOVE_ALPHA
     movementFrame.targetAlpha = MOVE_ALPHA
-    movementFrame.currentAlpha = testQ['ns_temp_a']
+    movementFrame.currentAlpha = BUTTON_ALPHA
     movementFrame.alphaSpeed = 2
-    movementFrame.BUTTON_ALPHA = testQ['ns_temp_a']  -- Сохраняем исходное значение
+    movementFrame.BUTTON_ALPHA = BUTTON_ALPHA  -- Сохраняем исходное значение
     
     movementFrame:SetScript("OnUpdate", function(self, elapsed)
         local isMoving = GetUnitSpeed("player") > 0
@@ -914,7 +928,7 @@ function AdaptiveFrame:StartMovementAlphaTracking()
         
         -- Автоматическая остановка при достижении цели
         if not isMoving and math.abs(self.currentAlpha - self.targetAlpha) < 0.01 then
-            self.currentAlpha = testQ['ns_temp_a']  -- Точно устанавливаем конечное значение
+            self.currentAlpha = BUTTON_ALPHA  -- Точно устанавливаем конечное значение
             self.parent.frame:EnableMouse(true)
             self.parent.frame:StopMovingOrSizing()
             self.parent:StopMovementAlphaTracking()
@@ -1917,8 +1931,8 @@ function CustomAchievements:CreateFrame(parent)
     self:CreateCategoryButtons(self.frame)
 
     -- Скроллируемая область для ачивок
-    self.achievementList = CreateFrame("ScrollFrame", nil, self.frame)
-    self.achievementList:SetSize(720, 450)
+    self.achievementList = CreateFrame("ScrollFrame", "achievementScrollFrame", self.frame, "UIPanelScrollFrameTemplate")
+    self.achievementList:SetSize(690, 450)
     self.achievementList:SetPoint("TOPLEFT", self.categoryContainer, "TOPRIGHT", -100, 0)
 
     -- Контейнер для элементов
@@ -1933,6 +1947,7 @@ function CustomAchievements:CreateFrame(parent)
 
     -- Скроллбар
     local scrollBar = CreateFrame("Slider", nil, self.achievementList, "UIPanelScrollBarTemplate")
+    scrollBar:Hide()
     scrollBar:SetPoint("TOPLEFT", self.achievementList, "TOPRIGHT", -20, -16)
     scrollBar:SetPoint("BOTTOMLEFT", self.achievementList, "BOTTOMRIGHT", -20, 16)
     scrollBar:SetWidth(SCROLL_BAR_WIDTH)
@@ -2663,13 +2678,38 @@ function NSQCMenu:addSlider(parentMenu, options)
     slider:SetValueStep(options.step or 1)
     slider:SetValue(options.default)
     
+    -- Добавляем текст тултипа
+    slider.tooltipText = options.tooltip
+    
     -- Текст слайдера
     _G[slider:GetName().."Text"]:SetText(options.label)
     _G[slider:GetName().."Low"]:SetText(options.min)
     _G[slider:GetName().."High"]:SetText(options.max)
     
+    -- Обработчики тултипа
+    slider:SetScript("OnEnter", function(self)
+        if self.tooltipText then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(self.tooltipText, 1, 1, 1, true)
+            GameTooltip:AddLine("Текущее значение: |cffffffff"..self:GetValue().."|r", 1, 1, 1, true)
+            GameTooltip:Show()
+        end
+    end)
+    
+    slider:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+    end)
+    
     slider:SetScript("OnValueChanged", function(self, value)
         if options.onChange then options.onChange(value) end
+        -- Обновляем тултип если открыт
+        if GameTooltip:IsOwned(self) then
+            GameTooltip:ClearLines()
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(self.tooltipText, 1, 1, 1, true)
+            GameTooltip:AddLine("Текущее значение: |cffffffff"..value.."|r", 1, 1, 1, true)
+            GameTooltip:Show()
+        end
     end)
     
     -- Обновляем высоту контента
@@ -2687,13 +2727,40 @@ function NSQCMenu:addCheckbox(parentMenu, options)
     checkbox:SetPoint("TOPLEFT", 16, -parentMenu.lastY)
     checkbox:SetChecked(options.default or false)
     
+    -- Добавляем текст тултипа
+    checkbox.tooltipText = options.tooltip
+    
     -- Текст чекбокса
     local label = parentMenu.scrollContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
     label:SetText(options.label)
     
+    -- Обработчики тултипа
+    checkbox:SetScript("OnEnter", function(self)
+        if self.tooltipText then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(self.tooltipText, 1, 1, 1, true)
+            local state = self:GetChecked() and "|cff00ff00Включено|r" or "|cffff0000Выключено|r"
+            GameTooltip:AddLine("Текущее значение: "..state, 1, 1, 1, true)
+            GameTooltip:Show()
+        end
+    end)
+    
+    checkbox:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+    end)
+    
     checkbox:SetScript("OnClick", function(self)
         if options.onClick then options.onClick(self:GetChecked()) end
+        -- Обновляем тултип если открыт
+        if GameTooltip:IsOwned(self) then
+            GameTooltip:ClearLines()
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(self.tooltipText, 1, 1, 1, true)
+            local state = self:GetChecked() and "|cff00ff00Включено|r" or "|cffff0000Выключено|r"
+            GameTooltip:AddLine("Текущее значение: "..state, 1, 1, 1, true)
+            GameTooltip:Show()
+        end
     end)
     
     -- Обновляем высоту контента
