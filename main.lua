@@ -18,9 +18,11 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
         C_Timer(5, function()
-            if AchievementMicroButton:IsEnabled() == 1 then
-                AchievementMicroButton:Click()
-                AchievementFrameCloseButton:Click()
+            if UnitLevel("player") >= 10 then
+                if AchievementMicroButton:IsEnabled() == 1 then
+                    AchievementMicroButton:Click()
+                    AchievementFrameCloseButton:Click()
+                end
             end
         end)
 
@@ -98,7 +100,7 @@ f:SetScript("OnEvent", OnEvent)
 --         parent = UIParent,
 --         position = {"CENTER", nil, "CENTER", 0, 0},
 --         text = "Абвг",
---         texture = "Interface\\AddOns\\NSQC\\emblem.tga",
+--         texture = "Interface\\AddOns\\NSQC3\\emblem.tga",
 --         onClick = function()
 --             print(">")
 --         end,

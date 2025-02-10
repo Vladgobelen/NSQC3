@@ -111,7 +111,7 @@ function achive_complit(channel, text, sender, prefix)
         customAchievements:setData(text, "dateEarned", date("%d/%m/%Y %H:%M"))
         customAchievements:setData(text, "dateCompleted", date("%d/%m/%Y %H:%M"))
         customAchievements:ShowAchievementAlert(text)
-        PlaySoundFile("Interface\\AddOns\\NSQC\\lvlUp.ogg")
+        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\lvlUp.ogg")
     else
         if customAchievements:GetAchievementData(text)["dateEarned"] == "Не получена" then
             customAchievements:setData(text, "dateEarned", date("%d/%m/%Y %H:%M"))

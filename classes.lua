@@ -637,10 +637,12 @@ function AdaptiveFrame:new(parent)
     self.height = 600       -- По умолчанию высота
     self.initialAspectRatio = self.width / self.height  -- Сохраняем начальное соотношение сторон
     self.buttonsPerRow = 5  -- Количество кнопок в ряду (по умолчанию)
+    self.skipSizeCheck = true -- Новый флаг
 
     -- Создаем фрейм
     self.frame = CreateFrame("Frame", nil, self.parent)
     self.frame:SetSize(self.width, self.height)
+    self.skipSizeCheck = false -- Разрешаем проверки после инициализации
     self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
     self.frame:SetFrameStrata("HIGH")
     self.frame:SetBackdrop({
@@ -744,11 +746,18 @@ function AdaptiveFrame:new(parent)
     end)
     self.resizeHandle:SetScript("OnMouseUp", function()
         self.frame:StopMovingOrSizing()
+        local x, y = adaptiveFrame:GetSize()
+        ns_dbc:mod_key("mfldRX", x, "настройки")
         --self:AdjustSizeAndPosition()
     end)
 
     -- Обработчик изменения размера фрейма
     self.frame:SetScript("OnSizeChanged", function(_, width, height)
+
+        if self.skipSizeCheck then
+            self.skipSizeCheck = false
+            return
+        end
         width, height = self:CheckFrameSize(width, height)
         self.frame:SetSize(width, height)
         self:AdjustSizeAndPosition()
@@ -764,10 +773,20 @@ end
 function AdaptiveFrame:ToggleFrameAlpha()
     local currentAlpha = select(4, self.frame:GetBackdropColor())
     FRAME_ALPHA = ns_dbc:get_key("FRAME_ALPHA", "настройки") or FRAME_ALPHA
-    if currentAlpha > FRAME_ALPHA-0.05 then
-        self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
-    elseif currentAlpha == 0 then
-        self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Возвращаем исходную прозрачность
+    if not ns_dbc:get_key("fullAlphaFrame", "настройки") then
+        if FRAME_ALPHA ~= 0 then
+            if currentAlpha > FRAME_ALPHA-0.05 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
+            elseif currentAlpha == 0 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Возвращаем исходную прозрачность
+            end
+        else
+            if currentAlpha > .1 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
+            elseif currentAlpha == 0 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, 1)  -- Возвращаем исходную прозрачность
+            end
+        end
     end
 end
 
@@ -778,10 +797,10 @@ end
 
 -- Метод для остановки перемещения или изменения размера фрейма
 function AdaptiveFrame:StopMovingOrSizing()
+    self.frame:StopMovingOrSizing()
     local x, y = self:GetPosition()
     ns_dbc:mod_key("mfldX", x, "настройки")
     ns_dbc:mod_key("mfldY", y, "настройки")
-    self.frame:StopMovingOrSizing()
     self:AdjustSizeAndPosition()
 end
 
@@ -906,7 +925,9 @@ function AdaptiveFrame:StartMovementAlphaTracking()
         -- Определение целевой прозрачности
         if isMoving then
             self.targetAlpha = MOVE_ALPHA
-            self.parent.frame:EnableMouse(self.targetAlpha > 0.1)
+            if ns_dbc:get_key("disableFld", "настройки") then
+                self.parent.frame:EnableMouse(self.targetAlpha > ns_dbc:get_key("MOVE_ALPHA", "настройки")+0.1)
+            end
             shouldUpdate = true
         else
             self.targetAlpha = self.BUTTON_ALPHA  -- Возвращаемся к BUTTON_ALPHA при остановке
@@ -921,9 +942,13 @@ function AdaptiveFrame:StartMovementAlphaTracking()
             for _, child in ipairs(self.parent.children) do
                 if child.frame and child.frame.SetAlpha then
                     child.frame:SetAlpha(self.currentAlpha)
-                    child.frame:EnableMouse(self.currentAlpha > 0.1)
-                    if self.currentAlpha < .1 then
-                        self.parent:Hide()
+                    if ns_dbc:get_key("disableFld", "настройки") then
+                        child.frame:EnableMouse(self.currentAlpha > ns_dbc:get_key("MOVE_ALPHA", "настройки")+.1)
+                    end
+                    if self.currentAlpha < ns_dbc:get_key("MOVE_ALPHA", "настройки")+0.1 then
+                        if ns_dbc:get_key("closeFld", "настройки") then
+                            self.parent:Hide()
+                        end
                     end
                 end
             end

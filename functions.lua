@@ -190,16 +190,34 @@ function NS3Menu(ver, subver)
     })
 
     menu:addCheckbox(generalSub, {
-        name = "LockCheckbox",
-        label = "Lock Position",
+        name = "Никогда не показывать рамку",
+        label = "Никогда не показывать рамку",
         default = false,
-        tooltip = "Описание",
+        tooltip = "Никогда не показывать рамку",
         onClick = function(checked)
-            print("Lock state:", checked)
-            -- Здесь логика блокировки позиции
+            ns_dbc:mod_key("fullAlphaFrame", checked, "настройки")
         end
     })
 
+    menu:addCheckbox(generalSub, {
+        name = "Закрывать поле при движении персонажа",
+        label = "Закрывать поле при движении персонажа",
+        default = false,
+        tooltip = "Закрывать поле при движении персонажа",
+        onClick = function(checked)
+            ns_dbc:mod_key("closeFld", checked, "настройки")
+        end
+    })
+
+    menu:addCheckbox(generalSub, {
+        name = "Не взаимодействовать с полем во время бега: клик насквозь",
+        label = "Не взаимодействовать с полем во время бега: клик насквозь",
+        default = true,
+        tooltip = "Не взаимодействовать с полем во время бега: клик насквозь",
+        onClick = function(checked)
+            ns_dbc:mod_key("disableFld", checked, "настройки")
+        end
+    })
 
     -- Добавляем информационные секции
     menu:addInfoSection(
@@ -262,9 +280,9 @@ function set_miniButton()
     miniMapButton:SetMovable(true)  -- Разрешаем перемещение
 
     -- Устанавливаем текстуры для иконки
-    miniMapButton:SetNormalTexture("Interface\\AddOns\\NSQC\\emblem.tga")
-    miniMapButton:SetPushedTexture("Interface\\AddOns\\NSQC\\emblem.tga")
-    miniMapButton:SetHighlightTexture("Interface\\AddOns\\NSQC\\emblem.tga")
+    miniMapButton:SetNormalTexture("Interface\\AddOns\\NSQC3\\emblem.tga")
+    miniMapButton:SetPushedTexture("Interface\\AddOns\\NSQC3\\emblem.tga")
+    miniMapButton:SetHighlightTexture("Interface\\AddOns\\NSQC3\\emblem.tga")
 
     -- Переменная для хранения актуальной версии
     local latestVersion = nil
@@ -438,6 +456,7 @@ function createFld()
             end
         end
     end)
+
     adaptiveFrame:SetPoint(ns_dbc:get_key("mfldX", "настройки") or 150, ns_dbc:get_key("mfldY", "настройки") or 100)
 end
 
@@ -517,12 +536,14 @@ function C_Timer(duration, callback, isLooping)
 end
 
 function sendAch(name, arg, re)
-    if not re then
-        if customAchievements:GetAchievementData(name)['dateEarned'] == "Не получена" then
+    if UnitLevel("player") >= 10 then
+        if not re then
+            if customAchievements:GetAchievementData(name)['dateEarned'] == "Не получена" then
+                SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
+            end
+        else
             SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
         end
-    else
-        SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
     end
 end
 
