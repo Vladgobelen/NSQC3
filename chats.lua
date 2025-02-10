@@ -11,27 +11,6 @@ local triggersByAddress = {
             forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
         }
     },
-    ["message:тест"] = {
-        {
-            keyword = {
-                { word = "тест", position = 1, source = "message" }
-            },
-            func = "OnTestTrigger",
-            chatType = { "GUILD"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
-        }
-    },
-    ["message:тест2"] = {
-        {
-            keyword = {
-                { word = "тест2", position = 1, source = "message" },
-                { word = "тест2", position = 2, source = "message" }
-            },
-            func = "OnTestTrigger",
-            chatType = { "GUILD"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
-        }
-    },
     ["prefix:nsqc_fld1"] = {
         {
             keyword = {

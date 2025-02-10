@@ -2523,3 +2523,210 @@ function CustomAchievements:setData(name, key, value)
     -- Обновляем интерфейс, если ачивка видима
     self:UpdateUI(self.selectedCategory)
 end
+
+NSQCMenu = {}
+NSQCMenu.__index = NSQCMenu
+
+-- Конструктор класса
+function NSQCMenu:new(addonName, options)
+    local instance = setmetatable({}, self)
+    
+    instance.addonName = addonName
+    instance.subMenus = {}
+    instance.elements = {}
+    
+    -- Создаем основной фрейм
+    instance.mainFrame = CreateFrame("Frame", addonName.."MainFrame", InterfaceOptionsFramePanelContainer)
+    instance.mainFrame.name = addonName
+    instance.mainFrame:Hide()
+    
+    -- Инициализация позиции элементов
+    instance.currentY = -50 -- Начальная позиция Y после заголовка
+    
+    -- Заголовок аддона
+    local title = instance.mainFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(addonName)
+    
+    InterfaceOptions_AddCategory(instance.mainFrame)
+    
+    return instance
+end
+
+-- Метод для добавления информационной секции
+function NSQCMenu:addInfoSection(titleText, contentText)
+    local parentFrame = self.mainFrame
+    local sectionY = self.currentY
+
+    -- Добавляем подзаголовок
+    local subtitle = parentFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    subtitle:SetPoint("TOPLEFT", 20, sectionY - 10)
+    subtitle:SetText(titleText)
+    subtitle:SetTextColor(1, 0.82, 0) -- Золотой цвет
+
+    -- Добавляем текст
+    local content = parentFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+    content:SetPoint("TOPLEFT", 30, sectionY - 30)
+    content:SetWidth(550) -- Фиксированная ширина
+    content:SetJustifyH("LEFT")
+    content:SetJustifyV("TOP")
+    content:SetText(self:wrapText(contentText, 540, "GameFontWhite")) -- Перенос текста
+
+    -- Обновляем позицию для следующих элементов
+    local textHeight = content:GetStringHeight()
+    self.currentY = sectionY - 40 - textHeight
+
+    table.insert(self.elements, {subtitle, content})
+end
+
+-- Метод для переноса текста
+function NSQCMenu:wrapText(text, maxWidth, font)
+    local wrappedText = ""
+    local line = ""
+    
+    for word in text:gmatch("%S+") do
+        local temp = line .. " " .. word
+        local tempWidth = self:getStringWidth(temp, font)
+        
+        if tempWidth > maxWidth then
+            wrappedText = wrappedText .. line .. "\n"
+            line = word
+        else
+            line = temp
+        end
+    end
+    
+    return wrappedText .. line
+end
+
+-- Вспомогательный метод для получения ширины текста
+function NSQCMenu:getStringWidth(text, font)
+    local temp = self.mainFrame:CreateFontString(nil, "ARTWORK", font)
+    temp:SetText(text)
+    local width = temp:GetStringWidth()
+    temp:Hide()
+    return width
+end
+
+-- Метод для создания подменю
+function NSQCMenu:addSubMenu(menuName)
+    local subFrame = CreateFrame("Frame", self.addonName..menuName.."SubFrame", InterfaceOptionsFramePanelContainer)
+    subFrame.name = menuName
+    subFrame.parent = self.addonName
+    subFrame:Hide()
+    
+    -- Создаем ScrollFrame
+    local scrollFrame = CreateFrame("ScrollFrame", menuName.."ScrollFrame", subFrame, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 10, -40)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -10, 10)
+    
+    -- Создаем контент для скролла
+    local scrollContent = CreateFrame("Frame", menuName.."ScrollContent", scrollFrame)
+    scrollContent:SetWidth(scrollFrame:GetWidth() - 20)
+    scrollContent:SetHeight(1)
+    scrollFrame:SetScrollChild(scrollContent)
+    
+    -- Настраиваем скроллбар
+    local scrollBar = _G[menuName.."ScrollFrameScrollBar"]
+    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -20, -16)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -20, 16)
+    
+    -- Заголовок подменю
+    local title = subFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(menuName)
+    
+    InterfaceOptions_AddCategory(subFrame)
+    
+    local subMenu = {
+        frame = subFrame,
+        scrollFrame = scrollFrame,
+        scrollContent = scrollContent,
+        elements = {},
+        lastY = 0, -- Теперь отсчет от верхнего края scrollContent
+        totalHeight = 0,
+        maxHeight = scrollFrame:GetHeight()
+    }
+    
+    table.insert(self.subMenus, subMenu)
+    return subMenu
+end
+
+
+-- Методы для добавления элементов в подменю
+function NSQCMenu:addSlider(parentMenu, options)
+    local slider = CreateFrame("Slider", parentMenu.frame:GetName()..options.name, parentMenu.scrollContent, "OptionsSliderTemplate")
+    slider:SetPoint("TOPLEFT", 16, -parentMenu.lastY)
+    slider:SetWidth(200)
+    slider:SetHeight(20)
+    slider:SetMinMaxValues(options.min, options.max)
+    slider:SetValueStep(options.step or 1)
+    slider:SetValue(options.default)
+    
+    -- Текст слайдера
+    _G[slider:GetName().."Text"]:SetText(options.label)
+    _G[slider:GetName().."Low"]:SetText(options.min)
+    _G[slider:GetName().."High"]:SetText(options.max)
+    
+    slider:SetScript("OnValueChanged", function(self, value)
+        if options.onChange then options.onChange(value) end
+    end)
+    
+    -- Обновляем высоту контента
+    parentMenu.lastY = parentMenu.lastY + 40
+    parentMenu.totalHeight = parentMenu.totalHeight + 40
+    parentMenu.scrollContent:SetHeight(parentMenu.totalHeight)
+    
+    table.insert(parentMenu.elements, slider)
+    self:updateScrollRange(parentMenu)
+    return slider
+end
+
+function NSQCMenu:addCheckbox(parentMenu, options)
+    local checkbox = CreateFrame("CheckButton", parentMenu.frame:GetName()..options.name, parentMenu.scrollContent, "ChatConfigCheckButtonTemplate")
+    checkbox:SetPoint("TOPLEFT", 16, -parentMenu.lastY)
+    checkbox:SetChecked(options.default or false)
+    
+    -- Текст чекбокса
+    local label = parentMenu.scrollContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
+    label:SetText(options.label)
+    
+    checkbox:SetScript("OnClick", function(self)
+        if options.onClick then options.onClick(self:GetChecked()) end
+    end)
+    
+    -- Обновляем высоту контента
+    parentMenu.lastY = parentMenu.lastY + 30
+    parentMenu.totalHeight = parentMenu.totalHeight + 30
+    parentMenu.scrollContent:SetHeight(parentMenu.totalHeight)
+    
+    table.insert(parentMenu.elements, checkbox)
+    self:updateScrollRange(parentMenu)
+    return checkbox
+end
+
+function NSQCMenu:updateScrollRange(parentMenu)
+    local scrollFrame = parentMenu.scrollFrame
+    local scrollBar
+
+    -- Retrieve the scrollbar as a child of the scrollFrame
+    for i = 1, scrollFrame:GetNumChildren() do
+        local child = select(i, scrollFrame:GetChildren())
+        if child and child:IsObjectType("Slider") then
+            scrollBar = child
+            break
+        end
+    end
+
+    if not scrollBar then
+        error("Scrollbar not found for scrollFrame: " .. parentMenu.scrollFrame:GetName())
+    end
+
+    local maxRange = parentMenu.totalHeight - parentMenu.maxHeight
+    if maxRange < 0 then maxRange = 0 end
+
+    scrollBar:SetMinMaxValues(0, maxRange)
+    scrollBar:SetValue(0)
+    scrollFrame:UpdateScrollChildRect()
+end

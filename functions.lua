@@ -132,46 +132,169 @@ function unixToDate(unixTime)
     return formattedDate
 end
 
-function NSQCMenu()
-    local optionsFrame = CreateFrame("Frame", "NSQSMenu", InterfaceOptionsFramePanelContainer)
-    optionsFrame.name = "NSQC"  -- Имя для меню
-    optionsFrame:Hide()
+function NS3Menu(ver, subver)
+    local menu = NSQCMenu:new("NSQC3")
 
-    local title = optionsFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("Настройки NSQC")
+    local generalSub = menu:addSubMenu("Настройки")
 
-    -- Опция для изменения размера окна
-    local sizeSlider = CreateFrame("Slider", "HelloWorldSizeSlider", optionsFrame, "OptionsSliderTemplate")
-    sizeSlider:SetPoint("TOPLEFT", 16, -50)
-    sizeSlider:SetMinMaxValues(100, 500)  -- Минимум и максимум
-    sizeSlider:SetValue(200)  -- Значение по умолчанию
-    sizeSlider:SetValueStep(10)  -- Шаг
-    sizeSlider:SetScript("OnValueChanged", function(self, value)
-        frame:SetSize(value, 100)  -- Изменяем размер окна
-        print("Размер окна изменен на: " .. value)
-    end)
+    menu:addSlider(generalSub, {
+        name = "SizeSlider",
+        label = "Window Size",
+        min = 100,
+        max = 500,
+        step = 10,
+        default = 200,
+        onChange = function(value) 
+            print("Size changed to:", value) 
+            -- Здесь логика изменения размера
+        end
+    })
 
-    local sizeLabel = sizeSlider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    sizeLabel:SetPoint("TOPLEFT", sizeSlider, "BOTTOMLEFT", 0, -5)
-    sizeLabel:SetText("Размер окна")
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    menu:addCheckbox(generalSub, {
+        name = "LockCheckbox",
+        label = "Lock Position",
+        default = false,
+        onClick = function(checked)
+            print("Lock state:", checked)
+            -- Здесь логика блокировки позиции
+        end
+    })
+    -- Добавляем информационные секции
+    menu:addInfoSection(
+        "Описание", 
+        "Один аддон, чтоб миром править. Один аддон, чтоб всех найти..."
+    )
 
-    -- Опция для фиксации позиции окна
-    local lockCheckbox = CreateFrame("CheckButton", "HelloWorldLockCheckbox", optionsFrame, "ChatConfigCheckButtonTemplate")
-    lockCheckbox:SetPoint("TOPLEFT", 16, -100)
-    lockCheckbox:SetChecked(false)
-
-    -- Убедимся, что текст для чекбокса установлен
-    local lockCheckboxText = lockCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lockCheckboxText:SetPoint("LEFT", lockCheckbox, "RIGHT", 5, 0)
-    lockCheckboxText:SetText("Фиксировать позицию окна")
-
-    lockCheckbox:SetScript("OnClick", function(self)
-        frame:SetMovable(not self:GetChecked())
-        print(self:GetChecked() and "Позиция окна зафиксирована." or "Позиция окна разблокирована.")
-    end)
-
-    InterfaceOptions_AddCategory(optionsFrame)
+    menu:addInfoSection(
+        "Версия", 
+        "Текущая версия: " .. ver .. "." .. subver
+    )
 end
 
 function CalculateAverageItemLevel(unit)
@@ -663,18 +786,18 @@ end
 
 
 
-local lastName = nil -- Переменная для хранения предыдущего значения
+-- local lastName = nil -- Переменная для хранения предыдущего значения
 
-GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
-    if GuildMemberDetailFrame:IsVisible() then
-        local selectedName = GuildFrame.selectedName
-        if selectedName and selectedName ~= lastName then
-            lastName = selectedName -- Обновляем предыдущее значение
-            print("Имя изменилось на:", selectedName)
-            -- Ваш код для обработки изменения
-        end
-    end
-end)
+-- GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
+--     if GuildMemberDetailFrame:IsVisible() then
+--         local selectedName = GuildFrame.selectedName
+--         if selectedName and selectedName ~= lastName then/run infoFrame:AddText("Клиент", 'GetAddOnMemoryUsage("NSQC")', true)
+--             lastName = selectedName -- Обновляем предыдущее значение
+--             print("Имя изменилось на:", selectedName)
+--             -- Ваш код для обработки изменения
+--         end
+--     end
+-- end)
 
 function testF(num)
     local t = GetTime()
