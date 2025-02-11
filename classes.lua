@@ -1396,21 +1396,26 @@ function UniversalInfoFrame:Hide()
     self.frame:Hide()
 end
 
--- Класс ChatHandler для обработки сообщений чата
 ChatHandler = {}
 ChatHandler.__index = ChatHandler
 
+-- Локальная таблица для хранения переменных вместо глобальных
+local variables = {}
+
+-- Функции для работы с локальными переменными
+local function SetVariable(name, value)
+    variables[name] = value
+end
+
+local function GetVariable(name)
+    return variables[name]
+end
+
 function ChatHandler:new(triggersByAddress, chatTypes)
     local new_object = setmetatable({}, self)
-    self.__index = self
-
-    -- Инициализация таблицы триггеров
     new_object.triggersByAddress = triggersByAddress or {}
-
-    -- Создаем фрейм для обработки событий
     new_object.frame = CreateFrame("Frame")
 
-    -- Регистрируем события чата в зависимости от переданных chatTypes
     if chatTypes then
         for _, chatType in ipairs(chatTypes) do
             if chatType == "ADDON" then
@@ -1420,7 +1425,6 @@ function ChatHandler:new(triggersByAddress, chatTypes)
             end
         end
     else
-        -- Если chatTypes не указан, регистрируем все события по умолчанию
         new_object.frame:RegisterEvent("CHAT_MSG_CHANNEL")
         new_object.frame:RegisterEvent("CHAT_MSG_SAY")
         new_object.frame:RegisterEvent("CHAT_MSG_YELL")
@@ -1434,7 +1438,6 @@ function ChatHandler:new(triggersByAddress, chatTypes)
         new_object.frame:RegisterEvent("CHAT_MSG_ADDON")
     end
 
-    -- Устанавливаем обработчик событий
     new_object.frame:SetScript("OnEvent", function(_, event, ...)
         new_object:OnChatMessage(event, ...)
     end)
@@ -1442,58 +1445,50 @@ function ChatHandler:new(triggersByAddress, chatTypes)
     return new_object
 end
 
--- Метод для обработки сообщений чата
 function ChatHandler:OnChatMessage(event, ...)
     local text, sender, _, _, _, _, _, _, channel, channelName, _, prefix
-
-    -- Обработка событий ADDON (параметры идут в другом порядке)
     if event == "CHAT_MSG_ADDON" then
         prefix, text, channel, sender = ...
     else
-        -- Обработка обычных сообщений чата
         text, sender = ...
     end
-    -- Проверяем триггер для специального ключа "*"
+
     if self.triggersByAddress["*"] then
         for _, trigger in ipairs(self.triggersByAddress["*"]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
+            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
                 if trigger.stopOnMatch then
-                    return -- Прекращаем обработку, если указан stopOnMatch
+                    return
                 end
             end
         end
     end
 
-    -- Определяем адрес (первое слово сообщения или префикса)
-    local addressPrefix = (event == "CHAT_MSG_ADDON" and "prefix:" .. (string.match(prefix, "^(%S+)") or "")) or nil
+    local addressPrefix = nil
+    if event == "CHAT_MSG_ADDON" then
+        addressPrefix = "prefix:" .. (string.match(prefix, "^(%S+)") or "")
+    end
+
     local addressMessage = "message:" .. (string.match(text, "^(%S+)") or "")
 
-    -- Проверяем триггеры для префикса (если это ADDON-сообщение)
     if addressPrefix and self.triggersByAddress[addressPrefix] then
         for _, trigger in ipairs(self.triggersByAddress[addressPrefix]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
+            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
                 return
             end
         end
     end
 
-    -- Проверяем триггеры для сообщения
     if self.triggersByAddress[addressMessage] then
         for _, trigger in ipairs(self.triggersByAddress[addressMessage]) do
-            if self:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event) then
+            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
                 return
             end
         end
     end
 end
 
-function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, prefix, event)
-    local keywords = trigger.keyword or {}
-    local funcName = trigger.func
-    local conditions = trigger.conditions or {}
-    local stopOnMatch = trigger.stopOnMatch or false
+function ChatHandler:CheckTrigger(trigger, text, sender, channel, prefix, event)
     local chatTypes = trigger.chatType
-    -- Проверяем тип чата
     if chatTypes then
         local currentChatType = string.match(event, "CHAT_MSG_(.+)")
         local chatTypeMatch = false
@@ -1506,16 +1501,13 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
         if not chatTypeMatch then
             return false
         end
-    else
-        print("No specific chat types defined for this trigger.")
     end
 
-    -- Проверяем запрещенные слова
     local allForbiddenWords = {}
     for _, wordOrVar in ipairs(trigger.forbiddenWords or {}) do
         if type(wordOrVar) == "string" and wordOrVar:sub(1, 1) == "$" then
             local varName = wordOrVar:sub(2)
-            local varValue = _G[varName]
+            local varValue = GetVariable(varName)
             if type(varValue) == "table" then
                 for _, forbiddenWord in ipairs(varValue) do
                     table.insert(allForbiddenWords, forbiddenWord)
@@ -1530,15 +1522,13 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
 
     for _, forbiddenWord in ipairs(allForbiddenWords) do
         if string.find(text:lower(), forbiddenWord:lower()) then
-            print("Found forbidden word:", forbiddenWord)
             return false
         end
     end
 
-    -- Проверяем ключевые слова
     local keywordsMatch = true
-    if #keywords > 0 then
-        for _, keywordData in ipairs(keywords) do
+    if #trigger.keyword > 0 then
+        for _, keywordData in ipairs(trigger.keyword) do
             local word = keywordData.word
             local position = keywordData.position
             local source = keywordData.source
@@ -1560,10 +1550,9 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
         end
     end
 
-    -- Проверяем условия
     if keywordsMatch then
         local allConditionsMet = true
-        for _, condition in ipairs(conditions) do
+        for _, condition in ipairs(trigger.conditions or {}) do
             if type(condition) == "string" then
                 condition = _G[condition]
             end
@@ -1579,16 +1568,15 @@ function ChatHandler:CheckTrigger(trigger, msg, kodmsg, text, sender, channel, p
             end
         end
 
-        -- Вызываем функцию, если все условия выполнены
         if allConditionsMet then
-            local func = _G[funcName]
+            local func = _G[trigger.func]
             if func then
                 func(event, text, sender, prefix, channel, channelName)
-                if stopOnMatch then
+                if trigger.stopOnMatch then
                     return true
                 end
             else
-                print("Ошибка: функция '" .. funcName .. "' не найдена.")
+                print("Ошибка: функция '" .. trigger.func .. "' не найдена.")
             end
         end
     end
@@ -1615,7 +1603,6 @@ CustomAchievements.COLLAPSED_POSITIONS = {
     date = {x = 300, y = -5},
     rewardPoints = {x = 440, y = -5}
 }
-
 CustomAchievements.EXPANDED_POSITIONS = {
     icon = {x = 5, y = 0},
     name = {x = 50, y = -5},
@@ -1648,8 +1635,8 @@ end
 -- Конструктор класса
 function CustomAchievements:new(staticDataTable, dynamicDataTable)
     local obj = setmetatable({}, self)
-    obj.staticData = _G[staticDataTable]  -- Статичные данные
-    obj.dynamicData = _G[dynamicDataTable] or {}  -- Динамические данные (если не существуют, создаем пустую таблицу)
+    obj.staticData = _G[staticDataTable]
+    obj.dynamicData = _G[dynamicDataTable] or {}
     obj.frame = nil
     obj.buttons = {}
     obj.tabCreated = false
@@ -1657,21 +1644,18 @@ function CustomAchievements:new(staticDataTable, dynamicDataTable)
     obj.selectedButton = nil
     obj.customAlertFrame = nil
 
-    -- Проверка корректности загрузки данных
     if not obj.staticData or type(obj.staticData) ~= "table" then
         error("Ошибка: статическая таблица данных не найдена или некорректна.")
     end
-
     if not obj.dynamicData or type(obj.dynamicData) ~= "table" then
         error("Ошибка: динамическая таблица данных не найдена или некорректна.")
     end
-
     return obj
 end
 
 -- Метод для получения данных ачивки по её имени
 function CustomAchievements:GetAchievementData(name)
-    for category, achievements in pairs(self.staticData) do
+    for _, achievements in pairs(self.staticData) do
         local static = achievements[name]
         if static then
             local dynamic = self.dynamicData[name]
@@ -1687,7 +1671,7 @@ function CustomAchievements:GetAchievementData(name)
                 progress = dynamic and dynamic.progress or 0,
                 isExpanded = dynamic and dynamic.isExpanded or false,
                 scrollPosition = dynamic and dynamic.scrollPosition or 0,
-                category = category  -- Добавляем категорию
+                category = _
             }
         end
     end
@@ -1696,50 +1680,37 @@ end
 
 -- Метод для создания вкладки "Ночная стража"
 function CustomAchievements:CreateNightWatchTab()
-    -- Проверяем, существуют ли вкладки
     if not AchievementFrameTab1 or not AchievementFrameTab2 then
-        return  -- Если вкладки не существуют, выходим
+        return
     end
 
-    -- Создаем третью вкладку с уникальным именем
     self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab3", AchievementFrame, "AchievementFrameTabButtonTemplate")
     self.nightWatchTab:SetText("Ночная стража")
-
-    -- Привязываем новую вкладку к вкладке "Статистика"
     self.nightWatchTab:SetPoint("LEFT", AchievementFrameTab2, "RIGHT", -6, 0)
 
-    -- Убедимся, что текст вкладки инициализирован
     local fontString = self.nightWatchTab:GetFontString()
     if fontString then
         fontString:SetText("Ночная стража")
     else
-        return  -- Если не удалось получить FontString, выходим
+        return
     end
 
-    -- Автоматически подгоняем ширину вкладки под текст
     PanelTemplates_TabResize(self.nightWatchTab, 0)
 
-    -- Обработчик клика для вкладки "Ночная стража"
     self.nightWatchTab:SetScript("OnClick", function()
-        -- Скрываем стандартные разделы
         AchievementFrameSummary:Hide()
         AchievementFrameAchievements:Hide()
         AchievementFrameStats:Hide()
 
-        -- Скрываем стандартные категории
         for i = 1, 20 do
-            if _G['AchievementFrameCategoriesContainerButton' .. i] then
-                _G['AchievementFrameCategoriesContainerButton' .. i]:Hide()
+            local button = _G['AchievementFrameCategoriesContainerButton' .. i]
+            if button then
+                button:Hide()
             end
         end
 
-        -- Показываем наш кастомный фрейм
         self:Show()
-
-        -- Обновляем интерфейс без категории (если не задана явно)
         self:UpdateUI(self.selectedCategory)
-
-        -- Обновляем состояние вкладок
         PanelTemplates_SetTab(AchievementFrame, 3)
     end)
 end
@@ -1757,11 +1728,7 @@ local function CreateTextureElement(parent, layer, texture, width, height, point
     local tex = parent:CreateTexture(nil, layer)
     tex:SetTexture(texture)
     tex:SetSize(width, height)
-    if relativeTo then
-        tex:SetPoint(point, relativeTo, relativePoint, x, y)
-    else
-        tex:SetPoint(point, x, y)
-    end
+    tex:SetPoint(point, relativeTo, relativePoint, x, y)
     return tex
 end
 
@@ -1771,10 +1738,7 @@ function CustomAchievements:SyncDynamicData()
         return
     end
 
-    -- Создаем временную таблицу для старых данных по уникальному индексу
     local oldDataMap = {}
-
-    -- Собираем старые данные по уникальному индексу
     for _, category in pairs(self.staticData) do
         for name, staticData in pairs(category) do
             local uniqueIndex = staticData.uniqueIndex
@@ -1784,16 +1748,13 @@ function CustomAchievements:SyncDynamicData()
         end
     end
 
-    -- Создаем новую структуру на основе статической таблицы
     for categoryName, achievements in pairs(self.staticData) do
         for name, staticData in pairs(achievements) do
             local uniqueIndex = staticData.uniqueIndex
             if uniqueIndex then
                 if oldDataMap[uniqueIndex] then
-                    -- Переносим существующие данные в новый индекс
                     self.dynamicData[name] = oldDataMap[uniqueIndex]
                 else
-                    -- Создаем новую запись с дефолтными значениями
                     self.dynamicData[name] = {
                         uniqueIndex = uniqueIndex,
                         dateEarned = "Не получена",
@@ -1807,7 +1768,6 @@ function CustomAchievements:SyncDynamicData()
         end
     end
 
-    -- Удаляем устаревшие записи из dynamicData
     local idsToRemove = {}
     for name, data in pairs(self.dynamicData) do
         local found = false
@@ -1821,7 +1781,6 @@ function CustomAchievements:SyncDynamicData()
             table.insert(idsToRemove, name)
         end
     end
-
     for _, id in ipairs(idsToRemove) do
         self.dynamicData[id] = nil
     end
@@ -1832,7 +1791,6 @@ function CustomAchievements:IsStructureChanged()
     local staticIndexByUnique = {}
     local dynamicIndexByUnique = {}
 
-    -- Собираем соответствие индексов из статической таблицы
     for _, category in pairs(self.staticData) do
         for name, staticData in pairs(category) do
             if staticData.uniqueIndex then
@@ -1841,14 +1799,12 @@ function CustomAchievements:IsStructureChanged()
         end
     end
 
-    -- Собираем соответствие индексов из динамической таблицы
     for name, dynamicData in pairs(self.dynamicData) do
         if dynamicData.uniqueIndex then
             dynamicIndexByUnique[dynamicData.uniqueIndex] = name
         end
     end
 
-    -- Сравниваем соответствие индексов между статической и динамической таблицами
     for uniqueIndex, staticName in pairs(staticIndexByUnique) do
         local dynamicName = dynamicIndexByUnique[uniqueIndex]
         if dynamicName ~= staticName then
@@ -1856,13 +1812,11 @@ function CustomAchievements:IsStructureChanged()
         end
     end
 
-    -- Проверяем наличие уникальных индексов в динамической таблице, которых нет в статической
     for uniqueIndex in pairs(dynamicIndexByUnique) do
         if not staticIndexByUnique[uniqueIndex] then
             return true
         end
     end
-
     return false
 end
 
@@ -1895,29 +1849,23 @@ function CustomAchievements:CreateFrame(parent)
     self.frame:SetPoint("CENTER")
     self.frame:Hide()
 
-    -- Заголовок
     local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("TOP", 130, -10)
 
-    -- Контейнер для кнопок категорий
     self:CreateCategoryButtons(self.frame)
 
-    -- Скроллируемая область для ачивок
     self.achievementList = CreateFrame("ScrollFrame", "achievementScrollFrame", self.frame, "UIPanelScrollFrameTemplate")
     self.achievementList:SetSize(690, 450)
     self.achievementList:SetPoint("TOPLEFT", self.categoryContainer, "TOPRIGHT", -100, 0)
 
-    -- Контейнер для элементов
     self.achievementContainer = CreateFrame("Frame", nil, self.achievementList)
     self.achievementContainer:SetSize(720, 450)
     self.achievementList:SetScrollChild(self.achievementContainer)
 
-    -- Фон
     local background = CreateTexture(self.achievementContainer, "BACKGROUND", TEXTURE_BACKGROUND)
     background:SetAllPoints()
     background:SetVertexColor(1, 1, 1, 1)
 
-    -- Скроллбар
     local scrollBar = CreateFrame("Slider", nil, self.achievementList, "UIPanelScrollBarTemplate")
     scrollBar:Hide()
     scrollBar:SetPoint("TOPLEFT", self.achievementList, "TOPRIGHT", -20, -16)
@@ -1948,40 +1896,31 @@ function CustomAchievements:CreateCategoryButtons(parent)
     local yOffset = 0
     self.categoryButtons = {}
 
-    -- Создаем контейнер для кнопок категорий
     self.categoryContainer = CreateFrame("Frame", nil, parent)
     self.categoryContainer:SetSize(buttonWidth, #categories * buttonHeight + 10)
     self.categoryContainer:SetPoint("TOPLEFT", parent, "TOPLEFT", 70, -30)
 
-    -- Создаем кнопки для каждой категории
     for _, category in ipairs(categories) do
         local button = CreateFrame("Button", nil, self.categoryContainer)
         button:SetSize(buttonWidth + 80, buttonHeight)
         button:SetPoint("TOPLEFT", self.categoryContainer, "TOPLEFT", 0, -yOffset)
 
-        -- Текстура фона кнопки
         local normalTexture = button:CreateTexture(nil, "BACKGROUND")
         normalTexture:SetTexture("Interface\\AchievementFrame\\UI-Achievement-Category-Background")
         normalTexture:SetPoint("CENTER", button, "CENTER")
         normalTexture:SetSize(200, 35)
+        normalTexture:SetTexCoord(0, 0.6640625, 0, 1)
 
-        -- Устанавливаем координаты текстуры (выбираем нужный участок)
-        normalTexture:SetTexCoord(0, 0.6640625, 0, 1)  -- Пример: используем верхнюю половину текстуры
-
-        -- Текст кнопки
         local buttonText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         buttonText:SetPoint("CENTER", button, "CENTER", 0, 3)
         buttonText:SetText(category)
 
-        -- Подсветка при наведении
         local highlightTexture = button:CreateTexture(nil, "HIGHLIGHT")
         highlightTexture:SetAllPoints()
         highlightTexture:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight")
         highlightTexture:SetBlendMode("ADD")
-        -- Устанавливаем координаты текстуры (выбираем нужный участок)
-        highlightTexture:SetTexCoord(0, 1, 0, 0.5)  -- Пример: используем верхнюю половину текстуры
+        highlightTexture:SetTexCoord(0, 1, 0, 0.5)
 
-        -- Обработчик клика
         button:SetScript("OnClick", function()
             self:FilterAchievementsByCategory(category)
         end)
@@ -1994,29 +1933,19 @@ end
 -- Метод для фильтрации ачивок по категории
 function CustomAchievements:FilterAchievementsByCategory(category)
     if not self.achievementContainer then return end
-
-    -- Устанавливаем выбранную категорию
     self.selectedCategory = category
-
-    -- Обновляем интерфейс с выбранной категорией
     self:UpdateUI(category)
 end
 
 -- Метод для добавления ачивки
 function CustomAchievements:AddAchievement(name)
-    -- Проверяем существование статичных данных
     if not self.staticData[name] then
         print("Ошибка: ачивка с ID " .. name .. " не найдена в статичных данных")
         return
     end
-
-    -- Если уже есть динамические данные - выходим
     if self.dynamicData[name] then return end
 
-    -- Получаем текущую дату и время
     local currentDate = date("%d/%m/%Y %H:%M")
-
-    -- Создаем запись в динамических данных
     self.dynamicData[name] = {
         uniqueIndex = self.staticData[name].uniqueIndex,
         dateEarned = currentDate,
@@ -2026,30 +1955,25 @@ function CustomAchievements:AddAchievement(name)
         scrollPosition = 0
     }
 
-    -- Обновляем интерфейс с учетом выбранной категории
     self:UpdateUI(self.selectedCategory)
     self:ShowAchievementAlert(name)
 end
 
 -- Метод для обновления интерфейса с учетом выбранной категории
 function CustomAchievements:UpdateUI(selectedCategory)
-    self:SyncDynamicData()  -- Синхронизируем динамические данные перед обновлением интерфейса
+    self:SyncDynamicData()
     if not self.achievementContainer then return end
 
-    -- Очищаем предыдущие элементы
     for _, child in ipairs({self.achievementContainer:GetChildren()}) do
         child:Hide()
         child:ClearAllPoints()
         child:SetParent(nil)
     end
-
     self.buttons = {}
-    local yOffset = 0  -- Инициализируем yOffset
 
-    -- Создаем временную таблицу для сортировки ачивок по индексу
+    local yOffset = 0
     local sortedAchievements = {}
 
-    -- Собираем ачивки в зависимости от выбранной категории
     for category, achievements in pairs(self.staticData) do
         if not selectedCategory or category == selectedCategory then
             for name, staticData in pairs(achievements) do
@@ -2058,12 +1982,10 @@ function CustomAchievements:UpdateUI(selectedCategory)
         end
     end
 
-    -- Сортируем ачивки по индексу
     table.sort(sortedAchievements, function(a, b)
         return a.index < b.index
     end)
 
-    -- Отображаем ачивки в отсортированном порядке
     for _, achievement in ipairs(sortedAchievements) do
         local name = achievement.name
         local dynamicData = self.dynamicData[name] or {}
@@ -2074,7 +1996,6 @@ function CustomAchievements:UpdateUI(selectedCategory)
         end
     end
 
-    -- Обновляем скроллируемую область
     self:UpdateScrollArea(yOffset)
 end
 
@@ -2083,10 +2004,8 @@ function CustomAchievements:UpdateScrollArea(totalHeight)
     local scrollBar = self.achievementList.scrollBar
     local containerHeight = totalHeight + 60
 
-    -- Обновляем высоту контейнера
     self.achievementContainer:SetHeight(containerHeight)
 
-    -- Обновляем скроллбар
     if scrollBar then
         local scrollHeight = containerHeight - self.achievementList:GetHeight()
         scrollBar:SetMinMaxValues(0, math.max(0, scrollHeight))
@@ -2104,53 +2023,39 @@ end
 
 -- Метод для создания кнопки ачивки
 function CustomAchievements:CreateAchievementButton(name, yOffset)
-    local achievement = self:GetAchievementFullData(name)  -- Используем GetAchievementFullData
+    local achievement = self:GetAchievementFullData(name)
     if not achievement then return nil end
 
-    -- Создаем кнопку
     local button = CreateFrame("Button", nil, self.achievementContainer)
     button:SetSize(510, COLLAPSED_HEIGHT)
     button:SetPoint("TOPLEFT", self.achievementContainer, "TOPLEFT", 195, -yOffset)
     button.id = name
 
-    -- Иконка ачивки
     button.icon = CreateTextureElement(button, "ARTWORK", achievement.texture, DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE, "TOPLEFT", button, "TOPLEFT", self.COLLAPSED_POSITIONS.icon.x, self.COLLAPSED_POSITIONS.icon.y)
-
-    -- Название ачивки
     button.nameText = CreateTextElement(button, "GameFontHighlight", "LEFT", "TOPLEFT", button.icon, "TOPRIGHT", 5, 0)
     button.nameText:SetText(achievement.name)
-
-    -- Дата получения
     button.dateText = CreateTextElement(button, "GameFontNormal", "LEFT", "TOPLEFT", button, "TOPLEFT", self.COLLAPSED_POSITIONS.date.x, self.COLLAPSED_POSITIONS.date.y)
     button.dateText:SetText(achievement.dateEarned)
-
-    -- Иконка очков награды
     button.rewardPointsIcon = CreateTextureElement(button, "ARTWORK", TEXTURE_SHIELD, REWARD_ICON_SIZE, REWARD_ICON_SIZE, "TOPLEFT", button, "TOPLEFT", self.COLLAPSED_POSITIONS.rewardPoints.x, self.COLLAPSED_POSITIONS.rewardPoints.y)
 
-    -- Состояние щита в зависимости от выполнения ачивки
     if achievement.dateCompleted ~= "Не выполнена" then
-        button.rewardPointsIcon:SetTexCoord(0, 0.5, 0, 1)  -- Зеленый щит
+        button.rewardPointsIcon:SetTexCoord(0, 0.5, 0, 1)
     else
-        button.rewardPointsIcon:SetTexCoord(0.5, 1, 0, 1)  -- Серый щит
+        button.rewardPointsIcon:SetTexCoord(0.5, 1, 0, 1)
     end
 
-    -- Текст очков награды
     button.rewardPointsText = CreateTextElement(button, "GameFontNormal", "CENTER", "CENTER", button.rewardPointsIcon, "CENTER", 0, 0)
     button.rewardPointsText:SetText(achievement.rewardPoints)
 
-    -- Подсветка при наведении
     button.highlight = CreateTextureElement(button, "BACKGROUND", TEXTURE_HIGHLIGHT, 510, COLLAPSED_HEIGHT, "TOPLEFT", button, "TOPLEFT", 0, 0)
     button.highlight:SetAlpha(0)
 
-    -- Фон в зависимости от статуса
     button.normal = CreateTextureElement(button, "BACKGROUND", achievement.dateCompleted ~= "Не выполнена" and TEXTURE_COMPLETE or TEXTURE_INCOMPLETE, 510, COLLAPSED_HEIGHT, "TOPLEFT", button, "TOPLEFT", 0, 0)
     button.normal:SetAlpha(1)
 
-    -- Обработчики событий
     button:RegisterForClicks("RightButtonDown", "LeftButtonDown")
     button:SetScript("OnClick", function(_, mouseButton)
         if mouseButton == "LeftButton" then
-            -- Переключаем состояние разворачивания/сворачивания
             self.dynamicData[name].isExpanded = not self.dynamicData[name].isExpanded
             local scrollBarValue = self.achievementList.scrollBar:GetValue()
             self:UpdateUI(self.selectedCategory)
@@ -2160,30 +2065,27 @@ function CustomAchievements:CreateAchievementButton(name, yOffset)
         end
     end)
 
-    -- Обработчик события OnEnter (при наведении мыши)
     button:SetScript("OnEnter", function()
-        button.highlight:SetAlpha(1)  -- Показываем подсветку
-        self:ShowAchievementTooltip(button, name)  -- Показываем тултип
+        button.highlight:SetAlpha(1)
+        self:ShowAchievementTooltip(button, name)
     end)
 
-    -- Обработчик события OnLeave (при убирании мыши)
     button:SetScript("OnLeave", function()
-        button.highlight:SetAlpha(0)  -- Скрываем подсветку
-        GameTooltip:Hide()  -- Скрываем тултип
+        button.highlight:SetAlpha(0)
+        GameTooltip:Hide()
     end)
 
-    -- Если ачивка уже развернута, вызываем метод раскрытия
     if achievement.isExpanded then
         self:ExpandAchievement(button, name)
     end
-
     return button
 end
 
 -- Метод для показа тултипа
 function CustomAchievements:ShowAchievementTooltip(button, name)
-    local data = self:GetAchievementFullData(name)  -- Используем GetAchievementFullData
+    local data = self:GetAchievementFullData(name)
     if not data then return end
+
     GameTooltip:SetOwner(button, TOOLTIP_ANCHOR)
     GameTooltip:SetText(data.name)
     GameTooltip:AddLine(data.description, 1, 1, 1, true)
@@ -2196,49 +2098,42 @@ end
 
 -- Метод для раскрытия ачивки
 function CustomAchievements:ExpandAchievement(button, name)
-    local achievement = self:GetAchievementFullData(name)  -- Используем GetAchievementFullData
+    local achievement = self:GetAchievementFullData(name)
     if not achievement then return end
 
-    -- Создаем descriptionText, если он не существует
     if not button.descriptionText then
         button.descriptionText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         button.descriptionText:SetWidth(400)
         button.descriptionText:SetWordWrap(true)
         button.descriptionText:SetText(achievement.description)
         button.descriptionText:SetJustifyH("LEFT")
-        button.descriptionText:Hide() -- Скрываем по умолчанию
+        button.descriptionText:Hide()
     end
 
-    -- Позиционирование элементов
     button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.icon.x, self.EXPANDED_POSITIONS.icon.y)
     button.nameText:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.name.x, self.EXPANDED_POSITIONS.name.y)
     button.dateText:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.date.x, self.EXPANDED_POSITIONS.date.y)
     button.rewardPointsIcon:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.rewardPoints.x, self.EXPANDED_POSITIONS.rewardPoints.y)
 
-    -- Показываем описание
     button.descriptionText:SetPoint("TOPLEFT", button, "TOPLEFT", self.EXPANDED_POSITIONS.description.x, self.EXPANDED_POSITIONS.description.y)
     button.descriptionText:Show()
 
-    -- Рассчитываем высоту описания
     local descriptionHeight = button.descriptionText:GetHeight()
-
-    -- Вложенные достижения
     local requiredYOffset = -80
     local iconSize = 30
     local iconSpacing = 5
+
     for i, reqId in ipairs(achievement.subAchievements) do
-        local reqAchievement = self:GetAchievementFullData(reqId)  -- Используем GetAchievementFullData
+        local reqAchievement = self:GetAchievementFullData(reqId)
         if reqAchievement then
             self:CreateNestedAchievementIcon(button, reqAchievement, i, self.EXPANDED_POSITIONS.requiredAchievements.x, requiredYOffset, iconSize, iconSpacing)
         end
     end
 
-    -- Высота кнопки
     local numRows = math.ceil(#achievement.subAchievements / MAX_ICONS_PER_ROW)
     local totalHeight = EXPANDED_BASE_HEIGHT + descriptionHeight + numRows * (iconSize + iconSpacing)
-    button:SetHeight(totalHeight - 30)  -- Корректируем высоту
+    button:SetHeight(totalHeight - 30)
 
-    -- Обновляем размеры текстур
     button.normal:SetAllPoints()
     button.highlight:SetAllPoints()
 end
@@ -2250,18 +2145,20 @@ function CustomAchievements:CreateNestedAchievementIcon(parent, achievement, ind
     local col = (index - 1) % MAX_ICONS_PER_ROW
     local row = math.floor((index - 1) / MAX_ICONS_PER_ROW)
     button:SetPoint("TOPLEFT", parent, "TOPLEFT", x + col * (size + spacing), y - row * (size + spacing))
+
     local icon = CreateTexture(button, "ARTWORK", achievement.texture)
     icon:SetAllPoints()
-    -- Проверяем выполнение ачивки
+
     if achievement.dateCompleted ~= "Не выполнена" then
-        icon:SetDesaturated(false)  -- Цветная иконка
+        icon:SetDesaturated(false)
     else
-        icon:SetDesaturated(true)   -- Серая иконка
+        icon:SetDesaturated(true)
     end
-    -- Обработчики событий
+
     button:SetScript("OnMouseDown", function()
-        self:NavigateToAchievement(achievement.id)  -- Передаем ID ачивки
+        self:NavigateToAchievement(achievement.id)
     end)
+
     button:SetScript("OnEnter", function()
         GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
         GameTooltip:SetText(achievement.name)
@@ -2272,6 +2169,7 @@ function CustomAchievements:CreateNestedAchievementIcon(parent, achievement, ind
         end
         GameTooltip:Show()
     end)
+
     button:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
@@ -2279,18 +2177,16 @@ end
 
 -- Навигация к достижению
 function CustomAchievements:NavigateToAchievement(id)
-    -- Сбрасываем состояние всех ачивок
     for _, dynamic in pairs(self.dynamicData) do
         dynamic.isExpanded = false
     end
-    -- Устанавливаем состояние текущей ачивки как развернутой
+
     local dynamic = self.dynamicData[id]
     if dynamic then
         dynamic.isExpanded = true
     end
-    -- Обновляем интерфейс
+
     self:UpdateUI()
-    -- Прокручиваем к нужной ачивке
     local scrollBar = self.achievementList.scrollBar
     local scrollPosition = dynamic and dynamic.scrollPosition or 0
     scrollBar:SetValue(scrollPosition)
@@ -2299,17 +2195,17 @@ end
 -- Метод для скрытия ачивок
 function CustomAchievements:HideAchievements()
     if self.frame then
-        self.frame:Hide()  -- Скрываем фрейм
+        self.frame:Hide()
     end
     for _, button in pairs(self.buttons) do
-        button:Hide()  -- Скрываем все кнопки ачивок
+        button:Hide()
     end
 end
 
 -- Метод для отображения ачивок
 function CustomAchievements:ShowAchievements()
     for _, button in pairs(self.buttons) do
-        button:Show()  -- Показываем все кнопки ачивок
+        button:Show()
     end
 end
 
@@ -2317,8 +2213,8 @@ end
 function CustomAchievements:Show()
     if self.frame then
         self.frame:Show()
-        self:UpdateUI(self.selectedCategory)  -- Обновляем UI с текущей категорией
-        self:ShowAchievements()  -- Показываем ачивки, если фрейм видим
+        self:UpdateUI(self.selectedCategory)
+        self:ShowAchievements()
     end
 end
 
@@ -2326,16 +2222,16 @@ end
 function CustomAchievements:Hide()
     if self.frame then
         self.frame:Hide()
-        self.selectedCategory = nil -- Сбрасываем выбранную категорию при закрытии окна
-        self:UpdateUI()  -- Обновляем UI без категории
+        self.selectedCategory = nil
+        self:UpdateUI()
     end
 end
 
 -- Метод для создания кастомного фрейма уведомлений
 function CustomAchievements:CreateCustomAlertFrame()
     local alertFrame = CreateFrame("Frame", "CustomAchievementAlertFrame", UIParent)
-    alertFrame:SetFrameStrata("DIALOG")  -- Высокий слой
-    alertFrame:SetFrameLevel(100)  -- Высокий уровень
+    alertFrame:SetFrameStrata("DIALOG")
+    alertFrame:SetFrameLevel(100)
     alertFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
     alertFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -2344,23 +2240,23 @@ function CustomAchievements:CreateCustomAlertFrame()
         insets = { left = 11, right = 12, top = 12, bottom = 11 }
     })
     alertFrame:SetBackdropColor(0, 0, 0, 0.8)
-    alertFrame:SetAlpha(1)  -- Начальная прозрачность
-    -- Иконка ачивки
+    alertFrame:SetAlpha(1)
+
     alertFrame.Icon = alertFrame:CreateTexture(nil, "ARTWORK")
     alertFrame.Icon:SetSize(40, 40)
     alertFrame.Icon:SetPoint("TOPLEFT", alertFrame, "TOPLEFT", 10, -10)
     alertFrame.Icon:SetTexture("Interface\\Icons\\Ability_Rogue_ShadowStrikes")
-    -- Текст названия ачивки
+
     alertFrame.Name = alertFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     alertFrame.Name:SetPoint("TOPLEFT", alertFrame.Icon, "TOPRIGHT", 10, 0)
     alertFrame.Name:SetJustifyH("LEFT")
     alertFrame.Name:SetText("Название ачивки")
-    -- Текст описания ачивки
+
     alertFrame.Description = alertFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     alertFrame.Description:SetPoint("TOPLEFT", alertFrame.Name, "BOTTOMLEFT", 0, -5)
     alertFrame.Description:SetJustifyH("LEFT")
     alertFrame.Description:SetText("Описание ачивки")
-    -- Функция для обновления размера фрейма
+
     alertFrame.UpdateSize = function(self)
         local nameWidth = self.Name:GetStringWidth()
         local descriptionWidth = self.Description:GetStringWidth()
@@ -2377,10 +2273,8 @@ end
 
 -- Метод для получения динамической таблицы ачивки по её имени
 function CustomAchievements:GetAchievementData(name)
-    -- Проверяем наличие ачивки в статической таблице
     for _, category in pairs(self.staticData) do
         if category[name] then
-            -- Возвращаем динамическую таблицу, если она существует
             return self.dynamicData[name]
         end
     end
@@ -2394,7 +2288,6 @@ function CustomAchievements:GetAchievementFullData(name)
         if category[name] then
             local staticData = category[name]
             local dynamicData = self.dynamicData[name] or {}  -- Если динамических данных нет, используем пустую таблицу
-
             -- Возвращаем объединенные данные
             return {
                 name = staticData.name,
@@ -2408,11 +2301,11 @@ function CustomAchievements:GetAchievementFullData(name)
                 progress = dynamicData.progress or 0,
                 isExpanded = dynamicData.isExpanded or false,
                 scrollPosition = dynamicData.scrollPosition or 0,
-                category = staticData.category,  -- Возвращаем категорию, в которой находится ачивка
+                category = category,  -- Возвращаем категорию, в которой находится ачивка
                 send_txt = staticData.send_txt,
                 subAchievements_args = staticData.subAchievements_args,
                 achievement_args = staticData.achievement_args,
-                achFunc = staticData.achFunc
+                achFunc = staticData.achFunc  -- Восстанавливаем поле achFunc
             }
         end
     end
@@ -2421,19 +2314,16 @@ end
 
 -- Метод для отображения уведомления о новой ачивке
 function CustomAchievements:ShowAchievementAlert(achievementName)
-    -- Получаем данные ачивки по её имени
     local achievement = self:GetAchievementFullData(achievementName)
     if not achievement then
         print("Ачивка с именем " .. achievementName .. " не найдена.")
         return
     end
 
-    -- Создаем или используем кастомный фрейм
     if not self.customAlertFrame then
         self.customAlertFrame = self:CreateCustomAlertFrame()
     end
 
-    -- Устанавливаем данные ачивки
     self.customAlertFrame.Name:SetText(achievement.name)
     self.customAlertFrame.Description:SetText(achievement.description)
     self.customAlertFrame.Icon:SetTexture(achievement.texture)
@@ -2441,7 +2331,6 @@ function CustomAchievements:ShowAchievementAlert(achievementName)
     self.customAlertFrame:SetAlpha(1)
     self.customAlertFrame:Show()
 
-    -- Устанавливаем таймер для скрытия фрейма
     self.customAlertFrame.timer = 5
     self.customAlertFrame.elapsed = 0
     self.customAlertFrame:SetScript("OnUpdate", function(self, elapsed)
@@ -2461,10 +2350,8 @@ end
 
 -- Метод для проверки существования ачивки по имени
 function CustomAchievements:IsAchievement(name)
-    -- Проверяем наличие ачивки в статической таблице
     for _, category in pairs(self.staticData) do
         if category[name] then
-            -- Проверяем наличие ачивки в динамической таблице
             local uniqueIndex = category[name].uniqueIndex
             return self.dynamicData[name] ~= nil and self.dynamicData[name].uniqueIndex == uniqueIndex
         end
@@ -2483,13 +2370,11 @@ end
 
 -- Метод для изменения данных динамической таблицы
 function CustomAchievements:setData(name, key, value)
-    -- Проверяем, существует ли ачивка в динамической таблице
     if not self.dynamicData[name] then
         print("Ошибка: ачивка с именем " .. name .. " не найдена в динамической таблице.")
         return
     end
 
-    -- Список допустимых ключей для изменения
     local allowedKeys = {
         dateEarned = true,
         dateCompleted = true,
@@ -2498,16 +2383,12 @@ function CustomAchievements:setData(name, key, value)
         scrollPosition = true
     }
 
-    -- Проверяем, является ли ключ допустимым
     if not allowedKeys[key] then
         print("Ошибка: ключ " .. key .. " недопустим для изменения.")
         return
     end
 
-    -- Изменяем значение параметра
     self.dynamicData[name][key] = value
-
-    -- Обновляем интерфейс, если ачивка видима
     self:UpdateUI(self.selectedCategory)
 end
 
@@ -2517,26 +2398,20 @@ NSQCMenu.__index = NSQCMenu
 -- Конструктор класса
 function NSQCMenu:new(addonName, options)
     local instance = setmetatable({}, self)
-    
     instance.addonName = addonName
     instance.subMenus = {}
     instance.elements = {}
-    
     -- Создаем основной фрейм
     instance.mainFrame = CreateFrame("Frame", addonName.."MainFrame", InterfaceOptionsFramePanelContainer)
     instance.mainFrame.name = addonName
     instance.mainFrame:Hide()
-    
     -- Инициализация позиции элементов
     instance.currentY = -50 -- Начальная позиция Y после заголовка
-    
     -- Заголовок аддона
     local title = instance.mainFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(addonName)
-    
     InterfaceOptions_AddCategory(instance.mainFrame)
-    
     return instance
 end
 
@@ -2544,13 +2419,11 @@ end
 function NSQCMenu:addInfoSection(titleText, contentText)
     local parentFrame = self.mainFrame
     local sectionY = self.currentY
-
     -- Добавляем подзаголовок
     local subtitle = parentFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     subtitle:SetPoint("TOPLEFT", 20, sectionY - 10)
     subtitle:SetText(titleText)
     subtitle:SetTextColor(1, 0.82, 0) -- Золотой цвет
-
     -- Добавляем текст
     local content = parentFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite")
     content:SetPoint("TOPLEFT", 30, sectionY - 30)
@@ -2558,11 +2431,9 @@ function NSQCMenu:addInfoSection(titleText, contentText)
     content:SetJustifyH("LEFT")
     content:SetJustifyV("TOP")
     content:SetText(self:wrapText(contentText, 540, "GameFontWhite")) -- Перенос текста
-
     -- Обновляем позицию для следующих элементов
     local textHeight = content:GetStringHeight()
     self.currentY = sectionY - 40 - textHeight
-
     table.insert(self.elements, {subtitle, content})
 end
 
@@ -2570,11 +2441,9 @@ end
 function NSQCMenu:wrapText(text, maxWidth, font)
     local wrappedText = ""
     local line = ""
-    
     for word in text:gmatch("%S+") do
         local temp = line .. " " .. word
-        local tempWidth = self:getStringWidth(temp, font)
-        
+        local tempWidth = self:getStringWidth(self.mainFrame, temp, font)
         if tempWidth > maxWidth then
             wrappedText = wrappedText .. line .. "\n"
             line = word
@@ -2582,13 +2451,16 @@ function NSQCMenu:wrapText(text, maxWidth, font)
             line = temp
         end
     end
-    
     return wrappedText .. line
 end
 
 -- Вспомогательный метод для получения ширины текста
-function NSQCMenu:getStringWidth(text, font)
-    local temp = self.mainFrame:CreateFontString(nil, "ARTWORK", font)
+function NSQCMenu:getStringWidth(frame, text, font)
+    if not frame then
+        print("Error: Frame is nil in getStringWidth")
+        return 0
+    end
+    local temp = frame:CreateFontString(nil, "ARTWORK", font)
     temp:SetText(text)
     local width = temp:GetStringWidth()
     temp:Hide()
@@ -2601,30 +2473,24 @@ function NSQCMenu:addSubMenu(menuName)
     subFrame.name = menuName
     subFrame.parent = self.addonName
     subFrame:Hide()
-    
     -- Создаем ScrollFrame
     local scrollFrame = CreateFrame("ScrollFrame", menuName.."ScrollFrame", subFrame, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 10, -40)
     scrollFrame:SetPoint("BOTTOMRIGHT", -10, 10)
-    
     -- Создаем контент для скролла
     local scrollContent = CreateFrame("Frame", menuName.."ScrollContent", scrollFrame)
     scrollContent:SetWidth(scrollFrame:GetWidth() - 20)
     scrollContent:SetHeight(1)
     scrollFrame:SetScrollChild(scrollContent)
-    
     -- Настраиваем скроллбар
     local scrollBar = _G[menuName.."ScrollFrameScrollBar"]
     scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -20, -16)
     scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -20, 16)
-    
     -- Заголовок подменю
     local title = subFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(menuName)
-    
     InterfaceOptions_AddCategory(subFrame)
-    
     local subMenu = {
         frame = subFrame,
         scrollFrame = scrollFrame,
@@ -2634,11 +2500,9 @@ function NSQCMenu:addSubMenu(menuName)
         totalHeight = 0,
         maxHeight = scrollFrame:GetHeight()
     }
-    
     table.insert(self.subMenus, subMenu)
     return subMenu
 end
-
 
 -- Методы для добавления элементов в подменю
 function NSQCMenu:addSlider(parentMenu, options)
@@ -2649,15 +2513,12 @@ function NSQCMenu:addSlider(parentMenu, options)
     slider:SetMinMaxValues(options.min, options.max)
     slider:SetValueStep(options.step or 1)
     slider:SetValue(options.default)
-    
     -- Добавляем текст тултипа
     slider.tooltipText = options.tooltip
-    
     -- Текст слайдера
     _G[slider:GetName().."Text"]:SetText(options.label)
     _G[slider:GetName().."Low"]:SetText(options.min)
     _G[slider:GetName().."High"]:SetText(options.max)
-    
     -- Обработчики тултипа
     slider:SetScript("OnEnter", function(self)
         if self.tooltipText then
@@ -2667,11 +2528,9 @@ function NSQCMenu:addSlider(parentMenu, options)
             GameTooltip:Show()
         end
     end)
-    
     slider:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
     end)
-    
     slider:SetScript("OnValueChanged", function(self, value)
         if options.onChange then options.onChange(value) end
         -- Обновляем тултип если открыт
@@ -2683,12 +2542,10 @@ function NSQCMenu:addSlider(parentMenu, options)
             GameTooltip:Show()
         end
     end)
-    
     -- Обновляем высоту контента
     parentMenu.lastY = parentMenu.lastY + 40
     parentMenu.totalHeight = parentMenu.totalHeight + 40
     parentMenu.scrollContent:SetHeight(parentMenu.totalHeight)
-    
     table.insert(parentMenu.elements, slider)
     self:updateScrollRange(parentMenu)
     return slider
@@ -2698,15 +2555,12 @@ function NSQCMenu:addCheckbox(parentMenu, options)
     local checkbox = CreateFrame("CheckButton", parentMenu.frame:GetName()..options.name, parentMenu.scrollContent, "ChatConfigCheckButtonTemplate")
     checkbox:SetPoint("TOPLEFT", 16, -parentMenu.lastY)
     checkbox:SetChecked(options.default or false)
-    
     -- Добавляем текст тултипа
     checkbox.tooltipText = options.tooltip
-    
     -- Текст чекбокса
     local label = parentMenu.scrollContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
     label:SetText(options.label)
-    
     -- Обработчики тултипа
     checkbox:SetScript("OnEnter", function(self)
         if self.tooltipText then
@@ -2717,11 +2571,9 @@ function NSQCMenu:addCheckbox(parentMenu, options)
             GameTooltip:Show()
         end
     end)
-    
     checkbox:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
     end)
-    
     checkbox:SetScript("OnClick", function(self)
         if options.onClick then options.onClick(self:GetChecked()) end
         -- Обновляем тултип если открыт
@@ -2734,12 +2586,10 @@ function NSQCMenu:addCheckbox(parentMenu, options)
             GameTooltip:Show()
         end
     end)
-    
     -- Обновляем высоту контента
     parentMenu.lastY = parentMenu.lastY + 30
     parentMenu.totalHeight = parentMenu.totalHeight + 30
     parentMenu.scrollContent:SetHeight(parentMenu.totalHeight)
-    
     table.insert(parentMenu.elements, checkbox)
     self:updateScrollRange(parentMenu)
     return checkbox
@@ -2747,24 +2597,12 @@ end
 
 function NSQCMenu:updateScrollRange(parentMenu)
     local scrollFrame = parentMenu.scrollFrame
-    local scrollBar
-
-    -- Retrieve the scrollbar as a child of the scrollFrame
-    for i = 1, scrollFrame:GetNumChildren() do
-        local child = select(i, scrollFrame:GetChildren())
-        if child and child:IsObjectType("Slider") then
-            scrollBar = child
-            break
-        end
-    end
-
+    local scrollBar = _G[scrollFrame:GetName().."ScrollBar"]
     if not scrollBar then
-        error("Scrollbar not found for scrollFrame: " .. parentMenu.scrollFrame:GetName())
+        error("Scrollbar not found for scrollFrame: " .. scrollFrame:GetName())
     end
-
     local maxRange = parentMenu.totalHeight - parentMenu.maxHeight
     if maxRange < 0 then maxRange = 0 end
-
     scrollBar:SetMinMaxValues(0, maxRange)
     scrollBar:SetValue(0)
     scrollFrame:UpdateScrollChildRect()
