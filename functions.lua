@@ -143,10 +143,10 @@ function NS3Menu(ver, subver)
         min = -500,
         max = 500,
         step = 10,
-        default = ns_dbc:get_key("SCREEN_PADDING", "настройки") or -40,
+        default = ns_dbc:getKey("SCREEN_PADDING", "настройки") or -40,
         tooltip = "Максимальное расстояние от края экрана до края поля",
         onChange = function(value) 
-            ns_dbc:mod_key("SCREEN_PADDING", value, "настройки")
+            ns_dbc:modKey("SCREEN_PADDING", value, "настройки")
         end
     })
 
@@ -156,10 +156,10 @@ function NS3Menu(ver, subver)
         min = 0,
         max = 1,
         step = 0.1,
-        default = ns_dbc:get_key("MOVE_ALPHA", "настройки") or 0,
+        default = ns_dbc:getKey("MOVE_ALPHA", "настройки") or 0,
         tooltip = "Максимальная прозрачности при движении",
         onChange = function(value) 
-            ns_dbc:mod_key("MOVE_ALPHA", value, "настройки")
+            ns_dbc:modKey("MOVE_ALPHA", value, "настройки")
         end
     })
 
@@ -169,10 +169,10 @@ function NS3Menu(ver, subver)
         min = 0,
         max = 1,
         step = 0.1,
-        default = ns_dbc:get_key("FRAME_ALPHA", "настройки") or 0,
+        default = ns_dbc:getKey("FRAME_ALPHA", "настройки") or 0,
         tooltip = "Прозрачность основного фрейма в видимом режиме. Требует /reload для применения",
         onChange = function(value) 
-            ns_dbc:mod_key("FRAME_ALPHA", value, "настройки")
+            ns_dbc:modKey("FRAME_ALPHA", value, "настройки")
         end
     })
 
@@ -182,10 +182,10 @@ function NS3Menu(ver, subver)
         min = 0,
         max = 1,
         step = 0.1,
-        default = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or 1,
+        default = ns_dbc:getKey("BUTTON_ALPHA", "настройки") or 1,
         tooltip = "Прозрачность кнопок поля. Так же меняется перетаскиванием ПКМ по рамке поля: Перетащить за рамку влево или вправо и кликнуть по ней ПКМ. Если меняется здесь, требует /reload",
         onChange = function(value) 
-            ns_dbc:mod_key("BUTTON_ALPHA", value, "настройки")
+            ns_dbc:modKey("BUTTON_ALPHA", value, "настройки")
         end
     })
 
@@ -195,27 +195,27 @@ function NS3Menu(ver, subver)
         default = false,
         tooltip = "Никогда не показывать рамку",
         onClick = function(checked)
-            ns_dbc:mod_key("fullAlphaFrame", checked, "настройки")
+            ns_dbc:modKey("fullAlphaFrame", checked, "настройки")
         end
     })
 
     menu:addCheckbox(generalSub, {
         name = "Закрывать поле при движении персонажа",
         label = "Закрывать поле при движении персонажа",
-        default = false,
+        default = true,
         tooltip = "Закрывать поле при движении персонажа",
         onClick = function(checked)
-            ns_dbc:mod_key("closeFld", checked, "настройки")
+            ns_dbc:modKey("closeFld", checked, "настройки")
         end
     })
 
     menu:addCheckbox(generalSub, {
         name = "Не взаимодействовать с полем во время бега: клик насквозь",
         label = "Не взаимодействовать с полем во время бега: клик насквозь",
-        default = true,
+        default = false,
         tooltip = "Не взаимодействовать с полем во время бега: клик насквозь",
         onClick = function(checked)
-            ns_dbc:mod_key("disableFld", checked, "настройки")
+            ns_dbc:modKey("disableFld", checked, "настройки")
         end
     })
 
@@ -391,14 +391,14 @@ function set_miniButton()
         miniMapButton:SetAlpha(1)  -- Возвращаем непрозрачность
 
         -- Сохраняем позицию в базу данных
-        ns_dbc:mod_key("minibtn_x", position.radius * math.cos(position.angle), "настройки")
-        ns_dbc:mod_key("minibtn_y", position.radius * math.sin(position.angle), "настройки")
+        ns_dbc:modKey("minibtn_x", position.radius * math.cos(position.angle), "настройки")
+        ns_dbc:modKey("minibtn_y", position.radius * math.sin(position.angle), "настройки")
     end)
 
     -- Восстановление позиции иконки после перезагрузки
     local function SetInitialPosition()
-        local savedX = ns_dbc:get_key("minibtn_x", "настройки") or 0
-        local savedY = ns_dbc:get_key("minibtn_y", "настройки") or 0
+        local savedX = ns_dbc:getKey("minibtn_x", "настройки") or 0
+        local savedY = ns_dbc:getKey("minibtn_y", "настройки") or 0
         -- Загружаем сохранённые координаты
 
         if savedX and savedY then
@@ -457,7 +457,7 @@ function createFld()
         end
     end)
 
-    adaptiveFrame:SetPoint(ns_dbc:get_key("mfldX", "настройки") or 150, ns_dbc:get_key("mfldY", "настройки") or 100)
+    adaptiveFrame:SetPoint(ns_dbc:getKey("mfldX", "настройки") or 150, ns_dbc:getKey("mfldY", "настройки") or 100)
 end
 
 function setFrameAchiv()
@@ -571,7 +571,7 @@ end
 function fBtnEnter(id, obj)
     -- Проверка наличия модификатора для текущей текстуры
     local textureKey = adaptiveFrame:getTexture(id)
-    if not mFldObj:get_key(textureKey).mod then 
+    if not mFldObj:getKey(textureKey).mod then 
         return 
     end
 
@@ -604,7 +604,7 @@ end
 
 function gPoint(name)
     for i=1,#mFld:getArg("gPoint") do
-        if name==mFld:getArg("gPoint")[i] then
+        if name == mFld:getArg("gPoint")[i] then
             return 1
         end
     end
@@ -641,12 +641,6 @@ local _convertTable3 = {
     [85] = "}", [86] = "[", [87] = "]", [88] = "'", [89] = ",",
 }
 
--- Предрасчет ASCII-символов (0-255)
-local char_cache = {}
-for i = 0, 255 do
-    char_cache[i] = char(i)
-end
-
 -- Обратная таблица конвертации
 local _reverseConvertTable3 = {}
 for k, v in pairs(_convertTable3) do
@@ -657,9 +651,12 @@ end
 local MAX_NUMBER = 90^12
 local MIN_NUMBER = -MAX_NUMBER
 
+-- Буфер для кодирования
+local encode_buffer = {}
+
 -- Кодирование числа в строку
 function en90(dec)
-    if type(dec) ~= "number" then error("Input must be a number") return end
+    if type(dec) ~= "number" then error("Input must be a number") end
     if dec == 0 then return "0" end
 
     -- Проверка диапазона
@@ -670,27 +667,29 @@ function en90(dec)
     local isNegative = dec < 0
     dec = abs(dec)
 
-    local buffer = {}
-    local idx = 0  -- Индекс для заполнения
-
+    local idx = 0
     repeat
         local remainder = dec % 90
         dec = floor(dec / 90)
         idx = idx + 1
-        buffer[idx] = _convertTable3[remainder]
+        encode_buffer[idx] = _convertTable3[remainder]
     until dec == 0
 
     -- Если число отрицательное, добавляем "-" в начало
     if isNegative then
-        tbl_insert(buffer, 1, "-") -- Добавляем знак минус в начало
+        idx = idx + 1
+        encode_buffer[idx] = "-"
     end
 
     -- Сборка строки в правильном порядке
-    for i = 1, floor(idx / 2) do
-        buffer[i], buffer[idx - i + 1] = buffer[idx - i + 1], buffer[i] -- Разворачиваем таблицу
+    local result = tbl_concat(encode_buffer, "", 1, idx)
+
+    -- Очистка буфера
+    for i = 1, idx do
+        encode_buffer[i] = nil
     end
 
-    return tbl_concat(buffer) -- Собираем строку
+    return result
 end
 
 -- Декодирование строки в число
@@ -699,17 +698,14 @@ function en10(encoded)
     if encoded == "0" then return 0 end
 
     local start = 1
-    local first_byte = byte(encoded, 1)
-    local isNegative = first_byte == 45  -- 45 = '-'
+    local isNegative = byte(encoded, 1) == 45  -- 45 = '-'
     if isNegative then start = 2 end
 
     local number = 0
     local len = #encoded
 
-    -- Быстрый проход по байтам
     for i = start, len do
-        local c = byte(encoded, i)
-        local symbol = char_cache[c]  -- Используем кэш символов
+        local symbol = sub(encoded, i, i)
         number = number * 90 + (_reverseConvertTable3[symbol] or 0)
     end
 

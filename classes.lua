@@ -18,23 +18,33 @@ NsDb.__index = NsDb
 -- Конструктор для создания нового объекта NsDb
 function NsDb:new(input_table, input_table_p, key, str_len, tbl_size)
     local new_object = setmetatable({}, self)
+    new_object:init(input_table, input_table_p, key, str_len, tbl_size)
+    return new_object
+end
+
+-- Инициализация объекта
+function NsDb:init(input_table, input_table_p, key, str_len, tbl_size)
+    self.input_table = self:initializeTable(input_table, key)
     if input_table_p then
-        input_table_p[key] = input_table_p[key] or {}
-        new_object.input_table_p = input_table_p[key]
+        self.input_table_p = self:initializeTable(input_table_p, key)
     end
+    if str_len then
+        self.str_len = str_len
+    end
+    if tbl_size then
+        self.tbl_size = tbl_size
+    end
+    self.isPointer = input_table_p and true or false
+end
+
+-- Вспомогательная функция для инициализации таблиц
+function NsDb:initializeTable(input_table, key)
     if key then
         input_table[key] = input_table[key] or {}
-        new_object.input_table = input_table[key]
+        return input_table[key]
     else
-        input_table = input_table or {}
-        new_object.input_table = input_table
+        return input_table or {}
     end
-    new_object.str_len = str_len
-    new_object.tbl_size = tbl_size
-    if input_table_p then
-        new_object.isPointer = 1
-    end
-    return new_object
 end
 
 -- Метод для получения строки по индексу
@@ -280,57 +290,64 @@ function NsDb:pLen()
         return nil
     end
 end
+
+-- Метод для получения общей длины
 function NsDb:Len()
     local Len = 0
     for i = 1, #self.input_table do
-        Len = Len + #self.input_table[i]
+        if type(self.input_table[i]) == "table" then
+            for _ in pairs(self.input_table[i]) do
+                Len = Len + 1
+            end
+        else
+            Len = Len + #self.input_table[i]
+        end
     end
     return Len
 end
 
 -- Метод для изменения ключа
-function NsDb:mod_key(change_key, message, dop_key, id)
-    if dop_key then
-        self.input_table[dop_key] = self.input_table[dop_key] or {}
-        if id then
-            self.input_table[dop_key][change_key] = self.input_table[dop_key][change_key] or {}
-            self.input_table[dop_key][change_key][id] = message
-        else
-            self.input_table[dop_key][change_key] = message
+function NsDb:modKey(change_key, message, dop_key, id)
+    local target_table = dop_key and self.input_table[dop_key] or self.input_table
+    if not target_table then
+        target_table = dop_key and {} or self.input_table
+        if dop_key then
+            self.input_table[dop_key] = target_table
         end
+    end
+    if id then
+        target_table[change_key] = target_table[change_key] or {}
+        target_table[change_key][id] = message
     else
-        if id then
-            self.input_table[change_key] = self.input_table[change_key] or {}
-            self.input_table[change_key][id] = message
-        else
-            self.input_table[change_key] = message
-        end
+        target_table[change_key] = message
     end
 end
-function NsDb:get_key(change_key, dop_key, id)
-    -- Проверяем существование основных таблиц и ключей на каждом уровне
-    if dop_key then
-        local dop_table = self.input_table[dop_key]
-        if dop_table and dop_table[change_key] then
-            if id and dop_table[change_key][id] ~= nil then
-                return dop_table[change_key][id]
-            elseif not id then
-                return dop_table[change_key]
-            end
-        end
-    else
-        local change_table = self.input_table[change_key]
-        if change_table then
-            if id and change_table[id] ~= nil then
-                return change_table[id]
-            elseif not id then
-                return change_table
-            end
+function NsDb:modKey(change_key, message, dop_key, id)
+    local target_table = dop_key and self.input_table[dop_key] or self.input_table
+    if not target_table then
+        target_table = dop_key and {} or self.input_table
+        if dop_key then
+            self.input_table[dop_key] = target_table
         end
     end
-
-    -- Если что-то пошло не так, возвращаем nil
-    return nil
+    if id then
+        target_table[change_key] = target_table[change_key] or {}
+        target_table[change_key][id] = message
+    else
+        target_table[change_key] = message
+    end
+end
+-- Метод для получения значения по ключу
+function NsDb:getKey(change_key, dop_key, id)
+    local target_table = dop_key and self.input_table[dop_key] or self.input_table
+    if not target_table then
+        return nil
+    end
+    if id then
+        return target_table[change_key] and target_table[change_key][id]
+    else
+        return target_table[change_key]
+    end
 end
 
 -- Определяем класс create_table
@@ -366,7 +383,6 @@ ButtonManager.__index = ButtonManager
 -- Конструктор для создания новой кнопки
 function ButtonManager:new(name, parent, width, height, text, texture, mv)
     local button = setmetatable({}, ButtonManager)
-    -- Создаем фрейм кнопки
     if texture then
         button.frame = CreateFrame("Button", name, parent)
         button.frame:SetNormalTexture(texture)
@@ -374,83 +390,44 @@ function ButtonManager:new(name, parent, width, height, text, texture, mv)
     else
         button.frame = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
     end
-    
-    -- Проверяем, удалось ли создать фрейм
     if not button.frame then
         print("Ошибка: не удалось создать фрейм кнопки!")
         return
     end
-    
-    -- Устанавливаем размер и текст кнопки
     button.frame:SetSize(width, height)
     button:SetText(text)
-    
-    -- Делаем кнопку перемещаемой
     if mv then
         button:SetMovable(mv)
     end
-    
     return button
 end
 
+-- Метод для установки текстуры на кнопке
 function ButtonManager:SetTexture(texture, highlightTexture)
     if texture then
         self.frame:SetNormalTexture('Interface\\AddOns\\NSQC3\\libs\\' .. texture .. '.tga')
     end
     if highlightTexture then
-        self.frame:SetHighlightTexture('Interface\\AddOns\\NSQC3\\libs\\' .. highlightTexture .. '.tga') -- Устанавливаем текстуру подсветки
+        self.frame:SetHighlightTexture('Interface\\AddOns\\NSQC3\\libs\\' .. highlightTexture .. '.tga')
     end
 end
 
 -- Метод для установки текста на кнопке
 function ButtonManager:SetText(text)
-    if texture then
-        self.frame:SetText(text)
-    else
-        local fontString = self.frame:GetFontString()
-        if not fontString then
-            fontString = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            self.frame:SetFontString(fontString)
-        end
-
-        -- Устанавливаем текст
-        fontString:SetText(text)
-
-        -- Получаем размеры кнопки
-        local buttonWidth, buttonHeight = self.frame:GetSize()
-
-        -- Начальный размер шрифта (60% от высоты кнопки)
-        local fontSize = math.floor(buttonHeight * 0.6)
-
-        -- Устанавливаем шрифт
-        fontString:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE", "MONOCHROME")
-
-        -- Проверяем, помещается ли текст в кнопку
-        while fontString:GetStringWidth() > buttonWidth and fontSize > 6 do
-            fontSize = fontSize - 1 -- Уменьшаем размер шрифта
-            fontString:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE", "MONOCHROME")
-        end
-
-        -- Выравниваем текст по центру кнопки
-        fontString:SetPoint("CENTER", self.frame, "CENTER", 0, 0) -- Центрируем текст
-        fontString:SetJustifyH("CENTER") -- Горизонтальное выравнивание по центру
-        fontString:SetJustifyV("MIDDLE") -- Вертикальное выравнивание по центру
-
-        -- Убедимся, что текст не выходит за границы кнопки
-        fontString:SetWordWrap(false) -- Отключаем перенос слов
-        fontString:SetNonSpaceWrap(false) -- Отключаем перенос по пробелам
-    end
-end
-
--- Метод для установки текста на кнопке через FontString
-function ButtonManager:SetTextT(text)
-    local fontString = self.frame:GetFontString()
-    if not fontString then
-        fontString = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        self.frame:SetFontString(fontString)
-    end
-    fontString:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE", "MONOCHROME")
+    local fontString = self.frame:GetFontString() or self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     fontString:SetText(text)
+    local buttonWidth, buttonHeight = self.frame:GetSize()
+    local fontSize = math.floor(buttonHeight * 0.6)
+    fontString:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE", "MONOCHROME")
+    while fontString:GetStringWidth() > buttonWidth and fontSize > 6 do
+        fontSize = fontSize - 1
+        fontString:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE", "MONOCHROME")
+    end
+    fontString:SetPoint("CENTER", self.frame, "CENTER", 0, 0)
+    fontString:SetJustifyH("CENTER")
+    fontString:SetJustifyV("MIDDLE")
+    fontString:SetWordWrap(false)
+    fontString:SetNonSpaceWrap(false)
 end
 
 -- Метод для установки позиции кнопки
@@ -476,19 +453,14 @@ end
 -- Метод для установки обработчика наведения мыши на кнопку
 function ButtonManager:SetOnEnter(onEnterFunction)
     local oldOnEnter = self.frame:GetScript("OnEnter")
-    
     self.frame:SetScript("OnEnter", function(selfFrame, ...)
-        -- Вызываем предыдущий обработчик (например, для тултипа)
         if oldOnEnter then oldOnEnter(selfFrame, ...) end
-        
-        -- Вызываем новый обработчик
         onEnterFunction(selfFrame, ...)
     end)
 end
 
 function ButtonManager:SetOnLeave(onLeaveFunction)
     local oldOnLeave = self.frame:GetScript("OnLeave")
-    
     self.frame:SetScript("OnLeave", function(...)
         if oldOnLeave then oldOnLeave(...) end
         onLeaveFunction(...)
@@ -509,24 +481,17 @@ end
 
 function ButtonManager:SetMultiLineTooltip(tooltipsTable)
     if type(tooltipsTable) ~= "table" then return end
-    
-    -- Сохраняем предыдущие обработчики
     local oldOnEnter = self.frame:GetScript("OnEnter")
     local oldOnLeave = self.frame:GetScript("OnLeave")
-    
     self.frame:SetScript("OnEnter", function(selfFrame, ...)
-        -- Вызываем предыдущий обработчик, если он был
         if oldOnEnter then oldOnEnter(selfFrame, ...) end
-        
         GameTooltip:SetOwner(selfFrame, "ANCHOR_RIGHT")
         for _, line in ipairs(tooltipsTable) do
             GameTooltip:AddLine(line, 1, 1, 1)
         end
         GameTooltip:Show()
     end)
-    
     self.frame:SetScript("OnLeave", function(...)
-        -- Вызываем предыдущий обработчик, если он был
         if oldOnLeave then oldOnLeave(...) end
         GameTooltip:Hide()
     end)
@@ -534,7 +499,7 @@ end
 
 function ButtonManager:SetSize(width, height)
     if self.frame then
-        self.frame:SetWidth(width)  -- Используем SetWidth и SetHeight вместо SetSize
+        self.frame:SetWidth(width)
         self.frame:SetHeight(height)
     else
         print("Ошибка: фрейм кнопки не существует!")
@@ -577,7 +542,6 @@ function ButtonManager:GetTxt(textureType)
     else
         return "Неверный тип текстуры."
     end
-
     if texture then
         local texturePath = texture:GetTexture()
         if texturePath then
@@ -593,20 +557,18 @@ end
 -- Метод для перемещения кнопки
 function ButtonManager:SetMovable(isMovable)
     if isMovable then
-        -- Разрешаем перемещение кнопки
         self.frame:SetMovable(true)
-        self.frame:RegisterForDrag("LeftButton") -- Разрешаем перетаскивание левой кнопкой мыши
+        self.frame:RegisterForDrag("LeftButton")
         self.frame:SetScript("OnDragStart", function(self)
-            self:StartMoving() -- Начинаем перемещение
+            self:StartMoving()
         end)
         self.frame:SetScript("OnDragStop", function(self)
-            self:StopMovingOrSizing() -- Завершаем перемещение
+            self:StopMovingOrSizing()
         end)
     else
-        -- Запрещаем перемещение кнопки
         self.frame:SetMovable(false)
-        self.frame:RegisterForDrag(nil) -- Отключаем перетаскивание
-        self.frame:SetScript("OnDragStart", nil) -- Убираем обработчики
+        self.frame:RegisterForDrag(nil)
+        self.frame:SetScript("OnDragStart", nil)
         self.frame:SetScript("OnDragStop", nil)
     end
 end
@@ -615,16 +577,14 @@ end
 local CLOSE_BUTTON_SIZE = 32
 local PADDING = 15
 local SCREEN_PADDING = -40  -- Отступ от краев экрана
-local MIN_WIDTH = 200       -- Минимальная ширина фрейма
-local MIN_HEIGHT = 200      -- Минимальная высота фрейма
-local BUTTON_PADDING = 0    -- Расстояние между кнопками
+local MIN_WIDTH = 200
+local MIN_HEIGHT = 200
+local BUTTON_PADDING = 0
 local F_PAD = 40
-local MOVE_ALPHA = .0
-
+local MOVE_ALPHA = 0
 -- Добавляем константы прозрачности
-local FRAME_ALPHA = 0     -- Прозрачность основного фрейма
-local BUTTON_ALPHA = 1    -- Прозрачность дочерних кнопок
-
+local FRAME_ALPHA = 0
+local BUTTON_ALPHA = 1
 -- Определяем класс AdaptiveFrame
 AdaptiveFrame = {}
 AdaptiveFrame.__index = AdaptiveFrame
@@ -633,14 +593,13 @@ AdaptiveFrame.__index = AdaptiveFrame
 function AdaptiveFrame:new(parent)
     local self = setmetatable({}, AdaptiveFrame)
     self.parent = parent or UIParent
-    self.width = 600        -- По умолчанию ширина
-    self.height = 600       -- По умолчанию высота
+    self.width = 600
+    self.height = 600
     self.initialAspectRatio = self.width / self.height  -- Сохраняем начальное соотношение сторон
     self.buttonsPerRow = 5  -- Количество кнопок в ряду (по умолчанию)
     self.skipSizeCheck = true -- Новый флаг
-
     -- Создаем фрейм
-    self.frame = CreateFrame("Frame", nil, self.parent)
+    self.frame = CreateFrame("Frame", "fdsfasdf", self.parent)
     self.frame:SetSize(self.width, self.height)
     self.skipSizeCheck = false -- Разрешаем проверки после инициализации
     self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
@@ -651,17 +610,15 @@ function AdaptiveFrame:new(parent)
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    FRAME_ALPHA = ns_dbc:get_key("FRAME_ALPHA", "настройки") or FRAME_ALPHA
-    BUTTON_ALPHA = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
+    FRAME_ALPHA = ns_dbc:getKey("FRAME_ALPHA", "настройки") or FRAME_ALPHA
+    BUTTON_ALPHA = ns_dbc:getKey("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
     self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Устанавливаем прозрачность фрейма
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
-
     -- Включаем возможность перемещения и изменения размера фрейма
     self.frame:SetMovable(true)
     self.frame:SetResizable(true)  -- Включаем возможность изменения размера
     self.frame:EnableMouse(true)
     self.frame:RegisterForDrag("LeftButton", "RightButton")  -- Регистрируем обработку левой и правой кнопок мыши
-
     -- Обработчик клика правой кнопкой мыши
     self.frame:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" then
@@ -670,11 +627,9 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
-
     -- Обработчик перетаскивания правой кнопкой мыши
     local startX = 0
     local isDragging = false
-
     self.frame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
             isDragging = false
@@ -683,7 +638,6 @@ function AdaptiveFrame:new(parent)
             self:StopMovingOrSizing()
         end
     end)
-
     self.frame:SetScript("OnDragStart", function(_, button)
         if button == "RightButton" then
             startX = GetCursorPosition()
@@ -694,20 +648,21 @@ function AdaptiveFrame:new(parent)
                     local currentX = GetCursorPosition()
                     local deltaX = currentX - startX
                     startX = currentX
-
                     -- Изменяем прозрачность дочерних кнопок
                     for _, child in ipairs(self.children) do
                         local currentAlpha = child.frame:GetAlpha() -- Исправлено: child.frame -> child
                         if deltaX > 0 then
                             -- Увеличиваем прозрачность при движении вправо
-                            child.frame:SetAlpha(math.min(currentAlpha + math.abs(deltaX) / 1000, 1)) -- Исправлено: child.frame -> child
-                            ns_dbc:mod_key("BUTTON_ALPHA", math.min(currentAlpha + math.abs(deltaX) / 1000, 1), "настройки")
-                            BUTTON_ALPHA = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
+                            local newAlpha = math.min(currentAlpha + math.abs(deltaX) / 1000, 1)
+                            child.frame:SetAlpha(newAlpha) -- Исправлено: child.frame -> child
+                            ns_dbc:modKey("BUTTON_ALPHA", newAlpha, "настройки")
+                            BUTTON_ALPHA = newAlpha
                         elseif deltaX < 0 then
                             -- Уменьшаем прозрачность при движении влево
-                            child.frame:SetAlpha(math.max(currentAlpha - math.abs(deltaX) / 1000, 0)) -- Исправлено: child.frame -> child
-                            ns_dbc:mod_key("BUTTON_ALPHA", math.max(currentAlpha - math.abs(deltaX) / 1000, 0), "настройки")
-                            BUTTON_ALPHA = ns_dbc:get_key("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
+                            local newAlpha = math.max(currentAlpha - math.abs(deltaX) / 1000, 0)
+                            child.frame:SetAlpha(newAlpha) -- Исправлено: child.frame -> child
+                            ns_dbc:modKey("BUTTON_ALPHA", newAlpha, "настройки")
+                            BUTTON_ALPHA = newAlpha
                         end
                     end
                 end
@@ -716,7 +671,6 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
-
     self.frame:SetScript("OnDragStop", function(_, button)
         if button == "RightButton" then
             isDragging = false
@@ -725,7 +679,6 @@ function AdaptiveFrame:new(parent)
             self:StopMovingOrSizing()
         end
     end)
-
     -- Создаем кнопку закрытия
     self.closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
     self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -733,7 +686,6 @@ function AdaptiveFrame:new(parent)
     self.closeButton:SetScript("OnClick", function()
         self:Hide()
     end)
-
     -- Создаем ручку для изменения размера фрейма
     self.resizeHandle = CreateFrame("Button", nil, self.frame)
     self.resizeHandle:SetSize(16, 16)
@@ -746,14 +698,12 @@ function AdaptiveFrame:new(parent)
     end)
     self.resizeHandle:SetScript("OnMouseUp", function()
         self.frame:StopMovingOrSizing()
-        local x, y = adaptiveFrame:GetSize()
-        ns_dbc:mod_key("mfldRX", x, "настройки")
-        --self:AdjustSizeAndPosition()
+        local x, y = self:GetSize()
+        ns_dbc:modKey("mfldRX", x, "настройки")
+        self:AdjustSizeAndPosition()
     end)
-
     -- Обработчик изменения размера фрейма
     self.frame:SetScript("OnSizeChanged", function(_, width, height)
-
         if self.skipSizeCheck then
             self.skipSizeCheck = false
             return
@@ -762,26 +712,24 @@ function AdaptiveFrame:new(parent)
         self.frame:SetSize(width, height)
         self:AdjustSizeAndPosition()
     end)
-
     -- Инициализируем список дочерних элементов
     self.children = {}
-
     return self
 end
 
 -- Метод для переключения прозрачности основного фрейма
 function AdaptiveFrame:ToggleFrameAlpha()
     local currentAlpha = select(4, self.frame:GetBackdropColor())
-    FRAME_ALPHA = ns_dbc:get_key("FRAME_ALPHA", "настройки") or FRAME_ALPHA
-    if not ns_dbc:get_key("fullAlphaFrame", "настройки") then
+    FRAME_ALPHA = ns_dbc:getKey("FRAME_ALPHA", "настройки") or FRAME_ALPHA
+    if not ns_dbc:getKey("fullAlphaFrame", "настройки") then
         if FRAME_ALPHA ~= 0 then
-            if currentAlpha > FRAME_ALPHA-0.05 then
+            if currentAlpha > FRAME_ALPHA - 0.05 then
                 self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
             elseif currentAlpha == 0 then
                 self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Возвращаем исходную прозрачность
             end
         else
-            if currentAlpha > .1 then
+            if currentAlpha > 0.1 then
                 self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
             elseif currentAlpha == 0 then
                 self.frame:SetBackdropColor(0.1, 0.1, 0.1, 1)  -- Возвращаем исходную прозрачность
@@ -799,8 +747,8 @@ end
 function AdaptiveFrame:StopMovingOrSizing()
     self.frame:StopMovingOrSizing()
     local x, y = self:GetPosition()
-    ns_dbc:mod_key("mfldX", x, "настройки")
-    ns_dbc:mod_key("mfldY", y, "настройки")
+    ns_dbc:modKey("mfldX", x, "настройки")
+    ns_dbc:modKey("mfldY", y, "настройки")
     self:AdjustSizeAndPosition()
 end
 
@@ -824,18 +772,15 @@ end
 function AdaptiveFrame:CheckFrameSize(width, height)
     local screenWidth, screenHeight = WorldFrame:GetWidth(), WorldFrame:GetHeight()
     local maxFrameHeight = screenHeight + 200 -- Максимальная высота фрейма
-    local minFrameHeight = MIN_HEIGHT         -- Минимальная высота фрейма
-
+    local minFrameHeight = MIN_HEIGHT
     -- Ограничиваем высоту фрейма максимальной доступной высотой
     if height > maxFrameHeight then
         height = maxFrameHeight
     end
-
     -- Проверяем минимальную высоту
     if height < minFrameHeight then
         height = minFrameHeight
     end
-
     -- Возвращаем высоту как ширину и высоту для сохранения пропорций
     return height, height
 end
@@ -845,27 +790,22 @@ function AdaptiveFrame:AdjustSizeAndPosition()
     local buttonsPerRow = 10  -- Фиксируем 10 столбцов
     local numChildren = #self.children
     local rows = math.ceil(numChildren / buttonsPerRow)
-
     local frameWidth, frameHeight = self.frame:GetSize()
     local buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
     local buttonHeight = buttonWidth
-
     local requiredWidth = 2 * F_PAD + buttonsPerRow * buttonWidth + (buttonsPerRow - 1) * BUTTON_PADDING
     local requiredHeight = 2 * F_PAD + rows * buttonHeight + (rows - 1) * BUTTON_PADDING
-
     if frameWidth < requiredWidth or frameHeight < requiredHeight then
         self.frame:SetSize(requiredWidth, requiredHeight)
         frameWidth, frameHeight = requiredWidth, requiredHeight
         buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
         buttonHeight = buttonWidth
     end
-
     for i, child in ipairs(self.children) do
         local row = math.floor((i - 1) / buttonsPerRow)
         local col = (i - 1) % buttonsPerRow
         local x = F_PAD + col * (buttonWidth + BUTTON_PADDING)
         local y = F_PAD + row * (buttonHeight + BUTTON_PADDING)
-
         if ButtonManager.SetSize and ButtonManager.SetPoint then
             ButtonManager.SetSize(child, buttonWidth, buttonHeight)
             ButtonManager.SetPoint(child, "BOTTOMLEFT", self.frame, "BOTTOMLEFT", x, y)
@@ -873,13 +813,11 @@ function AdaptiveFrame:AdjustSizeAndPosition()
             print("Error: Child does not support required methods")
         end
     end
-
     local screenWidth, screenHeight = UIParent:GetSize()
     local x, y = self.frame:GetLeft(), self.frame:GetBottom()
-    SCREEN_PADDING = ns_dbc:get_key("SCREEN_PADDING", "настройки") or SCREEN_PADDING
+    SCREEN_PADDING = ns_dbc:getKey("SCREEN_PADDING", "настройки") or SCREEN_PADDING
     x = math.max(SCREEN_PADDING, math.min(x, screenWidth - frameWidth - SCREEN_PADDING))
     y = math.max(SCREEN_PADDING, math.min(y, screenHeight - frameHeight - SCREEN_PADDING))
-
     self.frame:ClearAllPoints()
     self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)
 end
@@ -892,7 +830,6 @@ function AdaptiveFrame:AddButtons(numButtons, buttonsPerRow, size, texture, high
     local buttonTexture = texture
     local buttonHighlightTexture = highlightTexture
     local buttonText = ""
-
     for i = 1, numButtons do
         local buttonName = "button"..i
         local button = ButtonManager:new(buttonName, self.frame, buttonWidth, buttonHeight, buttonText, 'Interface\\AddOns\\NSQC3\\libs\\00t.tga', nil)
@@ -901,7 +838,6 @@ function AdaptiveFrame:AddButtons(numButtons, buttonsPerRow, size, texture, high
         button.frame:SetAlpha(BUTTON_ALPHA)  -- Устанавливаем прозрачность кнопки
         table.insert(self.children, button)
     end
-
     self:AdjustSizeAndPosition()
 end
 
@@ -911,29 +847,25 @@ function AdaptiveFrame:StartMovementAlphaTracking()
     local movementFrame = CreateFrame("Frame")
     self.movementFrame = movementFrame
     movementFrame.parent = self
-
-    MOVE_ALPHA = ns_dbc:get_key("MOVE_ALPHA", "настройки") or MOVE_ALPHA
+    MOVE_ALPHA = ns_dbc:getKey("MOVE_ALPHA", "настройки") or MOVE_ALPHA
     movementFrame.targetAlpha = MOVE_ALPHA
     movementFrame.currentAlpha = BUTTON_ALPHA
     movementFrame.alphaSpeed = 2
     movementFrame.BUTTON_ALPHA = BUTTON_ALPHA  -- Сохраняем исходное значение
-    
     movementFrame:SetScript("OnUpdate", function(self, elapsed)
         local isMoving = GetUnitSpeed("player") > 0
         local shouldUpdate = false
-        
         -- Определение целевой прозрачности
         if isMoving then
             self.targetAlpha = MOVE_ALPHA
-            if ns_dbc:get_key("disableFld", "настройки") then
-                self.parent.frame:EnableMouse(self.targetAlpha > ns_dbc:get_key("MOVE_ALPHA", "настройки")+0.1)
+            if ns_dbc:getKey("disableFld", "настройки") then
+                self.parent.frame:EnableMouse(self.targetAlpha > MOVE_ALPHA + 0.1)
             end
             shouldUpdate = true
         else
             self.targetAlpha = self.BUTTON_ALPHA  -- Возвращаемся к BUTTON_ALPHA при остановке
             shouldUpdate = true
         end
-        
         -- Плавное изменение прозрачности
         if shouldUpdate and math.abs(self.currentAlpha - self.targetAlpha) > 0.01 then
             self.currentAlpha = self.currentAlpha + (self.targetAlpha - self.currentAlpha) * self.alphaSpeed * elapsed
@@ -942,18 +874,17 @@ function AdaptiveFrame:StartMovementAlphaTracking()
             for _, child in ipairs(self.parent.children) do
                 if child.frame and child.frame.SetAlpha then
                     child.frame:SetAlpha(self.currentAlpha)
-                    if ns_dbc:get_key("disableFld", "настройки") then
-                        child.frame:EnableMouse(self.currentAlpha > ns_dbc:get_key("MOVE_ALPHA", "настройки")+.1)
+                    if ns_dbc:getKey("disableFld", "настройки") then
+                        child.frame:EnableMouse(self.currentAlpha > MOVE_ALPHA + 0.1)
                     end
-                    if self.currentAlpha < ns_dbc:get_key("MOVE_ALPHA", "настройки")+0.1 then
-                        if ns_dbc:get_key("closeFld", "настройки") then
+                    if self.currentAlpha < MOVE_ALPHA + 0.1 then
+                        if ns_dbc:getKey("closeFld", "настройки") then
                             self.parent:Hide()
                         end
                     end
                 end
             end
         end
-        
         -- Автоматическая остановка при достижении цели
         if not isMoving and math.abs(self.currentAlpha - self.targetAlpha) < 0.01 then
             self.currentAlpha = BUTTON_ALPHA  -- Точно устанавливаем конечное значение
@@ -989,20 +920,22 @@ end
 
 mDB = {}
 mDB.__index = mDB
-function mDB:new()
-    local private = {}
 
-    local obj = {
+function mDB:new()
+    local private = setmetatable({}, { __mode = "k" }) -- слабые ключи для сборки мусора
+    local obj = setmetatable({
         getArg = function(self, index)
             return private[index]
         end,
         setArg = function(self, index, value)
-            private[index] = value
+            if value == nil then
+                private[index] = nil -- явное удаление, если значение nil
+            else
+                private[index] = value
+            end
         end
-    }
-
-    setmetatable(obj, self)
-    self.__index = self
+    }, self)
+    obj.private = private -- хранить ссылку на private в объекте для предотвращения утечек памяти
     return obj
 end
 
