@@ -306,39 +306,45 @@ function NsDb:Len()
     return Len
 end
 
-function NsDb:modKey(change_key, message, dop_key, id)
-    local target_table = self.input_table
-
-    if dop_key then
-        -- Если dop_key существует, убедимся, что target_table содержит этот ключ
-        if not target_table[dop_key] then
-            target_table[dop_key] = {}
+function NsDb:modKey(...)
+    local n = select('#', ...)
+    if n < 2 then return end
+ 
+    local value = select(n, ...)
+    local row_key = select(n-1, ...)
+    if not row_key or value == nil then return end
+ 
+    local target = self.input_table
+ 
+    for i = 1, n-2 do
+        local key = select(i, ...)
+        if not key then return end
+        
+        local next_table = target[key]
+        if not next_table then
+            next_table = {}
+            target[key] = next_table
         end
-        target_table = target_table[dop_key]
+        target = next_table
     end
-
-    if id then
-        -- Если id существует, убедимся, что target_table содержит ключ change_key
-        if not target_table[change_key] then
-            target_table[change_key] = {}
-        end
-        target_table[change_key][id] = message
-    else
-        target_table[change_key] = message
-    end
+ 
+    target[row_key] = value
 end
 
--- Метод для получения значения по ключу
-function NsDb:getKey(change_key, dop_key, id)
-    local target_table = dop_key and self.input_table[dop_key] or self.input_table
-    if not target_table then
-        return nil
+function NsDb:getKey(...)
+    local n = select('#', ...)
+    if n == 0 then return nil end
+    
+    local target = self.input_table
+    
+    for i = 1, n-1 do
+        local key = select(i, ...)
+        if type(target) ~= "table" then return nil end
+        target = target[key]
+        if target == nil then return nil end
     end
-    if id then
-        return target_table[change_key] and target_table[change_key][id]
-    else
-        return target_table[change_key]
-    end
+    
+    return type(target) == "table" and target[select(n, ...)] or nil
 end
 
 -- Определяем класс create_table
@@ -601,8 +607,8 @@ function AdaptiveFrame:new(parent)
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    FRAME_ALPHA = ns_dbc:getKey("FRAME_ALPHA", "настройки") or FRAME_ALPHA
-    BUTTON_ALPHA = ns_dbc:getKey("BUTTON_ALPHA", "настройки") or BUTTON_ALPHA
+    FRAME_ALPHA = ns_dbc:getKey("настройки", "FRAME_ALPHA") or FRAME_ALPHA
+    BUTTON_ALPHA = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or BUTTON_ALPHA
     self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Устанавливаем прозрачность фрейма
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
     -- Включаем возможность перемещения и изменения размера фрейма
@@ -646,13 +652,13 @@ function AdaptiveFrame:new(parent)
                             -- Увеличиваем прозрачность при движении вправо
                             local newAlpha = math.min(currentAlpha + math.abs(deltaX) / 1000, 1)
                             child.frame:SetAlpha(newAlpha) -- Исправлено: child.frame -> child
-                            ns_dbc:modKey("BUTTON_ALPHA", newAlpha, "настройки")
+                            ns_dbc:modKey("настройки", "BUTTON_ALPHA", newAlpha)
                             BUTTON_ALPHA = newAlpha
                         elseif deltaX < 0 then
                             -- Уменьшаем прозрачность при движении влево
                             local newAlpha = math.max(currentAlpha - math.abs(deltaX) / 1000, 0)
                             child.frame:SetAlpha(newAlpha) -- Исправлено: child.frame -> child
-                            ns_dbc:modKey("BUTTON_ALPHA", newAlpha, "настройки")
+                            ns_dbc:modKey("настройки", "BUTTON_ALPHA", newAlpha)
                             BUTTON_ALPHA = newAlpha
                         end
                     end
@@ -690,7 +696,7 @@ function AdaptiveFrame:new(parent)
     self.resizeHandle:SetScript("OnMouseUp", function()
         self.frame:StopMovingOrSizing()
         local x, y = self:GetSize()
-        ns_dbc:modKey("mfldRX", x, "настройки")
+        ns_dbc:modKey("настройки", "mfldRX", x)
         self:AdjustSizeAndPosition()
     end)
     -- Обработчик изменения размера фрейма
@@ -711,8 +717,8 @@ end
 -- Метод для переключения прозрачности основного фрейма
 function AdaptiveFrame:ToggleFrameAlpha()
     local currentAlpha = select(4, self.frame:GetBackdropColor())
-    FRAME_ALPHA = ns_dbc:getKey("FRAME_ALPHA", "настройки") or FRAME_ALPHA
-    if not ns_dbc:getKey("fullAlphaFrame", "настройки") then
+    FRAME_ALPHA = ns_dbc:getKey("настройки", "FRAME_ALPHA") or FRAME_ALPHA
+    if not ns_dbc:getKey("настройки", "fullAlphaFrame") then
         if FRAME_ALPHA ~= 0 then
             if currentAlpha > FRAME_ALPHA - 0.05 then
                 self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
@@ -738,8 +744,8 @@ end
 function AdaptiveFrame:StopMovingOrSizing()
     self.frame:StopMovingOrSizing()
     local x, y = self:GetPosition()
-    ns_dbc:modKey("mfldX", x, "настройки")
-    ns_dbc:modKey("mfldY", y, "настройки")
+    ns_dbc:modKey("настройки", "mfldX", x)
+    ns_dbc:modKey("настройки", "mfldY", y)
     self:AdjustSizeAndPosition()
 end
 
@@ -806,7 +812,7 @@ function AdaptiveFrame:AdjustSizeAndPosition()
     end
     local screenWidth, screenHeight = UIParent:GetSize()
     local x, y = self.frame:GetLeft(), self.frame:GetBottom()
-    SCREEN_PADDING = ns_dbc:getKey("SCREEN_PADDING", "настройки") or SCREEN_PADDING
+    SCREEN_PADDING = ns_dbc:getKey("настройки", "SCREEN_PADDING") or SCREEN_PADDING
     x = math.max(SCREEN_PADDING, math.min(x, screenWidth - frameWidth - SCREEN_PADDING))
     y = math.max(SCREEN_PADDING, math.min(y, screenHeight - frameHeight - SCREEN_PADDING))
     self.frame:ClearAllPoints()
@@ -838,7 +844,7 @@ function AdaptiveFrame:StartMovementAlphaTracking()
     local movementFrame = CreateFrame("Frame")
     self.movementFrame = movementFrame
     movementFrame.parent = self
-    MOVE_ALPHA = ns_dbc:getKey("MOVE_ALPHA", "настройки") or MOVE_ALPHA
+    MOVE_ALPHA = ns_dbc:getKey("настройки", "MOVE_ALPHA") or MOVE_ALPHA
     movementFrame.targetAlpha = MOVE_ALPHA
     movementFrame.currentAlpha = BUTTON_ALPHA
     movementFrame.alphaSpeed = 2
@@ -849,7 +855,7 @@ function AdaptiveFrame:StartMovementAlphaTracking()
         -- Определение целевой прозрачности
         if isMoving then
             self.targetAlpha = MOVE_ALPHA
-            if ns_dbc:getKey("disableFld", "настройки") then
+            if ns_dbc:getKey("настройки", "disableFld") then
                 self.parent.frame:EnableMouse(self.targetAlpha > MOVE_ALPHA + 0.1)
             end
             shouldUpdate = true
@@ -865,11 +871,11 @@ function AdaptiveFrame:StartMovementAlphaTracking()
             for _, child in ipairs(self.parent.children) do
                 if child.frame and child.frame.SetAlpha then
                     child.frame:SetAlpha(self.currentAlpha)
-                    if ns_dbc:getKey("disableFld", "настройки") then
+                    if ns_dbc:getKey("настройки", "disableFld") then
                         child.frame:EnableMouse(self.currentAlpha > MOVE_ALPHA + 0.1)
                     end
                     if self.currentAlpha < MOVE_ALPHA + 0.1 then
-                        if ns_dbc:getKey("closeFld", "настройки") then
+                        if ns_dbc:getKey("настройки", "closeFld") then
                             self.parent:Hide()
                         end
                     end

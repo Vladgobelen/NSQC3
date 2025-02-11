@@ -143,10 +143,10 @@ function NS3Menu(ver, subver)
         min = -500,
         max = 500,
         step = 10,
-        default = ns_dbc:getKey("SCREEN_PADDING", "настройки") or -40,
+        default = ns_dbc:getKey("настройки", "SCREEN_PADDING") or -40,
         tooltip = "Максимальное расстояние от края экрана до края поля",
         onChange = function(value) 
-            ns_dbc:modKey("SCREEN_PADDING", value, "настройки")
+            ns_dbc:modKey("настройки", "SCREEN_PADDING", value)
         end
     })
 
@@ -156,10 +156,10 @@ function NS3Menu(ver, subver)
         min = 0,
         max = 1,
         step = 0.1,
-        default = ns_dbc:getKey("MOVE_ALPHA", "настройки") or 0,
+        default = ns_dbc:getKey("настройки", "MOVE_ALPHA") or 0,
         tooltip = "Максимальная прозрачности при движении",
         onChange = function(value) 
-            ns_dbc:modKey("MOVE_ALPHA", value, "настройки")
+            ns_dbc:modKey("настройки", "MOVE_ALPHA", value)
         end
     })
 
@@ -169,10 +169,10 @@ function NS3Menu(ver, subver)
         min = 0,
         max = 1,
         step = 0.1,
-        default = ns_dbc:getKey("FRAME_ALPHA", "настройки") or 0,
+        default = ns_dbc:getKey("настройки", "FRAME_ALPHA") or 0,
         tooltip = "Прозрачность основного фрейма в видимом режиме. Требует /reload для применения",
         onChange = function(value) 
-            ns_dbc:modKey("FRAME_ALPHA", value, "настройки")
+            ns_dbc:modKey("настройки", "FRAME_ALPHA", value)
         end
     })
 
@@ -182,10 +182,10 @@ function NS3Menu(ver, subver)
         min = 0,
         max = 1,
         step = 0.1,
-        default = ns_dbc:getKey("BUTTON_ALPHA", "настройки") or 1,
+        default = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or 1,
         tooltip = "Прозрачность кнопок поля. Так же меняется перетаскиванием ПКМ по рамке поля: Перетащить за рамку влево или вправо и кликнуть по ней ПКМ. Если меняется здесь, требует /reload",
         onChange = function(value) 
-            ns_dbc:modKey("BUTTON_ALPHA", value, "настройки")
+            ns_dbc:modKey("настройки", "BUTTON_ALPHA", value)
         end
     })
 
@@ -195,7 +195,7 @@ function NS3Menu(ver, subver)
         default = false,
         tooltip = "Никогда не показывать рамку",
         onClick = function(checked)
-            ns_dbc:modKey("fullAlphaFrame", checked, "настройки")
+            ns_dbc:modKey("настройки", "fullAlphaFrame", checked)
         end
     })
 
@@ -205,7 +205,7 @@ function NS3Menu(ver, subver)
         default = true,
         tooltip = "Закрывать поле при движении персонажа",
         onClick = function(checked)
-            ns_dbc:modKey("closeFld", checked, "настройки")
+            ns_dbc:modKey("настройки", "closeFld", checked)
         end
     })
 
@@ -215,7 +215,7 @@ function NS3Menu(ver, subver)
         default = false,
         tooltip = "Не взаимодействовать с полем во время бега: клик насквозь",
         onClick = function(checked)
-            ns_dbc:modKey("disableFld", checked, "настройки")
+            ns_dbc:modKey("настройки", "disableFld", checked)
         end
     })
 
@@ -391,14 +391,14 @@ function set_miniButton()
         miniMapButton:SetAlpha(1)  -- Возвращаем непрозрачность
 
         -- Сохраняем позицию в базу данных
-        ns_dbc:modKey("minibtn_x", position.radius * math.cos(position.angle), "настройки")
-        ns_dbc:modKey("minibtn_y", position.radius * math.sin(position.angle), "настройки")
+        ns_dbc:modKey("настройки", "minibtn_x", position.radius * math.cos(position.angle))
+        ns_dbc:modKey("настройки", "minibtn_y", position.radius * math.sin(position.angle))
     end)
 
     -- Восстановление позиции иконки после перезагрузки
     local function SetInitialPosition()
-        local savedX = ns_dbc:getKey("minibtn_x", "настройки") or 0
-        local savedY = ns_dbc:getKey("minibtn_y", "настройки") or 0
+        local savedX = ns_dbc:getKey("настройки", "minibtn_x") or 0
+        local savedY = ns_dbc:getKey("настройки", "minibtn_y") or 0
         -- Загружаем сохранённые координаты
 
         if savedX and savedY then
@@ -457,7 +457,7 @@ function createFld()
         end
     end)
 
-    adaptiveFrame:SetPoint(ns_dbc:getKey("mfldX", "настройки") or 150, ns_dbc:getKey("mfldY", "настройки") or 100)
+    adaptiveFrame:SetPoint(ns_dbc:getKey("настройки", "mfldX") or 150, ns_dbc:getKey("настройки", "mfldY") or 100)
 end
 
 function setFrameAchiv()
