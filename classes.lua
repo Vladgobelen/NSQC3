@@ -306,37 +306,28 @@ function NsDb:Len()
     return Len
 end
 
--- Метод для изменения ключа
 function NsDb:modKey(change_key, message, dop_key, id)
-    local target_table = dop_key and self.input_table[dop_key] or self.input_table
-    if not target_table then
-        target_table = dop_key and {} or self.input_table
-        if dop_key then
-            self.input_table[dop_key] = target_table
+    local target_table = self.input_table
+
+    if dop_key then
+        -- Если dop_key существует, убедимся, что target_table содержит этот ключ
+        if not target_table[dop_key] then
+            target_table[dop_key] = {}
         end
+        target_table = target_table[dop_key]
     end
+
     if id then
-        target_table[change_key] = target_table[change_key] or {}
+        -- Если id существует, убедимся, что target_table содержит ключ change_key
+        if not target_table[change_key] then
+            target_table[change_key] = {}
+        end
         target_table[change_key][id] = message
     else
         target_table[change_key] = message
     end
 end
-function NsDb:modKey(change_key, message, dop_key, id)
-    local target_table = dop_key and self.input_table[dop_key] or self.input_table
-    if not target_table then
-        target_table = dop_key and {} or self.input_table
-        if dop_key then
-            self.input_table[dop_key] = target_table
-        end
-    end
-    if id then
-        target_table[change_key] = target_table[change_key] or {}
-        target_table[change_key][id] = message
-    else
-        target_table[change_key] = message
-    end
-end
+
 -- Метод для получения значения по ключу
 function NsDb:getKey(change_key, dop_key, id)
     local target_table = dop_key and self.input_table[dop_key] or self.input_table
