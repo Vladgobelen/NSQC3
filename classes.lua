@@ -1393,6 +1393,12 @@ ChatHandler.__index = ChatHandler
 -- Локальная таблица для хранения переменных вместо глобальных
 local variables = {}
 
+-- Предопределенные шаблоны для поиска по позициям слов
+local WORD_POSITION_PATTERNS = {}
+for i = 1, 10 do -- Поддерживаем до 10 позиций
+    WORD_POSITION_PATTERNS[i] = "^"..string.rep("%S*%s+", i-1).."(%S+)"
+end
+
 -- Функции для работы с локальными переменными
 local function SetVariable(name, value)
     variables[name] = value
@@ -1407,26 +1413,20 @@ function ChatHandler:new(triggersByAddress, chatTypes)
     new_object.triggersByAddress = triggersByAddress or {}
     new_object.frame = CreateFrame("Frame")
 
+    local events = chatTypes and {} or {
+        "CHAT_MSG_CHANNEL", "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_WHISPER",
+        "CHAT_MSG_GUILD", "CHAT_MSG_PARTY", "CHAT_MSG_RAID", "CHAT_MSG_RAID_WARNING",
+        "CHAT_MSG_BATTLEGROUND", "CHAT_MSG_SYSTEM", "CHAT_MSG_ADDON"
+    }
+
     if chatTypes then
         for _, chatType in ipairs(chatTypes) do
-            if chatType == "ADDON" then
-                new_object.frame:RegisterEvent("CHAT_MSG_ADDON")
-            else
-                new_object.frame:RegisterEvent("CHAT_MSG_" .. chatType)
-            end
+            new_object.frame:RegisterEvent(chatType == "ADDON" and "CHAT_MSG_ADDON" or "CHAT_MSG_"..chatType)
         end
     else
-        new_object.frame:RegisterEvent("CHAT_MSG_CHANNEL")
-        new_object.frame:RegisterEvent("CHAT_MSG_SAY")
-        new_object.frame:RegisterEvent("CHAT_MSG_YELL")
-        new_object.frame:RegisterEvent("CHAT_MSG_WHISPER")
-        new_object.frame:RegisterEvent("CHAT_MSG_GUILD")
-        new_object.frame:RegisterEvent("CHAT_MSG_PARTY")
-        new_object.frame:RegisterEvent("CHAT_MSG_RAID")
-        new_object.frame:RegisterEvent("CHAT_MSG_RAID_WARNING")
-        new_object.frame:RegisterEvent("CHAT_MSG_BATTLEGROUND")
-        new_object.frame:RegisterEvent("CHAT_MSG_SYSTEM")
-        new_object.frame:RegisterEvent("CHAT_MSG_ADDON")
+        for _, event in ipairs(events) do
+            new_object.frame:RegisterEvent(event)
+        end
     end
 
     new_object.frame:SetScript("OnEvent", function(_, event, ...)
@@ -1437,139 +1437,94 @@ function ChatHandler:new(triggersByAddress, chatTypes)
 end
 
 function ChatHandler:OnChatMessage(event, ...)
-    local text, sender, _, _, _, _, _, _, channel, channelName, _, prefix
+    local text, sender, prefix, channel
     if event == "CHAT_MSG_ADDON" then
-        prefix, text, channel, sender = ...
+        prefix, text, _, sender = ...
     else
         text, sender = ...
     end
 
+    -- Обработка общего триггера
     if self.triggersByAddress["*"] then
         for _, trigger in ipairs(self.triggersByAddress["*"]) do
-            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
-                if trigger.stopOnMatch then
+            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) and trigger.stopOnMatch then
+                return
+            end
+        end
+    end
+
+    -- Формирование адресов для поиска
+    local addressPrefix = event == "CHAT_MSG_ADDON" and "prefix:"..(prefix:match("^(%S+)") or "")
+    local addressMessage = "message:"..(text:match("^(%S+)") or "")
+
+    -- Проверка триггеров по адресам
+    for _, address in ipairs({addressPrefix, addressMessage}) do
+        if address and self.triggersByAddress[address] then
+            for _, trigger in ipairs(self.triggersByAddress[address]) do
+                if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
                     return
                 end
-            end
-        end
-    end
-
-    local addressPrefix = nil
-    if event == "CHAT_MSG_ADDON" then
-        addressPrefix = "prefix:" .. (string.match(prefix, "^(%S+)") or "")
-    end
-
-    local addressMessage = "message:" .. (string.match(text, "^(%S+)") or "")
-
-    if addressPrefix and self.triggersByAddress[addressPrefix] then
-        for _, trigger in ipairs(self.triggersByAddress[addressPrefix]) do
-            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
-                return
-            end
-        end
-    end
-
-    if self.triggersByAddress[addressMessage] then
-        for _, trigger in ipairs(self.triggersByAddress[addressMessage]) do
-            if self:CheckTrigger(trigger, text, sender, channel, prefix, event) then
-                return
             end
         end
     end
 end
 
 function ChatHandler:CheckTrigger(trigger, text, sender, channel, prefix, event)
-    local chatTypes = trigger.chatType
-    if chatTypes then
-        local currentChatType = string.match(event, "CHAT_MSG_(.+)")
-        local chatTypeMatch = false
-        for _, allowedChatType in ipairs(chatTypes) do
-            if currentChatType == allowedChatType then
-                chatTypeMatch = true
+    -- Проверка типа чата
+    if trigger.chatType then
+        local currentChatType = event:match("CHAT_MSG_(.+)$")
+        local found = false
+        for _, t in ipairs(trigger.chatType) do
+            if t == currentChatType then
+                found = true
                 break
             end
         end
-        if not chatTypeMatch then
-            return false
-        end
+        if not found then return false end
     end
 
-    local allForbiddenWords = {}
+    -- Проверка запрещенных слов
+    local lowerText = text:lower()
     for _, wordOrVar in ipairs(trigger.forbiddenWords or {}) do
-        if type(wordOrVar) == "string" and wordOrVar:sub(1, 1) == "$" then
-            local varName = wordOrVar:sub(2)
-            local varValue = GetVariable(varName)
-            if type(varValue) == "table" then
-                for _, forbiddenWord in ipairs(varValue) do
-                    table.insert(allForbiddenWords, forbiddenWord)
-                end
-            elseif type(varValue) == "string" then
-                table.insert(allForbiddenWords, varValue)
+        local word = type(wordOrVar) == "string" and wordOrVar:sub(1,1) == "$" 
+            and GetVariable(wordOrVar:sub(2)) or wordOrVar
+        
+        if type(word) == "table" then
+            for _, w in ipairs(word) do
+                if lowerText:find(w:lower(), 1, true) then return false end
             end
-        else
-            table.insert(allForbiddenWords, wordOrVar)
-        end
-    end
-
-    for _, forbiddenWord in ipairs(allForbiddenWords) do
-        if string.find(text:lower(), forbiddenWord:lower()) then
+        elseif word and lowerText:find(word:lower(), 1, true) then
             return false
         end
     end
 
-    local keywordsMatch = true
-    if #trigger.keyword > 0 then
-        for _, keywordData in ipairs(trigger.keyword) do
-            local word = keywordData.word
-            local position = keywordData.position
-            local source = keywordData.source
-            local targetText = (source == "prefix") and prefix or text
-            local currentIndex = 0
-            for match in targetText:gmatch("%S+") do
-                currentIndex = currentIndex + 1
-                if currentIndex == position then
-                    if match ~= word then
-                        keywordsMatch = false
-                        break
-                    end
-                    break
-                end
-            end
-            if not keywordsMatch then
-                break
-            end
+    -- Проверка ключевых слов
+    for _, keywordData in ipairs(trigger.keyword) do
+        local target = keywordData.source == "prefix" and prefix or text
+        if not target then return false end
+        
+        local pattern = WORD_POSITION_PATTERNS[keywordData.position]
+        local match = target:match(pattern)
+        if not match or match ~= keywordData.word then
+            return false
         end
     end
 
-    if keywordsMatch then
-        local allConditionsMet = true
-        for _, condition in ipairs(trigger.conditions or {}) do
-            if type(condition) == "string" then
-                condition = _G[condition]
-            end
-            if type(condition) == "function" then
-                if not condition(text, sender, channel, prefix) then
-                    allConditionsMet = false
-                    break
-                end
-            else
-                print("Ошибка: условие не является функцией или именем функции.")
-                allConditionsMet = false
-                break
-            end
+    -- Проверка дополнительных условий
+    for _, condition in ipairs(trigger.conditions or {}) do
+        local func = type(condition) == "string" and _G[condition] or condition
+        if not func or not func(text, sender, channel, prefix) then
+            return false
         end
+    end
 
-        if allConditionsMet then
-            local func = _G[trigger.func]
-            if func then
-                func(event, text, sender, prefix, channel, channelName)
-                if trigger.stopOnMatch then
-                    return true
-                end
-            else
-                print("Ошибка: функция '" .. trigger.func .. "' не найдена.")
-            end
-        end
+    -- Вызов целевой функции
+    local func = _G[trigger.func]
+    if func then
+        func(event, text, sender, prefix, channel)
+        return trigger.stopOnMatch
+    else
+        print("Ошибка: функция '"..trigger.func.."' не найдена")
     end
     return false
 end
@@ -2505,7 +2460,7 @@ end
 function NSQCMenu:addSlider(parentMenu, options)
     local slider = CreateFrame("Slider", parentMenu.frame:GetName()..options.name, parentMenu.scrollContent, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", 16, -parentMenu.lastY)
-    slider:SetWidth(200)
+    slider:SetWidth(590)
     slider:SetHeight(20)
     slider:SetMinMaxValues(options.min, options.max)
     slider:SetValueStep(options.step or 1)
