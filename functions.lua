@@ -536,13 +536,15 @@ function C_Timer(duration, callback, isLooping)
 end
 
 function sendAch(name, arg, re)
-    if UnitLevel("player") >= 10 then
-        if not re then
-            if customAchievements:GetAchievementData(name)['dateEarned'] == "Не получена" then
+    if AchievementFrame then
+        if UnitLevel("player") >= 10 then
+            if not re then
+                if customAchievements:GetAchievementData(name)['dateEarned'] == "Не получена" then
+                    SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
+                end
+            else
                 SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
             end
-        else
-            SendAddonMessage("NSQC3_ach " .. arg, name, "guild")
         end
     end
 end

@@ -1680,13 +1680,21 @@ end
 
 -- Метод для создания вкладки "Ночная стража"
 function CustomAchievements:CreateNightWatchTab()
-    if not AchievementFrameTab1 or not AchievementFrameTab2 then
+    if not AchievementFrameTab1 then
         return
     end
 
-    self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab3", AchievementFrame, "AchievementFrameTabButtonTemplate")
+    -- Найдем последнюю вкладку
+    local lastTab = AchievementFrameTab1
+    local tabIndex = 1
+    while _G["AchievementFrameTab" .. (tabIndex + 1)] do
+        lastTab = _G["AchievementFrameTab" .. (tabIndex + 1)]
+        tabIndex = tabIndex + 1
+    end
+
+    self.nightWatchTab = CreateFrame("Button", "AchievementFrameTab" .. (tabIndex + 1), AchievementFrame, "AchievementFrameTabButtonTemplate")
     self.nightWatchTab:SetText("Ночная стража")
-    self.nightWatchTab:SetPoint("LEFT", AchievementFrameTab2, "RIGHT", -6, 0)
+    self.nightWatchTab:SetPoint("LEFT", lastTab, "RIGHT", -6, 0)
 
     local fontString = self.nightWatchTab:GetFontString()
     if fontString then
@@ -1701,17 +1709,15 @@ function CustomAchievements:CreateNightWatchTab()
         AchievementFrameSummary:Hide()
         AchievementFrameAchievements:Hide()
         AchievementFrameStats:Hide()
-
         for i = 1, 20 do
             local button = _G['AchievementFrameCategoriesContainerButton' .. i]
             if button then
                 button:Hide()
             end
         end
-
         self:Show()
         self:UpdateUI(self.selectedCategory)
-        PanelTemplates_SetTab(AchievementFrame, 3)
+        PanelTemplates_SetTab(AchievementFrame, tabIndex + 1)
     end)
 end
 
