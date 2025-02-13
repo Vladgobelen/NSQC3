@@ -6,6 +6,7 @@
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
         NSQC3_version = 1; NSQC3_subversion = 0
+        SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
         ns_dbc = ns_dbc or NsDb:new(nsDbc)
         NS3Menu(NSQC3_version, NSQC3_subversion)         -- Вызов функции для отображения меню

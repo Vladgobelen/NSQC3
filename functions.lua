@@ -302,29 +302,48 @@ function set_miniButton()
     eventFrame:SetScript("OnEvent", OnEvent)
 
     -- Функция для создания тултипа
+    -- Объявляем константы и статические строки вне функции
+    local TOOLTIP_COLOR_NSQC3 = "|cFF6495EDNSQC3|cFF808080-"
+    local TOOLTIP_COLOR_VERSION = "|cff00BFFF"
+    local TOOLTIP_COLOR_MEMORY = " |cffbbbbbbОЗУ: |cff00BFFF"
+    local TOOLTIP_COLOR_KB = " |cffbbbbbbкб"
+    local TOOLTIP_COLOR_LATEST_VERSION = "|cFF6495EDАктуальная версия аддона: "
+    local TOOLTIP_COLOR_UNKNOWN_VERSION = "|cFF6495EDАктуальная версия: |cffff0000Неизвестно"
+    local TOOLTIP_COLOR_AVERAGE_ILVL = "|cFF6495EDСредний уровень предметов: "
+    local TOOLTIP_COLOR_GEARSORE = "|cFF6495EDGearScore: "
+    local TOOLTIP_COLOR_LEFT_CLICK = "|cffFF8C00ЛКМ|cffFFFFE0 - открыть аддон"
+    local TOOLTIP_COLOR_RIGHT_CLICK = "|cffF4A460ПКМ|cffFFFFE0 - показать настройки"
+
     local function CreateTooltip(self)
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")  -- Отправляем запрос
         local myNome = GetUnitName("player")
 
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("|cFF6495EDNSQC3|cFF808080-|cff00BFFF" .. NSQC3_version .. "." .. NSQC3_subversion .. " |cffbbbbbbОЗУ: |cff00BFFF" .. string.format("%.0f", GetAddOnMemoryUsage("NSQC3")) .. " |cffbbbbbbкб")
         
-        -- Если есть информация о последней версии, добавляем её в тултип
+        -- Формируем строку информации о версии и памяти
+        local versionInfo = TOOLTIP_COLOR_NSQC3 .. TOOLTIP_COLOR_VERSION .. NSQC3_version .. "." .. NSQC3_subversion .. TOOLTIP_COLOR_MEMORY .. string.format("%.0f", GetAddOnMemoryUsage("NSQC3")) .. TOOLTIP_COLOR_KB
+        GameTooltip:AddLine(versionInfo)
+        
+        -- Добавляем информацию о последней версии, если она известна
         if latestVersion then
-            GameTooltip:AddLine("|cFF6495EDАктуальная версия аддона: |cff00BFFF" .. latestVersion .. "." .. latestSubVersion)
+            GameTooltip:AddLine(TOOLTIP_COLOR_LATEST_VERSION .. TOOLTIP_COLOR_VERSION .. latestVersion .. "." .. latestSubVersion)
         else
-            GameTooltip:AddLine("|cFF6495EDАктуальная версия: |cffff0000Неизвестно")
+            GameTooltip:AddLine(TOOLTIP_COLOR_UNKNOWN_VERSION)
         end
         
-        GameTooltip:AddLine("|cFF6495EDСредний уровень предметов: |cff00BFFF" .. string.format("%d", CalculateAverageItemLevel(myNome)))
+        -- Добавляем средний уровень предметов
+        local averageIlvl = TOOLTIP_COLOR_AVERAGE_ILVL .. TOOLTIP_COLOR_VERSION .. string.format("%d", CalculateAverageItemLevel(myNome))
+        GameTooltip:AddLine(averageIlvl)
         
-        if GS_Data ~= nil and GS_Data[GetRealmName()] and GS_Data[GetRealmName()].Players[myNome] then
-            GameTooltip:AddLine("|cFF6495EDGearScore: |cff00BFFF" .. string.format("%d", GS_Data[GetRealmName()].Players[myNome].GearScore))
+        -- Добавляем GearScore, если данные доступны
+        if GS_Data and GS_Data[GetRealmName()] and GS_Data[GetRealmName()].Players[myNome] then
+            local gearScore = TOOLTIP_COLOR_GEARSORE .. TOOLTIP_COLOR_VERSION .. string.format("%d", GS_Data[GetRealmName()].Players[myNome].GearScore)
+            GameTooltip:AddLine(gearScore)
         end
         
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffFF8C00ЛКМ|cffFFFFE0 - открыть аддон")
-        GameTooltip:AddLine("|cffF4A460ПКМ|cffFFFFE0 - показать настройки")
+        GameTooltip:AddLine(TOOLTIP_COLOR_LEFT_CLICK)
+        GameTooltip:AddLine(TOOLTIP_COLOR_RIGHT_CLICK)
         GameTooltip:Show()
     end
 
@@ -552,20 +571,19 @@ end
 local set = true
 
 function fBtnClick(id, obj)
-    if not set then
-        return
-    end
+    if not set then return end
     set = false
 
-    if arg2 then
-        print("Функция запущена с параметрами:", id, obj)
+    local actionPrefix = ({
+        LeftButton = "NSQC3_clcl ",
+        RightButton = "NSQC3_clcr "
+    })[arg1]
+
+    if actionPrefix and arg2 then
+        SendAddonMessage(actionPrefix .. id, obj, "guild")
     end
 
-    if not arg2 then
-
-    end
-
-    C_Timer(.3, function()
+    C_Timer(0.3, function()
         set = true
     end)
 end
@@ -621,26 +639,24 @@ local abs, floor = math.abs, math.floor
 local byte, sub, char = string.byte, string.sub, string.char
 local tbl_insert, tbl_concat, error = table.insert, table.concat, error
 
--- Таблица конвертации чисел в символы
 local _convertTable3 = {
     [0] = "0", [1] = "1", [2] = "2", [3] = "3", [4] = "4",
     [5] = "5", [6] = "6", [7] = "7", [8] = "8", [9] = "9",
     [10] = "A", [11] = "B", [12] = "C", [13] = "D", [14] = "E",
     [15] = "F", [16] = "G", [17] = "#", [18] = "$", [19] = "%",
     [20] = "(", [21] = ")", [22] = "*", [23] = "+", [24] = "-",
-    [25] = ".", [26] = "/", [27] = ":", [28] = ";", [29] = "<",
-    [30] = "=", [31] = ">", [32] = "?", [33] = "@", [34] = "H",
-    [35] = "I", [36] = "J", [37] = "K", [38] = "L", [39] = "M",
-    [40] = "N", [41] = "O", [42] = "P", [43] = "Q", [44] = "R",
-    [45] = "S", [46] = "T", [47] = "U", [48] = "V", [49] = "W",
-    [50] = "X", [51] = "Y", [52] = "Z", [53] = "^", [54] = "_",
-    [55] = "`", [56] = "a", [57] = "b", [58] = "c", [59] = "d",
-    [60] = "e", [61] = "f", [62] = "g", [63] = "h", [64] = "i",
-    [65] = "j", [66] = "k", [67] = "l", [68] = "m", [69] = "n",
-    [70] = "o", [71] = "p", [72] = "q", [73] = "r", [74] = "s",
-    [75] = "t", [76] = "u", [77] = "v", [78] = "w", [79] = "x",
-    [80] = "y", [81] = "z", [82] = "!", [83] = "{", [84] = "|",
-    [85] = "}", [86] = "[", [87] = "]", [88] = "'", [89] = ",",
+    [25] = "/", [26] = ";", [27] = "<", [28] = "=", [29] = ">",
+    [30] = "@", [31] = "H", [32] = "I", [33] = "J", [34] = "K",
+    [35] = "L", [36] = "M", [37] = "N", [38] = "O", [39] = "P",
+    [40] = "Q", [41] = "R", [42] = "S", [43] = "T", [44] = "U",
+    [45] = "V", [46] = "W", [47] = "X", [48] = "Y", [49] = "Z",
+    [50] = "^", [51] = "_", [52] = "`", [53] = "a", [54] = "b",
+    [55] = "c", [56] = "d", [57] = "e", [58] = "f", [59] = "g",
+    [60] = "h", [61] = "i", [62] = "j", [63] = "k", [64] = "l",
+    [65] = "m", [66] = "n", [67] = "o", [68] = "p", [69] = "q",
+    [70] = "r", [71] = "s", [72] = "t", [73] = "u", [74] = "v",
+    [75] = "w", [76] = "x", [77] = "y", [78] = "z", [79] = "{",
+    [80] = "|", [81] = "}", [82] = "[", [83] = "]", [84] = "'",
 }
 
 -- Обратная таблица конвертации
@@ -650,14 +666,14 @@ for k, v in pairs(_convertTable3) do
 end
 
 -- Максимальное поддерживаемое число (90^12)
-local MAX_NUMBER = 90^12
+local MAX_NUMBER = 85^12
 local MIN_NUMBER = -MAX_NUMBER
 
 -- Буфер для кодирования
 local encode_buffer = {}
 
 -- Кодирование числа в строку
-function en90(dec)
+function en85(dec)
     if type(dec) ~= "number" then error("Input must be a number") end
     if dec == 0 then return "0" end
 
@@ -671,8 +687,8 @@ function en90(dec)
 
     local idx = 0
     repeat
-        local remainder = dec % 90
-        dec = floor(dec / 90)
+        local remainder = dec % 85
+        dec = floor(dec / 85)
         idx = idx + 1
         encode_buffer[idx] = _convertTable3[remainder]
     until dec == 0
@@ -694,7 +710,6 @@ function en90(dec)
     return result
 end
 
--- Декодирование строки в число
 function en10(encoded)
     if type(encoded) ~= "string" then return 0 end
     if encoded == "0" then return 0 end
@@ -706,9 +721,15 @@ function en10(encoded)
     local number = 0
     local len = #encoded
 
-    for i = start, len do
+    -- Если строка состоит только из одного символа
+    if len == 1 then
+        local symbol = sub(encoded, 1, 1)
+        return _reverseConvertTable3[symbol] or 0
+    end
+
+    for i = len, start, -1 do
         local symbol = sub(encoded, i, i)
-        number = number * 90 + (_reverseConvertTable3[symbol] or 0)
+        number = number * 85 + (_reverseConvertTable3[symbol] or 0)
     end
 
     return isNegative and -number or number

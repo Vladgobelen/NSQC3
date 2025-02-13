@@ -8,7 +8,8 @@ local tonumber = tonumber
 local utf8sub = string.utf8sub
 local ipairs = ipairs
 local gmatch = string.gmatch
-local numeCod = numeCod
+local en85 = en85
+local en10 = en10
 local string_utf8sub = string.utf8sub
 local string_utf8len = string.utf8len
 -- Определяем класс NsDb
@@ -16,23 +17,20 @@ NsDb = {}
 NsDb.__index = NsDb
 
 -- Конструктор для создания нового объекта NsDb
-function NsDb:new(input_table, input_table_p, key, str_len, tbl_size)
+function NsDb:new(input_table, input_table_p, key, str_len)
     local new_object = setmetatable({}, self)
-    new_object:init(input_table, input_table_p, key, str_len, tbl_size)
+    new_object:init(input_table, input_table_p, key, str_len)
     return new_object
 end
 
 -- Инициализация объекта
-function NsDb:init(input_table, input_table_p, key, str_len, tbl_size)
+function NsDb:init(input_table, input_table_p, key, str_len)
     self.input_table = self:initializeTable(input_table, key)
     if input_table_p then
         self.input_table_p = self:initializeTable(input_table_p, key)
     end
     if str_len then
         self.str_len = str_len
-    end
-    if tbl_size then
-        self.tbl_size = tbl_size
     end
     self.isPointer = input_table_p and true or false
 end
@@ -47,83 +45,52 @@ function NsDb:initializeTable(input_table, key)
     end
 end
 
--- Метод для получения строки по индексу
-function NsDb:getLine(line)
-    local function getSum(line)
-        local targetLength = line
-        local totalLengths = 0
-        local targetLineIndex
-        local targetLine
+function NsDb:getStr(n)
+    if not self.isPointer or n < 1 then return nil end
 
-        local decodedLengthsCache = {}
-
-        -- Проходим по всем строкам в input_table_p
-        for i, lengthsLine in ipairs(self.input_table_p) do
-            if not decodedLengthsCache[i] then
-                local lengths = {}
-                -- Разбиваем строку на пары символов
-                for length in gmatch(lengthsLine, "..") do
-                    table_insert(lengths, length)
-                end
-                decodedLengthsCache[i] = lengths
-            end
-
-            local lengths = decodedLengthsCache[i]
-            totalLengths = totalLengths + #lengths
-
-            -- Если суммарная длина превышает целевой индекс, сохраняем строку
-            if totalLengths >= targetLength then
-                targetLineIndex = i
-                targetLine = lengthsLine
-                break
-            end
+    -- 1. Поиск нужной строки с адресами
+    local totalAddr, addressStr, strIndex, relIndex = 0, nil, 0, 0
+    for i, str in ipairs(self.input_table_p) do
+        local count = math.floor(utf8len(str) / 2) -- кол-во адресов в строке (замена // на math.floor)
+        if totalAddr + count >= n then
+            relIndex = n - totalAddr    -- относительный индекс в строке
+            addressStr, strIndex = str, i
+            break
         end
+        totalAddr = totalAddr + count
+    end
+    if not addressStr then return nil end
 
-        if not targetLine then
-            return nil, "Длина не найдена."
-        end
+    -- 2. Извлечение конкретного адреса
+    local addrPos = (relIndex - 1) * 2 + 1
+    local addr = utf8sub(addressStr, addrPos, addrPos + 1)
 
-        local lengths = decodedLengthsCache[targetLineIndex]
-        local positionInLine = targetLength - (totalLengths - #lengths)
+    -- 3. Обработка адреса (удаление пробела)
+    if utf8sub(addr, 1, 1) == ' ' then
+        addr = utf8sub(addr, 2, 2)
+    end
+    local length = en10(addr) -- получаем длину данных
 
-        if positionInLine < 1 or positionInLine > #lengths then
-            return nil, "Длина не найдена в целевой строке."
-        end
+    -- 4. Извлечение данных из соответствующей строки
+    local dataChunk = self.input_table[strIndex]
+    if not dataChunk then return nil end
 
-        local decodedLengths = {}
-        for i = 1, #lengths do
-            decodedLengths[i] = numeCod(lengths[i])
-        end
-
-        local sum = 0
-        for i = 1, positionInLine do
-            sum = sum + (decodedLengths[i] or 0)
-        end
-
-        return decodedLengths[positionInLine], sum, targetLineIndex, positionInLine, lengths[positionInLine], decodedLengths[positionInLine]
+    -- 5. Вычисляем стартовую позицию только в текущем чанке
+    local start = 0
+    for i = 1, relIndex - 1 do
+        local pos = (i - 1) * 2 + 1
+        local a = utf8sub(addressStr, pos, pos + 1)
+        if utf8sub(a, 1, 1) == ' ' then a = utf8sub(a, 2, 2) end
+        start = start + en10(a)
     end
 
-    local num, sum, my_line, positionInLine, encryptedLength, decryptedLength = getSum(line)
-
-    if num then
-        local startIndex = sum - num + 1
-        local endIndex = sum
-        local inputLine = self.input_table[my_line]
-        local inputLineLength = utf8len(inputLine)  -- Используем кэшированную функцию
-
-        if startIndex < 1 or endIndex > inputLineLength then
-            return nil, "Некорректные индексы для подстроки."
-        end
-
-        return utf8sub(inputLine, startIndex, endIndex)  -- Используем кэшированную функцию
-    else
-        return nil, "Длина не найдена."
-    end
+    -- 6. Возвращаем данные из текущего чанка
+    return utf8sub(dataChunk, start + 1, start + length)
 end
 
 -- Метод для создания бинарного представления сообщения
 function NsDb:create_bin(message, str)
-    local pointer = numCod(utf8len(message))
+    local pointer = en85(utf8len(message))
     pointer = (string.len(pointer) < 2) and " " .. pointer or pointer
     if str == 0 then
         table_insert(self.input_table, message)
@@ -146,7 +113,7 @@ end
 
 function NsDb:add_line(message)
     local num = #self.input_table
-    if num < 1 or #self.input_table[num] >= self.tbl_size then
+    if num < 1 then
         self.input_table[num + 1] = {}
         self.input_table[num + 1][#self.input_table[num + 1] + 1] = message
     else
@@ -223,8 +190,8 @@ function NsDb:get_fdict(index)
     -- Получаем адрес по индексу
     local address = addresses[index]
 
-    -- Декодируем адрес с помощью функции numeCod
-    local wordCount = numeCod(address)
+    -- Декодируем адрес с помощью функции 
+    local wordCount = en10(address)
     if not wordCount then
         return nil, "Некорректный адрес: " .. address
     end
@@ -271,6 +238,7 @@ end
 
 -- Метод для проверки уникальности сообщения
 function NsDb:is_unique(message)
+    print(#self.input_table, message)
     for i = 1, #self.input_table do
         if self.input_table[i][message] then
             return false
@@ -1400,7 +1368,7 @@ ChatHandler.__index = ChatHandler
 local variables = {}
 
 -- Предопределенные шаблоны для поиска по позициям слов
-local WORD_POSITION_PATTERNS = {}
+WORD_POSITION_PATTERNS = {}
 for i = 1, 10 do -- Поддерживаем до 10 позиций
     WORD_POSITION_PATTERNS[i] = "^"..string.rep("%S*%s+", i-1).."(%S+)"
 end
