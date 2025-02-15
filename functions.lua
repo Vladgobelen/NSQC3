@@ -658,33 +658,23 @@ local _convertTable3 = {
     [75] = "w", [76] = "x", [77] = "y", [78] = "z", [79] = "{",
     [80] = "|", [81] = "}", [82] = "[", [83] = "]", [84] = "'",
 }
-
 -- Обратная таблица конвертации
 local _reverseConvertTable3 = {}
 for k, v in pairs(_convertTable3) do
     _reverseConvertTable3[v] = k
 end
-
--- Максимальное поддерживаемое число (90^12)
+-- Максимальное поддерживаемое число (85^12)
 local MAX_NUMBER = 85^12
-local MIN_NUMBER = -MAX_NUMBER
-
 -- Буфер для кодирования
 local encode_buffer = {}
-
 -- Кодирование числа в строку
 function en85(dec)
     if type(dec) ~= "number" then error("Input must be a number") end
     if dec == 0 then return "0" end
-
     -- Проверка диапазона
-    if dec < MIN_NUMBER or dec > MAX_NUMBER then
+    if dec < 0 or dec > MAX_NUMBER then
         error("Number out of range: " .. tostring(dec))
     end
-
-    local isNegative = dec < 0
-    dec = abs(dec)
-
     local idx = 0
     repeat
         local remainder = dec % 85
@@ -692,49 +682,30 @@ function en85(dec)
         idx = idx + 1
         encode_buffer[idx] = _convertTable3[remainder]
     until dec == 0
-
-    -- Если число отрицательное, добавляем "-" в начало
-    if isNegative then
-        idx = idx + 1
-        encode_buffer[idx] = "-"
+    -- Сборка строки в правильном порядке (обратном)
+    local result = ""
+    for i = idx, 1, -1 do
+        result = result .. (encode_buffer[i] or "")
     end
-
-    -- Сборка строки в правильном порядке
-    local result = tbl_concat(encode_buffer, "", 1, idx)
-
     -- Очистка буфера
     for i = 1, idx do
         encode_buffer[i] = nil
     end
-
     return result
 end
-
+-- Декодирование строки в число
 function en10(encoded)
     if type(encoded) ~= "string" then return 0 end
     if encoded == "0" then return 0 end
-
-    local start = 1
-    local isNegative = byte(encoded, 1) == 45  -- 45 = '-'
-    if isNegative then start = 2 end
-
     local number = 0
     local len = #encoded
-
-    -- Если строка состоит только из одного символа
-    if len == 1 then
-        local symbol = sub(encoded, 1, 1)
-        return _reverseConvertTable3[symbol] or 0
-    end
-
-    for i = len, start, -1 do
+    for i = 1, len do
         local symbol = sub(encoded, i, i)
-        number = number * 85 + (_reverseConvertTable3[symbol] or 0)
+        local digit = _reverseConvertTable3[symbol] or 0
+        number = number * 85 + digit
     end
-
-    return isNegative and -number or number
+    return number
 end
-
 
 
 

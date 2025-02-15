@@ -33,6 +33,21 @@ function NsDb:init(input_table, input_table_p, key, str_len)
         self.str_len = str_len
     end
     self.isPointer = input_table_p and true or false
+
+    -- Инициализация переменных состояния
+    if self.isPointer then
+        if #self.input_table_p == 0 then
+            self.last_str_addr = 0
+            self.str_count = 0
+        else
+            -- Считаем количество строк и размер последней строки
+            self.str_count = 0
+            self.last_str_addr = en10(self.input_table_p[#self.input_table_p]:sub(-2):gsub("^%s", ""))
+            for i = 1, #self.input_table_p do
+                self.str_count = self.str_count + 1       
+            end
+        end
+    end
 end
 
 -- Вспомогательная функция для инициализации таблиц
@@ -45,48 +60,91 @@ function NsDb:initializeTable(input_table, key)
     end
 end
 
+function NsDb:addStr(message)
+    local msg_len = utf8len(message) -- Длина входящего сообщения
+    -- Если адрес последней строки равен 0, инициализируем новую строку данных
+    if self.last_str_addr >= self.str_len or self.str_count == 0 then
+        -- Добавляем данные в массив строк
+        self.input_table[#self.input_table+1] = message        
+        -- Обновляем строку адресов
+        local encoded_len = en85(msg_len)
+        if utf8len(encoded_len) == 1 then
+            encoded_len = "  " .. encoded_len -- Добавляем пробел, чтобы всегда было два символа
+        elseif utf8len(encoded_len) == 2 then
+            encoded_len = " " .. encoded_len
+        end
+        self.input_table_p[#self.input_table_p+1] = encoded_len
+    else
+        self.input_table[#self.input_table] = self.input_table[#self.input_table] .. message
+        local encoded_len = en85(self.last_str_addr + msg_len)
+        if utf8len(encoded_len) == 1 then
+            encoded_len = "  " .. encoded_len -- Добавляем пробел, чтобы всегда было два символа
+        elseif utf8len(encoded_len) == 2 then
+            encoded_len = " " .. encoded_len
+        end
+        self.input_table_p[#self.input_table_p] = self.input_table_p[#self.input_table_p] .. encoded_len
+    end
+    self.last_str_addr = #self.input_table[#self.input_table]
+    self.str_count = #self.input_table_p
+end
+
 function NsDb:getStr(n)
     if not self.isPointer or n < 1 then return nil end
-
-    -- 1. Поиск нужной строки с адресами
-    local totalAddr, addressStr, strIndex, relIndex = 0, nil, 0, 0
-    for i, str in ipairs(self.input_table_p) do
-        local count = math.floor(utf8len(str) / 2) -- кол-во адресов в строке (замена // на math.floor)
-        if totalAddr + count >= n then
-            relIndex = n - totalAddr    -- относительный индекс в строке
-            addressStr, strIndex = str, i
-            break
+    local buff = 0
+    for i = 1, #self.input_table_p do
+        if n > #self.input_table_p[i]/3+buff then
+            buff = buff + #self.input_table_p[i]/3
+        else
+            return self.input_table[i]:sub(
+                en10(self.input_table_p[i]:sub((n-1 - buff - 1) * 3 + 1, (n-1 - buff - 1) * 3 + 1 + 2):gsub("^%s", ""))+1, 
+                en10(self.input_table_p[i]:sub((n - buff - 1) * 3 + 1, (n - buff - 1) * 3 + 1 + 2):gsub("^%s", ""))
+                )
         end
-        totalAddr = totalAddr + count
     end
-    if not addressStr then return nil end
-
-    -- 2. Извлечение конкретного адреса
-    local addrPos = (relIndex - 1) * 2 + 1
-    local addr = utf8sub(addressStr, addrPos, addrPos + 1)
-
-    -- 3. Обработка адреса (удаление пробела)
-    if utf8sub(addr, 1, 1) == ' ' then
-        addr = utf8sub(addr, 2, 2)
-    end
-    local length = en10(addr) -- получаем длину данных
-
-    -- 4. Извлечение данных из соответствующей строки
-    local dataChunk = self.input_table[strIndex]
-    if not dataChunk then return nil end
-
-    -- 5. Вычисляем стартовую позицию только в текущем чанке
-    local start = 0
-    for i = 1, relIndex - 1 do
-        local pos = (i - 1) * 2 + 1
-        local a = utf8sub(addressStr, pos, pos + 1)
-        if utf8sub(a, 1, 1) == ' ' then a = utf8sub(a, 2, 2) end
-        start = start + en10(a)
-    end
-
-    -- 6. Возвращаем данные из текущего чанка
-    return utf8sub(dataChunk, start + 1, start + length)
 end
+
+-- function NsDb:getStr(n)
+--     if not self.isPointer or n < 1 then return nil end
+
+--     -- 1. Поиск нужной строки с адресами
+--     local totalAddr, addressStr, strIndex, relIndex = 0, nil, 0, 0
+--     for i, str in ipairs(self.input_table_p) do
+--         local count = math.floor(utf8len(str) / 2) -- кол-во адресов в строке (замена // на math.floor)
+--         if totalAddr + count >= n then
+--             relIndex = n - totalAddr    -- относительный индекс в строке
+--             addressStr, strIndex = str, i
+--             break
+--         end
+--         totalAddr = totalAddr + count
+--     end
+--     if not addressStr then return nil end
+
+--     -- 2. Извлечение конкретного адреса
+--     local addrPos = (relIndex - 1) * 2 + 1
+--     local addr = utf8sub(addressStr, addrPos, addrPos + 1)
+
+--     -- 3. Обработка адреса (удаление пробела)
+--     if utf8sub(addr, 1, 1) == ' ' then
+--         addr = utf8sub(addr, 2, 2)
+--     end
+--     local length = en10(addr) -- получаем длину данных
+
+--     -- 4. Извлечение данных из соответствующей строки
+--     local dataChunk = self.input_table[strIndex]
+--     if not dataChunk then return nil end
+
+--     -- 5. Вычисляем стартовую позицию только в текущем чанке
+--     local start = 0
+--     for i = 1, relIndex - 1 do
+--         local pos = (i - 1) * 2 + 1
+--         local a = utf8sub(addressStr, pos, pos + 1)
+--         if utf8sub(a, 1, 1) == ' ' then a = utf8sub(a, 2, 2) end
+--         start = start + en10(a)
+--     end
+
+--     -- 6. Возвращаем данные из текущего чанка
+--     return utf8sub(dataChunk, start + 1, start + length)
+-- end
 
 -- Метод для создания бинарного представления сообщения
 function NsDb:create_bin(message, str)
@@ -251,7 +309,7 @@ function NsDb:pLen()
     local pLen = 0
     if self.input_table_p then
         for i = 1, #self.input_table_p do
-            pLen = pLen + (tonumber(utf8len(self.input_table_p[i]))/2)
+            pLen = pLen + (tonumber(utf8len(self.input_table_p[i]))/3)
         end
         return pLen
     else
