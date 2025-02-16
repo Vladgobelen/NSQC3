@@ -2,16 +2,16 @@
 local pairs = pairs
 local table_insert = table.insert
 local setmetatable = setmetatable
-local utf8len = string.utf8len
+local utf8len = utf8myLen
 local CreateFrame = CreateFrame
 local tonumber = tonumber
-local utf8sub = string.utf8sub
+local utf8sub = utf8mySub
 local ipairs = ipairs
 local gmatch = string.gmatch
 local en85 = en85
 local en10 = en10
-local string_utf8sub = string.utf8sub
-local string_utf8len = string.utf8len
+local string_utf8sub = utf8mySub
+local string_utf8len = utf8myLen
 -- Определяем класс NsDb
 NsDb = {}
 NsDb.__index = NsDb
@@ -62,43 +62,61 @@ end
 
 function NsDb:addStr(message)
     local msg_len = utf8len(message) -- Длина входящего сообщения
-    -- Если адрес последней строки равен 0, инициализируем новую строку данных
+    print(en85(msg_len),'123',utf8len(message))
+    -- Если адрес последней строки превысил лимит или это первая строка
     if self.last_str_addr >= self.str_len or self.str_count == 0 then
-        -- Добавляем данные в массив строк
-        self.input_table[#self.input_table+1] = message        
-        -- Обновляем строку адресов
-        local encoded_len = en85(msg_len)
-        if utf8len(encoded_len) == 1 then
-            encoded_len = "  " .. encoded_len -- Добавляем пробел, чтобы всегда было два символа
-        elseif utf8len(encoded_len) == 2 then
-            encoded_len = " " .. encoded_len
-        end
-        self.input_table_p[#self.input_table_p+1] = encoded_len
+        -- Добавляем новую строку в основной массив
+        self.input_table[#self.input_table + 1] = message
+        
+        -- Кодируем длину и форматируем до 3 символов
+        local encoded_len = ("   "..en85(msg_len)):sub(-3)
+        -- Добавляем в таблицу указателей
+        self.input_table_p[#self.input_table_p + 1] = encoded_len
     else
+        -- Дописываем к последней существующей строке
         self.input_table[#self.input_table] = self.input_table[#self.input_table] .. message
-        local encoded_len = en85(self.last_str_addr + msg_len)
-        if utf8len(encoded_len) == 1 then
-            encoded_len = "  " .. encoded_len -- Добавляем пробел, чтобы всегда было два символа
-        elseif utf8len(encoded_len) == 2 then
-            encoded_len = " " .. encoded_len
-        end
+        
+        -- Кодируем новую конечную позицию
+        print('333',self.last_str_addr, msg_len)
+        local encoded_len = ("   "..en85(self.last_str_addr + msg_len)):sub(-3)
+        
+        -- Обновляем последний указатель
         self.input_table_p[#self.input_table_p] = self.input_table_p[#self.input_table_p] .. encoded_len
     end
-    self.last_str_addr = #self.input_table[#self.input_table]
+    
+    -- Обновляем состояние
+    self.last_str_addr = utf8len(self.input_table[#self.input_table])
     self.str_count = #self.input_table_p
 end
 
 function NsDb:getStr(n)
     if not self.isPointer or n < 1 then return nil end
-    local buff = 0
+    
+    local buff = 0 -- Накопитель смещения между блоками
+    
+    -- Ищем нужный блок указателей
     for i = 1, #self.input_table_p do
-        if n > #self.input_table_p[i]/3+buff then
-            buff = buff + #self.input_table_p[i]/3
+        local block_size = #self.input_table_p[i] / 3  -- Количество указателей в блоке
+        
+        -- Проверяем попадание в текущий блок
+        if n > block_size + buff then
+            buff = buff + block_size
         else
-            return self.input_table[i]:sub(
-                en10(self.input_table_p[i]:sub((n-1 - buff - 1) * 3 + 1, (n-1 - buff - 1) * 3 + 1 + 2):gsub("^%s", ""))+1, 
-                en10(self.input_table_p[i]:sub((n - buff - 1) * 3 + 1, (n - buff - 1) * 3 + 1 + 2):gsub("^%s", ""))
-                )
+            -- Вычисляем позиции в строке указателей
+            local start_pos = (n - 1 - buff - 1) * 3 + 1
+            local end_pos = (n - buff - 1) * 3 + 1 + 2
+            
+            -- Извлекаем и декодируем адреса
+            local start_str = self.input_table_p[i]:sub(start_pos, start_pos + 2):match("%S+.*")
+            local end_str = self.input_table_p[i]:sub(end_pos - 2, end_pos):match("%S+.*")
+            print(en10(start_str))
+            print(en10(end_str))
+            -- Возвращаем подстроку из основного хранилища
+            return utf8sub(
+                self.input_table[i], 
+                en10(start_str) + 1,  -- +1 из-за индексации с 1
+                en10(end_str)
+            )
         end
     end
 end
@@ -296,7 +314,6 @@ end
 
 -- Метод для проверки уникальности сообщения
 function NsDb:is_unique(message)
-    print(#self.input_table, message)
     for i = 1, #self.input_table do
         if self.input_table[i][message] then
             return false

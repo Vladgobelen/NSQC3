@@ -3,10 +3,10 @@ local pairs = pairs
 local table_insert = table.insert
 local string_gmatch = string.gmatch
 local string_lower = string.lower
-local utf8sub = string.utf8sub
+local utf8sub = utf8mySub
 local math_abs = math.abs
 local math_floor = math.floor
-local utf8len = string.utf8len
+local utf8len = utf8myLen
 
 -- Функция для разделения строки на подстроки по заданному разделителю
 function mysplit(inputString, separator)
@@ -707,9 +707,94 @@ function en10(encoded)
     return number
 end
 
+local utf8_pattern = "[\1-\127\194-\244][\128-\191]*"
 
+function utf8myLen(s)
+    return select(2, s:gsub(utf8_pattern, ""))
+end
 
+local strbyte, strlen, strsub = string.byte, string.len, string.sub
 
+-- Определяет количество байт, занимаемых UTF-8 символом (без изменения логики)
+local function utf8charbytes(s, i)
+    local c = strbyte(s, i)
+    if c > 0 and c <= 127 then
+        return 1
+    elseif c >= 194 and c <= 223 then
+        return 2
+    elseif c >= 224 and c <= 239 then
+        return 3
+    elseif c >= 240 and c <= 244 then
+        return 4
+    else
+        error("Invalid UTF-8 character at position " .. i)
+    end
+end
+
+-- Извлекает подстроку из UTF-8 строки с оптимизациями
+function utf8mySub(s, i, j)
+    if type(s) ~= "string" then
+        error("bad argument #1 to 'utf8sub' (string expected)")
+    end
+    if type(i) ~= "number" or type(j) ~= "number" then
+        error("bad arguments #2 and/or #3 to 'utf8sub' (numbers expected)")
+    end
+
+    local bytes = strlen(s)
+    local startChar, endChar = i, j
+    local charPositions -- Таблица для кэширования позиций символов при необходимости
+
+    -- Обработка отрицательных индексов и вычисление длины
+    if i < 0 or j < 0 then
+        charPositions = {}
+        local len = 0
+        local pos = 1
+        while pos <= bytes do
+            local charBytes = utf8charbytes(s, pos)
+            len = len + 1
+            charPositions[len] = pos -- Сохраняем позицию символа
+            pos = pos + charBytes
+        end
+        -- Корректируем индексы
+        startChar = (i < 0) and (len + i + 1) or i
+        endChar = (j < 0) and (len + j + 1) or j
+        -- Ограничиваем endChar до максимума и корректируем startChar
+        endChar = math.min(endChar, len)
+        startChar = math.max(startChar, 1)
+    end
+
+    -- Проверка невалидных границ
+    if startChar > endChar then
+        return ""
+    end
+
+    -- Поиск байтовых позиций
+    local startByte, endByte
+    if charPositions then
+        -- Используем кэшированные позиции
+        startByte = charPositions[startChar]
+        local endPos = charPositions[endChar]
+        endByte = endPos + utf8charbytes(s, endPos) - 1
+    else
+        -- Стандартный поиск
+        local currentChar = 0
+        local pos = 1
+        while pos <= bytes do
+            local charBytes = utf8charbytes(s, pos)
+            currentChar = currentChar + 1
+            if currentChar == startChar then
+                startByte = pos
+            end
+            if currentChar == endChar then
+                endByte = pos + charBytes - 1
+                break
+            end
+            pos = pos + charBytes
+        end
+    end
+
+    return strsub(s, startByte, endByte)
+end
 
 -- local lastName = nil -- Переменная для хранения предыдущего значения
 
