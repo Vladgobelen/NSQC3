@@ -109,8 +109,6 @@ function NsDb:getStr(n)
             -- Извлекаем и декодируем адреса
             local start_str = self.input_table_p[i]:sub(start_pos, start_pos + 2):match("%S+.*")
             local end_str = self.input_table_p[i]:sub(end_pos - 2, end_pos):match("%S+.*")
-            print(en10(start_str))
-            print(en10(end_str))
             -- Возвращаем подстроку из основного хранилища
             return utf8sub(
                 self.input_table[i], 
@@ -984,12 +982,29 @@ UniversalInfoFrame = {}
 UniversalInfoFrame.__index = UniversalInfoFrame
 
 function UniversalInfoFrame:new(updateInterval, saveTable)
+    -- Разбиваем строку на части
+    local tableName, key = saveTable:match("^([%w_]+)%['?\"?([^'\"]+)['\"]?%]$")
+    if not tableName or not key then
+        error("Неверный формат пути к таблице: " .. tostring(saveTablePath))
+    end
+
+    -- Получаем таблицу из _G
+    local tableRef = _G[tableName]
+    if type(tableRef) ~= "table" then
+        error("Таблица " .. tableName .. " не существует")
+    end
+
+    -- Проверяем, существует ли ключ
+    if type(tableRef[key]) ~= "table" then
+        tableRef[key] = {}  -- Создаем новую таблицу, если её нет
+    end
+
     -- Инициализация нового объекта
     local new_object = setmetatable({}, self)
     self.__index = self
 
-    -- Инициализация параметров
-    new_object.saveTable = saveTable or {}
+    -- Сохраняем таблицу в объекте
+    new_object.saveTable = tableRef[key]
     new_object.textsTop = {}
     new_object.textsBottom = {}
     new_object.updateInterval = updateInterval or 1

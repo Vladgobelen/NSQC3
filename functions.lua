@@ -708,7 +708,6 @@ function en10(encoded)
 end
 
 local utf8_pattern = "[\1-\127\194-\244][\128-\191]*"
-
 function utf8myLen(s)
     return select(2, s:gsub(utf8_pattern, ""))
 end
@@ -809,17 +808,6 @@ end
 --     end
 -- end)
 
-function testF(num)
-    local t = GetTime()
-    for i = 1, num do
-        for i = 1, 100 do
-            --mFld:setArg(i, text:sub((i*3)-2, i*3))
-            local j = adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3)
-        end
-    end
-    print("Прошло: " .. GetTime() - t)
-end
-
 
 
 
@@ -855,6 +843,4 @@ function ShowTex(texturePath, duration, x, y)
     end
 end
 
--- Пример использования:
--- Отобразить текстуру "Interface\\Icons\\INV_Misc_QuestionMark" на 5 секунд
 

@@ -20,7 +20,7 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
         C_Timer(5, function()
-            if UnitLevel("player") >= 10 then
+            if UnitLevel("player") >= 5 then
                 if AchievementMicroButton:IsEnabled() == 1 then
                     AchievementMicroButton:Click()
                     AchievementFrameCloseButton:Click()
