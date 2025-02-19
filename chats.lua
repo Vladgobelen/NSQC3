@@ -6,7 +6,7 @@ local triggersByAddress = {
             keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
             conditions = {
             },
-            chatType = { "GUILD"},
+            chatType = {"GUILD"},
             stopOnMatch = false,  -- Не прерывать обработку других триггеров
             forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
         }
@@ -24,7 +24,7 @@ local triggersByAddress = {
                     return kodMsg[2] == myNome
                 end
             },
-            chatType = { "ADDON"},
+            chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
@@ -41,7 +41,7 @@ local triggersByAddress = {
                     return kodMsg[2] == myNome
                 end
             },
-            chatType = { "ADDON"},
+            chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
@@ -63,7 +63,7 @@ local triggersByAddress = {
                     end
                 end
             },
-            chatType = { "GUILD"},  -- Тип чата, на который реагирует триггер
+            chatType = {"GUILD"},  -- Тип чата, на который реагирует триггер
             stopOnMatch = false  -- Прервать обработку других триггеров после срабатывания этого222
         }
     },
@@ -75,12 +75,12 @@ local triggersByAddress = {
             func = "achive_complit",
             conditions = {
                 function(channel, text, sender, prefix)
-                    local kodMsg = mysplit(prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
                     local myNome = GetUnitName("player")
-                    return kodMsg[2] == myNome
+                    return kod2 == myNome
                 end
             },
-            chatType = { "ADDON"},
+            chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
@@ -92,11 +92,104 @@ local triggersByAddress = {
             func = "sendPoint",
             conditions = {
             },
-            chatType = { "ADDON"},
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:sendObj1"] = {
+        {
+            keyword = {
+                { word = "sendObj1", position = 1, source = "prefix" },
+            },
+            func = "showHPonEnter",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:sendObj2"] = {
+        {
+            keyword = {
+                { word = "sendObj2", position = 1, source = "prefix" },
+            },
+            func = "showHPonEnter1",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:sendObj21"] = {
+        {
+            keyword = {
+                { word = "sendObj21", position = 1, source = "prefix" },
+            },
+            func = "showHPonEnter2",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     }
 }
+
+function showHPonEnter(channel, text, sender, prefix)
+    j = 2
+    for i = 1, 100 do
+        if adaptiveFrame:getTexture(i) == text:sub(1, 3) then
+            local hp = en10(text:sub(j*3-2, j*3))
+            if mFldObj:getKey(adaptiveFrame:getTexture(i)).viewHP > hp then
+                adaptiveFrame.children[i]:SetTextT(en10(text:sub(j*3-2, j*3)))
+            end
+            j = j + 1
+        end
+    end
+end
+function showHPonEnter1(channel, text, sender, prefix)
+    for i = 1, 50 do
+        local hp = en10(text:sub(i*3-2, i*3))
+        if mFldObj:getKey(adaptiveFrame:getTexture(i)).viewHP then
+            if mFldObj:getKey(adaptiveFrame:getTexture(i)).viewHP > hp then
+                adaptiveFrame.children[i]:SetTextT(en10(text:sub(i*3-2, i*3)))
+            end
+        end
+    end
+end
+function showHPonEnter2(channel, text, sender, prefix)
+    for i = 1, 50 do
+        local hp = en10(text:sub(i*3-2, i*3))
+        if mFldObj:getKey(adaptiveFrame:getTexture(i+50)).viewHP then
+            if mFldObj:getKey(adaptiveFrame:getTexture(i+50)).viewHP > hp then
+                adaptiveFrame.children[i+50]:SetTextT(en10(text:sub(i*3-2, i*3)))
+            end
+        end
+    end
+end
 
 function sendPoint(channel, text, sender, prefix)
     local temp = mysplit(text)
@@ -147,6 +240,8 @@ function displayFld2(channel, text, sender, prefix)
         end)
     end
     adaptiveFrame:Show()
+    adaptiveFrame:SetText(mFldName)
+    mFld:setArg("onEnterFlag", nil)
 end
 
 function OnAnyTrigger1(channel, text, sender, prefix)

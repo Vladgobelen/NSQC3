@@ -358,7 +358,8 @@ function set_miniButton()
 
     miniMapButton:SetScript("OnClick", function(self)
         sendAch("Великий открыватор", -1)
-        SendAddonMessage("getFld ", "", "guild")
+        mFldName = GetUnitName("player")
+        SendAddonMessage("getFld " .. mFldName, "", "guild")
     end)
 
     -- Инициализация таблицы для сохранения позиции
@@ -613,8 +614,7 @@ function fBtnEnter(id, obj)
                 activeCount = activeCount + 1
             end
         end
-
-        SendAddonMessage(activeCount <= 50 and "nsGetObj1" or "nsGetObj2", obj, "guild")
+        SendAddonMessage((activeCount <= 50 and "nsGetObj1 " or "nsGetObj2 ") .. mFldName, obj, "guild")
     end
 end
 
@@ -795,18 +795,18 @@ function utf8mySub(s, i, j)
     return strsub(s, startByte, endByte)
 end
 
--- local lastName = nil -- Переменная для хранения предыдущего значения
-
--- GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
---     if GuildMemberDetailFrame:IsVisible() then
---         local selectedName = GuildFrame.selectedName
---         if selectedName and selectedName ~= lastName then/run infoFrame:AddText("Клиент", 'GetAddOnMemoryUsage("NSQC")', true)
---             lastName = selectedName -- Обновляем предыдущее значение
---             print("Имя изменилось на:", selectedName)
---             -- Ваш код для обработки изменения
---         end
---     end
--- end)
+GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
+    if GuildMemberDetailFrame:IsVisible() then
+        local selectedName = GuildFrame.selectedName
+        if selectedName and selectedName ~= mFldName then
+            mFldName = selectedName -- Обновляем предыдущее значение
+            SendAddonMessage("getFld " .. mFldName, "", "guild")
+            for i = 1, 100 do
+                adaptiveFrame.children[i]:SetTextT("")
+            end
+        end
+    end
+end)
 
 
 
@@ -843,4 +843,11 @@ function ShowTex(texturePath, duration, x, y)
     end
 end
 
+----------------------------------------------------------------
+NULL = 0/0
+
+function is_null(value)
+  return value ~= value
+end
+----------------------------------------------------------------
 

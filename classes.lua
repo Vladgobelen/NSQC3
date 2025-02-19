@@ -12,6 +12,9 @@ local en85 = en85
 local en10 = en10
 local string_utf8sub = utf8mySub
 local string_utf8len = utf8myLen
+local str_rep = string.rep
+local str_sub = string.sub
+
 -- Определяем класс NsDb
 NsDb = {}
 NsDb.__index = NsDb
@@ -60,9 +63,32 @@ function NsDb:initializeTable(input_table, key)
     end
 end
 
+-- Добавление или обновление строки
+function NsDb:addStaticStr(nik, nStr, nArg, message)
+    self.input_table[nik] = self.input_table[nik] or {}
+
+    if not nArg then
+        self.input_table[nik][nStr] = message
+        return
+    end
+
+    -- Обновляем строку
+    local currentStr = self.input_table[nik][nStr]
+    self.input_table[nik][nStr] = currentStr:sub(1, (nArg - 1) * 3)
+                                .. ("   " .. message):sub(-3)
+                                .. currentStr:sub(nArg * 3 + 1)
+end
+
+function NsDb:getStaticStr(nik, nStr, nArg)
+    local str = self.input_table 
+              and self.input_table[nik] 
+              and self.input_table[nik][nStr]
+    
+    return str and (nArg and str_sub(str, (nArg-1)*3 + 1, nArg*3) or str)
+end
+
 function NsDb:addStr(message)
     local msg_len = utf8len(message) -- Длина входящего сообщения
-    print(en85(msg_len),'123',utf8len(message))
     -- Если адрес последней строки превысил лимит или это первая строка
     if self.last_str_addr >= self.str_len or self.str_count == 0 then
         -- Добавляем новую строку в основной массив
@@ -468,6 +494,52 @@ function ButtonManager:SetText(text)
     fontString:SetNonSpaceWrap(false)
 end
 
+-- Метод для установки текста на кнопке через FontString с возможностью задания цвета в формате HEX
+function ButtonManager:SetTextT(text, color)
+    local fontString = self.frame:GetFontString()
+    if not fontString then
+        fontString = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        self.frame:SetFontString(fontString)
+    end
+
+    -- Установка шрифта и размера
+    fontString:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE", "MONOCHROME")
+
+    -- Установка текста
+    fontString:SetText(text)
+
+    -- Функция для преобразования HEX-цвета в RGB
+    local function HexToRGB(hexColor)
+        -- Убираем символ "#" если он есть
+        hexColor = hexColor:gsub("#", "")
+        
+        -- Преобразуем шестнадцатеричную строку в числа RGB
+        local r = tonumber("0x" .. hexColor:sub(1, 2)) / 255
+        local g = tonumber("0x" .. hexColor:sub(3, 4)) / 255
+        local b = tonumber("0x" .. hexColor:sub(5, 6)) / 255
+        
+        return r, g, b
+    end
+
+    -- Установка цвета текста
+    if color == nil then
+        -- Если цвет не указан, используем цвет по умолчанию #FF8C00
+        local r, g, b = HexToRGB("FF8C00")
+        fontString:SetTextColor(r, g, b)
+    elseif type(color) == "string" and color:match("^%x%x%x%x%x%x$") then
+        -- Если передан HEX-цвет, преобразуем его в RGB
+        local r, g, b = HexToRGB(color)
+        fontString:SetTextColor(r, g, b)
+    elseif type(color) == "table" then
+        -- Если передан массив RGB
+        local r, g, b = unpack(color)
+        fontString:SetTextColor(r, g, b)
+    else
+        -- Используем белый цвет по умолчанию, если формат некорректен
+        fontString:SetTextColor(1.0, 1.0, 1.0)
+    end
+end
+
 -- Метод для установки позиции кнопки
 function ButtonManager:SetPosition(point, relativeTo, relativePoint, xOffset, yOffset)
     self.frame:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset)
@@ -652,6 +724,13 @@ function AdaptiveFrame:new(parent)
     BUTTON_ALPHA = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or BUTTON_ALPHA
     self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Устанавливаем прозрачность фрейма
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
+
+     -- Создаем текстовое поле
+    self.textField = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    self.textField:SetPoint("TOP", self.frame, "TOP", 0, -5)  -- Позиционируем текстовое поле в верхней части фрейма, отступ 5 пикселей от верха
+    self.textField:SetText("")  -- Устанавливаем начальный текст
+    self.textField:SetTextColor(1, 1, 1, 1)  -- Устанавливаем цвет текста (белый)
+
     -- Включаем возможность перемещения и изменения размера фрейма
     self.frame:SetMovable(true)
     self.frame:SetResizable(true)  -- Включаем возможность изменения размера
@@ -753,6 +832,14 @@ function AdaptiveFrame:new(parent)
     -- Инициализируем список дочерних элементов
     self.children = {}
     return self
+end
+
+function AdaptiveFrame:SetText(text)
+    if self.textField then
+        self.textField:SetText(text)
+    else
+        print("Ошибка: Текстовое поле не инициализировано.")
+    end
 end
 
 -- Метод для переключения прозрачности основного фрейма
@@ -870,7 +957,7 @@ function AdaptiveFrame:AddButtons(numButtons, buttonsPerRow, size, texture, high
     local buttonText = ""
     for i = 1, numButtons do
         local buttonName = "button"..i
-        local button = ButtonManager:new(buttonName, self.frame, buttonWidth, buttonHeight, buttonText, 'Interface\\AddOns\\NSQC3\\libs\\00t.tga', nil)
+        local button = ButtonManager:new(buttonName, self.frame, buttonWidth, buttonHeight, buttonText, '', nil)
         button.frame:RegisterForClicks("LeftButtonUp", "LeftButtonDown", "RightButtonUp", "RightButtonDown", "MiddleButtonDown", "Button4Up", "Button5Up", "Button5Down")
         button.frame:EnableMouseWheel(true)
         button.frame:SetAlpha(BUTTON_ALPHA)  -- Устанавливаем прозрачность кнопки
@@ -954,6 +1041,16 @@ end
 function AdaptiveFrame:SetPoint(x, y)
     self.frame:ClearAllPoints()
     self.frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+end
+
+function AdaptiveFrame:isVisible()
+    -- Проверяем, существует ли фрейм
+    if not self.frame then
+        return false
+    end
+
+    -- Проверяем, видим ли фрейм
+    return self.frame:IsVisible()
 end
 
 mDB = {}
