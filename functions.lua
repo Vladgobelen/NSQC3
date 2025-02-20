@@ -581,7 +581,7 @@ function fBtnClick(id, obj)
     })[arg1]
 
     if actionPrefix and arg2 then
-        SendAddonMessage(actionPrefix .. id, obj, "guild")
+        SendAddonMessage(actionPrefix .. mFldName .. " " .. id, obj, "guild")
     end
 
     C_Timer(0.3, function()
@@ -800,9 +800,11 @@ GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
         local selectedName = GuildFrame.selectedName
         if selectedName and selectedName ~= mFldName then
             mFldName = selectedName -- Обновляем предыдущее значение
-            SendAddonMessage("getFld " .. mFldName, "", "guild")
-            for i = 1, 100 do
-                adaptiveFrame.children[i]:SetTextT("")
+            if adaptiveFrame:isVisible() then
+                SendAddonMessage("getFld " .. mFldName, "", "guild")
+                for i = 1, 100 do
+                    adaptiveFrame.children[i]:SetTextT("")
+                end
             end
         end
     end

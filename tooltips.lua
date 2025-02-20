@@ -102,6 +102,20 @@ ns_tooltips = {
             "|cff99ff99ПКМ: |cffFFCF40Рубить дерево"
         }
     },
+    ["00f"] = {
+        mod = 1,
+        viewHP = 999,
+        tooltips = {
+            "|cFF6495EDГустая трава. Ну видно же!",
+            "|cff99ff99ПКМ: |cffFFCF40добывать траву",
+            " ",
+            "|cffFFCF40шанс получить траву(|cffffffffниже 100 хп|cffFFCF40): |cff99ff991%",
+            "|cffFFCF40шанс получить траву(|cffffffffот 100 до 200 хп|cffFFCF40): |cff99ff995%",
+            "|cffFFCF40шанс получить траву(|cffffffffот 200 до 500 хп|cffFFCF40): |cff99ff9910%",
+            "|cffFFCF40шанс получить траву(|cffffffffот 500 до 900 хп|cffFFCF40): |cff99ff9950%",
+            "|cffFFCF40шанс получить траву(|cffffffffвыше 900 хп|cffFFCF40): |cff99ff9990%"
+        }
+    },
     ["0ka"] = {
         tooltips = {
             "|cFF6495EDНесокрушимая скала",

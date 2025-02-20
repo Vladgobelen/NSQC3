@@ -145,7 +145,6 @@ local triggersByAddress = {
             conditions = {
                 function(channel, text, sender, prefix)
                     local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
-                    local myNome = GetUnitName("player")
                     return kod2 == mFldName
                 end,
                 function(channel, text, sender, prefix)
@@ -155,8 +154,61 @@ local triggersByAddress = {
             chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
-    }
+    },
+    ["prefix:newObjHP"] = {
+        {
+            keyword = {
+                { word = "newObjHP", position = 1, source = "prefix" },
+            },
+            func = "newObjHP",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:objEnParent"] = {
+        {
+            keyword = {
+                { word = "objEnParent", position = 1, source = "prefix" },
+            },
+            func = "objEnParent",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function objEnParent(channel, text, sender, prefix)
+    local nik = prefix:match(WORD_POSITION_PATTERNS[2])
+    local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
+    local obj = text:match(WORD_POSITION_PATTERNS[1])
+    local objHP = text:match(WORD_POSITION_PATTERNS[2])
+    adaptiveFrame.children[id]:SetTexture(obj)
+    adaptiveFrame.children[id]:SetTextT(en10(objHP))
+end
+
+function newObjHP(channel, text, sender, prefix)
+    local nik = prefix:match(WORD_POSITION_PATTERNS[2])
+    local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
+    adaptiveFrame.children[id]:SetTextT(en10(text))
+end
 
 function showHPonEnter(channel, text, sender, prefix)
     j = 2

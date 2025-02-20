@@ -802,6 +802,9 @@ function AdaptiveFrame:new(parent)
     self.closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING, -PADDING)
     self.closeButton:SetScript("OnClick", function()
         self:Hide()
+        for i = 1, 100 do
+            adaptiveFrame.children[i]:SetTextT("")
+        end
     end)
     -- Создаем ручку для изменения размера фрейма
     self.resizeHandle = CreateFrame("Button", nil, self.frame)
