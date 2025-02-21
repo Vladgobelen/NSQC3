@@ -214,14 +214,12 @@ local triggersByAddress = {
     },
 }
 
-function postroit_c()
+function postroit_c(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
     adaptiveFrame.children[id]:SetTexture(obj)
-    print(mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP, objHP)
-    if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > objHP then
-        print('больше')
+    if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > en10(objHP) then
         adaptiveFrame.children[id]:SetTextT(en10(objHP))
     end
 end
