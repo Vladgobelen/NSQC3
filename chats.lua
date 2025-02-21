@@ -193,8 +193,38 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:postroit"] = {
+        {
+            keyword = {
+                { word = "postroit", position = 1, source = "prefix" },
+            },
+            func = "postroit_c",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
 
+function postroit_c()
+    local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
+    local obj = text:match(WORD_POSITION_PATTERNS[1])
+    local objHP = text:match(WORD_POSITION_PATTERNS[2])
+    adaptiveFrame.children[id]:SetTexture(obj)
+    print(mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP, objHP)
+    if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > objHP then
+        print('больше')
+        adaptiveFrame.children[id]:SetTextT(en10(objHP))
+    end
+end
 function objEnParent(channel, text, sender, prefix)
     local nik = prefix:match(WORD_POSITION_PATTERNS[2])
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
