@@ -47,7 +47,7 @@ function NsDb:init(input_table, input_table_p, key, str_len)
             self.str_count = 0
             self.last_str_addr = en10(self.input_table_p[#self.input_table_p]:sub(-2):gsub("^%s", ""))
             for i = 1, #self.input_table_p do
-                self.str_count = self.str_count + 1       
+                self.str_count = self.str_count + 1
             end
         end
     end

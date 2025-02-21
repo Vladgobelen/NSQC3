@@ -581,6 +581,7 @@ function fBtnClick(id, obj)
     })[arg1]
 
     if actionPrefix and arg2 then
+        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\" .. obj .. ".ogg")
         SendAddonMessage(actionPrefix .. mFldName .. " " .. id, obj, "guild")
     end
 
