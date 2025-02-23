@@ -1059,13 +1059,12 @@ end
 PopupPanel = {}
 PopupPanel.__index = PopupPanel
 
--- Конструктор
 function PopupPanel:Create(buttonWidth, buttonHeight, buttonsPerRow, spacing)
     local self = setmetatable({}, PopupPanel)
     self.buttonWidth = buttonWidth
     self.buttonHeight = buttonHeight
     self.buttonsPerRow = buttonsPerRow
-    self.spacing = spacing or 5
+    self.spacing = spacing or 0
     self.buttons = {}
     return self
 end
@@ -1075,10 +1074,17 @@ function PopupPanel:CreateButtons(buttonDataList)
         error("Сначала вызовите Show() для создания панели.")
     end
 
-    -- Удаляем старые кнопки
-    for _, btn in ipairs(self.buttons) do btn:Hide() end
-    self.buttons = {}
+    -- Уничтожаем старые кнопки (для Wrath 3.3.5)
+    for _, btn in ipairs(self.buttons) do 
+        btn:SetParent(nil)  -- Отсоединяем от родителя
+        btn:Hide()          -- Скрываем
+        btn:SetScript("OnClick", nil)  -- Удаляем обработчики
+        btn:SetScript("OnEnter", nil)
+        btn:SetScript("OnLeave", nil)
+    end
+    self.buttons = {} -- Очищаем таблицу
 
+    -- Создаем новые кнопки
     local totalButtons = #buttonDataList
     if totalButtons == 0 then return end
 
