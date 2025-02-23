@@ -1066,7 +1066,7 @@ end
 
 
 
-local PopupPanel = {}
+PopupPanel = {}
 PopupPanel.__index = PopupPanel
 
 -- Конструктор
@@ -1080,8 +1080,7 @@ function PopupPanel:Create(buttonWidth, buttonHeight, buttonsPerRow, spacing)
     return self
 end
 
--- Создание кнопок на панели
-function PopupPanel:CreateButtons(buttonCount, buttonTextures, buttonFunctions)
+function PopupPanel:CreateButtons(buttonDataList)
     if not self.panel then 
         error("Сначала вызовите Show() для создания панели.")
     end
@@ -1090,36 +1089,53 @@ function PopupPanel:CreateButtons(buttonCount, buttonTextures, buttonFunctions)
     for _, btn in ipairs(self.buttons) do btn:Hide() end
     self.buttons = {}
 
-    -- Создаем кнопки снизу вверх
-    for i = 1, buttonCount do
+    local totalButtons = #buttonDataList
+    if totalButtons == 0 then return end
+
+    -- Рассчитываем ширину панели
+    local buttonsPerRow = math.min(totalButtons, self.buttonsPerRow)
+    local panelWidth = buttonsPerRow * self.buttonWidth + (buttonsPerRow - 1) * self.spacing
+    local panelHeight = math.ceil(totalButtons / self.buttonsPerRow) * (self.buttonHeight + self.spacing)
+
+    self.panel:SetSize(panelWidth, panelHeight)
+
+    -- Центрируем кнопки
+    for i, data in ipairs(buttonDataList) do
         local button = CreateFrame("Button", nil, self.panel)
         button:SetSize(self.buttonWidth, self.buttonHeight)
+        button:SetFrameStrata("DIALOG")
 
-        local row = math.ceil(i / self.buttonsPerRow) - 1
+        -- Расчет позиции
+        local row = math.floor((i - 1) / self.buttonsPerRow)
         local col = (i - 1) % self.buttonsPerRow
+        local xOffset = col * (self.buttonWidth + self.spacing) - (panelWidth / 2) + (self.buttonWidth / 2)
+        local yOffset = -row * (self.buttonHeight + self.spacing)
 
-        -- Позиционируем снизу вверх
-        button:SetPoint("BOTTOMLEFT", self.panel, "BOTTOMLEFT", 
-            col * (self.buttonWidth + self.spacing), 
-            row * (self.buttonHeight + self.spacing))
+        button:SetPoint("CENTER", self.panel, "CENTER", xOffset, yOffset)
         
-        local texture = button:CreateTexture()
-        texture:SetAllPoints()
-        texture:SetTexture(buttonTextures[i])
-        button.texture = texture
-        button:SetScript("OnClick", buttonFunctions[i])
+        -- Настройка текстуры
+        button:SetNormalTexture(data.texture)
+        button:SetHighlightTexture(data.texture)
+
+        -- Обработчик клика
+        button:SetScript("OnClick", data.func)
+
+        -- Взаимодействие с панелью
+        button:SetScript("OnEnter", function() 
+            self.panel:Show() 
+        end)
+        button:SetScript("OnLeave", function() 
+            if not self.panel:IsMouseOver() then
+                self.panel:Hide()
+            end
+        end)
+
         table.insert(self.buttons, button)
     end
-
-    -- Обновляем размер панели
-    local rows = math.ceil(buttonCount / self.buttonsPerRow)
-    local panelWidth = self.buttonsPerRow * self.buttonWidth + (self.buttonsPerRow - 1) * self.spacing
-    local panelHeight = rows * self.buttonHeight + (rows - 1) * self.spacing
-    self.panel:SetSize(panelWidth, panelHeight)
 end
 
 -- Показ панели
-function PopupPanel:Show(parentButton, parentTexture, triggerTable)
+function PopupPanel:Show(parentButton, secondaryTriggers)
     if not self.panel then
         self.panel = CreateFrame("Frame", nil, UIParent)
         self.panel:SetBackdrop({bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background"})
@@ -1127,70 +1143,53 @@ function PopupPanel:Show(parentButton, parentTexture, triggerTable)
         self.panel:Hide()
     end
 
-    -- Позиционирование панели над кнопкой
+    self.parentButton = parentButton
+
+    -- Позиционирование панели
     local function UpdatePosition()
-        local _, _, _, y = parentButton:GetRect()
         self.panel:ClearAllPoints()
-        self.panel:SetPoint("BOTTOM", parentButton, "TOP", 0, 0) -- Отступ 10 пикселей
+        self.panel:SetPoint("BOTTOM", parentButton, "TOP", 0, 0)
     end
 
     -- Триггеры
     parentButton:SetScript("OnEnter", function()
-        if parentTexture == triggerTable.mainTrigger then
+        local buttonDataList = {}
+
+        -- Проверяем все триггеры
+        for _, triggerFunc in ipairs(secondaryTriggers) do
+            local success, data = triggerFunc(parentButton)
+            if success then
+                for _, btnData in ipairs(data) do
+                    table.insert(buttonDataList, btnData)
+                end
+            end
+        end
+
+        if #buttonDataList > 0 then
+            self:CreateButtons(buttonDataList)
             UpdatePosition()
             self.panel:Show()
         end
     end)
 
     parentButton:SetScript("OnLeave", function()
-        if not self.panel:IsMouseOver() then
+        --if not self.panel:IsMouseOver() then
             self.panel:Hide()
-        end
+        --end
     end)
 
     self.panel:SetScript("OnLeave", function()
-        if not parentButton:IsMouseOver() then
+        --if not parentButton:IsMouseOver() then
             self.panel:Hide()
-        end
+        --end
     end)
 end
 
--- Пример использования
-local panel = PopupPanel:Create(50, 50, 3, 5)
 
--- Кнопка-триггер
-local btn = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
-btn:SetSize(100, 40)
-btn:SetPoint("CENTER")
-btn:SetText("Наведи на меня")
 
--- Текстура кнопки
-local tex = btn:CreateTexture()
-tex:SetAllPoints()
-tex:SetTexture("Interface\\Buttons\\UI-Panel-Button-Up")
 
--- Инициализация
-panel:Show(btn, "Interface\\Buttons\\UI-Panel-Button-Up", {
-    mainTrigger = "Interface\\Buttons\\UI-Panel-Button-Up",
-    secondaryTriggers = {}
-})
 
--- Добавляем кнопки на панель
-panel:CreateButtons(6, {
-    "Interface\\Icons\\Spell_Nature_Thorns",
-    "Interface\\Icons\\Spell_Nature_HealingTouch",
-    "Interface\\Icons\\Spell_Nature_Regeneration",
-    "Interface\\Icons\\Spell_Nature_ResistNature",
-    "Interface\\Icons\\Spell_Nature_StoneClawTotem",
-    "Interface\\Icons\\Spell_Nature_Strength"
-}, {
-    function() print("Кнопка 1") end,
-    function() print("Кнопка 2") end,
-    function() print("Кнопка 3") end,
-    function() print("Кнопка 4") end,
-    function() print("Кнопка 5") end,
-    function() print("Кнопка 6") end,
-})
+
 
 
 

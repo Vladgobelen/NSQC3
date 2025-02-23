@@ -456,6 +456,34 @@ function createFld()
     -- Создаем адаптивный фрейм
     adaptiveFrame = AdaptiveFrame:new(UIParent)
     adaptiveFrame:AddButtons(100, 10, adaptiveFrame:GetSize()/10, nil, nil)
+    local panel = {}
+    for i = 1, 100 do
+        -- Функция-триггер, которая проверяет параметры кнопки
+        local trigger1 = function(parentButton)
+            local texture = parentButton:GetNormalTexture():GetTexture()
+            if texture == "Interface\\AddOns\\NSQC3\\libs\\00t" then
+                return true, {
+                    {texture = "Interface\\Icons\\Spell_Nature_Thorns", func = function() print("Действие 1") end},
+                    {texture = "Interface\\Icons\\Spell_Nature_HealingTouch", func = function() print("Действие 2") end}
+                }
+            end
+            return false
+        end
+        -- Триггер 2: Проверка имени
+        local trigger2 = function(parentButton)
+            print(parentButton:GetName())
+            local name = parentButton:GetName()
+            if name and name:find("1") then
+                return true, {
+                    {texture = "Interface\\Icons\\Spell_Nature_Regeneration", func = function() print("Специальное действие") end}
+                }
+            end
+            return false
+        end
+        local panel = PopupPanel:Create(50, 50, 6, 0) -- 4 кнопки в ряд
+        panel:Show(adaptiveFrame.children[i].frame, {trigger1, trigger2})
+    end
+
     adaptiveFrame:Hide()
     adaptiveFrame:StartMovementAlphaTracking()
 
