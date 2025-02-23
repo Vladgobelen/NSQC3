@@ -1056,16 +1056,6 @@ function AdaptiveFrame:isVisible()
     return self.frame:IsVisible()
 end
 
-
-
-
-
-
-
-
-
-
-
 PopupPanel = {}
 PopupPanel.__index = PopupPanel
 
@@ -1122,9 +1112,19 @@ function PopupPanel:CreateButtons(buttonDataList)
 
         -- Взаимодействие с панелью
         button:SetScript("OnEnter", function() 
-            self.panel:Show() 
+            self.panel:Show()
+
+            -- Показываем тултип, если он задан
+            if data.tooltip then
+                GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+                GameTooltip:SetText(data.tooltip)
+                GameTooltip:SetWidth(500) -- Устанавливаем ширину тултипа вручную
+                GameTooltip:Show()
+            end
         end)
+
         button:SetScript("OnLeave", function() 
+            GameTooltip:Hide() -- Скрываем тултип
             if not self.panel:IsMouseOver() then
                 self.panel:Hide()
             end
@@ -1184,14 +1184,6 @@ function PopupPanel:Show(parentButton, secondaryTriggers)
         --end
     end)
 end
-
-
-
-
-
-
-
-
 
 mDB = {}
 mDB.__index = mDB

@@ -475,7 +475,11 @@ function createFld()
             local name = parentButton:GetName()
             if name and name:find("1") then
                 return true, {
-                    {texture = "Interface\\Icons\\Spell_Nature_Regeneration", func = function() print("Специальное действие") end}
+                    {
+                        texture = "Interface\\Icons\\Spell_Nature_Regeneration",
+                        func = function() print("Специальное действие") end,
+                        tooltip = "Это кнопка Spell_Nature_Regeneration" -- Добавляем текст тултипа
+                    }
                 }
             end
             return false
