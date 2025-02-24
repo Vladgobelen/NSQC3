@@ -471,7 +471,6 @@ function createFld()
         end
         -- Триггер 2: Проверка имени
         local trigger2 = function(parentButton)
-            print(parentButton:GetName())
             local name = parentButton:GetName()
             if name and name:find("1") then
                 return true, {
