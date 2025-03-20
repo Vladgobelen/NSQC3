@@ -2858,3 +2858,273 @@ function NSQCMenu:updateScrollRange(parentMenu)
     scrollBar:SetValue(0)
     scrollFrame:UpdateScrollChildRect()
 end
+
+local QuestUI = {}
+QuestUI.__index = QuestUI
+
+function QuestUI:Create(parent)
+    local self = setmetatable({}, QuestUI)
+    
+    -- Основное окно
+    self.mainFrame = CreateFrame("Frame", nil, parent or UIParent)
+    self.mainFrame:SetSize(400, 500)
+    self.mainFrame:SetPoint("CENTER")
+    self.mainFrame:SetMovable(true)
+    self.mainFrame:EnableMouse(true)
+    self.mainFrame:RegisterForDrag("LeftButton")
+    self.mainFrame:SetScript("OnDragStart", self.mainFrame.StartMoving)
+    self.mainFrame:SetScript("OnDragStop", self.mainFrame.StopMovingOrSizing)
+    self.mainFrame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    self.mainFrame:SetFrameStrata("FULLSCREEN")
+    self.mainFrame:SetAlpha(1.0)  -- Устанавливаем непрозрачность основного окна
+    self.mainFrame:SetBackdropColor(0, 0, 0, 1)
+    -- Кнопка закрытия
+    self.closeButton = CreateFrame("Button", nil, self.mainFrame, "UIPanelCloseButton")
+    self.closeButton:SetPoint("TOPRIGHT", 7, 25)
+    self.closeButton:SetScript("OnClick", function() self:Hide() end)
+    
+    -- Окна справа (предметы и действия)
+    self.itemsFrame = self:_CreateSideFrame("TOP", 500, 300)
+    self.actionsFrame = self:_CreateSideFrame("BOTTOM", 500, 200)
+    
+    -- Устанавливаем непрозрачность для окон предметов и действий
+    self.itemsFrame.frame:SetAlpha(1.0)  -- Окно предметов
+    self.actionsFrame.frame:SetAlpha(1.0)  -- Окно действий
+    
+    -- Настройка текста квеста
+    self:_SetupQuestText()
+    
+    return self
+end
+
+function QuestUI:_CreateSideFrame(anchorPoint, width, height)
+    local frame = CreateFrame("Frame", nil, self.mainFrame)
+    frame:SetSize(width, height)
+    frame:SetPoint("LEFT", self.mainFrame, "RIGHT", 10, 0)
+    frame:SetPoint(anchorPoint, self.mainFrame, anchorPoint, 0, 0)
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+
+    frame:SetBackdropColor(0, 0, 0, 1)  -- Черный цвет фона с полной непрозрачностью
+    frame:SetAlpha(1.0)  -- Устанавливаем непрозрачность
+    
+    -- Scroll Frame
+    local scrollFrame = CreateFrame("ScrollFrame", nil, frame)
+    scrollFrame:SetPoint("TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("BOTTOMRIGHT", 10, 8) -- Увеличен правый отступ
+    
+    -- Scroll Bar (сдвинут на 30 пикселей вправо)
+    local scrollBar = CreateFrame("Slider", nil, scrollFrame, "UIPanelScrollBarTemplate")
+    scrollBar:SetPoint("TOPRIGHT", 8, -16)
+    scrollBar:SetPoint("BOTTOMRIGHT", 8, 16)
+    scrollBar:SetWidth(16)
+    scrollBar:SetScript("OnValueChanged", function(_, value)
+        scrollFrame:SetVerticalScroll(value)
+    end)
+    
+    -- Контент
+    local content = CreateFrame("Frame")
+    content:SetSize(width - 16, 1)
+    scrollFrame:SetScrollChild(content)
+    
+    return {
+        frame = frame,
+        scrollFrame = scrollFrame,
+        scrollBar = scrollBar,
+        content = content,
+        items = {}
+    }
+end
+
+function QuestUI:_SetupQuestText()
+    -- Основной Scroll Frame
+    self.questScroll = CreateFrame("ScrollFrame", nil, self.mainFrame)
+    self.questScroll:SetPoint("TOPLEFT", 15, -15)
+    self.questScroll:SetSize(370, 475) -- Увеличенная высота
+    
+    -- Scroll Bar для основного окна
+    self.mainScrollBar = CreateFrame("Slider", nil, self.questScroll, "UIPanelScrollBarTemplate")
+    self.mainScrollBar:SetPoint("TOPRIGHT", 0, -30) -- Смещение для увеличенной высоты
+    self.mainScrollBar:SetPoint("BOTTOMRIGHT", -8, 16)
+    self.mainScrollBar:SetWidth(16)
+    self.mainScrollBar:SetScript("OnValueChanged", function(_, value)
+        self.questScroll:SetVerticalScroll(value)
+    end)
+    
+    -- Контент текста
+    self.questContent = CreateFrame("Frame")
+    self.questContent:SetSize(340, 1) -- Уменьшенная ширина
+    self.questScroll:SetScrollChild(self.questContent)
+    
+    -- Текст квеста
+    self.questText = self.questContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.questText:SetPoint("TOPLEFT", 10, -10)
+    self.questText:SetJustifyH("LEFT")
+    self.questText:SetWordWrap(true)
+    self.questText:SetWidth(325) -- Уменьшенная ширина текста
+end
+
+function QuestUI:AddItem(name, onClick)
+    self:_AddListElement(self.itemsFrame, name, onClick)
+end
+
+function QuestUI:AddAction(name, onClick)
+    self:_AddListElement(self.actionsFrame, name, onClick)
+end
+
+function QuestUI:_AddListElement(targetFrame, text, onClick)
+    local button = CreateFrame("Button", nil, targetFrame.content)
+    button:SetSize(230, 20)  -- Начальная ширина кнопки
+    
+    -- Позиция элемента
+    local yOffset = -(#targetFrame.items * 20)
+    button:SetPoint("TOPLEFT", 10, yOffset)
+    
+    -- Текст элемента
+    button.textField = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")  -- Сохраняем текстовое поле в кнопке
+    button.textField:SetText(text)
+    button.textField:SetPoint("LEFT")
+    
+    -- Подсветка при наведении
+    button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    button:GetHighlightTexture():SetAlpha(0.3)
+    
+    -- Обработчик клика
+    button:SetScript("OnClick", onClick)
+    
+    -- Добавляем кнопку в список элементов
+    table.insert(targetFrame.items, button)
+    
+    -- Обновляем высоту контента
+    targetFrame.content:SetHeight(#targetFrame.items * 20)
+    
+    -- Обновляем ширину окна
+    self:_UpdateFrameWidth(targetFrame)
+    
+    -- Обновляем скролл
+    self:_UpdateScroll(targetFrame)
+end
+
+function QuestUI:_UpdateFrameWidth(targetFrame)
+    local maxWidth = 0  -- Начальная максимальная ширина
+    
+    -- Проходим по всем элементам в окне
+    for _, button in ipairs(targetFrame.items) do
+        local textField = button.textField  -- Получаем текстовое поле из кнопки
+        local textWidth = textField:GetStringWidth()  -- Получаем ширину текста
+        
+        -- Если ширина текста больше текущей максимальной, обновляем максимальную ширину
+        if textWidth > maxWidth then
+            maxWidth = textWidth
+        end
+    end
+    
+    -- Устанавливаем новую ширину окна с учетом отступов
+    local newWidth = maxWidth + 20  -- 20 - отступы
+    targetFrame.frame:SetWidth(newWidth + 16)
+    targetFrame.content:SetWidth(newWidth)  -- Учитываем отступы для контента
+end
+
+function QuestUI:ClearItems()
+    -- Удаляем все элементы из окна предметов
+    for _, button in ipairs(self.itemsFrame.items) do
+        button:Hide()  -- Скрываем кнопку
+        button:SetParent(nil)  -- Отвязываем от родителя
+    end
+    
+    -- Очищаем список элементов
+    self.itemsFrame.items = {}
+    
+    -- Сбрасываем высоту контента
+    self.itemsFrame.content:SetHeight(0)
+    
+    -- Сбрасываем ширину окна
+    self.itemsFrame.frame:SetWidth(230)  -- Начальная ширина
+    self.itemsFrame.content:SetWidth(230 - 16)  -- Учитываем отступы
+    
+    -- Обновляем скролл
+    self:_UpdateScroll(self.itemsFrame)
+end
+
+function QuestUI:ClearActions()
+    -- Удаляем все элементы из окна действий
+    for _, button in ipairs(self.actionsFrame.items) do
+        button:Hide()  -- Скрываем кнопку
+        button:SetParent(nil)  -- Отвязываем от родителя
+    end
+    
+    -- Очищаем список элементов
+    self.actionsFrame.items = {}
+    
+    -- Сбрасываем высоту контента
+    self.actionsFrame.content:SetHeight(0)
+    
+    -- Сбрасываем ширину окна
+    self.actionsFrame.frame:SetWidth(230)  -- Начальная ширина
+    self.actionsFrame.content:SetWidth(230 - 16)  -- Учитываем отступы
+    
+    -- Обновляем скролл
+    self:_UpdateScroll(self.actionsFrame)
+end
+
+function QuestUI:_UpdateScroll(targetFrame)
+    local contentHeight = targetFrame.content:GetHeight()
+    local frameHeight = targetFrame.scrollFrame:GetHeight()
+    
+    local maxScroll = math.max(0, contentHeight - frameHeight)
+    targetFrame.scrollBar:SetMinMaxValues(0, maxScroll)
+    targetFrame.scrollBar:SetValue(0)
+    
+    if maxScroll > 0 then
+        targetFrame.scrollBar:Show()
+    else
+        targetFrame.scrollBar:Hide()
+    end
+end
+
+function QuestUI:SetQuestText(text)
+    self.questText:SetText(text)
+    
+    -- Обновляем высоту текста
+    local textHeight = self.questText:GetStringHeight()
+    self.questContent:SetHeight(math.max(textHeight + 20, 475)) -- Новая минимальная высота
+    
+    -- Обновляем скролл основного окна
+    self:_UpdateScroll({
+        scrollFrame = self.questScroll,
+        scrollBar = self.mainScrollBar,
+        content = self.questContent
+    })
+end
+
+function QuestUI:Show()
+    self.mainFrame:Show()
+    self.itemsFrame.frame:Show()
+    self.actionsFrame.frame:Show()
+end
+
+function QuestUI:Hide()
+    self.mainFrame:Hide()
+    self.itemsFrame.frame:Hide()
+    self.actionsFrame.frame:Hide()
+end
+
+-- Пример использования:
+questUI = QuestUI:Create(UIParent)
+
+-- Добавление элементов
+questUI:SetQuestText(("Пример длинного текста квеста... "))
+
+    questUI:AddItem("очень длинное ", function() print("Выбран предмет ") end)
+    questUI:AddAction("Действие ", function() print("Выбрано действие ") end)
+
+questUI:Show()
