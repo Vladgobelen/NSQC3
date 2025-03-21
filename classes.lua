@@ -2859,7 +2859,7 @@ function NSQCMenu:updateScrollRange(parentMenu)
     scrollFrame:UpdateScrollChildRect()
 end
 
-local QuestUI = {}
+QuestUI = {}
 QuestUI.__index = QuestUI
 
 function QuestUI:Create(parent)
@@ -2884,15 +2884,32 @@ function QuestUI:Create(parent)
     self.mainFrame:SetAlpha(1.0)
     self.mainFrame:SetBackdropColor(0, 0, 0, 1)
     
+    -- Заголовок основного окна
+    local mainTitleBg = CreateFrame("Frame", nil, self.mainFrame)
+    mainTitleBg:SetPoint("TOPLEFT", self.mainFrame, "TOPLEFT", 0, 0)
+    mainTitleBg:SetPoint("TOPRIGHT", self.mainFrame, "TOPRIGHT", 0, 0)
+    mainTitleBg:SetHeight(35) -- Увеличиваем высоту заголовка до 35 пикселей
+    mainTitleBg:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Header",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    mainTitleBg:SetBackdropColor(0, 0, 0, 1)
+    
+    local mainTitle = mainTitleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    mainTitle:SetPoint("CENTER", mainTitleBg, "CENTER", 0, 0)
+    mainTitle:SetText("Квест")
+    
     -- Кнопка закрытия
     self.closeButton = CreateFrame("Button", nil, self.mainFrame, "UIPanelCloseButton")
-    self.closeButton:SetPoint("TOPRIGHT", 7, 25)
+    self.closeButton:SetPoint("TOPRIGHT", -3, 0)
     self.closeButton:SetScript("OnClick", function() self:Hide() end)
     
     -- Окна (левое, правое и действия)
-    self.leftItemsFrame = self:_CreateSideFrame("LEFT", "TOP", 300, 300)
-    self.rightItemsFrame = self:_CreateSideFrame("RIGHT", "TOP", 300, 300)
-    self.actionsFrame = self:_CreateSideFrame("RIGHT", "BOTTOM", 300, 200)
+    self.leftItemsFrame = self:_CreateSideFrame("LEFT", "TOP", 300, 300, "Локации")
+    self.rightItemsFrame = self:_CreateSideFrame("RIGHT", "TOP", 300, 300, "Предметы")
+    self.actionsFrame = self:_CreateSideFrame("RIGHT", "BOTTOM", 300, 200, "Действия")
     
     -- Настройка текста квеста
     self:_SetupQuestText()
@@ -2900,7 +2917,7 @@ function QuestUI:Create(parent)
     return self
 end
 
-function QuestUI:_CreateSideFrame(side, anchorPoint, width, height)
+function QuestUI:_CreateSideFrame(side, anchorPoint, width, height, titleText)
     local frame = CreateFrame("Frame", nil, self.mainFrame)
     frame:SetSize(width, height)
     
@@ -2921,9 +2938,26 @@ function QuestUI:_CreateSideFrame(side, anchorPoint, width, height)
     })
     frame:SetBackdropColor(0, 0, 0, 1)
     
+    -- Заголовок окна
+    local titleBg = CreateFrame("Frame", nil, frame)
+    titleBg:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    titleBg:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    titleBg:SetHeight(35) -- Увеличиваем высоту заголовка до 35 пикселей
+    titleBg:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Header",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    titleBg:SetBackdropColor(0, 0, 0, 1)
+    
+    local title = titleBg:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    title:SetPoint("CENTER", titleBg, "CENTER", 0, 0)
+    title:SetText(titleText) -- Используем переданный текст заголовка
+    
     -- Scroll Frame
     local scrollFrame = CreateFrame("ScrollFrame", nil, frame)
-    scrollFrame:SetPoint("TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("TOPLEFT", 8, -43) -- Смещаем вниз, чтобы не перекрывать увеличенный заголовок
     scrollFrame:SetPoint("BOTTOMRIGHT", -8, 8)
     
     -- Scroll Bar
@@ -2945,11 +2979,11 @@ function QuestUI:_CreateSideFrame(side, anchorPoint, width, height)
         scrollFrame = scrollFrame,
         scrollBar = scrollBar,
         content = content,
-        items = {}
+        items = {},
+        title = title
     }
 end
 
--- Все оригинальные методы остаются без изменений
 function QuestUI:_SetupQuestText()
     self.questScroll = CreateFrame("ScrollFrame", nil, self.mainFrame)
     self.questScroll:SetPoint("TOPLEFT", 15, -15)
@@ -2968,7 +3002,7 @@ function QuestUI:_SetupQuestText()
     self.questScroll:SetScrollChild(self.questContent)
     
     self.questText = self.questContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.questText:SetPoint("TOPLEFT", 10, -10)
+    self.questText:SetPoint("TOPLEFT", 10, -25)
     self.questText:SetJustifyH("LEFT")
     self.questText:SetWordWrap(true)
     self.questText:SetWidth(325)
@@ -3084,9 +3118,17 @@ function QuestUI:Hide()
 end
 
 -- Пример использования
--- questUI = QuestUI:Create(UIParent)
--- questUI:SetQuestText("Новый текст квеста с интерактивными элементами")
--- questUI:AddItem("Меч героя", function() print("Меч выбран!") end)
--- questUI:AddLocationItem("Сундук", function() print("Сундук открыт!") end)
--- questUI:AddAction("Атаковать", function() print("Атака!") end)
--- questUI:Show()
+questUI = QuestUI:Create(UIParent)
+questUI:SetQuestText("Новый текст квеста с интерактивными элементами")
+questUI:AddItem("Меч героя", function() print("Меч выбран!") end)
+questUI:AddLocationItem("Сундук", function() print("Сундук открыт!") end)
+questUI:AddAction("Атаковать", function() print("Атака!") end)
+questUI:Show()
+
+
+
+
+
+
+
+
