@@ -3118,12 +3118,15 @@ function QuestUI:Hide()
 end
 
 -- Пример использования
-questUI = QuestUI:Create(UIParent)
-questUI:SetQuestText("Новый текст квеста с интерактивными элементами")
-questUI:AddItem("Меч героя", function() print("Меч выбран!") end)
-questUI:AddLocationItem("Сундук", function() print("Сундук открыт!") end)
-questUI:AddAction("Атаковать", function() print("Атака!") end)
-questUI:Show()
+-- questUI = QuestUI:Create(UIParent)
+-- questUI:SetQuestText("Новый текст квеста с интерактивными элементами")
+-- questUI:AddItem("Меч героя", function() print("Меч выбран!") end)
+-- questUI:AddLocationItem("Сундук", function() print("Сундук открыт!") end)
+-- questUI:AddAction("Атаковать", function() print("Атака!") end)
+-- questUI:Show()
+
+
+
 
 
 

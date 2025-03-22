@@ -622,6 +622,7 @@ function fBtnClick(id, obj)
 end
 
 function fBtnEnter(id, obj)
+    adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
     -- Проверка наличия модификатора для текущей текстуры
     local textureKey = adaptiveFrame:getTexture(id)
     if not mFldObj:getKey(textureKey).mod then 

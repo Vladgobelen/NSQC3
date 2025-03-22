@@ -218,7 +218,7 @@ function postroit_c(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
-    adaptiveFrame.children[id]:SetTexture(obj)
+    adaptiveFrame.children[id]:SetTexture(obj, obj)
     if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > en10(objHP) then
         adaptiveFrame.children[id]:SetTextT(en10(objHP))
     end
@@ -228,7 +228,7 @@ function objEnParent(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
-    adaptiveFrame.children[id]:SetTexture(obj)
+    adaptiveFrame.children[id]:SetTexture(obj, obj)
     adaptiveFrame.children[id]:SetTextT(en10(objHP))
 end
 
@@ -297,7 +297,7 @@ function displayFld1(channel, text, sender, prefix)
     for i = 1, 50 do
         --mFld:setArg(i, text:sub((i*3)-2, i*3))
         adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
-        adaptiveFrame.children[i]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(i)).tooltips)
+        
         adaptiveFrame.children[i]:SetOnEnter(function()
             fBtnEnter(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
