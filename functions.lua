@@ -622,7 +622,7 @@ function fBtnClick(id, obj)
 end
 
 function fBtnEnter(id, obj)
-    adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
+    --adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
     -- Проверка наличия модификатора для текущей текстуры
     local textureKey = adaptiveFrame:getTexture(id)
     if not mFldObj:getKey(textureKey).mod then 
@@ -843,9 +843,44 @@ GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
     end
 end)
 
+function time100()
+    if adaptiveFrame.children[1].frame:IsVisible() then
+        SendAddonMessage("time100", 1, "GUILD")
+    else
+        SendAddonMessage("time100", 0, "GUILD")
+    end
+end
 
-
-
+function setTooltip(obj, text, flag)
+    if not obj then return end
+    
+    -- Проверяем, есть ли у объекта уже установленный обработчик OnEnter
+    local existingScript = obj:GetScript("OnEnter")
+    
+    if flag and existingScript then
+        -- Если флаг есть и есть существующий обработчик, создаем обертку
+        obj:SetScript("OnEnter", function(self)
+            -- Сначала вызываем оригинальный обработчик
+            existingScript(self)
+            
+            -- Затем добавляем наш текст
+            GameTooltip:AddLine(text, 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+    else
+        -- Если флага нет или нет существующего обработчика, создаем новый
+        obj:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(text)
+            GameTooltip:Show()
+        end)
+        
+        -- Стандартный обработчик для скрытия тултипа
+        obj:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    end
+end
 
 
 

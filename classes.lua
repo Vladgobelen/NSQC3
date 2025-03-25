@@ -1692,6 +1692,11 @@ ChatHandler.__index = ChatHandler
 -- Локальная таблица для хранения переменных вместо глобальных
 local variables = {}
 
+-- Шаблон для доступа к номеру элемента без пробелов
+OBJECT_POSITION_PATTERNS = {}
+for i = 1, 100 do  -- Важно: цикл до 100, а не 10!
+    OBJECT_POSITION_PATTERNS[i] = "^" .. string.rep("...", i - 1) .. "(...)"
+end
 -- Предопределенные шаблоны для поиска по позициям слов
 WORD_POSITION_PATTERNS = {}
 for i = 1, 10 do -- Поддерживаем до 10 позиций

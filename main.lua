@@ -31,6 +31,10 @@ local function OnEvent(self, event, isLogin, isReload)
         C_Timer(10, function()
             UpdateAddOnMemoryUsage()
         end, true)
+
+        C_Timer(100, function()
+            time100()
+        end, true)
     end
     if arg1 == "Blizzard_AchievementUI" then
         setFrameAchiv()
