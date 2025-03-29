@@ -218,11 +218,16 @@ function postroit_c(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
+    print(obj, objHP)
     adaptiveFrame.children[id]:SetTexture(obj, obj)
     if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > en10(objHP) then
+        print('22222222')
         adaptiveFrame.children[id]:SetTextT(en10(objHP))
     end
+    adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
+    --setTooltip(BT4Button1, "Текст", 1)
 end
+
 function objEnParent(channel, text, sender, prefix)
     local nik = prefix:match(WORD_POSITION_PATTERNS[2])
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
@@ -230,6 +235,7 @@ function objEnParent(channel, text, sender, prefix)
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
     adaptiveFrame.children[id]:SetTexture(obj, obj)
     adaptiveFrame.children[id]:SetTextT(en10(objHP))
+    adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
 end
 
 function newObjHP(channel, text, sender, prefix)
@@ -304,6 +310,7 @@ function displayFld1(channel, text, sender, prefix)
         adaptiveFrame.children[i]:SetOnClick(function()
             fBtnClick(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
+        adaptiveFrame.children[i]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(i)).tooltips)
     end
 end
 function displayFld2(channel, text, sender, prefix)
@@ -318,6 +325,7 @@ function displayFld2(channel, text, sender, prefix)
         adaptiveFrame.children[j]:SetOnClick(function()
             fBtnClick(j, adaptiveFrame.children[j].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
+        adaptiveFrame.children[j]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(j)).tooltips)
     end
     adaptiveFrame:Show()
     adaptiveFrame:SetText(mFldName)

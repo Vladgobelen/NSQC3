@@ -1056,6 +1056,185 @@ function AdaptiveFrame:isVisible()
     return self.frame:IsVisible()
 end
 
+function AdaptiveFrame:CreateSideFrame()
+    if self.sideFrame then return end
+    
+    -- Увеличиваем дополнительные отступы
+    self.sideTextHeight = 15
+    self.sideTextPadding = 5
+    self.scrollBarWidth = 16
+    self.framePadding = 10
+    self.textExtraSpace = 500  -- Увеличено с 10 до 25 для гарантии
+    
+    -- Главный фрейм
+    self.sideFrame = CreateFrame("Frame", "MyAddonSideFrame", self.frame)
+    self.sideFrame:SetFrameStrata("HIGH")
+    self.sideFrame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = self.framePadding, right = self.framePadding, 
+                 top = self.framePadding, bottom = self.framePadding }
+    })
+    self.sideFrame:SetBackdropColor(0, 0, 0, 1)
+    self.sideFrame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0.6)
+
+    -- Фрейм для скроллинга с именем
+    self.sideScrollFrame = CreateFrame("ScrollFrame", "MyAddonScrollFrame", self.sideFrame, "UIPanelScrollFrameTemplate")
+    self.sideScrollFrame:SetPoint("TOPLEFT", self.framePadding, -self.framePadding)
+    self.sideScrollFrame:SetPoint("BOTTOMRIGHT", -self.scrollBarWidth-self.framePadding, self.framePadding)
+
+    -- Контентная область с запасом по ширине
+    self.sideContent = CreateFrame("Frame", nil, self.sideScrollFrame)
+    self.sideContent:SetSize(100, 100)
+    self.sideScrollFrame:SetScrollChild(self.sideContent)
+
+    -- Скроллбар
+    self.sideScrollBar = _G[self.sideScrollFrame:GetName().."ScrollBar"]
+    self.sideScrollBar.scrollStep = self.sideTextHeight + self.sideTextPadding
+    
+    self.sideTextLines = {}
+    self:HideSideFrame()
+end
+
+function AdaptiveFrame:UpdateSideFrame()
+    if not self.sideFrame or not self.sideFrame:IsShown() then 
+        return 
+    end
+    
+    local mainWidth, mainHeight = self.frame:GetSize()
+    local maxTextWidth = 0
+    local extraPadding = 40
+    
+    -- Находим максимальную ширину текста
+    for _, lineFrame in ipairs(self.sideTextLines) do
+        lineFrame.text:SetWidth(0)
+        local textWidth = lineFrame.text:GetStringWidth()
+        if textWidth > maxTextWidth then
+            maxTextWidth = textWidth
+        end
+    end
+    
+    -- Рассчитываем итоговые ширины
+    local contentWidth = maxTextWidth + extraPadding
+    local frameWidth = math.max(100, contentWidth)
+    
+    -- Устанавливаем размеры sideFrame
+    self.sideFrame:SetSize(frameWidth, mainHeight)
+    self.sideFrame:SetPoint("LEFT", self.frame, "RIGHT", 5, 0)
+    
+    -- Обновляем размер контента
+    local totalHeight = #self.sideTextLines * (self.sideTextHeight + self.sideTextPadding)
+    local visibleHeight = self.sideScrollFrame:GetHeight()
+    self.sideContent:SetSize(frameWidth, math.max(totalHeight, visibleHeight))
+    
+    -- Настраиваем скроллбар
+    self.sideScrollBar:SetMinMaxValues(0, math.max(0, totalHeight - visibleHeight))
+    
+    -- Позиционируем строки
+    for i, lineFrame in ipairs(self.sideTextLines) do
+        lineFrame:ClearAllPoints()
+        lineFrame:SetWidth(frameWidth)
+        lineFrame:SetHeight(self.sideTextHeight)
+        local yOffset = -(i-1)*(self.sideTextHeight + self.sideTextPadding)
+        lineFrame:SetPoint("TOPLEFT", self.sideContent, "TOPLEFT", 0, yOffset)
+        
+        lineFrame.text:SetWidth(frameWidth)
+        lineFrame.text:SetPoint("TOPLEFT", lineFrame, "TOPLEFT", 0, 0)
+    end
+end
+
+function AdaptiveFrame:AddSideText(text)
+    if not self.sideFrame then self:CreateSideFrame() end
+    
+    local lineFrame = CreateFrame("Frame", nil, self.sideContent)
+    lineFrame:SetSize(100, self.sideTextHeight)
+    
+    local line = lineFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    line:SetPoint("LEFT", lineFrame, "LEFT", 0, 0)
+    line:SetJustifyH("LEFT")
+    line:SetText(text)
+    line:SetTextColor(1, 1, 1, 1)
+    line:SetHeight(self.sideTextHeight)
+    
+    lineFrame:EnableMouse(true)
+    lineFrame:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then
+            self:MoveLineUp(lineFrame)
+        elseif button == "RightButton" then
+            self:ShowDeleteConfirmation(lineFrame)
+        end
+    end)
+    
+    lineFrame.text = line
+    table.insert(self.sideTextLines, lineFrame)
+    self:UpdateSideFrame()
+end
+
+function AdaptiveFrame:MoveLineUp(lineFrame)
+    for i, frame in ipairs(self.sideTextLines) do
+        if frame == lineFrame and i > 1 then
+            -- Меняем местами с предыдущей строкой
+            self.sideTextLines[i], self.sideTextLines[i-1] = self.sideTextLines[i-1], self.sideTextLines[i]
+            
+            -- Обновляем текст (чтобы сохранить порядок)
+            local tempText = lineFrame.text:GetText()
+            lineFrame.text:SetText(self.sideTextLines[i-1].text:GetText())
+            self.sideTextLines[i-1].text:SetText(tempText)
+            
+            self:UpdateSideFrame()
+            break
+        end
+    end
+end
+
+-- Новый метод для показа подтверждения удаления
+function AdaptiveFrame:ShowDeleteConfirmation(lineFrame)
+    local textToDelete = lineFrame.text:GetText()
+    
+    StaticPopupDialogs["CONFIRM_DELETE_LINE"] = {
+        text = "Вы хотите удалить \""..textToDelete.."\"?",
+        button1 = "Да",
+        button2 = "Нет",
+        OnAccept = function()
+            self:DeleteLine(lineFrame)
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+    
+    StaticPopup_Show("CONFIRM_DELETE_LINE")
+end
+
+-- Метод для удаления строки
+function AdaptiveFrame:DeleteLine(lineFrame)
+    for i, frame in ipairs(self.sideTextLines) do
+        if frame == lineFrame then
+            frame:Hide()
+            frame:SetParent(nil)
+            table.remove(self.sideTextLines, i)
+            self:UpdateSideFrame()
+            break
+        end
+    end
+end
+
+-- Метод для показа бокового фрейма
+function AdaptiveFrame:ShowSideFrame()
+    if not self.sideFrame then self:CreateSideFrame() end
+    self.sideFrame:Show()
+    self:UpdateSideFrame()
+end
+
+-- Метод для скрытия бокового фрейма
+function AdaptiveFrame:HideSideFrame()
+    if self.sideFrame then
+        self.sideFrame:Hide()
+    end
+end
+
 PopupPanel = {}
 PopupPanel.__index = PopupPanel
 
