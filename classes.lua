@@ -699,19 +699,19 @@ local BUTTON_ALPHA = 1
 AdaptiveFrame = {}
 AdaptiveFrame.__index = AdaptiveFrame
 
--- Конструктор для создания нового объекта AdaptiveFrame
 function AdaptiveFrame:new(parent)
     local self = setmetatable({}, AdaptiveFrame)
     self.parent = parent or UIParent
     self.width = 600
     self.height = 600
-    self.initialAspectRatio = self.width / self.height  -- Сохраняем начальное соотношение сторон
-    self.buttonsPerRow = 5  -- Количество кнопок в ряду (по умолчанию)
-    self.skipSizeCheck = true -- Новый флаг
-    -- Создаем фрейм
-    self.frame = CreateFrame("Frame", "fdsfasdf", self.parent)
+    self.initialAspectRatio = self.width / self.height
+    self.buttonsPerRow = 5
+    self.skipSizeCheck = true
+    
+    -- Создаем основной фрейм
+    self.frame = CreateFrame("Frame", "AdaptiveFrame_"..math.random(10000), self.parent)
     self.frame:SetSize(self.width, self.height)
-    self.skipSizeCheck = false -- Разрешаем проверки после инициализации
+    self.skipSizeCheck = false
     self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
     self.frame:SetFrameStrata("HIGH")
     self.frame:SetBackdrop({
@@ -720,23 +720,25 @@ function AdaptiveFrame:new(parent)
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
+    
     FRAME_ALPHA = ns_dbc:getKey("настройки", "FRAME_ALPHA") or FRAME_ALPHA
     BUTTON_ALPHA = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or BUTTON_ALPHA
-    self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Устанавливаем прозрачность фрейма
+    self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
 
-     -- Создаем текстовое поле
+    -- Текстовое поле
     self.textField = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    self.textField:SetPoint("TOP", self.frame, "TOP", 0, -5)  -- Позиционируем текстовое поле в верхней части фрейма, отступ 5 пикселей от верха
-    self.textField:SetText("")  -- Устанавливаем начальный текст
-    self.textField:SetTextColor(1, 1, 1, 1)  -- Устанавливаем цвет текста (белый)
+    self.textField:SetPoint("TOP", self.frame, "TOP", 0, -5)
+    self.textField:SetText("")
+    self.textField:SetTextColor(1, 1, 1, 1)
 
-    -- Включаем возможность перемещения и изменения размера фрейма
+    -- Настройки перемещения и изменения размера
     self.frame:SetMovable(true)
-    self.frame:SetResizable(true)  -- Включаем возможность изменения размера
+    self.frame:SetResizable(true)
     self.frame:EnableMouse(true)
-    self.frame:RegisterForDrag("LeftButton", "RightButton")  -- Регистрируем обработку левой и правой кнопок мыши
-    -- Обработчик клика правой кнопкой мыши
+    self.frame:RegisterForDrag("LeftButton", "RightButton")
+    
+    -- Обработчики событий мыши
     self.frame:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" then
             self:ToggleFrameAlpha()
@@ -744,40 +746,37 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
-    -- Обработчик перетаскивания правой кнопкой мыши
+    
     local startX = 0
     local isDragging = false
     self.frame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
             isDragging = false
-            self.frame:SetScript("OnUpdate", nil) -- Удаляем OnUpdate, когда перетаскивание завершено
+            self.frame:SetScript("OnUpdate", nil)
         else
             self:StopMovingOrSizing()
         end
     end)
+    
     self.frame:SetScript("OnDragStart", function(_, button)
         if button == "RightButton" then
             startX = GetCursorPosition()
             isDragging = true
-            -- Устанавливаем OnUpdate только при начале перетаскивания
             self.frame:SetScript("OnUpdate", function()
                 if isDragging then
                     local currentX = GetCursorPosition()
                     local deltaX = currentX - startX
                     startX = currentX
-                    -- Изменяем прозрачность дочерних кнопок
                     for _, child in ipairs(self.children) do
-                        local currentAlpha = child.frame:GetAlpha() -- Исправлено: child.frame -> child
+                        local currentAlpha = child.frame:GetAlpha()
                         if deltaX > 0 then
-                            -- Увеличиваем прозрачность при движении вправо
-                            local newAlpha = math.min(currentAlpha + math.abs(deltaX) / 1000, 1)
-                            child.frame:SetAlpha(newAlpha) -- Исправлено: child.frame -> child
+                            local newAlpha = math.min(currentAlpha + math.abs(deltaX)/1000, 1)
+                            child.frame:SetAlpha(newAlpha)
                             ns_dbc:modKey("настройки", "BUTTON_ALPHA", newAlpha)
                             BUTTON_ALPHA = newAlpha
                         elseif deltaX < 0 then
-                            -- Уменьшаем прозрачность при движении влево
-                            local newAlpha = math.max(currentAlpha - math.abs(deltaX) / 1000, 0)
-                            child.frame:SetAlpha(newAlpha) -- Исправлено: child.frame -> child
+                            local newAlpha = math.max(currentAlpha - math.abs(deltaX)/1000, 0)
+                            child.frame:SetAlpha(newAlpha)
                             ns_dbc:modKey("настройки", "BUTTON_ALPHA", newAlpha)
                             BUTTON_ALPHA = newAlpha
                         end
@@ -788,41 +787,81 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
+    
     self.frame:SetScript("OnDragStop", function(_, button)
         if button == "RightButton" then
             isDragging = false
-            self.frame:SetScript("OnUpdate", nil) -- Удаляем OnUpdate при остановке перетаскивания
+            self.frame:SetScript("OnUpdate", nil)
         else
             self:StopMovingOrSizing()
         end
     end)
-    -- Создаем кнопку закрытия
+
+    -- Кнопка закрытия
     self.closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
     self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
-    self.closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING, -PADDING)
+    self.closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING+5, -PADDING)
     self.closeButton:SetScript("OnClick", function()
         self:Hide()
         for i = 1, 100 do
-            adaptiveFrame.children[i]:SetTextT("")
+            if self.children[i] then
+                self.children[i]:SetTextT("")
+            end
         end
     end)
-    -- Создаем ручку для изменения размера фрейма
+
+    -- Кнопка управления боковой панелью
+    self.toggleSideButton = CreateFrame("Button", nil, self.frame)
+    self.toggleSideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.toggleSideButton:SetPoint("TOPRIGHT", self.closeButton, "BOTTOMRIGHT", 5, -5)
+    
+    -- Текстуры для кнопки (используем стандартные стрелки из WoW)
+    self.toggleSideButton:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+    self.toggleSideButton:GetNormalTexture():SetDesaturated(true)
+    self.toggleSideButton:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+    self.toggleSideButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    
+    self.toggleSideButton:SetScript("OnClick", function()
+        if not self.sideFrame then
+            self:CreateSideFrame()
+            self:ShowSideFrame()
+            self.toggleSideButton:GetNormalTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
+            self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down")
+        elseif self.sideFrame:IsShown() then
+            self:HideSideFrame()
+            self.toggleSideButton:GetNormalTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+            self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+        else
+            self:ShowSideFrame()
+            self.toggleSideButton:GetNormalTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
+            self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down")
+        end
+    end)
+    
+    -- Подсказка для кнопки
+    self.toggleSideButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.toggleSideButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Показать/скрыть инвентарь")
+        GameTooltip:Show()
+    end)
+    self.toggleSideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Ручка изменения размера
     self.resizeHandle = CreateFrame("Button", nil, self.frame)
     self.resizeHandle:SetSize(16, 16)
     self.resizeHandle:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -40, 40)
     self.resizeHandle:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     self.resizeHandle:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     self.resizeHandle:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    self.resizeHandle:SetScript("OnMouseDown", function()
-        self.frame:StartSizing("BOTTOMRIGHT")
-    end)
-    self.resizeHandle:SetScript("OnMouseUp", function()
+    self.resizeHandle:SetScript("OnMouseDown", function() self.frame:StartSizing("BOTTOMRIGHT") end)
+    self.resizeHandle:SetScript("OnMouseUp", function() 
         self.frame:StopMovingOrSizing()
         local x, y = self:GetSize()
         ns_dbc:modKey("настройки", "mfldRX", x)
         self:AdjustSizeAndPosition()
     end)
-    -- Обработчик изменения размера фрейма
+
+    -- Обработчик изменения размера
     self.frame:SetScript("OnSizeChanged", function(_, width, height)
         if self.skipSizeCheck then
             self.skipSizeCheck = false
@@ -832,8 +871,10 @@ function AdaptiveFrame:new(parent)
         self.frame:SetSize(width, height)
         self:AdjustSizeAndPosition()
     end)
-    -- Инициализируем список дочерних элементов
+
+    -- Инициализация списка дочерних элементов
     self.children = {}
+    
     return self
 end
 
@@ -1106,14 +1147,15 @@ function AdaptiveFrame:UpdateSideFrame()
     local maxTextWidth = 0
     local extraPadding = 40
     
-    -- Находим максимальную ширину текста
+    -- Сначала обновляем все тексты и находим максимальную ширину
     for _, lineFrame in ipairs(self.sideTextLines) do
-        lineFrame.text:SetWidth(0)
+        lineFrame.text:SetWidth(0) -- Сбрасываем ширину для корректного расчета
         local textWidth = lineFrame.text:GetStringWidth()
-        if textWidth > maxTextWidth then
-            maxTextWidth = textWidth
-        end
+        maxTextWidth = math.max(maxTextWidth, textWidth)
     end
+    
+    -- Увеличиваем максимальную ширину на 30 пикселей для учета возможных итераторов
+    maxTextWidth = maxTextWidth + 30
     
     -- Рассчитываем итоговые ширины
     local contentWidth = maxTextWidth + extraPadding
@@ -1131,22 +1173,78 @@ function AdaptiveFrame:UpdateSideFrame()
     -- Настраиваем скроллбар
     self.sideScrollBar:SetMinMaxValues(0, math.max(0, totalHeight - visibleHeight))
     
-    -- Позиционируем строки
+    -- Позиционируем строки с учетом новой ширины
     for i, lineFrame in ipairs(self.sideTextLines) do
         lineFrame:ClearAllPoints()
-        lineFrame:SetWidth(frameWidth)
+        lineFrame:SetWidth(frameWidth - 20) -- Оставляем отступ для скроллбара
         lineFrame:SetHeight(self.sideTextHeight)
         local yOffset = -(i-1)*(self.sideTextHeight + self.sideTextPadding)
-        lineFrame:SetPoint("TOPLEFT", self.sideContent, "TOPLEFT", 0, yOffset)
+        lineFrame:SetPoint("TOPLEFT", self.sideContent, "TOPLEFT", 10, yOffset)
         
-        lineFrame.text:SetWidth(frameWidth)
-        lineFrame.text:SetPoint("TOPLEFT", lineFrame, "TOPLEFT", 0, 0)
+        lineFrame.text:SetWidth(frameWidth - 30) -- Устанавливаем ширину текста с запасом
+        lineFrame.text:SetPoint("LEFT", lineFrame, "LEFT", 5, 0)
     end
 end
 
+function AdaptiveFrame:RemoveSideText(baseText)
+    if not self.sideFrame or not self.sideTextLines then return 0 end
+    
+    local removedCount = 0
+    baseText = baseText:gsub("%(%d+%)$", ""):trim()
+    
+    for i = #self.sideTextLines, 1, -1 do
+        local lineText = self.sideTextLines[i].text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            self.sideTextLines[i]:Hide()
+            table.remove(self.sideTextLines, i)
+            removedCount = removedCount + 1
+        end
+    end
+    
+    if removedCount > 0 then
+        self:UpdateSideFrame()
+    end
+    return removedCount
+end
+
+-- Модифицированный метод AddSideText
 function AdaptiveFrame:AddSideText(text)
     if not self.sideFrame then self:CreateSideFrame() end
     
+    -- Парсим базовое имя и счетчик
+    local baseText = text:gsub("%(%d+%)$", ""):trim()
+    local maxCount = 0
+    local existingIndex = -1
+    
+    -- Ищем существующие строки с таким же базовым именем
+    for i, lineFrame in ipairs(self.sideTextLines) do
+        local lineText = lineFrame.text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            -- Извлекаем текущий счетчик
+            local currentCount = tonumber(lineText:match("%((%d+)%)$")) or 1
+            if currentCount > maxCount then
+                maxCount = currentCount
+                existingIndex = i
+            end
+        end
+    end
+    
+    -- Если нашли существующую строку - обновляем ее
+    if existingIndex ~= -1 then
+        local lineFrame = self.sideTextLines[existingIndex]
+        local newCount = maxCount + 1
+        local newText = baseText .. "(" .. newCount .. ")"
+        
+        lineFrame.text:SetText(newText)
+        self:UpdateSideFrame() -- Принудительно обновляем фрейм после изменения
+        return
+    end
+    
+    -- Если строка не найдена - добавляем новую
     local lineFrame = CreateFrame("Frame", nil, self.sideContent)
     lineFrame:SetSize(100, self.sideTextHeight)
     
@@ -1169,6 +1267,20 @@ function AdaptiveFrame:AddSideText(text)
     lineFrame.text = line
     table.insert(self.sideTextLines, lineFrame)
     self:UpdateSideFrame()
+end
+
+-- Вспомогательный метод для парсинга текста и номера
+function AdaptiveFrame:ParseExistingText(text)
+    if not text then return nil, nil end
+    
+    -- Проверяем формат "текст(число)"
+    local base, count = text:match("^(.-)%((%d+)%)$")
+    if base and count then
+        return base:trim(), tonumber(count)
+    end
+    
+    -- Если нет числа в скобках - возвращаем исходный текст
+    return text:trim(), 1
 end
 
 function AdaptiveFrame:MoveLineUp(lineFrame)

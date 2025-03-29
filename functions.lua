@@ -881,6 +881,10 @@ function setTooltip(obj, text, flag)
     end
 end
 
+function trim(s)
+    return s:match("^%s*(.-)%s*$")
+end
+string.trim = string.trim or trim
 
 
 -- Функция для отображения текстуры по центру экрана
