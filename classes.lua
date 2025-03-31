@@ -475,14 +475,26 @@ function GpDb:_CreateWindow()
     -- 3. Заголовок окна
     self.window.title = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.window.title:SetPoint("TOP", 0, -15)
-    self.window.title:SetText("GP Tracker")
+    self.window.title:SetText("")
 
     -- 4. Кнопка закрытия
     self.window.closeButton = CreateFrame("Button", nil, self.window, "UIPanelCloseButton")
     self.window.closeButton:SetPoint("TOPRIGHT", -5, -5)
     self.window.closeButton:SetScript("OnClick", function() self.window:Hide() end)
 
-    -- 5. Область с прокруткой
+    -- 5. Чекбокс "Только рейд"
+    self.window.raidOnlyCheckbox = CreateFrame("CheckButton", nil, self.window, "UICheckButtonTemplate")
+    self.window.raidOnlyCheckbox:SetPoint("TOPLEFT", 10, -15)
+    self.window.raidOnlyCheckbox:SetSize(24, 24)
+    self.window.raidOnlyCheckbox.text = self.window.raidOnlyCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.window.raidOnlyCheckbox.text:SetPoint("LEFT", self.window.raidOnlyCheckbox, "RIGHT", 5, 0)
+    self.window.raidOnlyCheckbox.text:SetText("Только рейд")
+    self.window.raidOnlyCheckbox:SetScript("OnClick", function()
+        self:_UpdateFromGuild()
+        self:UpdateWindow()
+    end)
+
+    -- 6. Область с прокруткой
     self.window.scrollFrame = CreateFrame("ScrollFrame", "ScrollFrame", self.window, "UIPanelScrollFrameTemplate")
     self.window.scrollFrame:SetPoint("TOPLEFT", 10, -40)
     self.window.scrollFrame:SetPoint("BOTTOMRIGHT", -5, 40)
@@ -491,32 +503,32 @@ function GpDb:_CreateWindow()
     self.window.scrollChild:SetSize(380, 500)
     self.window.scrollFrame:SetScrollChild(self.window.scrollChild)
 
-    -- 6. Ползунок прокрутки
+    -- 7. Ползунок прокрутки
     self.window.scrollBar = _G[self.window.scrollFrame:GetName().."ScrollBar"]
     self.window.scrollBar:SetPoint("TOPLEFT", self.window.scrollFrame, "TOPRIGHT", -20, -16)
     self.window.scrollBar:SetPoint("BOTTOMLEFT", self.window.scrollFrame, "BOTTOMRIGHT", -20, 16)
 
-    -- 7. Строка с количеством отображаемых игроков
+    -- 8. Строка с количеством отображаемых игроков
     self.window.countText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.window.countText:SetPoint("BOTTOMLEFT", 10, 10)
     self.window.countText:SetPoint("BOTTOMRIGHT", -10, 10)
     self.window.countText:SetJustifyH("LEFT")
     self.window.countText:SetText("")
 
-    -- 8. Строка с общим количеством игроков с GP
+    -- 9. Строка с общим количеством игроков с ГП
     self.window.totalText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.window.totalText:SetPoint("BOTTOMLEFT", 10, 30)
     self.window.totalText:SetPoint("BOTTOMRIGHT", -10, 30)
     self.window.totalText:SetJustifyH("LEFT")
     self.window.totalText:SetText("")
 
-    -- 9. Настройка таблицы
+    -- 10. Настройка таблицы
     self:_SetupTable()
 end
 
 function GpDb:_SetupTable()
     -- Заголовки колонок (без изменений)
-    local headers = {"Ник", "GP"}
+    local headers = {"Ник", "ГП"}
     for i, header in ipairs(headers) do
         local btn = CreateFrame("Button", nil, self.window.scrollChild)
         btn:SetSize(i == 1 and 290 or 50, 20)
@@ -620,7 +632,7 @@ function GpDb:RefreshRowHighlights()
     -- Обновляем счетчик выделенных
     local selectedCount = 0
     for _ in pairs(self.selected_indices) do selectedCount = selectedCount + 1 end
-    self.window.countText:SetText(string.format("Выделено: %d | Всего: %d", selectedCount, #self.gp_data))
+    self.window.countText:SetText(string.format("Выделено: %d", selectedCount))
 end
 
 function GpDb:ClearSelection()
@@ -683,9 +695,17 @@ end
 
 function GpDb:Show()
     self.window:Show()
+    
+    if IsInRaid() then
+        self.window.raidOnlyCheckbox:SetChecked(true)
+    else
+        self.window.raidOnlyCheckbox:SetChecked(false)
+    end
+    
     self:_UpdateFromGuild()
     self:UpdateWindow()
 end
+
 
 function GpDb:Hide()
     self.window:Hide()
@@ -693,53 +713,140 @@ end
 
 function GpDb:_UpdateFromGuild()
     if not IsInGuild() then
-        print("|cFFFF0000GP Tracker:|r Вы не состоите в гильдии")
+        print("|cFFFF0000ГП:|r Вы не состоите в гильдии")
         return
     end
 
     GuildRoster()
-    
     self.gp_data = {}
     local totalWithGP = 0
     local totalMembers = GetNumGuildMembers()
     
-    for i = 1, totalMembers do
-        local name, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(i)
+    -- Режим "Только рейд" и мы в рейде
+    if self.window.raidOnlyCheckbox:GetChecked() and IsInRaid() then
+        local numRaidMembers = GetNumGroupMembers()
+        local raidCheckPassed = true
+        local guildRosterInfo = {}  -- Для хранения данных гильдии
         
-        if name and officerNote and officerNote ~= "" then
-            local words = {}
-            for word in officerNote:gmatch("%S+") do
-                table.insert(words, word)
+        -- Сначала собираем всех членов гильдии для быстрого поиска
+        for j = 1, totalMembers do
+            local guildName, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
+            if guildName then
+                guildRosterInfo[guildName] = {
+                    publicNote = publicNote,
+                    officerNote = officerNote,
+                    classFileName = classFileName
+                }
+            end
+        end
+        
+        -- Проверяем всех игроков рейда
+        for i = 1, numRaidMembers do
+            local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
+            if not guildRosterInfo[raidName] then
+                raidCheckPassed = false
+                print(string.format("|cFFFF0000ГП:|r Игрок %s не состоит в вашей гильдии", raidName))
+                break
+            end
+        end
+        
+        -- Если есть чужой игрок - очищаем список
+        if not raidCheckPassed then
+            self.window.countText:SetText("Отображается игроков: 0 (в рейде есть не члены гильдии)")
+            self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
+            return
+        end
+        
+        -- Если все в гильдии - заполняем ВСЕХ рейдовых игроков
+        for i = 1, numRaidMembers do
+            local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
+            local guildInfo = guildRosterInfo[raidName]
+            local gp = 0
+            local publicNote = guildInfo.publicNote or ""
+            local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
+            
+            -- Получаем GP из officerNote
+            if guildInfo.officerNote then
+                local words = {}
+                for word in guildInfo.officerNote:gmatch("%S+") do
+                    table.insert(words, word)
+                end
+                if #words >= 3 then
+                    gp = tonumber(words[3]) or 0
+                end
             end
             
-            if #words >= 3 then
-                local gp = tonumber(words[3])
-                if gp ~= nil and gp ~= 0 then
-                    totalWithGP = totalWithGP + 1
-                    local _, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
-                    local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
-                    
-                    local displayName = name
-                    if publicNote and publicNote ~= "" then
-                        displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
+            local displayName = raidName
+            if publicNote and publicNote ~= "" then
+                displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
+            end
+            
+            table.insert(self.gp_data, {
+                nick = displayName,
+                original_nick = raidName,
+                gp = gp,
+                classColor = classColor,
+                classFileName = classFileName  -- Сохраняем для сортировки
+            })
+            
+            if gp > 0 then
+                totalWithGP = totalWithGP + 1
+            end
+        end
+    else
+        -- Обычный режим (не рейд или галочка выключена)
+        for i = 1, totalMembers do
+            local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
+            
+            if name and officerNote and officerNote ~= "" then
+                local words = {}
+                for word in officerNote:gmatch("%S+") do
+                    table.insert(words, word)
+                end
+                
+                if #words >= 3 then
+                    local gp = tonumber(words[3]) or 0
+                    if gp ~= 0 then
+                        totalWithGP = totalWithGP + 1
+                        local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
+                        
+                        local displayName = name
+                        if publicNote and publicNote ~= "" then
+                            displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
+                        end
+                        
+                        table.insert(self.gp_data, {
+                            nick = displayName,
+                            original_nick = name,
+                            gp = gp,
+                            classColor = classColor,
+                            classFileName = classFileName
+                        })
                     end
-                    
-                    table.insert(self.gp_data, {
-                        nick = displayName,
-                        original_nick = name,
-                        gp = gp,
-                        classColor = classColor
-                    })
                 end
             end
         end
     end
     
-    -- Обновляем текстовые поля с информацией
+    -- Обновляем UI
     self.window.countText:SetText(string.format("Отображается игроков: %d", #self.gp_data))
-    self.window.totalText:SetText(string.format("Всего игроков с GP: %d (из %d в гильдии)", totalWithGP, totalMembers))
+    self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
     
     self:SortData()
+end
+
+function GpDb:Show()
+    self.window:Show()
+    
+    -- Автоматически включаем режим "Только рейд" если мы в рейде
+    if IsInRaid() then
+        self.window.raidOnlyCheckbox:SetChecked(true)
+    else
+        self.window.raidOnlyCheckbox:SetChecked(false)
+    end
+    
+    self:_UpdateFromGuild()
+    self:UpdateWindow()
 end
 
 function GpDb:AddGpEntry(nick, gp)
