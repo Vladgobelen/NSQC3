@@ -982,6 +982,109 @@ function GpDb:LoadFromNsDb()
     self:UpdateWindow()
 end
 
+function GpDb:_CreateRaidSelectionWindow()
+    -- Создаем фрейм дополнительного окна
+    self.raidWindow = CreateFrame("Frame", "GpDbRaidWindow", self.window)
+    self.raidWindow:SetFrameStrata("DIALOG")
+    self.raidWindow:SetSize(250, self.window:GetHeight() * 0.34) -- 34% от высоты основного окна
+    self.raidWindow:SetPoint("BOTTOMLEFT", self.window, "BOTTOMRIGHT", 5, 0)
+    self.raidWindow:SetMovable(false)
+    
+    -- Непрозрачный черный фон
+    self.raidWindow.background = self.raidWindow:CreateTexture(nil, "BACKGROUND")
+    self.raidWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.raidWindow.background:SetVertexColor(0, 0, 0)
+    self.raidWindow.background:SetAlpha(1)
+    self.raidWindow.background:SetAllPoints(true)
+
+    -- Граница окна
+    self.raidWindow.borderFrame = CreateFrame("Frame", nil, self.raidWindow)
+    self.raidWindow.borderFrame:SetPoint("TOPLEFT", -3, 3)
+    self.raidWindow.borderFrame:SetPoint("BOTTOMRIGHT", 3, -3)
+    self.raidWindow.borderFrame:SetBackdrop({
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        edgeSize = 16,
+        insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+
+    -- Кнопка закрытия
+    self.raidWindow.closeButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelCloseButton")
+    self.raidWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
+
+    -- Выпадающий список рейдов (в верхней части)
+    self.raidWindow.dropdown = CreateFrame("Frame", "GpDbRaidDropdown", self.raidWindow, "UIDropDownMenuTemplate")
+    self.raidWindow.dropdown:SetPoint("TOPLEFT", 10, -10)
+    self.raidWindow.dropdown:SetPoint("RIGHT", self.raidWindow.closeButton, "LEFT", -10, 0)
+    self.raidWindow.dropdown:SetHeight(32)
+    
+    -- Текстовое поле "Другое" (прямо под выпадающим списком)
+    self.raidWindow.otherText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.raidWindow.otherText:SetPoint("TOPLEFT", self.raidWindow.dropdown, "BOTTOMLEFT", 0, -10)
+    self.raidWindow.otherText:SetText("Другое:")
+
+    -- Поле ввода для "Другое" (под текстом)
+    self.raidWindow.editBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
+    self.raidWindow.editBox:SetPoint("TOPLEFT", self.raidWindow.otherText, "BOTTOMLEFT", 0, -5)
+    self.raidWindow.editBox:SetPoint("RIGHT", -10, 0)
+    self.raidWindow.editBox:SetHeight(20)
+    self.raidWindow.editBox:SetAutoFocus(false)
+
+    -- Поле ввода ГП (в самом низу слева)
+    self.raidWindow.gpEditBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
+    self.raidWindow.gpEditBox:SetPoint("BOTTOMLEFT", 10, 5)
+    self.raidWindow.gpEditBox:SetSize(100, 20)
+    self.raidWindow.gpEditBox:SetAutoFocus(false)
+
+    -- Кнопка "Начислить" (в самом низу справа)
+    self.raidWindow.awardButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
+    self.raidWindow.awardButton:SetPoint("BOTTOMRIGHT", -10, 5)
+    self.raidWindow.awardButton:SetSize(100, 22)
+    self.raidWindow.awardButton:SetText("Начислить")
+    self.raidWindow.awardButton:SetScript("OnClick", function()
+        -- Логика начисления ГП
+    end)
+
+    -- Инициализация выпадающего списка
+    UIDropDownMenu_Initialize(self.raidWindow.dropdown, function(frame, level, menuList)
+        local info = UIDropDownMenu_CreateInfo()
+        
+        local numSaved = GetNumSavedInstances()
+        for i = 1, numSaved do
+            local name, id, _, _, _, _, _, _, players = GetSavedInstanceInfo(i)
+            if name and id then
+                info.text = string.format("%d: %s %d", id, name, players)
+                info.arg1 = {name = name, id = id, players = players}
+                info.func = function(self)
+                    UIDropDownMenu_SetSelectedID(frame, self:GetID())
+                end
+                UIDropDownMenu_AddButton(info)
+            end
+        end
+    end)
+
+    UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
+    self.raidWindow:Hide()
+    
+    self.raidWindow.closeButton:SetScript("OnClick", function() 
+        self.raidWindow:Hide() 
+    end)
+end
+
+-- Добавляем метод для показа/скрытия окна
+function GpDb:ToggleRaidWindow()
+    if not self.raidWindow then
+        self:_CreateRaidSelectionWindow()
+    end
+    
+    if self.raidWindow:IsShown() then
+        self.raidWindow:Hide()
+    else
+        self.raidWindow:Show()
+        -- Обновляем список рейдов при каждом открытии
+        UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
+    end
+end
+
 -- Определяем класс create_table
 create_table = {}
 create_table.__index = create_table
