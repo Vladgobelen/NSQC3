@@ -453,14 +453,14 @@ function GpDb:_CreateWindow()
     self.window:SetScript("OnDragStop", self.window.StopMovingOrSizing)
     self.window:Hide()
 
-    -- 1. НЕПРОЗРАЧНЫЙ ЧЁРНЫЙ ФОН
+    -- 1. Непрозрачный чёрный фон
     self.window.background = self.window:CreateTexture(nil, "BACKGROUND")
     self.window.background:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.window.background:SetVertexColor(0, 0, 0)
     self.window.background:SetAlpha(1)
     self.window.background:SetAllPoints(true)
 
-    -- 2. ГРАНИЦА ОКНА
+    -- 2. Граница окна
     self.window.borderFrame = CreateFrame("Frame", nil, self.window)
     self.window.borderFrame:SetPoint("TOPLEFT", -3, 3)
     self.window.borderFrame:SetPoint("BOTTOMRIGHT", 3, -3)
@@ -470,17 +470,17 @@ function GpDb:_CreateWindow()
         insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
 
-    -- 3. ЗАГОЛОВОК ОКНА
+    -- 3. Заголовок окна
     self.window.title = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.window.title:SetPoint("TOP", 0, -15)
     self.window.title:SetText("GP Tracker")
 
-    -- 4. КНОПКА ЗАКРЫТИЯ
+    -- 4. Кнопка закрытия
     self.window.closeButton = CreateFrame("Button", nil, self.window, "UIPanelCloseButton")
     self.window.closeButton:SetPoint("TOPRIGHT", -5, -5)
     self.window.closeButton:SetScript("OnClick", function() self.window:Hide() end)
 
-    -- 5. ОБЛАСТЬ С ПРОКРУТКОЙ
+    -- 5. Область с прокруткой
     self.window.scrollFrame = CreateFrame("ScrollFrame", "ScrollFrame", self.window, "UIPanelScrollFrameTemplate")
     self.window.scrollFrame:SetPoint("TOPLEFT", 10, -40)
     self.window.scrollFrame:SetPoint("BOTTOMRIGHT", -5, 40)
@@ -489,78 +489,102 @@ function GpDb:_CreateWindow()
     self.window.scrollChild:SetSize(380, 500)
     self.window.scrollFrame:SetScrollChild(self.window.scrollChild)
 
-    -- 6. ПОЛЗУНОК ПРОКРУТКИ
+    -- 6. Ползунок прокрутки
     self.window.scrollBar = _G[self.window.scrollFrame:GetName().."ScrollBar"]
     self.window.scrollBar:SetPoint("TOPLEFT", self.window.scrollFrame, "TOPRIGHT", -20, -16)
     self.window.scrollBar:SetPoint("BOTTOMLEFT", self.window.scrollFrame, "BOTTOMRIGHT", -20, 16)
 
-    -- 7. НАСТРОЙКА ТАБЛИЦЫ
+    -- 7. Строка с количеством отображаемых игроков
+    self.window.countText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.window.countText:SetPoint("BOTTOMLEFT", 10, 10)
+    self.window.countText:SetPoint("BOTTOMRIGHT", -10, 10)
+    self.window.countText:SetJustifyH("LEFT")
+    self.window.countText:SetText("")
+
+    -- 8. Строка с общим количеством игроков с GP
+    self.window.totalText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.window.totalText:SetPoint("BOTTOMLEFT", 10, 30)
+    self.window.totalText:SetPoint("BOTTOMRIGHT", -10, 30)
+    self.window.totalText:SetJustifyH("LEFT")
+    self.window.totalText:SetText("")
+
+    -- 9. Настройка таблицы
     self:_SetupTable()
 end
+
 
 function GpDb:_SetupTable()
     -- Заголовки колонок
     local headers = {"Ник", "GP"}
     for i, header in ipairs(headers) do
         local btn = CreateFrame("Button", nil, self.window.scrollChild)
-        btn:SetSize(i == 1 and 240 or 100, 20)
-        btn:SetPoint("TOPLEFT", (i-1)*240 + (i == 2 and 30 or 0), 0)
-        
+        btn:SetSize(i == 1 and 290 or 50, 20)
+        btn:SetPoint("TOPLEFT", (i-1)*290 + (i == 2 and 10 or 0), 0)
         btn:SetNormalFontObject("GameFontNormal")
         btn:SetHighlightFontObject("GameFontHighlight")
-        
         local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetAllPoints(true)
         text:SetText(header)
-        
         btn:SetScript("OnClick", function()
             self:SortData(header:lower())
             self:UpdateWindow()
         end)
     end
 
-    -- Создаем больше строк для прокрутки
+    -- Рассчитываем количество видимых строк
+    local _, _, _, scrollHeight = self.window.scrollFrame:GetBoundsRect()
+    self.visible_rows = math.max(10, math.floor(scrollHeight / 25) - 1)
+
+    -- Создаем строки таблицы
     self.rows = {}
-    for i = 1, 50 do  -- Увеличили количество строк до 50
+    for i = 1, 999 do
         local row = CreateFrame("Frame", nil, self.window.scrollChild)
-        row:SetSize(380, 20)
+        row:SetSize(350, 20)
         row:SetPoint("TOPLEFT", 0, -25 - (i-1)*25)
-        
+
         row.nick = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         row.nick:SetPoint("LEFT", 10, 0)
-        row.nick:SetWidth(240)
+        row.nick:SetWidth(290)
         row.nick:SetJustifyH("LEFT")
-        
+
         row.gp = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        row.gp:SetPoint("LEFT", 270, 0)
-        row.gp:SetWidth(100)
-        row.gp:SetJustifyH("LEFT")
-        
+        row.gp:SetPoint("RIGHT", 5, 0)
+        row.gp:SetWidth(50)
+        row.gp:SetJustifyH("RIGHT")
+
         self.rows[i] = row
     end
 end
 
 function GpDb:UpdateWindow()
     if not self.window or not self.rows then return end
-    
-    -- Рассчитываем видимую область
+
+    -- Фильтруем только игроков с GP (не nil)
+    local valid_entries = {}
+    for _, entry in ipairs(self.gp_data) do
+        if entry.gp ~= nil then
+            table.insert(valid_entries, entry)
+        end
+    end
+
+    -- Настройки прокрутки
     local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
-    local maxRows = min(#self.gp_data, 50)
-    
-    for i = 1, 50 do
+    local totalEntries = #valid_entries
+
+    -- Обновляем видимые строки
+    for i = 1, self.visible_rows do
         local row = self.rows[i]
         local index = i + offset
         
-        if index <= #self.gp_data then
-            local entry = self.gp_data[index]
+        if index <= totalEntries then
+            local entry = valid_entries[index]
             
-            -- Обновляем данные строки
+            -- Обновляем ник
             row.nick:SetText(entry.nick)
             if entry.classColor then
                 local plainName = entry.nick:match("^[^|]+") or entry.nick
                 row.nick:SetText(plainName)
                 row.nick:SetTextColor(entry.classColor.r, entry.classColor.g, entry.classColor.b)
-                
                 local notePart = entry.nick:match("|c.+$")
                 if notePart then
                     local fullText = row.nick:GetText() .. " " .. notePart
@@ -570,17 +594,28 @@ function GpDb:UpdateWindow()
                 row.nick:SetTextColor(1, 1, 1)
             end
             
+            -- Обновляем GP с цветом в зависимости от значения
             row.gp:SetText(tostring(entry.gp))
-            row.gp:SetTextColor(1, 1, 1)
+            if entry.gp < 0 then
+                row.gp:SetTextColor(1, 0, 0) -- Красный для отрицательных
+            elseif entry.gp > 0 then
+                row.gp:SetTextColor(0, 1, 0) -- Зеленый для положительных
+            else
+                row.gp:SetTextColor(1, 1, 1) -- Белый для нуля
+            end
+            
             row:Show()
         else
             row:Hide()
         end
     end
+
+    -- Настраиваем полосу прокрутки
+    FauxScrollFrame_Update(self.window.scrollFrame, totalEntries, self.visible_rows, 25)
+    self.window.scrollChild:SetHeight(max(totalEntries * 25, self.visible_rows * 25))
     
-    -- Настраиваем прокрутку
-    FauxScrollFrame_Update(self.window.scrollFrame, #self.gp_data, 20, 25)
-    self.window.scrollChild:SetHeight(max(#self.gp_data * 25, self.visible_rows * 25))
+    -- Обновляем счетчики
+    self.window.countText:SetText(string.format("Отображается игроков: %d/%d", math.min(self.visible_rows, totalEntries), totalEntries))
 end
 
 function GpDb:Show()
@@ -602,8 +637,10 @@ function GpDb:_UpdateFromGuild()
     GuildRoster()
     
     self.gp_data = {}
+    local totalWithGP = 0
+    local totalMembers = GetNumGuildMembers()
     
-    for i = 1, GetNumGuildMembers() do
+    for i = 1, totalMembers do
         local name, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(i)
         
         if name and officerNote and officerNote ~= "" then
@@ -614,7 +651,8 @@ function GpDb:_UpdateFromGuild()
             
             if #words >= 3 then
                 local gp = tonumber(words[3])
-                if gp and gp ~= 0 then
+                if gp ~= nil and gp ~= 0 then
+                    totalWithGP = totalWithGP + 1
                     local _, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
                     local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
                     
@@ -633,6 +671,10 @@ function GpDb:_UpdateFromGuild()
             end
         end
     end
+    
+    -- Обновляем текстовые поля с информацией
+    self.window.countText:SetText(string.format("Отображается игроков: %d", #self.gp_data))
+    self.window.totalText:SetText(string.format("Всего игроков с GP: %d (из %d в гильдии)", totalWithGP, totalMembers))
     
     self:SortData()
 end
