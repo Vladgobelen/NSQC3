@@ -431,8 +431,8 @@ function GpDb:new(input_table)
         sort_column = "nick",
         sort_ascending = true,
         visible_rows = 20,
-        selected_indices = {}, -- Table to store selected indices
-        last_selected_index = nil -- For shift-click range selection
+        selected_indices = {},
+        last_selected_index = nil
     }
     setmetatable(new_object, self)
     
@@ -527,7 +527,6 @@ function GpDb:_CreateWindow()
 end
 
 function GpDb:_SetupTable()
-    -- Заголовки колонок (без изменений)
     local headers = {"Ник", "ГП"}
     for i, header in ipairs(headers) do
         local btn = CreateFrame("Button", nil, self.window.scrollChild)
@@ -544,7 +543,7 @@ function GpDb:_SetupTable()
         end)
     end
 
-    -- Создаем строки таблицы с новой системой выделения
+    -- Создаем строки таблицы с системой выделения
     self.rows = {}
     for i = 1, 999 do
         local row = CreateFrame("Button", "GpDbRow"..i, self.window.scrollChild)
@@ -555,7 +554,7 @@ function GpDb:_SetupTable()
         row:EnableMouse(true)
         row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         
-        -- Текстура для выделения (новая реализация)
+        -- Текстура для выделения
         row:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
         row:GetHighlightTexture():SetVertexColor(0.4, 0.4, 0.8, 0.4)
         
@@ -765,7 +764,7 @@ function GpDb:_UpdateFromGuild()
             local publicNote = guildInfo.publicNote or ""
             local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
             
-            -- Получаем GP из officerNote
+            -- Получаем ГП из officerNote
             if guildInfo.officerNote then
                 local words = {}
                 for word in guildInfo.officerNote:gmatch("%S+") do
