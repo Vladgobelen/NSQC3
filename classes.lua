@@ -874,104 +874,83 @@ function GpDb:_UpdateFromGuild()
         return
     end
 
-    -- Обновляем данные гильдии
+    -- Обновляем данные гильдии (добавляем задержку для гарантированного обновления)
     GuildRoster()
-
-    -- Собираем полный список членов гильдии для быстрой проверки
-    local guildRosterInfo = {}
-    for j = 1, totalMembers do
-        local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
-        if name then
-            guildRosterInfo[name] = {
-                publicNote = publicNote,
-                officerNote = officerNote,
-                classFileName = classFileName
-            }
-        end
-    end
-
-    -- Режим "Только рейд" и мы в рейде
-    if raidOnlyMode then
-        local numRaidMembers = GetNumGroupMembers()
-        local raidCheckPassed = true
-        local invalidPlayers = {}
-
-        -- Проверяем всех игроков рейда на принадлежность к гильдии
-        for i = 1, numRaidMembers do
-            local raidName = GetRaidRosterInfo(i)
-            if not guildRosterInfo[raidName] then
-                raidCheckPassed = false
-                table.insert(invalidPlayers, raidName)
+    C_Timer(0.5, function()
+        -- Собираем полный список членов гильдии для быстрой проверки
+        local guildRosterInfo = {}
+        for j = 1, GetNumGuildMembers() do
+            local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
+            if name then
+                guildRosterInfo[name] = {
+                    publicNote = publicNote,
+                    officerNote = officerNote,
+                    classFileName = classFileName
+                }
             end
         end
 
-        -- Если есть чужие игроки - сообщаем и выходим
-        if not raidCheckPassed then
-            print("|cFFFF0000ГП:|r В рейде есть не члены гильдии: "..table.concat(invalidPlayers, ", "))
-            self.window.countText:SetText("Отображается игроков: 0 (в рейде есть не члены гильдии)")
-            self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
-            self:UpdateWindow()
-            return
-        end
+        -- Режим "Только рейд" и мы в рейде
+        if raidOnlyMode then
+            local numRaidMembers = GetNumGroupMembers()
+            local raidCheckPassed = true
+            local invalidPlayers = {}
 
-        -- Заполняем данные ВСЕХ игроков рейда (даже с нулевым ГП)
-        for i = 1, numRaidMembers do
-            local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
-            local guildInfo = guildRosterInfo[raidName]
-            local gp = 0
-            local publicNote = guildInfo.publicNote or ""
-            
-            -- Парсим ГП из officerNote
-            if guildInfo.officerNote then
-                local words = {}
-                for word in guildInfo.officerNote:gmatch("%S+") do
-                    table.insert(words, word)
-                end
-                if #words >= 3 then
-                    gp = tonumber(words[3]) or 0
+            -- Проверяем всех игроков рейда на принадлежность к гильдии
+            for i = 1, numRaidMembers do
+                local raidName, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, isConnected = GetRaidRosterInfo(i)
+                if raidName then
+                    -- Удаляем серверную часть имени для сравнения
+                    local plainName = raidName:match("^(.-)-") or raidName
+                    if not guildRosterInfo[plainName] then
+                        raidCheckPassed = false
+                        table.insert(invalidPlayers, raidName)
+                    end
                 end
             end
 
-            if gp > 0 then
-                totalWithGP = totalWithGP + 1
+            -- Если есть чужие игроки - сообщаем и выходим
+            if not raidCheckPassed then
+                print("|cFFFF0000ГП:|r В рейде есть не члены гильдии: "..table.concat(invalidPlayers, ", "))
+                self.window.countText:SetText("Отображается игроков: 0 (в рейде есть не члены гильдии)")
+                self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
+                self:UpdateWindow()
+                return
             end
 
-            local displayName = raidName
-            if publicNote and publicNote ~= "" then
-                displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
-            end
-
-            table.insert(self.gp_data, {
-                nick = displayName,
-                original_nick = raidName,
-                gp = gp,
-                classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
-                classFileName = classFileName
-            })
-        end
-    else
-        -- Обычный режим - показываем только игроков с ГП
-        for i = 1, totalMembers do
-            local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
-            
-            if name and officerNote and officerNote ~= "" then
-                local words = {}
-                for word in officerNote:gmatch("%S+") do
-                    table.insert(words, word)
-                end
-                
-                if #words >= 3 then
-                    local gp = tonumber(words[3]) or 0
-                    if gp ~= 0 then
-                        totalWithGP = totalWithGP + 1
-                        local displayName = name
-                        if publicNote and publicNote ~= "" then
-                            displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
-                        end
+            -- Заполняем данные ВСЕХ игроков рейда (даже с нулевым ГП)
+            for i = 1, numRaidMembers do
+                local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
+                if raidName then
+                    local plainName = raidName:match("^(.-)-") or raidName
+                    local guildInfo = guildRosterInfo[plainName]
+                    if guildInfo then
+                        local gp = 0
+                        local publicNote = guildInfo.publicNote or ""
                         
+                        -- Парсим ГП из officerNote
+                        if guildInfo.officerNote then
+                            local words = {}
+                            for word in guildInfo.officerNote:gmatch("%S+") do
+                                table.insert(words, word)
+                            end
+                            if #words >= 3 then
+                                gp = tonumber(words[3]) or 0
+                            end
+                        end
+
+                        if gp > 0 then
+                            totalWithGP = totalWithGP + 1
+                        end
+
+                        local displayName = raidName
+                        if publicNote and publicNote ~= "" then
+                            displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
+                        end
+
                         table.insert(self.gp_data, {
                             nick = displayName,
-                            original_nick = name,
+                            original_nick = raidName,
                             gp = gp,
                             classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                             classFileName = classFileName
@@ -979,15 +958,47 @@ function GpDb:_UpdateFromGuild()
                     end
                 end
             end
+        else
+            -- Обычный режим - показываем только игроков с ГП
+            for i = 1, GetNumGuildMembers() do
+                local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
+                
+                if name and officerNote and officerNote ~= "" then
+                    local words = {}
+                    for word in officerNote:gmatch("%S+") do
+                        table.insert(words, word)
+                    end
+                    
+                    if #words >= 3 then
+                        local gp = tonumber(words[3]) or 0
+                        if gp ~= 0 then
+                            totalWithGP = totalWithGP + 1
+                            local displayName = name
+                            if publicNote and publicNote ~= "" then
+                                displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
+                            end
+                            
+                            table.insert(self.gp_data, {
+                                nick = displayName,
+                                original_nick = name,
+                                gp = gp,
+                                classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
+                                classFileName = classFileName
+                            })
+                        end
+                    end
+                end
+            end
         end
-    end
 
-    -- Обновляем UI
-    self.window.countText:SetText(string.format("Отображается игроков: %d", #self.gp_data))
-    self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
-    
-    self:ClearSelection()
-    self:SortData()
+        -- Обновляем UI
+        self.window.countText:SetText(string.format("Отображается игроков: %d", #self.gp_data))
+        self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, GetNumGuildMembers()))
+        
+        self:ClearSelection()
+        self:SortData()
+        self:UpdateWindow()
+    end)
 end
 
 function GpDb:Show()
@@ -1000,8 +1011,12 @@ function GpDb:Show()
         self.window.raidOnlyCheckbox:SetChecked(false)
     end
     
-    self:_UpdateFromGuild()
-    self:UpdateWindow()
+    -- Принудительно обновляем данные гильдии перед показом
+    GuildRoster()
+    C_Timer(0.5, function()
+        self:_UpdateFromGuild()
+        self:UpdateWindow()
+    end)
 end
 
 function GpDb:AddGpEntry(nick, gp)
