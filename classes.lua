@@ -430,7 +430,9 @@ function GpDb:new(input_table)
         gp_data = {},
         sort_column = "nick",
         sort_ascending = true,
-        visible_rows = 20
+        visible_rows = 20,
+        selected_indices = {}, -- Table to store selected indices
+        last_selected_index = nil -- For shift-click range selection
     }
     setmetatable(new_object, self)
     
@@ -512,9 +514,8 @@ function GpDb:_CreateWindow()
     self:_SetupTable()
 end
 
-
 function GpDb:_SetupTable()
-    -- Заголовки колонок
+    -- Заголовки колонок (без изменений)
     local headers = {"Ник", "GP"}
     for i, header in ipairs(headers) do
         local btn = CreateFrame("Button", nil, self.window.scrollChild)
@@ -531,17 +532,29 @@ function GpDb:_SetupTable()
         end)
     end
 
-    -- Рассчитываем количество видимых строк
-    local _, _, _, scrollHeight = self.window.scrollFrame:GetBoundsRect()
-    self.visible_rows = math.max(10, math.floor(scrollHeight / 25) - 1)
-
-    -- Создаем строки таблицы
+    -- Создаем строки таблицы с новой системой выделения
     self.rows = {}
     for i = 1, 999 do
-        local row = CreateFrame("Frame", nil, self.window.scrollChild)
+        local row = CreateFrame("Button", "GpDbRow"..i, self.window.scrollChild)
         row:SetSize(350, 20)
         row:SetPoint("TOPLEFT", 0, -25 - (i-1)*25)
-
+        
+        -- Настройки для кликов
+        row:EnableMouse(true)
+        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        
+        -- Текстура для выделения (новая реализация)
+        row:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
+        row:GetHighlightTexture():SetVertexColor(0.4, 0.4, 0.8, 0.4)
+        
+        -- Текстура для выбранного состояния
+        row.selection = row:CreateTexture(nil, "BACKGROUND")
+        row.selection:SetAllPoints(true)
+        row.selection:SetTexture("Interface\\Buttons\\WHITE8X8")
+        row.selection:SetVertexColor(0.3, 0.3, 0.7, 0.7)
+        row.selection:Hide()
+        
+        -- Поля текста
         row.nick = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         row.nick:SetPoint("LEFT", 10, 0)
         row.nick:SetWidth(290)
@@ -552,56 +565,99 @@ function GpDb:_SetupTable()
         row.gp:SetWidth(50)
         row.gp:SetJustifyH("RIGHT")
 
+        -- Обработчик кликов
+        row:SetScript("OnClick", function(_, button)
+            local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
+            local dataIndex = i + offset
+            
+            if button == "LeftButton" then
+                if IsShiftKeyDown() and self.last_selected_index then
+                    -- Выделение диапазона
+                    self:ClearSelection()
+                    local start = math.min(self.last_selected_index, dataIndex)
+                    local finish = math.max(self.last_selected_index, dataIndex)
+                    for idx = start, finish do
+                        if self.gp_data[idx] then
+                            self.selected_indices[idx] = true
+                        end
+                    end
+                elseif IsControlKeyDown() then
+                    -- Добавление/удаление из выделения
+                    self.selected_indices[dataIndex] = not self.selected_indices[dataIndex]
+                    self.last_selected_index = dataIndex
+                else
+                    -- Одиночное выделение
+                    self:ClearSelection()
+                    self.selected_indices[dataIndex] = true
+                    self.last_selected_index = dataIndex
+                end
+                
+                -- Мгновенное обновление визуала
+                self:RefreshRowHighlights()
+            end
+        end)
+
         self.rows[i] = row
     end
+end
+
+function GpDb:RefreshRowHighlights()
+    local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
+    
+    for i, row in ipairs(self.rows) do
+        local dataIndex = i + offset
+        if dataIndex <= #self.gp_data then
+            if self.selected_indices[dataIndex] then
+                row.selection:Show()
+                row:GetHighlightTexture():SetAlpha(0.2) -- Снижаем прозрачность ховера при выделении
+            else
+                row.selection:Hide()
+                row:GetHighlightTexture():SetAlpha(0.4) -- Возвращаем стандартную прозрачность
+            end
+        end
+    end
+    
+    -- Обновляем счетчик выделенных
+    local selectedCount = 0
+    for _ in pairs(self.selected_indices) do selectedCount = selectedCount + 1 end
+    self.window.countText:SetText(string.format("Выделено: %d | Всего: %d", selectedCount, #self.gp_data))
+end
+
+function GpDb:ClearSelection()
+    self.selected_indices = {}
+end
+
+function GpDb:GetSelectedEntries()
+    local selected = {}
+    for index, _ in pairs(self.selected_indices) do
+        if index <= #self.gp_data then
+            table.insert(selected, self.gp_data[index])
+        end
+    end
+    return selected
 end
 
 function GpDb:UpdateWindow()
     if not self.window or not self.rows then return end
 
-    -- Фильтруем только игроков с GP (не nil)
-    local valid_entries = {}
-    for _, entry in ipairs(self.gp_data) do
-        if entry.gp ~= nil then
-            table.insert(valid_entries, entry)
-        end
-    end
-
-    -- Настройки прокрутки
     local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
-    local totalEntries = #valid_entries
-
-    -- Обновляем видимые строки
+    
     for i = 1, self.visible_rows do
         local row = self.rows[i]
-        local index = i + offset
+        local dataIndex = i + offset
         
-        if index <= totalEntries then
-            local entry = valid_entries[index]
+        if dataIndex <= #self.gp_data then
+            local entry = self.gp_data[dataIndex]
             
-            -- Обновляем ник
+            -- Обновляем текст
             row.nick:SetText(entry.nick)
+            row.gp:SetText(tostring(entry.gp))
+            
+            -- Цвета текста
             if entry.classColor then
-                local plainName = entry.nick:match("^[^|]+") or entry.nick
-                row.nick:SetText(plainName)
                 row.nick:SetTextColor(entry.classColor.r, entry.classColor.g, entry.classColor.b)
-                local notePart = entry.nick:match("|c.+$")
-                if notePart then
-                    local fullText = row.nick:GetText() .. " " .. notePart
-                    row.nick:SetText(fullText)
-                end
             else
                 row.nick:SetTextColor(1, 1, 1)
-            end
-            
-            -- Обновляем GP с цветом в зависимости от значения
-            row.gp:SetText(tostring(entry.gp))
-            if entry.gp < 0 then
-                row.gp:SetTextColor(1, 0, 0) -- Красный для отрицательных
-            elseif entry.gp > 0 then
-                row.gp:SetTextColor(0, 1, 0) -- Зеленый для положительных
-            else
-                row.gp:SetTextColor(1, 1, 1) -- Белый для нуля
             end
             
             row:Show()
@@ -610,12 +666,19 @@ function GpDb:UpdateWindow()
         end
     end
 
-    -- Настраиваем полосу прокрутки
-    FauxScrollFrame_Update(self.window.scrollFrame, totalEntries, self.visible_rows, 25)
-    self.window.scrollChild:SetHeight(max(totalEntries * 25, self.visible_rows * 25))
+    -- Обновляем выделения
+    self:RefreshRowHighlights()
     
-    -- Обновляем счетчики
-    self.window.countText:SetText(string.format("Отображается игроков: %d/%d", math.min(self.visible_rows, totalEntries), totalEntries))
+    -- Обновление скролла
+    FauxScrollFrame_Update(self.window.scrollFrame, #self.gp_data, self.visible_rows, 25)
+end
+
+function GpDb:GetNumSelected()
+    local count = 0
+    for _ in pairs(self.selected_indices) do
+        count = count + 1
+    end
+    return count
 end
 
 function GpDb:Show()
