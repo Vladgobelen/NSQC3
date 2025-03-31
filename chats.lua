@@ -221,7 +221,6 @@ function postroit_c(channel, text, sender, prefix)
     print(obj, objHP)
     adaptiveFrame.children[id]:SetTexture(obj, obj)
     if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > en10(objHP) then
-        print('22222222')
         adaptiveFrame.children[id]:SetTextT(en10(objHP))
     end
     adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)

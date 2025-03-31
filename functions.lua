@@ -900,7 +900,32 @@ function getInstId()
     end
 end
 
-
+-- function SendGuildOfficerMessageWithBonus(message)
+--     local msg = mysplit(message)
+--     local myName = UnitName("player") -- Получаем имя текущего игрока
+    
+--     -- Проверяем, что сообщение имеет минимум 3 слова
+--     if #msg < 3 then
+--         return -- Выходим, если слов недостаточно
+--     end
+    
+--     local bonusMessage = msg[2] -- Второе слово (бонус)
+--     -- Собираем оставшуюся часть сообщения начиная с 3-го слова
+--     local mainMessage = table.concat(msg, " ", 3)
+--     print(mainMessage)
+--     for i = 1, GetNumGuildMembers(true) do
+--         local name, rankName = GetGuildRosterInfo(i)
+--         if name == myName then
+--             if rankName == "Лейтенант" or rankName == "Капитан" then
+--                 -- Отправляем сообщение в офицерский чат
+--                 SendChatMessage(mainMessage .. " плюс " .. bonusMessage, "OFFICER", nil, 1)
+--                 -- Отправляем аддон-сообщение
+--                 SendAddonMessage("nsGP" .. " " .. bonusMessage, mainMessage, "guild")
+--             end
+--             break -- Прерываем цикл после нахождения своего игрока
+--         end
+--     end
+-- end
 
 
 

@@ -436,7 +436,6 @@ function GpDb:new(input_table)
     }
     setmetatable(new_object, self)
     
-    new_object.ns_db = NsDb:new(input_table, nil, nil, nil)
     new_object:_CreateWindow()
     new_object:_CreateRaidSelectionWindow()
     
@@ -497,8 +496,8 @@ function GpDb:_CreateWindow()
 
     -- 6. Область с прокруткой
     self.window.scrollFrame = CreateFrame("ScrollFrame", "ScrollFrame", self.window, "UIPanelScrollFrameTemplate")
-    self.window.scrollFrame:SetPoint("TOPLEFT", 10, -40)
-    self.window.scrollFrame:SetPoint("BOTTOMRIGHT", -5, 40)
+    self.window.scrollFrame:SetPoint("TOPLEFT", 0, -40)
+    self.window.scrollFrame:SetPoint("BOTTOMRIGHT", 0, 40)
 
     self.window.scrollChild = CreateFrame("Frame")
     self.window.scrollChild:SetSize(380, 500)
@@ -577,13 +576,41 @@ function GpDb:_SetupTable()
         row.gp:SetWidth(50)
         row.gp:SetJustifyH("RIGHT")
 
+        -- Переменная для отслеживания времени последнего клика
+        row.lastClickTime = 0
+        
         -- Обработчик кликов
-        row:SetScript("OnClick", function(_, button)
+        row:SetScript("OnClick", function(_, button, down)
             local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
             local dataIndex = i + offset
             
             -- Проверяем валидность данных
             if not self.gp_data or not self.gp_data[dataIndex] then return end
+            
+            -- Получаем текущее время
+            local currentTime = GetTime()
+            
+            -- Проверяем двойной клик (только ЛКМ и только если в рейде)
+            if button == "LeftButton" and IsInRaid() and (currentTime - row.lastClickTime) < 0.5 then
+                -- Двойной клик - выделяем все элементы
+                self:ClearSelection()
+                for idx = 1, #self.gp_data do
+                    self.selected_indices[idx] = true
+                end
+                self.last_selected_index = dataIndex
+                
+                -- Обновляем интерфейс
+                self:_UpdateSelectionCount()
+                self:RefreshRowHighlights()
+                self:UpdateRaidWindowVisibility()
+                
+                -- Сбрасываем время клика
+                row.lastClickTime = 0
+                return
+            end
+            
+            -- Запоминаем время клика для проверки двойного клика
+            row.lastClickTime = currentTime
             
             if button == "LeftButton" then
                 local wasSelected = self.selected_indices[dataIndex]
@@ -735,10 +762,17 @@ end
 function GpDb:UpdateRaidWindowVisibility()
     if not self.raidWindow then return end
     
-    -- Проверяем есть ли выделенные элементы
+    -- Проверяем звание игрока
+    local hasOfficerRank = self:_CheckOfficerRank()
+    if not hasOfficerRank then
+        if self.raidWindow:IsShown() then
+            self.raidWindow:Hide()
+        end
+        return
+    end
+    
     local hasSelection = next(self.selected_indices) ~= nil
     
-    -- Если выделений нет - закрываем окно и выходим
     if not hasSelection then
         if self.raidWindow:IsShown() then
             self.raidWindow:Hide()
@@ -746,18 +780,11 @@ function GpDb:UpdateRaidWindowVisibility()
         return
     end
     
-    -- Проверяем условия для отображения окна
     local inRaid = IsInRaid()
     local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
-    
-    -- Основное условие показа:
-    -- 1. Мы не в рейде ИЛИ
-    -- 2. Мы в рейде и включена галочка "Только рейд"
     local shouldShow = not inRaid or raidOnlyChecked
     
-    -- Если должны показывать - проверяем что все выделенные в рейде
     if shouldShow and inRaid then
-        -- Собираем список игроков рейда
         local raidMembers = {}
         for i = 1, GetNumGroupMembers() do
             local name = GetRaidRosterInfo(i)
@@ -766,7 +793,6 @@ function GpDb:UpdateRaidWindowVisibility()
             end
         end
         
-        -- Проверяем всех выделенных игроков
         for index in pairs(self.selected_indices) do
             local entry = self.gp_data[index]
             if entry and not raidMembers[entry.original_nick] then
@@ -777,11 +803,9 @@ function GpDb:UpdateRaidWindowVisibility()
         end
     end
     
-    -- Управляем видимостью окна
     if shouldShow then
         if not self.raidWindow:IsShown() then
             self.raidWindow:Show()
-            -- Сбрасываем форму при открытии
             UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
             self.raidWindow.editBox:SetText("")
             self.raidWindow.gpEditBox:SetText("")
@@ -1156,16 +1180,18 @@ end
 function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow = CreateFrame("Frame", "GpDbRaidWindow", self.window)
     self.raidWindow:SetFrameStrata("DIALOG")
-    self.raidWindow:SetSize(250, self.window:GetHeight() * 0.34)
+    self.raidWindow:SetSize(250, self.window:GetHeight() * 0.4)
     self.raidWindow:SetPoint("BOTTOMLEFT", self.window, "BOTTOMRIGHT", 5, 0)
     self.raidWindow:SetMovable(false)
     
+    -- Background
     self.raidWindow.background = self.raidWindow:CreateTexture(nil, "BACKGROUND")
     self.raidWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.raidWindow.background:SetVertexColor(0, 0, 0)
     self.raidWindow.background:SetAlpha(1)
     self.raidWindow.background:SetAllPoints(true)
 
+    -- Border
     self.raidWindow.borderFrame = CreateFrame("Frame", nil, self.raidWindow)
     self.raidWindow.borderFrame:SetPoint("TOPLEFT", -3, 3)
     self.raidWindow.borderFrame:SetPoint("BOTTOMRIGHT", 3, -3)
@@ -1175,40 +1201,145 @@ function GpDb:_CreateRaidSelectionWindow()
         insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
 
+    -- Close button
     self.raidWindow.closeButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelCloseButton")
     self.raidWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
 
+    -- Dropdown for raid selection
     self.raidWindow.dropdown = CreateFrame("Frame", "GpDbRaidDropdown", self.raidWindow, "UIDropDownMenuTemplate")
     self.raidWindow.dropdown:SetPoint("TOPLEFT", 10, -10)
     self.raidWindow.dropdown:SetPoint("RIGHT", self.raidWindow.closeButton, "LEFT", -10, 0)
     self.raidWindow.dropdown:SetHeight(32)
     
+    -- Boss text label
+    self.raidWindow.bossText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.raidWindow.bossText:SetPoint("TOPLEFT", self.raidWindow.dropdown, "BOTTOMLEFT", 0, -10)
+    self.raidWindow.bossText:SetText("Босс:")
+    self.raidWindow.bossText:Hide()
+    
+    -- Boss editbox
+    self.raidWindow.bossEditBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
+    self.raidWindow.bossEditBox:SetPoint("TOPLEFT", self.raidWindow.bossText, "BOTTOMLEFT", 0, -5)
+    self.raidWindow.bossEditBox:SetPoint("RIGHT", -10, 0)
+    self.raidWindow.bossEditBox:SetHeight(20)
+    self.raidWindow.bossEditBox:SetAutoFocus(false)
+    self.raidWindow.bossEditBox:EnableMouse(false)
+    self.raidWindow.bossEditBox:SetTextColor(0.5, 0.5, 0.5)
+    self.raidWindow.bossEditBox:Hide()
+    
+    -- Other reason text
     self.raidWindow.otherText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.raidWindow.otherText:SetPoint("TOPLEFT", self.raidWindow.dropdown, "BOTTOMLEFT", 0, -10)
+    self.raidWindow.otherText:SetPoint("TOPLEFT", self.raidWindow.bossEditBox, "BOTTOMLEFT", 0, -10)
     self.raidWindow.otherText:SetText("Другое:")
-
+    
+    -- Other reason editbox
     self.raidWindow.editBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
     self.raidWindow.editBox:SetPoint("TOPLEFT", self.raidWindow.otherText, "BOTTOMLEFT", 0, -5)
     self.raidWindow.editBox:SetPoint("RIGHT", -10, 0)
     self.raidWindow.editBox:SetHeight(20)
     self.raidWindow.editBox:SetAutoFocus(false)
+    self.raidWindow.editBox:SetScript("OnTextChanged", function()
+        if self.raidWindow.editBox:GetText() ~= "" then
+            UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
+            self.raidWindow.selectedRaidId = nil
+            self.raidWindow.selectedRaidName = nil
+            self.raidWindow.bossText:Hide()
+            self.raidWindow.bossEditBox:Hide()
+            self.raidWindow.bossEditBox:EnableMouse(false)
+            self.raidWindow.bossEditBox:SetTextColor(0.5, 0.5, 0.5)
+        end
+    end)
 
+    -- GP value editbox
     self.raidWindow.gpEditBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
     self.raidWindow.gpEditBox:SetPoint("BOTTOMLEFT", 10, 5)
     self.raidWindow.gpEditBox:SetSize(100, 20)
     self.raidWindow.gpEditBox:SetAutoFocus(false)
 
+    -- Award button
     self.raidWindow.awardButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
     self.raidWindow.awardButton:SetPoint("BOTTOMRIGHT", -10, 5)
     self.raidWindow.awardButton:SetSize(100, 22)
     self.raidWindow.awardButton:SetText("Начислить")
+
+    -- Selected raid data storage
+    self.raidWindow.selectedRaidId = nil
+    self.raidWindow.selectedRaidName = nil
+    self.raidWindow.selectedRaidPlayers = nil
+
+    -- Dropdown initialization
+    UIDropDownMenu_Initialize(self.raidWindow.dropdown, function(frame, level, menuList)
+        local info = UIDropDownMenu_CreateInfo()
+        local numSaved = GetNumSavedInstances()
+        local raidButtons = {}
+
+        for i = 1, numSaved do
+            local name, id, _, _, _, _, _, _, players = GetSavedInstanceInfo(i)
+            if name and id then
+                info.text = string.format("%d: %s (%d игроков)", id, name, players)
+                info.func = function()
+                    for _, btn in pairs(raidButtons) do
+                        btn.checked = false
+                    end
+                    
+                    self.raidWindow.selectedRaidId = id
+                    self.raidWindow.selectedRaidName = name
+                    self.raidWindow.selectedRaidPlayers = players
+                    UIDropDownMenu_SetText(frame, string.format("%d: %s", id, name))
+                    self.raidWindow.editBox:SetText("")
+                    
+                    self.raidWindow.bossText:Show()
+                    self.raidWindow.bossEditBox:Show()
+                    self.raidWindow.bossEditBox:EnableMouse(true)
+                    self.raidWindow.bossEditBox:SetTextColor(1, 1, 1)
+                    
+                    self.raidWindow.editBox:SetText("")
+                    self.raidWindow.editBox:EnableMouse(false)
+                    self.raidWindow.editBox:SetTextColor(0.5, 0.5, 0.5)
+                    
+                    this.checked = true
+                end
+                info.checked = (self.raidWindow.selectedRaidId == id)
+                
+                raidButtons[i] = info
+                UIDropDownMenu_AddButton(info)
+            end
+        end
+        
+        info.text = "Очистить выбор"
+        info.func = function()
+            UIDropDownMenu_SetText(frame, "Выберите рейд")
+            self.raidWindow.selectedRaidId = nil
+            self.raidWindow.selectedRaidName = nil
+            self.raidWindow.bossText:Hide()
+            self.raidWindow.bossEditBox:Hide()
+            self.raidWindow.bossEditBox:EnableMouse(false)
+            self.raidWindow.bossEditBox:SetTextColor(0.5, 0.5, 0.5)
+            self.raidWindow.bossEditBox:SetText("")
+            self.raidWindow.editBox:EnableMouse(true)
+            self.raidWindow.editBox:SetTextColor(1, 1, 1)
+        end
+        info.notCheckable = true
+        UIDropDownMenu_AddButton(info)
+    end)
+
+    -- Award button handler
     self.raidWindow.awardButton:SetScript("OnClick", function()
+        -- Officer rank check
+        if not self:_CheckOfficerRank() then
+            print("|cFFFF0000ГП:|r Только офицеры могут начислять ГП")
+            self.raidWindow:Hide()
+            return
+        end
+        
+        -- Selected players check
         if next(self.selected_indices) == nil then
             print("|cFFFF0000ГП:|r Нет выделенных игроков")
             self.raidWindow:Hide()
             return
         end
         
+        -- Raid check
         local inRaid = IsInRaid()
         local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
         
@@ -1217,63 +1348,126 @@ function GpDb:_CreateRaidSelectionWindow()
             return
         end
         
-        local raidName = UIDropDownMenu_GetText(self.raidWindow.dropdown)
+        -- Get input values
         local otherText = self.raidWindow.editBox:GetText()
+        local bossText = self.raidWindow.bossEditBox:GetText()
         local gpValue = tonumber(self.raidWindow.gpEditBox:GetText()) or 0
         
-        if raidName == "Выберите рейд" and otherText ~= "" then
-            raidName = otherText
-        end
-        
-        if raidName == "Выберите рейд" and otherText == "" then
-            print("|cFFFF0000ГП:|r Выберите рейд или введите название")
+        -- Validate boss field if raid is selected
+        if self.raidWindow.selectedRaidId and (not bossText or bossText == "") then
+            print("|cFFFF0000ГП:|r Поле 'Босс' обязательно при выборе рейда")
             return
         end
         
-        if gpValue <= 0 then
-            print("|cFFFF0000ГП:|r Введите корректное значение ГП")
+        -- Determine source
+        local dungeonInfo = ""
+        if self.raidWindow.selectedRaidId then
+            dungeonInfo = tostring(self.raidWindow.selectedRaidId) .. " " .. bossText
+        elseif otherText ~= "" then
+            dungeonInfo = otherText
+        else
+            print("|cFFFF0000ГП:|r Нужно выбрать рейд или указать причину в поле 'Другое'")
             return
         end
         
-        local selectedEntries = self:GetSelectedEntries()
-        for _, entry in ipairs(selectedEntries) do
-            entry.gp = (entry.gp or 0) + gpValue
-        end
-        
-        self:UpdateWindow()
-        self.raidWindow.editBox:SetText("")
-        self.raidWindow.gpEditBox:SetText("")
-        print(string.format("|cFF00FF00ГП:|r Начислено %d ГП за %s", gpValue, raidName))
-    end)
-
-    UIDropDownMenu_Initialize(self.raidWindow.dropdown, function(frame, level, menuList)
-        local info = UIDropDownMenu_CreateInfo()
-        
-        local numSaved = GetNumSavedInstances()
-        for i = 1, numSaved do
-            local name, id, _, _, _, _, _, _, players = GetSavedInstanceInfo(i)
-            if name and id then
-                info.text = string.format("%d: %s (%d)", id, name, players)
-                info.arg1 = {name = name, id = id, players = players}
-                info.func = function(self)
-                    UIDropDownMenu_SetSelectedID(frame, self:GetID())
-                    UIDropDownMenu_SetText(frame, self.arg1.name)
-                end
-                UIDropDownMenu_AddButton(info)
+        -- Get selected players
+        local selectedNicks = {}
+        for index in pairs(self.selected_indices) do
+            if self.gp_data[index] then
+                table.insert(selectedNicks, self.gp_data[index].original_nick)
             end
         end
+        
+        -- Output result
+        local logStr
+        if self.raidWindow.selectedRaidId then
+            -- Формат: "ID_рейда:имя_босса GP_значение player1 player2..."
+            logStr = tostring(self.raidWindow.selectedRaidId)
+            if bossText and bossText ~= "" then
+                logStr = logStr .. ":" .. bossText
+            end
+            logStr = logStr .. " " .. gpValue
+        else
+            -- Формат для произвольного текста: "описание GP_значение player1 player2..."
+            logStr = otherText .. " " .. gpValue
+        end
+
+        -- Добавляем список игроков
+        for _, nik in pairs(selectedNicks) do
+            SendAddonMessage("nsGP" .. " " .. gpValue, nik, "guild")
+            local _, _, nikID, _ = getIDnome("","",nik,"")
+            logStr = logStr .. " " .. nikID
+        end
+
+        SendAddonMessage("nsGPlog", logStr, "guild")
+        
+        -- Update GP values
+        for _, entry in ipairs(self:GetSelectedEntries()) do
+            entry.gp = (entry.gp or 0) + gpValue
+        end
+        self:UpdateWindow()
+        
+        -- Clear fields
+        self.raidWindow.editBox:SetText("")
+        self.raidWindow.bossEditBox:SetText("")
+        self.raidWindow.gpEditBox:SetText("")
+        UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
+        self.raidWindow.selectedRaidId = nil
+        self.raidWindow.selectedRaidName = nil
+        self.raidWindow.selectedRaidPlayers = nil
+        
+        -- Reset field states
+        self.raidWindow.bossText:Hide()
+        self.raidWindow.bossEditBox:Hide()
+        self.raidWindow.bossEditBox:EnableMouse(false)
+        self.raidWindow.bossEditBox:SetTextColor(0.5, 0.5, 0.5)
+        self.raidWindow.editBox:EnableMouse(true)
+        self.raidWindow.editBox:SetTextColor(1, 1, 1)
+        
+        -- Hide window
+        self.raidWindow:Hide()
     end)
 
-    UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
-    self.raidWindow:Hide()
-    
+    -- Close button handler
     self.raidWindow.closeButton:SetScript("OnClick", function() 
         self.raidWindow:Hide() 
     end)
+
+    -- Initial state
+    UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
+    self.raidWindow:Hide()
+end
+
+function GpDb:_CheckOfficerRank()
+    if not IsInGuild() then return false end
+    
+    local playerName = UnitName("player")
+    for i = 1, GetNumGuildMembers() do
+        local name, _, rankIndex = GetGuildRosterInfo(i)
+        if name and name == playerName then
+            -- Получаем информацию о звании
+            local rankName = GuildControlGetRankName(rankIndex + 1) -- rankIndex начинается с 0
+            -- Проверяем, является ли звание офицерским (Капитан или Лейтенант)
+            if rankName == "Капитан" or rankName == "Лейтенант" then
+                return true
+            end
+            break
+        end
+    end
+    return false
 end
 
 -- Добавляем метод для показа/скрытия окна
 function GpDb:ToggleRaidWindow()
+    -- Проверяем звание игрока
+    if not self:_CheckOfficerRank() then
+        print("|cFFFF0000ГП:|r Только офицеры могут начислять ГП")
+        if self.raidWindow and self.raidWindow:IsShown() then
+            self.raidWindow:Hide()
+        end
+        return
+    end
+    
     if not self.raidWindow then
         self:_CreateRaidSelectionWindow()
     end
@@ -1282,14 +1476,12 @@ function GpDb:ToggleRaidWindow()
     local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
     local hasSelection = next(self.selected_indices) ~= nil
     
-    -- Если нет выделения, но окно было показано вручную - показываем его
     if not hasSelection and not self.raidWindow:IsShown() then
         self.raidWindow:Show()
         UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
         return
     end
     
-    -- Стандартная логика для случаев с выделением
     if hasSelection then
         if inRaid and not raidOnlyChecked then
             print("|cFFFF0000ГП:|r Для начисления ГП в рейде включите 'Только рейд'")
