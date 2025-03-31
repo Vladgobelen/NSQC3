@@ -438,6 +438,7 @@ function GpDb:new(input_table)
     
     new_object.ns_db = NsDb:new(input_table, nil, nil, nil)
     new_object:_CreateWindow()
+    new_object:_CreateRaidSelectionWindow()
     
     return new_object
 end
@@ -582,14 +583,24 @@ function GpDb:_SetupTable()
             local dataIndex = i + offset
             
             if button == "LeftButton" then
-                if IsShiftKeyDown() and self.last_selected_index then
-                    -- Выделение диапазона
-                    self:ClearSelection()
-                    local start = math.min(self.last_selected_index, dataIndex)
-                    local finish = math.max(self.last_selected_index, dataIndex)
-                    for idx = start, finish do
-                        if self.gp_data[idx] then
-                            self.selected_indices[idx] = true
+                local wasSelected = self.selected_indices[dataIndex]
+                
+                if IsShiftKeyDown() then
+                    -- Проверяем, есть ли последний выделенный индекс
+                    if not self.last_selected_index then
+                        -- Если нет, делаем текущий элемент единственным выделенным
+                        self:ClearSelection()
+                        self.selected_indices[dataIndex] = true
+                        self.last_selected_index = dataIndex
+                    else
+                        -- Выделение диапазона
+                        self:ClearSelection()
+                        local start = math.min(self.last_selected_index, dataIndex)
+                        local finish = math.max(self.last_selected_index, dataIndex)
+                        for idx = start, finish do
+                            if self.gp_data[idx] then
+                                self.selected_indices[idx] = true
+                            end
                         end
                     end
                 elseif IsControlKeyDown() then
@@ -597,19 +608,34 @@ function GpDb:_SetupTable()
                     self.selected_indices[dataIndex] = not self.selected_indices[dataIndex]
                     self.last_selected_index = dataIndex
                 else
-                    -- Одиночное выделение
-                    self:ClearSelection()
-                    self.selected_indices[dataIndex] = true
-                    self.last_selected_index = dataIndex
+                    -- Одиночное выделение/снятие выделения
+                    if wasSelected then
+                        self.selected_indices[dataIndex] = nil
+                        self.last_selected_index = nil
+                    else
+                        self:ClearSelection()
+                        self.selected_indices[dataIndex] = true
+                        self.last_selected_index = dataIndex
+                    end
                 end
                 
-                -- Мгновенное обновление визуала
                 self:RefreshRowHighlights()
+                self:UpdateRaidWindowVisibility()
             end
         end)
 
         self.rows[i] = row
     end
+
+    -- Модифицируем обработчик скрытия окна
+    self.window:SetScript("OnHide", function()
+        -- Сбрасываем выделение
+        self:ClearSelection()
+        -- Скрываем окно рейда, если оно было открыто
+        if self.raidWindow and self.raidWindow:IsShown() then
+            self.raidWindow:Hide()
+        end
+    end)
 end
 
 function GpDb:RefreshRowHighlights()
@@ -636,6 +662,9 @@ end
 
 function GpDb:ClearSelection()
     self.selected_indices = {}
+    self.last_selected_index = nil
+    self:RefreshRowHighlights()
+    self:UpdateRaidWindowVisibility()
 end
 
 function GpDb:GetSelectedEntries()
@@ -646,6 +675,31 @@ function GpDb:GetSelectedEntries()
         end
     end
     return selected
+end
+
+function GpDb:UpdateRaidWindowVisibility()
+    if not self.raidWindow then return end
+    
+    local hasSelection = next(self.selected_indices) ~= nil
+    local inRaid = IsInRaid()
+    local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
+    
+    -- Показываем окно только если:
+    -- 1. Есть выделенные игроки
+    -- 2. Если мы в рейде, то должна быть включена галочка "Только рейд"
+    local shouldShow = hasSelection and (not inRaid or raidOnlyChecked)
+    
+    if shouldShow then
+        if not self.raidWindow:IsShown() then
+            self.raidWindow:Show()
+            -- Обновляем список рейдов при каждом открытии
+            UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
+        end
+    else
+        if self.raidWindow:IsShown() then
+            self.raidWindow:Hide()
+        end
+    end
 end
 
 function GpDb:UpdateWindow()
@@ -682,6 +736,7 @@ function GpDb:UpdateWindow()
     
     -- Обновление скролла
     FauxScrollFrame_Update(self.window.scrollFrame, #self.gp_data, self.visible_rows, 25)
+    self:UpdateRaidWindowVisibility()
 end
 
 function GpDb:GetNumSelected()
@@ -695,76 +750,82 @@ end
 function GpDb:Show()
     self.window:Show()
     
-    if IsInRaid() then
-        self.window.raidOnlyCheckbox:SetChecked(true)
-    else
-        self.window.raidOnlyCheckbox:SetChecked(false)
-    end
+    -- Автоматически устанавливаем галочку "Только рейд" если мы в рейде
+    self.window.raidOnlyCheckbox:SetChecked(IsInRaid())
     
     self:_UpdateFromGuild()
     self:UpdateWindow()
 end
-
 
 function GpDb:Hide()
     self.window:Hide()
 end
 
 function GpDb:_UpdateFromGuild()
-    if not IsInGuild() then
-        print("|cFFFF0000ГП:|r Вы не состоите в гильдии")
-        return
-    end
-
-    GuildRoster()
+    -- Всегда начинаем с чистого списка
     self.gp_data = {}
     local totalWithGP = 0
     local totalMembers = GetNumGuildMembers()
     
+    -- Синхронизируем галочку с текущим состоянием рейда
+    local inRaid = IsInRaid()
+    self.window.raidOnlyCheckbox:SetChecked(inRaid)
+    local raidOnlyMode = inRaid and self.window.raidOnlyCheckbox:GetChecked()
+
+    if not IsInGuild() then
+        print("|cFFFF0000ГП:|r Вы не состоите в гильдии")
+        self:UpdateWindow()
+        return
+    end
+
+    -- Обновляем данные гильдии
+    GuildRoster()
+
+    -- Собираем полный список членов гильдии для быстрой проверки
+    local guildRosterInfo = {}
+    for j = 1, totalMembers do
+        local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
+        if name then
+            guildRosterInfo[name] = {
+                publicNote = publicNote,
+                officerNote = officerNote,
+                classFileName = classFileName
+            }
+        end
+    end
+
     -- Режим "Только рейд" и мы в рейде
-    if self.window.raidOnlyCheckbox:GetChecked() and IsInRaid() then
+    if raidOnlyMode then
         local numRaidMembers = GetNumGroupMembers()
         local raidCheckPassed = true
-        local guildRosterInfo = {}  -- Для хранения данных гильдии
-        
-        -- Сначала собираем всех членов гильдии для быстрого поиска
-        for j = 1, totalMembers do
-            local guildName, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
-            if guildName then
-                guildRosterInfo[guildName] = {
-                    publicNote = publicNote,
-                    officerNote = officerNote,
-                    classFileName = classFileName
-                }
-            end
-        end
-        
-        -- Проверяем всех игроков рейда
+        local invalidPlayers = {}
+
+        -- Проверяем всех игроков рейда на принадлежность к гильдии
         for i = 1, numRaidMembers do
-            local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
+            local raidName = GetRaidRosterInfo(i)
             if not guildRosterInfo[raidName] then
                 raidCheckPassed = false
-                print(string.format("|cFFFF0000ГП:|r Игрок %s не состоит в вашей гильдии", raidName))
-                break
+                table.insert(invalidPlayers, raidName)
             end
         end
-        
-        -- Если есть чужой игрок - очищаем список
+
+        -- Если есть чужие игроки - сообщаем и выходим
         if not raidCheckPassed then
+            print("|cFFFF0000ГП:|r В рейде есть не члены гильдии: "..table.concat(invalidPlayers, ", "))
             self.window.countText:SetText("Отображается игроков: 0 (в рейде есть не члены гильдии)")
             self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
+            self:UpdateWindow()
             return
         end
-        
-        -- Если все в гильдии - заполняем ВСЕХ рейдовых игроков
+
+        -- Заполняем данные ВСЕХ игроков рейда (даже с нулевым ГП)
         for i = 1, numRaidMembers do
             local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
             local guildInfo = guildRosterInfo[raidName]
             local gp = 0
             local publicNote = guildInfo.publicNote or ""
-            local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
             
-            -- Получаем ГП из officerNote
+            -- Парсим ГП из officerNote
             if guildInfo.officerNote then
                 local words = {}
                 for word in guildInfo.officerNote:gmatch("%S+") do
@@ -774,26 +835,26 @@ function GpDb:_UpdateFromGuild()
                     gp = tonumber(words[3]) or 0
                 end
             end
-            
+
+            if gp > 0 then
+                totalWithGP = totalWithGP + 1
+            end
+
             local displayName = raidName
             if publicNote and publicNote ~= "" then
                 displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
             end
-            
+
             table.insert(self.gp_data, {
                 nick = displayName,
                 original_nick = raidName,
                 gp = gp,
-                classColor = classColor,
-                classFileName = classFileName  -- Сохраняем для сортировки
+                classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
+                classFileName = classFileName
             })
-            
-            if gp > 0 then
-                totalWithGP = totalWithGP + 1
-            end
         end
     else
-        -- Обычный режим (не рейд или галочка выключена)
+        -- Обычный режим - показываем только игроков с ГП
         for i = 1, totalMembers do
             local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
             
@@ -807,8 +868,6 @@ function GpDb:_UpdateFromGuild()
                     local gp = tonumber(words[3]) or 0
                     if gp ~= 0 then
                         totalWithGP = totalWithGP + 1
-                        local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
-                        
                         local displayName = name
                         if publicNote and publicNote ~= "" then
                             displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
@@ -818,7 +877,7 @@ function GpDb:_UpdateFromGuild()
                             nick = displayName,
                             original_nick = name,
                             gp = gp,
-                            classColor = classColor,
+                            classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                             classFileName = classFileName
                         })
                     end
@@ -826,11 +885,12 @@ function GpDb:_UpdateFromGuild()
             end
         end
     end
-    
+
     -- Обновляем UI
     self.window.countText:SetText(string.format("Отображается игроков: %d", #self.gp_data))
     self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
     
+    self:ClearSelection()
     self:SortData()
 end
 
@@ -983,21 +1043,18 @@ function GpDb:LoadFromNsDb()
 end
 
 function GpDb:_CreateRaidSelectionWindow()
-    -- Создаем фрейм дополнительного окна
     self.raidWindow = CreateFrame("Frame", "GpDbRaidWindow", self.window)
     self.raidWindow:SetFrameStrata("DIALOG")
-    self.raidWindow:SetSize(250, self.window:GetHeight() * 0.34) -- 34% от высоты основного окна
+    self.raidWindow:SetSize(250, self.window:GetHeight() * 0.34)
     self.raidWindow:SetPoint("BOTTOMLEFT", self.window, "BOTTOMRIGHT", 5, 0)
     self.raidWindow:SetMovable(false)
     
-    -- Непрозрачный черный фон
     self.raidWindow.background = self.raidWindow:CreateTexture(nil, "BACKGROUND")
     self.raidWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.raidWindow.background:SetVertexColor(0, 0, 0)
     self.raidWindow.background:SetAlpha(1)
     self.raidWindow.background:SetAllPoints(true)
 
-    -- Граница окна
     self.raidWindow.borderFrame = CreateFrame("Frame", nil, self.raidWindow)
     self.raidWindow.borderFrame:SetPoint("TOPLEFT", -3, 3)
     self.raidWindow.borderFrame:SetPoint("BOTTOMRIGHT", 3, -3)
@@ -1007,44 +1064,77 @@ function GpDb:_CreateRaidSelectionWindow()
         insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
 
-    -- Кнопка закрытия
     self.raidWindow.closeButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelCloseButton")
     self.raidWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
 
-    -- Выпадающий список рейдов (в верхней части)
     self.raidWindow.dropdown = CreateFrame("Frame", "GpDbRaidDropdown", self.raidWindow, "UIDropDownMenuTemplate")
     self.raidWindow.dropdown:SetPoint("TOPLEFT", 10, -10)
     self.raidWindow.dropdown:SetPoint("RIGHT", self.raidWindow.closeButton, "LEFT", -10, 0)
     self.raidWindow.dropdown:SetHeight(32)
     
-    -- Текстовое поле "Другое" (прямо под выпадающим списком)
     self.raidWindow.otherText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.raidWindow.otherText:SetPoint("TOPLEFT", self.raidWindow.dropdown, "BOTTOMLEFT", 0, -10)
     self.raidWindow.otherText:SetText("Другое:")
 
-    -- Поле ввода для "Другое" (под текстом)
     self.raidWindow.editBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
     self.raidWindow.editBox:SetPoint("TOPLEFT", self.raidWindow.otherText, "BOTTOMLEFT", 0, -5)
     self.raidWindow.editBox:SetPoint("RIGHT", -10, 0)
     self.raidWindow.editBox:SetHeight(20)
     self.raidWindow.editBox:SetAutoFocus(false)
 
-    -- Поле ввода ГП (в самом низу слева)
     self.raidWindow.gpEditBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
     self.raidWindow.gpEditBox:SetPoint("BOTTOMLEFT", 10, 5)
     self.raidWindow.gpEditBox:SetSize(100, 20)
     self.raidWindow.gpEditBox:SetAutoFocus(false)
 
-    -- Кнопка "Начислить" (в самом низу справа)
     self.raidWindow.awardButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
     self.raidWindow.awardButton:SetPoint("BOTTOMRIGHT", -10, 5)
     self.raidWindow.awardButton:SetSize(100, 22)
     self.raidWindow.awardButton:SetText("Начислить")
     self.raidWindow.awardButton:SetScript("OnClick", function()
-        -- Логика начисления ГП
+        if next(self.selected_indices) == nil then
+            print("|cFFFF0000ГП:|r Нет выделенных игроков")
+            self.raidWindow:Hide()
+            return
+        end
+        
+        local inRaid = IsInRaid()
+        local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
+        
+        if inRaid and not raidOnlyChecked then
+            print("|cFFFF0000ГП:|r Для начисления ГП в рейде включите 'Только рейд'")
+            return
+        end
+        
+        local raidName = UIDropDownMenu_GetText(self.raidWindow.dropdown)
+        local otherText = self.raidWindow.editBox:GetText()
+        local gpValue = tonumber(self.raidWindow.gpEditBox:GetText()) or 0
+        
+        if raidName == "Выберите рейд" and otherText ~= "" then
+            raidName = otherText
+        end
+        
+        if raidName == "Выберите рейд" and otherText == "" then
+            print("|cFFFF0000ГП:|r Выберите рейд или введите название")
+            return
+        end
+        
+        if gpValue <= 0 then
+            print("|cFFFF0000ГП:|r Введите корректное значение ГП")
+            return
+        end
+        
+        local selectedEntries = self:GetSelectedEntries()
+        for _, entry in ipairs(selectedEntries) do
+            entry.gp = (entry.gp or 0) + gpValue
+        end
+        
+        self:UpdateWindow()
+        self.raidWindow.editBox:SetText("")
+        self.raidWindow.gpEditBox:SetText("")
+        print(string.format("|cFF00FF00ГП:|r Начислено %d ГП за %s", gpValue, raidName))
     end)
 
-    -- Инициализация выпадающего списка
     UIDropDownMenu_Initialize(self.raidWindow.dropdown, function(frame, level, menuList)
         local info = UIDropDownMenu_CreateInfo()
         
@@ -1052,10 +1142,11 @@ function GpDb:_CreateRaidSelectionWindow()
         for i = 1, numSaved do
             local name, id, _, _, _, _, _, _, players = GetSavedInstanceInfo(i)
             if name and id then
-                info.text = string.format("%d: %s %d", id, name, players)
+                info.text = string.format("%d: %s (%d)", id, name, players)
                 info.arg1 = {name = name, id = id, players = players}
                 info.func = function(self)
                     UIDropDownMenu_SetSelectedID(frame, self:GetID())
+                    UIDropDownMenu_SetText(frame, self.arg1.name)
                 end
                 UIDropDownMenu_AddButton(info)
             end
@@ -1076,12 +1167,31 @@ function GpDb:ToggleRaidWindow()
         self:_CreateRaidSelectionWindow()
     end
     
-    if self.raidWindow:IsShown() then
-        self.raidWindow:Hide()
-    else
+    local inRaid = IsInRaid()
+    local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
+    local hasSelection = next(self.selected_indices) ~= nil
+    
+    -- Если нет выделения, но окно было показано вручную - показываем его
+    if not hasSelection and not self.raidWindow:IsShown() then
         self.raidWindow:Show()
-        -- Обновляем список рейдов при каждом открытии
         UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
+        return
+    end
+    
+    -- Стандартная логика для случаев с выделением
+    if hasSelection then
+        if inRaid and not raidOnlyChecked then
+            print("|cFFFF0000ГП:|r Для начисления ГП в рейде включите 'Только рейд'")
+            self.raidWindow:Hide()
+            return
+        end
+        
+        if self.raidWindow:IsShown() then
+            self.raidWindow:Hide()
+        else
+            self.raidWindow:Show()
+            UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
+        end
     end
 end
 
