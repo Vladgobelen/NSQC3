@@ -103,7 +103,6 @@ function NsDb:addStr(message)
         self.input_table[#self.input_table] = self.input_table[#self.input_table] .. message
         
         -- Кодируем новую конечную позицию
-        print('333',self.last_str_addr, msg_len)
         local encoded_len = ("   "..en85(self.last_str_addr + msg_len)):sub(-3)
         
         -- Обновляем последний указатель
@@ -412,6 +411,364 @@ function NsDb:getKey(...)
     end
     
     return type(target) == "table" and target[select(n, ...)] or nil
+end
+
+function NsDb:hasKey(key)
+    return self.input_table and self.input_table[key] ~= nil
+end
+
+function NsDb:createTable(key)
+    self.input_table = self.input_table or {}
+    self.input_table[key] = {}
+end
+
+GpDb = {}
+GpDb.__index = GpDb
+
+function GpDb:new(input_table)
+    local new_object = {
+        gp_data = {},
+        sort_column = "nick",
+        sort_ascending = true,
+        visible_rows = 20
+    }
+    setmetatable(new_object, self)
+    
+    new_object.ns_db = NsDb:new(input_table, nil, nil, nil)
+    new_object:_CreateWindow()
+    
+    return new_object
+end
+
+function GpDb:_CreateWindow()
+    -- Создаем основной фрейм окна
+    self.window = CreateFrame("Frame", "GpTrackerWindow", UIParent)
+    self.window:SetFrameStrata("DIALOG")
+    self.window:SetSize(400, 500)
+    self.window:SetPoint("LEFT", 5, 100)
+    self.window:SetMovable(true)
+    self.window:EnableMouse(true)
+    self.window:RegisterForDrag("LeftButton")
+    self.window:SetScript("OnDragStart", self.window.StartMoving)
+    self.window:SetScript("OnDragStop", self.window.StopMovingOrSizing)
+    self.window:Hide()
+
+    -- 1. НЕПРОЗРАЧНЫЙ ЧЁРНЫЙ ФОН
+    self.window.background = self.window:CreateTexture(nil, "BACKGROUND")
+    self.window.background:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.window.background:SetVertexColor(0, 0, 0)
+    self.window.background:SetAlpha(1)
+    self.window.background:SetAllPoints(true)
+
+    -- 2. ГРАНИЦА ОКНА
+    self.window.borderFrame = CreateFrame("Frame", nil, self.window)
+    self.window.borderFrame:SetPoint("TOPLEFT", -3, 3)
+    self.window.borderFrame:SetPoint("BOTTOMRIGHT", 3, -3)
+    self.window.borderFrame:SetBackdrop({
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        edgeSize = 16,
+        insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+
+    -- 3. ЗАГОЛОВОК ОКНА
+    self.window.title = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.window.title:SetPoint("TOP", 0, -15)
+    self.window.title:SetText("GP Tracker")
+
+    -- 4. КНОПКА ЗАКРЫТИЯ
+    self.window.closeButton = CreateFrame("Button", nil, self.window, "UIPanelCloseButton")
+    self.window.closeButton:SetPoint("TOPRIGHT", -5, -5)
+    self.window.closeButton:SetScript("OnClick", function() self.window:Hide() end)
+
+    -- 5. ОБЛАСТЬ С ПРОКРУТКОЙ
+    self.window.scrollFrame = CreateFrame("ScrollFrame", "ScrollFrame", self.window, "UIPanelScrollFrameTemplate")
+    self.window.scrollFrame:SetPoint("TOPLEFT", 10, -40)
+    self.window.scrollFrame:SetPoint("BOTTOMRIGHT", -5, 40)
+
+    self.window.scrollChild = CreateFrame("Frame")
+    self.window.scrollChild:SetSize(380, 500)
+    self.window.scrollFrame:SetScrollChild(self.window.scrollChild)
+
+    -- 6. ПОЛЗУНОК ПРОКРУТКИ
+    self.window.scrollBar = _G[self.window.scrollFrame:GetName().."ScrollBar"]
+    self.window.scrollBar:SetPoint("TOPLEFT", self.window.scrollFrame, "TOPRIGHT", -20, -16)
+    self.window.scrollBar:SetPoint("BOTTOMLEFT", self.window.scrollFrame, "BOTTOMRIGHT", -20, 16)
+
+    -- 7. НАСТРОЙКА ТАБЛИЦЫ
+    self:_SetupTable()
+end
+
+function GpDb:_SetupTable()
+    -- Заголовки колонок
+    local headers = {"Ник", "GP"}
+    for i, header in ipairs(headers) do
+        local btn = CreateFrame("Button", nil, self.window.scrollChild)
+        btn:SetSize(i == 1 and 240 or 100, 20)
+        btn:SetPoint("TOPLEFT", (i-1)*240 + (i == 2 and 30 or 0), 0)
+        
+        btn:SetNormalFontObject("GameFontNormal")
+        btn:SetHighlightFontObject("GameFontHighlight")
+        
+        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        text:SetAllPoints(true)
+        text:SetText(header)
+        
+        btn:SetScript("OnClick", function()
+            self:SortData(header:lower())
+            self:UpdateWindow()
+        end)
+    end
+
+    -- Создаем больше строк для прокрутки
+    self.rows = {}
+    for i = 1, 50 do  -- Увеличили количество строк до 50
+        local row = CreateFrame("Frame", nil, self.window.scrollChild)
+        row:SetSize(380, 20)
+        row:SetPoint("TOPLEFT", 0, -25 - (i-1)*25)
+        
+        row.nick = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.nick:SetPoint("LEFT", 10, 0)
+        row.nick:SetWidth(240)
+        row.nick:SetJustifyH("LEFT")
+        
+        row.gp = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.gp:SetPoint("LEFT", 270, 0)
+        row.gp:SetWidth(100)
+        row.gp:SetJustifyH("LEFT")
+        
+        self.rows[i] = row
+    end
+end
+
+function GpDb:UpdateWindow()
+    if not self.window or not self.rows then return end
+    
+    -- Рассчитываем видимую область
+    local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
+    local maxRows = min(#self.gp_data, 50)
+    
+    for i = 1, 50 do
+        local row = self.rows[i]
+        local index = i + offset
+        
+        if index <= #self.gp_data then
+            local entry = self.gp_data[index]
+            
+            -- Обновляем данные строки
+            row.nick:SetText(entry.nick)
+            if entry.classColor then
+                local plainName = entry.nick:match("^[^|]+") or entry.nick
+                row.nick:SetText(plainName)
+                row.nick:SetTextColor(entry.classColor.r, entry.classColor.g, entry.classColor.b)
+                
+                local notePart = entry.nick:match("|c.+$")
+                if notePart then
+                    local fullText = row.nick:GetText() .. " " .. notePart
+                    row.nick:SetText(fullText)
+                end
+            else
+                row.nick:SetTextColor(1, 1, 1)
+            end
+            
+            row.gp:SetText(tostring(entry.gp))
+            row.gp:SetTextColor(1, 1, 1)
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+    
+    -- Настраиваем прокрутку
+    FauxScrollFrame_Update(self.window.scrollFrame, #self.gp_data, 20, 25)
+    self.window.scrollChild:SetHeight(max(#self.gp_data * 25, self.visible_rows * 25))
+end
+
+function GpDb:Show()
+    self.window:Show()
+    self:_UpdateFromGuild()
+    self:UpdateWindow()
+end
+
+function GpDb:Hide()
+    self.window:Hide()
+end
+
+function GpDb:_UpdateFromGuild()
+    if not IsInGuild() then
+        print("|cFFFF0000GP Tracker:|r Вы не состоите в гильдии")
+        return
+    end
+
+    GuildRoster()
+    
+    self.gp_data = {}
+    
+    for i = 1, GetNumGuildMembers() do
+        local name, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(i)
+        
+        if name and officerNote and officerNote ~= "" then
+            local words = {}
+            for word in officerNote:gmatch("%S+") do
+                table.insert(words, word)
+            end
+            
+            if #words >= 3 then
+                local gp = tonumber(words[3])
+                if gp and gp ~= 0 then
+                    local _, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
+                    local classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1}
+                    
+                    local displayName = name
+                    if publicNote and publicNote ~= "" then
+                        displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
+                    end
+                    
+                    table.insert(self.gp_data, {
+                        nick = displayName,
+                        original_nick = name,
+                        gp = gp,
+                        classColor = classColor
+                    })
+                end
+            end
+        end
+    end
+    
+    self:SortData()
+end
+
+function GpDb:AddGpEntry(nick, gp)
+    table.insert(self.gp_data, {
+        nick = nick,
+        original_nick = nick,
+        gp = tonumber(gp) or 0
+    })
+    self:SortData()
+    self:UpdateWindow()
+end
+
+function GpDb:UpdateGpEntry(nick, new_gp)
+    for _, entry in ipairs(self.gp_data) do
+        if entry.original_nick == nick then
+            entry.gp = tonumber(new_gp) or 0
+            break
+        end
+    end
+    self:SortData()
+    self:UpdateWindow()
+end
+
+function GpDb:RemoveGpEntry(nick)
+    for i, entry in ipairs(self.gp_data) do
+        if entry.original_nick == nick then
+            table.remove(self.gp_data, i)
+            break
+        end
+    end
+    self:UpdateWindow()
+end
+
+function GpDb:FindGpEntry(nick)
+    for _, entry in ipairs(self.gp_data) do
+        if entry.original_nick == nick then
+            return entry.gp
+        end
+    end
+    return nil
+end
+
+function GpDb:ClearAll()
+    self.gp_data = {}
+    self:UpdateWindow()
+end
+
+function GpDb:SortData(column)
+    if column then
+        if self.sort_column == column then
+            self.sort_ascending = not self.sort_ascending
+        else
+            self.sort_column = column
+            self.sort_ascending = true
+        end
+    end
+
+    table.sort(self.gp_data, function(a, b)
+        local valA, valB
+        
+        if self.sort_column == "nick" then
+            valA = string.lower(string.lower(a.original_nick or ""))
+            valB = string.lower(string.lower(b.original_nick or ""))
+        else
+            valA = a.gp or 0
+            valB = b.gp or 0
+        end
+
+        if self.sort_ascending then
+            return valA < valB
+        else
+            return valA > valB
+        end
+    end)
+    
+    self:UpdateWindow()
+end
+
+function GpDb:UpdateWindow()
+    if not self.window or not self.rows then return end
+    
+    for i, row in ipairs(self.rows) do
+        local entry = self.gp_data[i]
+        if entry then
+            row.nick:SetText(entry.nick)
+            if entry.classColor then
+                -- Применяем цвет класса только к имени (до скобок)
+                local plainName = entry.nick:match("^[^|]+") or entry.nick
+                row.nick:SetText(plainName)
+                row.nick:SetTextColor(entry.classColor.r, entry.classColor.g, entry.classColor.b)
+                
+                -- Добавляем публичную заметку с желтым цветом
+                local notePart = entry.nick:match("|c.+$")
+                if notePart then
+                    local fullText = row.nick:GetText() .. " " .. notePart
+                    row.nick:SetText(fullText)
+                end
+            else
+                row.nick:SetTextColor(1, 1, 1)
+            end
+            
+            row.gp:SetText(tostring(entry.gp))
+            row.gp:SetTextColor(1, 1, 1)
+            
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+    
+    self.window.scrollChild:SetHeight(#self.gp_data * 25)
+    self.window.scrollFrame:UpdateScrollChildRect()
+end
+
+function GpDb:SaveToNsDb()
+    for _, entry in ipairs(self.gp_data) do
+        self.ns_db:addStaticStr("GP_DATA", entry.original_nick, nil, tostring(entry.gp))
+    end
+end
+
+function GpDb:LoadFromNsDb()
+    self.gp_data = {}
+    local data = self.ns_db.input_table["GP_DATA"]
+    if data then
+        for nick, gp in pairs(data) do
+            table.insert(self.gp_data, {
+                nick = nick,
+                original_nick = nick,
+                gp = tonumber(gp) or 0
+            })
+        end
+    end
+    self:SortData()
+    self:UpdateWindow()
 end
 
 -- Определяем класс create_table

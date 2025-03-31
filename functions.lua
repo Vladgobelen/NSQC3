@@ -886,6 +886,33 @@ function trim(s)
 end
 string.trim = string.trim or trim
 
+function getInstId()
+    local numSaved = GetNumSavedInstances()
+    if numSaved > 0 then
+        for i = 1, numSaved do
+            local name, id, _, _, locked = GetSavedInstanceInfo(i)
+            if locked then
+                print("Рейд:", name, "| Уникальный ID:", id)
+            end
+        end
+    else
+        print("Нет сохранённых рейдов.")
+    end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- Функция для отображения текстуры по центру экрана
 -- texturePath: путь к текстуре
