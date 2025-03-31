@@ -582,36 +582,62 @@ function GpDb:_SetupTable()
             local offset = FauxScrollFrame_GetOffset(self.window.scrollFrame)
             local dataIndex = i + offset
             
+            -- Проверяем валидность данных
+            if not self.gp_data or not self.gp_data[dataIndex] then return end
+            
             if button == "LeftButton" then
                 local wasSelected = self.selected_indices[dataIndex]
                 
+                -- SHIFT+ЛКМ - выделение диапазона
                 if IsShiftKeyDown() then
-                    -- Проверяем, есть ли последний выделенный индекс
                     if not self.last_selected_index then
-                        -- Если нет, делаем текущий элемент единственным выделенным
                         self:ClearSelection()
                         self.selected_indices[dataIndex] = true
                         self.last_selected_index = dataIndex
                     else
-                        -- Выделение диапазона
-                        self:ClearSelection()
-                        local start = math.min(self.last_selected_index, dataIndex)
-                        local finish = math.max(self.last_selected_index, dataIndex)
-                        for idx = start, finish do
+                        local startIdx = math.min(self.last_selected_index, dataIndex)
+                        local endIdx = math.max(self.last_selected_index, dataIndex)
+                        
+                        if not IsControlKeyDown() then
+                            self:ClearSelection()
+                        end
+                        
+                        for idx = startIdx, endIdx do
                             if self.gp_data[idx] then
                                 self.selected_indices[idx] = true
                             end
                         end
                     end
+                    
+                -- CTRL+ЛКМ - добавление/удаление из выделения
                 elseif IsControlKeyDown() then
-                    -- Добавление/удаление из выделения
-                    self.selected_indices[dataIndex] = not self.selected_indices[dataIndex]
-                    self.last_selected_index = dataIndex
-                else
-                    -- Одиночное выделение/снятие выделения
-                    if wasSelected then
-                        self.selected_indices[dataIndex] = nil
+                    -- Изменяем состояние выделения
+                    self.selected_indices[dataIndex] = not wasSelected
+                    
+                    -- Очищаем несуществующие выделения
+                    for idx in pairs(self.selected_indices) do
+                        if not self.gp_data[idx] then
+                            self.selected_indices[idx] = nil
+                        end
+                    end
+                    
+                    -- Обновляем last_selected_index
+                    if self.selected_indices[dataIndex] then
+                        self.last_selected_index = dataIndex
+                    else
                         self.last_selected_index = nil
+                        for idx in pairs(self.selected_indices) do
+                            if self.selected_indices[idx] then
+                                self.last_selected_index = idx
+                                break
+                            end
+                        end
+                    end
+                    
+                -- Обычный клик
+                else
+                    if wasSelected then
+                        self:ClearSelection()
                     else
                         self:ClearSelection()
                         self.selected_indices[dataIndex] = true
@@ -619,6 +645,8 @@ function GpDb:_SetupTable()
                     end
                 end
                 
+                -- Принудительное обновление интерфейса
+                self:_UpdateSelectionCount()
                 self:RefreshRowHighlights()
                 self:UpdateRaidWindowVisibility()
             end
@@ -636,6 +664,32 @@ function GpDb:_SetupTable()
             self.raidWindow:Hide()
         end
     end)
+end
+
+function GpDb:_UpdateSelectionCount()
+    local count = 0
+    -- Считаем ТОЛЬКО действительно выделенные и существующие элементы
+    for idx, selected in pairs(self.selected_indices) do
+        if selected and self.gp_data[idx] then
+            count = count + 1
+        else
+            self.selected_indices[idx] = nil -- Очищаем невалидные
+        end
+    end
+    
+    -- Обновляем текст
+    self.window.countText:SetText(string.format("Выделено: %d", count))
+    
+    -- Если нет выделений - сбрасываем last_selected_index
+    if count == 0 then
+        self.last_selected_index = nil
+    end
+    
+    return count
+end
+
+function GpDb:IsValidIndex(index)
+    return index and type(index) == "number" and self.gp_data and self.gp_data[index]
 end
 
 function GpDb:RefreshRowHighlights()
@@ -663,6 +717,7 @@ end
 function GpDb:ClearSelection()
     self.selected_indices = {}
     self.last_selected_index = nil
+    self:_UpdateSelectionCount()
     self:RefreshRowHighlights()
     self:UpdateRaidWindowVisibility()
 end
@@ -680,20 +735,56 @@ end
 function GpDb:UpdateRaidWindowVisibility()
     if not self.raidWindow then return end
     
+    -- Проверяем есть ли выделенные элементы
     local hasSelection = next(self.selected_indices) ~= nil
+    
+    -- Если выделений нет - закрываем окно и выходим
+    if not hasSelection then
+        if self.raidWindow:IsShown() then
+            self.raidWindow:Hide()
+        end
+        return
+    end
+    
+    -- Проверяем условия для отображения окна
     local inRaid = IsInRaid()
     local raidOnlyChecked = self.window.raidOnlyCheckbox:GetChecked()
     
-    -- Показываем окно только если:
-    -- 1. Есть выделенные игроки
-    -- 2. Если мы в рейде, то должна быть включена галочка "Только рейд"
-    local shouldShow = hasSelection and (not inRaid or raidOnlyChecked)
+    -- Основное условие показа:
+    -- 1. Мы не в рейде ИЛИ
+    -- 2. Мы в рейде и включена галочка "Только рейд"
+    local shouldShow = not inRaid or raidOnlyChecked
     
+    -- Если должны показывать - проверяем что все выделенные в рейде
+    if shouldShow and inRaid then
+        -- Собираем список игроков рейда
+        local raidMembers = {}
+        for i = 1, GetNumGroupMembers() do
+            local name = GetRaidRosterInfo(i)
+            if name then
+                raidMembers[name] = true
+            end
+        end
+        
+        -- Проверяем всех выделенных игроков
+        for index in pairs(self.selected_indices) do
+            local entry = self.gp_data[index]
+            if entry and not raidMembers[entry.original_nick] then
+                shouldShow = false
+                print("|cFFFF0000ГП:|r Некоторые выделенные игроки не в рейде")
+                break
+            end
+        end
+    end
+    
+    -- Управляем видимостью окна
     if shouldShow then
         if not self.raidWindow:IsShown() then
             self.raidWindow:Show()
-            -- Обновляем список рейдов при каждом открытии
-            UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
+            -- Сбрасываем форму при открытии
+            UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
+            self.raidWindow.editBox:SetText("")
+            self.raidWindow.gpEditBox:SetText("")
         end
     else
         if self.raidWindow:IsShown() then
@@ -741,9 +832,14 @@ end
 
 function GpDb:GetNumSelected()
     local count = 0
-    for _ in pairs(self.selected_indices) do
-        count = count + 1
+    for idx in pairs(self.selected_indices) do
+        if self.gp_data[idx] then  -- Проверяем что элемент существует
+            count = count + 1
+        else
+            self.selected_indices[idx] = nil  -- Очищаем несуществующие
+        end
     end
+    print(string.format("GetNumSelected: найдено %d элементов", count))
     return count
 end
 
@@ -980,7 +1076,7 @@ function GpDb:SortData(column)
             return valA > valB
         end
     end)
-    
+    self:ClearSelection()
     self:UpdateWindow()
 end
 
