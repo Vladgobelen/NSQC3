@@ -1361,10 +1361,45 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.selectedPlayersText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     self.raidWindow.selectedPlayersText:SetPoint("TOPLEFT", self.raidWindow.saveCheckbox, "BOTTOMLEFT", 0, -5)
     self.raidWindow.selectedPlayersText:SetPoint("RIGHT", -10, 0)
-    self.raidWindow.selectedPlayersText:SetHeight(40)
+    self.raidWindow.selectedPlayersText:SetHeight(70)
     self.raidWindow.selectedPlayersText:SetJustifyH("LEFT")
     self.raidWindow.selectedPlayersText:SetJustifyV("TOP")
     self.raidWindow.selectedPlayersText:SetWordWrap(true)
+
+    -- Кнопки быстрого ввода ГП
+    local quickGPValues = {5, 10, 20, 25, 50, 100}
+    local lastQuickButton
+    
+    for i, value in ipairs(quickGPValues) do
+        local btn = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
+        btn:SetSize(27, 20)
+        btn:SetText(tostring(value))
+        
+        if i == 1 then
+            btn:SetPoint("BOTTOMLEFT", self.raidWindow.selectedPlayersText, "BOTTOMLEFT", 0, -20)
+        else
+            btn:SetPoint("LEFT", lastQuickButton, "RIGHT", 5, 0)
+        end
+        
+        btn:SetScript("OnClick", function()
+            local currentValue = tonumber(self.raidWindow.gpEditBox:GetText()) or 0
+            self.raidWindow.gpEditBox:SetText(tostring(value))
+            self.raidWindow.gpEditBox:HighlightText()
+        end)
+        
+        lastQuickButton = btn
+    end
+    
+    -- Кнопка минуса
+    local minusBtn = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
+    minusBtn:SetSize(40, 22)
+    minusBtn:SetText("-/+")
+    minusBtn:SetPoint("LEFT", lastQuickButton, "RIGHT", 5, 0)
+    minusBtn:SetScript("OnClick", function()
+        local currentValue = tonumber(self.raidWindow.gpEditBox:GetText()) or 0
+        self.raidWindow.gpEditBox:SetText(tostring(-currentValue))
+        self.raidWindow.gpEditBox:HighlightText()
+    end)
 
     -- Поле ввода ГП
     self.raidWindow.gpEditBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
