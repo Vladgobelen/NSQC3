@@ -1352,7 +1352,7 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.saveCheckbox.text:SetPoint("LEFT", self.raidWindow.saveCheckbox, "RIGHT", 5, 0)
     self.raidWindow.saveCheckbox.text:SetText("Сохранить выбор")
     self.raidWindow.saveCheckbox:SetChecked(true)
-    self.saveSelectionEnabled = true
+    --self.saveSelectionEnabled = true
     self.raidWindow.saveCheckbox:SetScript("OnClick", function()
         self.saveSelectionEnabled = self.raidWindow.saveCheckbox:GetChecked()
     end)
@@ -1566,6 +1566,9 @@ function GpDb:RestoreRaidWindowState()
     end
     
     -- Всегда отображаем lastGPValue, даже если 0
+    if not self.lastGPValue then
+        self.lastGPValue = 0
+    end
     self.raidWindow.gpEditBox:SetText(tostring(self.lastGPValue))
     self.raidWindow.saveCheckbox:SetChecked(self.saveSelectionEnabled)
     
