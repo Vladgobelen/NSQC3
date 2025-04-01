@@ -105,20 +105,18 @@ function log(...)
 end
 
 function unixToDate(unixTime)
-    -- Проверяем, что unixTime является числом
+    -- Проверка ввода
     if type(unixTime) ~= "number" then
-        return "Invalid input"
+        return "Invalid input", nil, nil
     end
 
-    -- Получаем текущее время в формате таблицы
+    -- Получаем таблицу даты
     local dateTable = date("*t", unixTime)
-
-    -- Проверяем, что dateTable успешно создана
     if not dateTable then
-        return "Invalid Unix time"
+        return "Invalid Unix time", nil, nil
     end
 
-    -- Форматируем дату и время в строку
+    -- Форматирование даты (ваш существующий код)
     local formattedDate = string.format(
         "%04d-%02d-%02d %02d:%02d:%02d",
         dateTable.year,
@@ -129,7 +127,25 @@ function unixToDate(unixTime)
         dateTable.sec
     )
 
-    return formattedDate
+    -- День недели (1=воскресенье, 2=понедельник...7=суббота)
+    local dayOfWeek = dateTable.wday
+
+    -- Номер недели в году (упрощенный расчет)
+    local yearStart = time() - (dateTable.yday - 1) * 86400  -- Timestamp 1 января этого года
+    local weekNumber = math.floor((unixTime - yearStart) / (86400 * 7)) + 1
+
+    -- Корректировка для первой/последней недели года
+    if weekNumber < 1 then
+        weekNumber = 52  -- Последняя неделя предыдущего года
+    elseif weekNumber > 52 then
+        -- Проверяем, действительно ли это 53 неделя
+        local nextYearStart = yearStart + (365 + (dateTable.isdst and 1 or 0)) * 86400
+        if unixTime >= nextYearStart then
+            weekNumber = 1
+        end
+    end
+
+    return formattedDate, dayOfWeek, weekNumber
 end
 
 function NS3Menu(ver, subver)
