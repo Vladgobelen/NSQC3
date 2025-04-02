@@ -448,6 +448,56 @@ function NsDb:isArray(tbl)
     return count == #tbl  -- Если количество элементов == длине массива
 end
 
+-- Метод для получения размера подтаблицы (включая вложенные таблицы)
+function NsDb:getSubtableSize(...)
+    local n = select('#', ...)
+    if n == 0 then return 0 end
+    
+    local target = self.input_table
+    
+    -- Ищем целевую подтаблицу по цепочке ключей
+    for i = 1, n do
+        local key = select(i, ...)
+        if type(target) ~= "table" then return 0 end
+        target = target[key]
+        if target == nil then return 0 end
+    end
+    
+    -- Если дошли сюда - нашли подтаблицу
+    return self:calculateTableSize(target)
+end
+
+-- Вспомогательная рекурсивная функция для подсчета размера таблицы
+function NsDb:calculateTableSize(tbl)
+    if type(tbl) ~= "table" then return 0 end
+    
+    local size = 0
+    for k, v in pairs(tbl) do
+        if type(v) == "table" then
+            size = size + self:calculateTableSize(v)
+        else
+            size = size + 1
+        end
+    end
+    
+    return size
+end
+
+-- Считает количество подтаблиц в основной таблице (верхний уровень)
+function NsDb:TotalSize()
+    if not self.input_table or type(self.input_table) ~= "table" then
+        return 0
+    end
+    
+    local count = 0
+    for _, v in pairs(self.input_table) do
+        if type(v) == "table" then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 GpDb = {}
 GpDb.__index = GpDb
 
@@ -458,14 +508,149 @@ function GpDb:new(input_table)
         sort_ascending = true,
         visible_rows = 20,
         selected_indices = {},
-        last_selected_index = nil
+        last_selected_index = nil,
+        logData = {}
     }
     setmetatable(new_object, self)
     
     new_object:_CreateWindow()
     new_object:_CreateRaidSelectionWindow()
+    new_object:_CreateLogWindow()
     
     return new_object
+end
+
+function GpDb:_CreateLogWindow()
+    -- Основное окно логов
+    self.logWindow = CreateFrame("Frame", "GpDbLogWindow", self.window)
+    self.logWindow:SetFrameStrata("DIALOG")
+    self.logWindow:SetSize(600, self.window:GetHeight())
+    self.logWindow:SetPoint("TOPLEFT", self.window, "TOPRIGHT", 5, 0)
+    self.logWindow:SetMovable(false)
+    self.logWindow:Hide()
+
+    -- Фон окна
+    self.logWindow.background = self.logWindow:CreateTexture(nil, "BACKGROUND")
+    self.logWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.logWindow.background:SetVertexColor(0.1, 0.1, 0.1)
+    self.logWindow.background:SetAlpha(0.9)
+    self.logWindow.background:SetAllPoints(true)
+
+    -- Граница окна
+    self.logWindow.borderFrame = CreateFrame("Frame", nil, self.logWindow)
+    self.logWindow.borderFrame:SetPoint("TOPLEFT", -3, 3)
+    self.logWindow.borderFrame:SetPoint("BOTTOMRIGHT", 3, -3)
+    self.logWindow.borderFrame:SetBackdrop({
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        edgeSize = 16,
+        insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+
+    -- Кнопка закрытия
+    self.logWindow.closeButton = CreateFrame("Button", nil, self.logWindow, "UIPanelCloseButton")
+    self.logWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
+    self.logWindow.closeButton:SetScript("OnClick", function() 
+        self.logWindow:Hide() 
+    end)
+
+    -- Фильтры
+    self.logWindow.filters = CreateFrame("Frame", nil, self.logWindow)
+    self.logWindow.filters:SetPoint("TOPLEFT", 10, -5)
+    self.logWindow.filters:SetPoint("RIGHT", -10, 0)
+    self.logWindow.filters:SetHeight(30)
+
+    -- Поле "Количество"
+    self.logWindow.countFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.countFilter:SetSize(60, 20)
+    self.logWindow.countFilter:SetPoint("LEFT", self.logWindow.filters, "LEFT")
+    self.logWindow.countFilter:SetAutoFocus(false)
+    self.logWindow.countFilter:SetText("Кол-во")
+    self.logWindow.countFilter:SetScript("OnEscapePressed", function() self.logWindow.countFilter:ClearFocus() end)
+    self.logWindow.countFilter:SetScript("OnEnterPressed", function() 
+        self.logWindow.countFilter:ClearFocus() 
+        self:UpdateLogDisplay()
+    end)
+
+    -- Поле "Время"
+    self.logWindow.timeFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.timeFilter:SetSize(70, 20)
+    self.logWindow.timeFilter:SetPoint("LEFT", self.logWindow.countFilter, "RIGHT", 5, 0)
+    self.logWindow.timeFilter:SetAutoFocus(false)
+    self.logWindow.timeFilter:SetText("Время")
+    self.logWindow.timeFilter:SetScript("OnEscapePressed", function() self.logWindow.timeFilter:ClearFocus() end)
+    self.logWindow.timeFilter:SetScript("OnEnterPressed", function() 
+        self.logWindow.timeFilter:ClearFocus() 
+        self:UpdateLogDisplay()
+    end)
+
+    -- Поле "РЛ"
+    self.logWindow.rlFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.rlFilter:SetSize(70, 20)
+    self.logWindow.rlFilter:SetPoint("LEFT", self.logWindow.timeFilter, "RIGHT", 5, 0)
+    self.logWindow.rlFilter:SetAutoFocus(false)
+    self.logWindow.rlFilter:SetText("РЛ")
+    self.logWindow.rlFilter:SetScript("OnEscapePressed", function() self.logWindow.rlFilter:ClearFocus() end)
+    self.logWindow.rlFilter:SetScript("OnEnterPressed", function() 
+        self.logWindow.rlFilter:ClearFocus() 
+        self:UpdateLogDisplay()
+    end)
+
+    -- Поле "Рейд"
+    self.logWindow.raidFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.raidFilter:SetSize(100, 20)
+    self.logWindow.raidFilter:SetPoint("LEFT", self.logWindow.rlFilter, "RIGHT", 5, 0)
+    self.logWindow.raidFilter:SetAutoFocus(false)
+    self.logWindow.raidFilter:SetText("Рейд")
+    self.logWindow.raidFilter:SetScript("OnEscapePressed", function() self.logWindow.raidFilter:ClearFocus() end)
+    self.logWindow.raidFilter:SetScript("OnEnterPressed", function() 
+        self.logWindow.raidFilter:ClearFocus() 
+        self:UpdateLogDisplay()
+    end)
+
+    -- Поле "Ник"
+    self.logWindow.nameFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.nameFilter:SetSize(100, 20)
+    self.logWindow.nameFilter:SetPoint("LEFT", self.logWindow.raidFilter, "RIGHT", 5, 0)
+    self.logWindow.nameFilter:SetAutoFocus(false)
+    self.logWindow.nameFilter:SetText("Ник")
+    self.logWindow.nameFilter:SetScript("OnEscapePressed", function() self.logWindow.nameFilter:ClearFocus() end)
+    self.logWindow.nameFilter:SetScript("OnEnterPressed", function() 
+        self.logWindow.nameFilter:ClearFocus() 
+        self:UpdateLogDisplay()
+    end)
+
+    -- Кнопка "Показать"
+    self.logWindow.showButton = CreateFrame("Button", nil, self.logWindow.filters, "UIPanelButtonTemplate")
+    self.logWindow.showButton:SetSize(80, 22)
+    self.logWindow.showButton:SetPoint("LEFT", self.logWindow.nameFilter, "RIGHT", 5, 0)
+    self.logWindow.showButton:SetText("Показать")
+    self.logWindow.showButton:SetScript("OnClick", function() 
+        self:UpdateLogDisplay()
+    end)
+
+    -- Область с прокруткой для логов
+    self.logWindow.scrollFrame = CreateFrame("ScrollFrame", "GpDbLogScrollFrame", self.logWindow, "UIPanelScrollFrameTemplate")
+    self.logWindow.scrollFrame:SetPoint("TOPLEFT", 0, -70)
+    self.logWindow.scrollFrame:SetPoint("BOTTOMRIGHT", 0, 10)
+
+    self.logWindow.scrollChild = CreateFrame("Frame")
+    self.logWindow.scrollChild:SetSize(580, 1000)
+    self.logWindow.scrollFrame:SetScrollChild(self.logWindow.scrollChild)
+
+    -- Создаем строки для отображения логов
+    self.logRows = {}
+    for i = 1, 50 do
+        local row = CreateFrame("Frame", "GpDbLogRow"..i, self.logWindow.scrollChild)
+        row:SetSize(580, 20)
+        row:SetPoint("TOPLEFT", 0, -((i-1)*20))
+
+        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row.text:SetAllPoints(true)
+        row.text:SetJustifyH("LEFT")
+        row.text:SetText("")
+
+        self.logRows[i] = row
+    end
 end
 
 function GpDb:_CreateWindow()
@@ -507,6 +692,15 @@ function GpDb:_CreateWindow()
     self.window.closeButton = CreateFrame("Button", nil, self.window, "UIPanelCloseButton")
     self.window.closeButton:SetPoint("TOPRIGHT", -5, -5)
     self.window.closeButton:SetScript("OnClick", function() self.window:Hide() end)
+
+    -- 4.1 Кнопка логов (справа от кнопки закрытия)
+    self.window.logButton = CreateFrame("Button", nil, self.window, "UIPanelButtonTemplate")
+    self.window.logButton:SetSize(24, 24)
+    self.window.logButton:SetPoint("RIGHT", self.window.closeButton, "LEFT", -5, 0)
+    self.window.logButton:SetText("L")
+    self.window.logButton:SetScript("OnClick", function() 
+        self:ToggleLogWindow() 
+    end)
 
     -- 5. Чекбокс "Только рейд"
     self.window.raidOnlyCheckbox = CreateFrame("CheckButton", nil, self.window, "UICheckButtonTemplate")
@@ -726,7 +920,97 @@ function GpDb:_SetupTable()
         if self.raidWindow and self.raidWindow:IsShown() then
             self.raidWindow:Hide()
         end
+        -- Скрываем окно логов, если оно было открыто
+        if self.logWindow and self.logWindow:IsShown() then
+            self.logWindow:Hide()
+        end
     end)
+end
+
+function GpDb:ToggleLogWindow()
+    if not self.logWindow then
+        self:_CreateLogWindow()
+    end
+
+    if self.logWindow:IsShown() then
+        self.logWindow:Hide()
+    else
+        self.logWindow:Show()
+        self:UpdateLogDisplay()
+        
+        -- Если открыто окно рейда - корректируем размер
+        if self.raidWindow and self.raidWindow:IsShown() then
+            self.logWindow:SetHeight(self.window:GetHeight() / 2)
+        else
+            self.logWindow:SetHeight(self.window:GetHeight())
+        end
+    end
+end
+
+function GpDb:UpdateLogDisplay()
+    if not self.logWindow or not self.logWindow:IsShown() then return end
+    
+    local countFilter = self.logWindow.countFilter:GetText():lower()
+    local timeFilter = self.logWindow.timeFilter:GetText():lower()
+    local rlFilter = self.logWindow.rlFilter:GetText():lower()
+    local raidFilter = self.logWindow.raidFilter:GetText():lower()
+    local nameFilter = self.logWindow.nameFilter:GetText():lower()
+
+    local filteredData = {}
+    
+    for _, logEntry in ipairs(self.logData) do
+        local matches = true
+        
+        -- Фильтрация по количеству
+        if countFilter ~= "" and countFilter ~= "кол-во" and 
+           not tostring(logEntry.count):lower():find(countFilter, 1, true) then
+            matches = false
+        end
+        
+        -- Фильтрация по времени
+        if matches and timeFilter ~= "" and timeFilter ~= "время" and 
+           not logEntry.time:lower():find(timeFilter, 1, true) then
+            matches = false
+        end
+        
+        -- Фильтрация по РЛ
+        if matches and rlFilter ~= "" and rlFilter ~= "рл" and 
+           not logEntry.rl:lower():find(rlFilter, 1, true) then
+            matches = false
+        end
+        
+        -- Фильтрация по рейду
+        if matches and raidFilter ~= "" and raidFilter ~= "рейд" and 
+           not logEntry.raid:lower():find(raidFilter, 1, true) then
+            matches = false
+        end
+        
+        -- Фильтрация по нику
+        if matches and nameFilter ~= "" and nameFilter ~= "ник" and 
+           not logEntry.nick:lower():find(nameFilter, 1, true) then
+            matches = false
+        end
+        
+        if matches then
+            table.insert(filteredData, logEntry)
+        end
+    end
+
+    -- Обновляем отображение
+    for i, row in ipairs(self.logRows) do
+        if i <= #filteredData then
+            local entry = filteredData[i]
+            row.text:SetText(string.format("%d | %s | %s | %s | %s", 
+                entry.count, entry.time, entry.rl, entry.raid, entry.nick))
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+
+    -- Обновляем высоту scrollChild
+    self.logWindow.scrollChild:SetHeight(#filteredData * 20)
+    self.logWindow.scrollFrame:UpdateScrollChildRect()
 end
 
 function GpDb:_UpdateSelectionCount()
@@ -795,6 +1079,32 @@ function GpDb:GetSelectedEntries()
     return selected
 end
 
+function GpDb:AddLogEntry(count, time, rl, raid, nick)
+    -- Проверяем наличие окна логов
+    if not self.logWindow then
+        self:_CreateLogWindow()
+    end
+    
+    -- Добавляем новую запись в начало списка (новые записи сверху)
+    table.insert(self.logData, 1, {
+        count = tonumber(count) or 0,
+        time = time or date("%H:%M"),  -- Текущее время по умолчанию
+        rl = rl or UnitName("player") or "Неизвестно",
+        raid = raid or "Неизвестно",
+        nick = nick or "Неизвестно"
+    })
+    
+    -- Ограничиваем количество хранимых записей (например, 200)
+    if #self.logData > 200 then
+        table.remove(self.logData)  -- Удаляем самую старую запись
+    end
+    
+    -- Обновляем отображение, если окно видимо
+    if self.logWindow and self.logWindow:IsShown() then
+        self:UpdateLogDisplay()
+    end
+end
+
 function GpDb:UpdateRaidWindowVisibility()
     if not self.raidWindow then return end
     
@@ -803,6 +1113,10 @@ function GpDb:UpdateRaidWindowVisibility()
     if not hasOfficerRank then
         if self.raidWindow:IsShown() then
             self.raidWindow:Hide()
+            -- Восстанавливаем полный размер окна логов
+            if self.logWindow and self.logWindow:IsShown() then
+                self.logWindow:SetHeight(self.window:GetHeight())
+            end
         end
         return
     end
@@ -812,6 +1126,10 @@ function GpDb:UpdateRaidWindowVisibility()
     if not hasSelection then
         if self.raidWindow:IsShown() then
             self.raidWindow:Hide()
+            -- Восстанавливаем полный размер окна логов
+            if self.logWindow and self.logWindow:IsShown() then
+                self.logWindow:SetHeight(self.window:GetHeight())
+            end
         end
         return
     end
@@ -843,11 +1161,21 @@ function GpDb:UpdateRaidWindowVisibility()
         if not self.raidWindow:IsShown() then
             self.raidWindow:Show()
             self:RestoreRaidWindowState() -- Восстанавливаем состояния при показе
+            self:_UpdateSelectedPlayersText() -- Обновляем список игроков
+            
+            -- Корректируем размер окна логов
+            if self.logWindow and self.logWindow:IsShown() then
+                self.logWindow:SetHeight(self.window:GetHeight() / 2)
+            end
         end
-        self:_UpdateSelectedPlayersText() -- Обновляем список игроков
     else
         if self.raidWindow:IsShown() then
             self.raidWindow:Hide()
+        end
+        
+        -- Корректируем размер окна логов
+        if self.logWindow and self.logWindow:IsShown() then
+            self.logWindow:SetHeight(self.window:GetHeight())
         end
     end
 end
@@ -1352,7 +1680,7 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.saveCheckbox.text:SetPoint("LEFT", self.raidWindow.saveCheckbox, "RIGHT", 5, 0)
     self.raidWindow.saveCheckbox.text:SetText("Сохранить выбор")
     self.raidWindow.saveCheckbox:SetChecked(true)
-    --self.saveSelectionEnabled = true
+    self.saveSelectionEnabled = true
     self.raidWindow.saveCheckbox:SetScript("OnClick", function()
         self.saveSelectionEnabled = self.raidWindow.saveCheckbox:GetChecked()
     end)
@@ -1476,6 +1804,10 @@ function GpDb:_CreateRaidSelectionWindow()
                 SendAddonMessage("nsGP" .. " " .. gpValue, nick, "guild")
                 local _, _, nickID = getIDnome("","",nick,"")
                 logStr = logStr .. " " .. nickID
+                
+                -- Добавляем запись в лог
+                self:AddLogEntry(gpValue, date("%H:%M"), UnitName("player"), 
+                    self.raidWindow.selectedRaidName or self.raidWindow.editBox:GetText(), nick)
             end
         end
 
@@ -1488,6 +1820,14 @@ function GpDb:_CreateRaidSelectionWindow()
         end
         self:UpdateWindow()
         self.raidWindow:Hide()
+    end)
+
+    -- Добавляем обработчик скрытия окна для корректировки размера логов
+    self.raidWindow:SetScript("OnHide", function()
+        -- Восстанавливаем полный размер окна логов при скрытии окна рейда
+        if self.logWindow and self.logWindow:IsShown() then
+            self.logWindow:SetHeight(self.window:GetHeight())
+        end
     end)
 
     -- Инициализация при первом открытии

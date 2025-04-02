@@ -110,42 +110,51 @@ function unixToDate(unixTime)
         return "Invalid input", nil, nil
     end
 
-    -- Получаем таблицу даты
+    -- Получаем таблицу даты (в WoW используется date(), а не os.date())
     local dateTable = date("*t", unixTime)
     if not dateTable then
         return "Invalid Unix time", nil, nil
     end
 
-    -- Форматирование даты (ваш существующий код)
-    local formattedDate = string.format(
-        "%04d-%02d-%02d %02d:%02d:%02d",
-        dateTable.year,
-        dateTable.month,
-        dateTable.day,
-        dateTable.hour,
-        dateTable.min,
-        dateTable.sec
-    )
+    -- Форматируем дату в строку
+    local dateString = string.format("%04d-%02d-%02d %02d:%02d:%02d",
+        dateTable.year, dateTable.month, dateTable.day,
+        dateTable.hour, dateTable.min, dateTable.sec)
 
-    -- День недели (1=воскресенье, 2=понедельник...7=суббота)
-    local dayOfWeek = dateTable.wday
+    -- Корректируем день недели (в WoW воскресенье = 1, понедельник = 2, и т.д.)
+    -- Приводим к стандарту ISO: понедельник = 1, воскресенье = 7
+    local dayOfWeek = dateTable.wday - 1
+    if dayOfWeek == 0 then dayOfWeek = 7 end
 
-    -- Номер недели в году (упрощенный расчет)
-    local yearStart = time() - (dateTable.yday - 1) * 86400  -- Timestamp 1 января этого года
-    local weekNumber = math.floor((unixTime - yearStart) / (86400 * 7)) + 1
-
-    -- Корректировка для первой/последней недели года
-    if weekNumber < 1 then
-        weekNumber = 52  -- Последняя неделя предыдущего года
-    elseif weekNumber > 52 then
-        -- Проверяем, действительно ли это 53 неделя
-        local nextYearStart = yearStart + (365 + (dateTable.isdst and 1 or 0)) * 86400
-        if unixTime >= nextYearStart then
-            weekNumber = 1
+    -- Вычисляем номер недели (по ISO 8601)
+    -- В WoW нет встроенной функции, поэтому реализуем вручную
+    local function getISOWeekNumber(y, m, d)
+        -- Простая реализация (может не учитывать все крайние случаи)
+        local jan1 = date("*t", time({year = y, month = 1, day = 1}))
+        local firstThursday
+        if jan1.wday <= 5 then  -- Пятница или раньше
+            firstThursday = 11 - jan1.wday
+        else  -- Суббота или воскресенье
+            firstThursday = 4 + (7 - jan1.wday)
+        end
+        
+        local dayOfYear = dateTable.yday
+        local weekNum = math.floor((dayOfYear - firstThursday + 10) / 7)
+        
+        if weekNum < 1 then
+            -- Это последняя неделя предыдущего года
+            return getISOWeekNumber(y - 1, 12, 31)
+        elseif weekNum > 52 and (date("*t", time({year = y, month = 12, day = 31}))).yday - firstThursday < 4 then
+            -- Это первая неделя следующего года
+            return 1
+        else
+            return weekNum
         end
     end
 
-    return formattedDate, dayOfWeek, weekNumber
+    local weekNumber = getISOWeekNumber(dateTable.year, dateTable.month, dateTable.day)
+
+    return dateString, dayOfWeek, weekNumber
 end
 
 function NS3Menu(ver, subver)
@@ -992,3 +1001,165 @@ function is_null(value)
 end
 ----------------------------------------------------------------
 
+
+
+
+
+
+
+-- Base85 with custom encoding table for WoW 3.3.5 (Lua 5.1)
+
+local Base85 = {}
+
+-- Your custom encoding table
+local encodeTable = {
+    [0] = "0", [1] = "1", [2] = "2", [3] = "3", [4] = "4",
+    [5] = "5", [6] = "6", [7] = "7", [8] = "8", [9] = "9",
+    [10] = "A", [11] = "B", [12] = "C", [13] = "D", [14] = "E",
+    [15] = "F", [16] = "G", [17] = "#", [18] = "$", [19] = "%",
+    [20] = "(", [21] = ")", [22] = "*", [23] = "+", [24] = "-",
+    [25] = "/", [26] = ";", [27] = "<", [28] = "=", [29] = ">",
+    [30] = "@", [31] = "H", [32] = "I", [33] = "J", [34] = "K",
+    [35] = "L", [36] = "M", [37] = "N", [38] = "O", [39] = "P",
+    [40] = "Q", [41] = "R", [42] = "S", [43] = "T", [44] = "U",
+    [45] = "V", [46] = "W", [47] = "X", [48] = "Y", [49] = "Z",
+    [50] = "^", [51] = "_", [52] = "`", [53] = "a", [54] = "b",
+    [55] = "c", [56] = "d", [57] = "e", [58] = "f", [59] = "g",
+    [60] = "h", [61] = "i", [62] = "j", [63] = "k", [64] = "l",
+    [65] = "m", [66] = "n", [67] = "o", [68] = "p", [69] = "q",
+    [70] = "r", [71] = "s", [72] = "t", [73] = "u", [74] = "v",
+    [75] = "w", [76] = "x", [77] = "y", [78] = "z", [79] = "{",
+    [80] = "|", [81] = "}", [82] = "[", [83] = "]", [84] = "'",
+}
+
+-- Decoding table (built dynamically for performance)
+local decodeTable = nil
+
+local function BuildDecodeTable()
+    decodeTable = {}
+    for i=0,84 do
+        local c = encodeTable[i]
+        decodeTable[c] = i
+    end
+end
+
+-- Helper function to convert 4 bytes to a 32-bit integer
+local function BytesToInt(b1, b2, b3, b4)
+    return b1*16777216 + b2*65536 + b3*256 + b4
+end
+
+-- Helper function to convert a 32-bit integer to 5 base85 characters
+local function IntToBase85(num)
+    if num == 0 then return encodeTable[0]..encodeTable[0]..encodeTable[0]..encodeTable[0]..encodeTable[0] end
+    
+    local result = {}
+    for i=1,5 do
+        local remainder = num % 85
+        result[6-i] = encodeTable[remainder]
+        num = math.floor(num / 85)
+    end
+    
+    return table.concat(result)
+end
+
+-- Encodes a string to Base85
+function Base85.Encode(input)
+    if not input then return nil end
+    if #input == 0 then return "" end
+    
+    local result = {}
+    local padding = 0
+    
+    -- Process 4 bytes at a time
+    for i=1, #input, 4 do
+        local b1, b2, b3, b4 = input:byte(i, i+3)
+        
+        -- Handle padding for the last chunk
+        if not b2 then b2 = 0 end
+        if not b3 then b3 = 0 end
+        if not b4 then b4 = 0; padding = 4 - (#input - i) end
+        
+        local num = BytesToInt(b1, b2, b3, b4)
+        local chunk = IntToBase85(num)
+        
+        -- Shorten the last chunk if there was padding
+        if padding > 0 then
+            chunk = chunk:sub(1, 5 - padding)
+        end
+        
+        table.insert(result, chunk)
+    end
+    
+    return table.concat(result)
+end
+
+-- Helper function to convert 5 base85 characters to a 32-bit integer
+local function Base85ToInt(str)
+    if not decodeTable then BuildDecodeTable() end
+    
+    local num = 0
+    for i=1, #str do
+        local c = str:sub(i,i)
+        local value = decodeTable[c]
+        if not value then
+            error("Invalid Base85 character: " .. c)
+        end
+        num = num * 85 + value
+    end
+    
+    -- Handle short chunks (padding)
+    for i=#str+1, 5 do
+        num = num * 85 + 84
+    end
+    
+    return num
+end
+
+-- Helper function to convert a 32-bit integer to 4 bytes
+local function IntToBytes(num)
+    local b4 = num % 256; num = math.floor(num / 256)
+    local b3 = num % 256; num = math.floor(num / 256)
+    local b2 = num % 256; num = math.floor(num / 256)
+    local b1 = num % 256
+    
+    return b1, b2, b3, b4
+end
+
+-- Decodes a Base85 string
+function Base85.Decode(input)
+    if not input then return nil end
+    if #input == 0 then return "" end
+    
+    local result = {}
+    local padding = 0
+    
+    -- Process 5 characters at a time
+    for i=1, #input, 5 do
+        local chunk = input:sub(i, i+4)
+        
+        -- Handle padding for the last chunk
+        if #chunk < 5 then
+            padding = 5 - #chunk
+            chunk = chunk .. string.rep(encodeTable[84], padding) -- Use the last character for padding
+        end
+        
+        local num = Base85ToInt(chunk)
+        local b1, b2, b3, b4 = IntToBytes(num)
+        
+        -- Remove padding bytes
+        if padding > 0 then
+            if padding >= 1 then b4 = nil end
+            if padding >= 2 then b3 = nil end
+            if padding >= 3 then b2 = nil end
+            -- Never remove all 4 bytes
+        end
+        
+        -- Add bytes to result
+        if b1 then table.insert(result, string.char(b1)) end
+        if b2 then table.insert(result, string.char(b2)) end
+        if b3 then table.insert(result, string.char(b3)) end
+        if b4 then table.insert(result, string.char(b4)) end
+    end
+    
+    return table.concat(result)
+end
