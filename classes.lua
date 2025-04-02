@@ -639,7 +639,8 @@ function GpDb:_CreateLogWindow()
         print(string.format("|cFFFFFF00РЛ:|r %s", rl))
         print(string.format("|cFFFFFF00Рейд:|r %s", raid))
         print(string.format("|cFFFFFF00Ник:|r %s", name))
-        gpDb:AddLogEntry("14:30", "РЛ_Игрок", "Мол_Крыла", "Цель_Игрок Игрок2 игрок4 Игрок5 Игрок6 Игрок7 Игрок8")
+        gpDb:AddLogEntry("14:30", 5, "Шеф", "Мол_Крыла", "Шеф Годвар Витинари")
+        gpDb:AddLogEntry("14:35", -5, "Шеф", "Мол_Крыла", "Шеф Годвар Витинари")
     end)
 
     -- Область с прокруткой для логов
@@ -983,53 +984,44 @@ end
 function GpDb:UpdateLogDisplay()
     if not self.logWindow or not self.logWindow:IsShown() then return end
     
-    -- Вычисляем общую высоту контента
+    -- Вычисляем общую высоту
     local totalHeight = 0
     local rowHeights = {}
     
-    -- Предварительно вычисляем высоту каждой строки
+    -- Сначала вычисляем высоту всех строк
     for i, entry in ipairs(self.logData) do
-        local text = string.format("%s | %s | %s | %s", entry.time, entry.rl, entry.raid, entry.nick)
-        
-        -- Создаем временный FontString для измерения
         local tempText = self.logWindow.scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        tempText:SetWidth(580) -- Ширина строки
-        tempText:SetText(text)
+        tempText:SetWidth(580)
+        tempText:SetText(entry.text)
         tempText:SetWordWrap(true)
-        
-        local textHeight = tempText:GetStringHeight() + 5 -- Добавляем небольшой отступ
+        local textHeight = tempText:GetStringHeight() + 5
         rowHeights[i] = textHeight
         totalHeight = totalHeight + textHeight
-        
         tempText:Hide()
     end
 
-    -- Позиционируем строки (новые снизу)
+    -- Позиционируем строки (старые сверху, новые снизу)
     local currentY = 0
-    for i, row in ipairs(self.logRows) do
-        local dataIndex = #self.logData - i + 1
-        if dataIndex >= 1 then
+    for i = 1, #self.logRows do
+        local dataIndex = i -- Отображаем записи по порядку (1=самая старая)
+        if dataIndex <= #self.logData then
             local entry = self.logData[dataIndex]
             local textHeight = rowHeights[dataIndex]
             
-            row:SetHeight(textHeight)
-            row:SetPoint("TOPLEFT", 0, -currentY)
-            
-            row.text:SetText(string.format("%s | %s | %s | %s", entry.time, entry.rl, entry.raid, entry.nick))
-            row:Show()
+            self.logRows[i]:SetHeight(textHeight)
+            self.logRows[i]:SetPoint("TOPLEFT", 0, -currentY)
+            self.logRows[i].text:SetText(entry.text)
+            self.logRows[i]:Show()
             
             currentY = currentY + textHeight
         else
-            row:Hide()
+            self.logRows[i]:Hide()
         end
     end
 
-    -- Обновляем высоту scrollChild
+    -- Обновляем высоту контента
     self.logWindow.scrollChild:SetHeight(totalHeight)
     self.logWindow.scrollFrame:UpdateScrollChildRect()
-    
-    -- Прокручиваем вниз к новым записям
-    self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())
 end
 
 function GpDb:_UpdateSelectionCount()
@@ -1098,22 +1090,75 @@ function GpDb:GetSelectedEntries()
     return selected
 end
 
-function GpDb:AddLogEntry(count, time, rl, raid, nick)
+function GpDb:AddLogEntry(time, gp, rl, raid, targets)
     -- Проверяем наличие окна логов
     if not self.logWindow then
         self:_CreateLogWindow()
     end
     
-    -- Добавляем новую запись в КОНЕЦ списка (чтобы новые были внизу)
+    -- Функция для получения цвета класса игрока
+    local function GetClassColor(name)
+        if not name or type(name) ~= "string" or name == "" then 
+            return "|cFFFFFFFF" 
+        end
+        
+        local plainName = name:match("^(.-)-") or name
+        
+        for i = 1, GetNumGuildMembers() do
+            local guildName, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
+            if guildName and guildName == plainName then
+                local color = RAID_CLASS_COLORS[classFileName]
+                if color then
+                    return string.format("|cFF%02x%02x%02x", color.r*255, color.g*255, color.b*255)
+                end
+                break
+            end
+        end
+        
+        return "|cFFFFFFFF"
+    end
+    
+    -- Получаем числовое значение ГП
+    local gpValue = tonumber(gp) or 0
+    
+    -- Форматируем компоненты
+    local formattedTime = "|cFFA0A0A0" .. (time or date("%H:%M")) .. "|r"
+    local rlName = type(rl) == "string" and rl or UnitName("player") or "Неизвестно"
+    local formattedRl = GetClassColor(rlName) .. rlName .. "|r"
+    local gpColor = gpValue >= 0 and "|cFF00FF00" or "|cFFFF0000"
+    local formattedGp = gpColor .. tostring(gpValue) .. "|r" -- Явное преобразование в строку
+    local raidName = type(raid) == "string" and raid or "Неизвестно"
+    local formattedRaid = "|cFFFFFF00" .. raidName .. "|r"
+    
+    -- Форматируем цели
+    local targetsList = type(targets) == "string" and targets or "Неизвестно"
+    local formattedTargets = {}
+    for name in targetsList:gmatch("%S+") do
+        table.insert(formattedTargets, GetClassColor(name) .. name .. "|r")
+    end
+    local formattedTargetsText = table.concat(formattedTargets, " ")
+    
+    -- Собираем строку лога (правильный порядок)
+    local logText = string.format("%s | %s | %s | %s | %s", 
+        formattedTime, 
+        formattedRl,
+        formattedGp,
+        formattedRaid, 
+        formattedTargetsText)
+    
+    -- Добавляем новую запись В КОНЕЦ таблицы (для отображения снизу)
     table.insert(self.logData, {
-        --count = tonumber(count) or 0,
-        time = time or date("%H:%M"),
-        rl = rl or UnitName("player") or "Неизвестно",
-        raid = raid or "Неизвестно",
-        nick = nick or "Неизвестно"
+        text = logText,
+        raw = {
+            time = time or date("%H:%M"),
+            rl = rlName,
+            gp = gpValue, -- Сохраняем числовое значение
+            raid = raidName,
+            targets = targetsList
+        }
     })
     
-    -- Ограничиваем количество записей (удаляем самые старые СВЕРХУ)
+    -- Ограничиваем количество записей (удаляем старые сверху)
     if #self.logData > 200 then
         table.remove(self.logData, 1)
     end
@@ -1121,11 +1166,10 @@ function GpDb:AddLogEntry(count, time, rl, raid, nick)
     -- Обновляем отображение
     if self.logWindow and self.logWindow:IsShown() then
         self:UpdateLogDisplay()
-        -- Автопрокрутка вниз к новой записи
+        -- Прокручиваем вниз к новым записям
         self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())
     end
 end
-
 
 function GpDb:UpdateRaidWindowVisibility()
     if not self.raidWindow then return end
