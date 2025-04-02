@@ -624,13 +624,27 @@ function GpDb:_CreateLogWindow()
     self.logWindow.showButton:SetSize(80, 22)
     self.logWindow.showButton:SetPoint("LEFT", self.logWindow.nameFilter, "RIGHT", 5, 0)
     self.logWindow.showButton:SetText("Показать")
-    self.logWindow.showButton:SetScript("OnClick", function() 
-        self:UpdateLogDisplay()
+    self.logWindow.showButton:SetScript("OnClick", function()
+        gpDb:ClearLog()
+        local count = self.logWindow.countFilter:GetText()
+        local time = self.logWindow.timeFilter:GetText()
+        local rl = self.logWindow.rlFilter:GetText()
+        local raid = self.logWindow.raidFilter:GetText()
+        local name = self.logWindow.nameFilter:GetText()
+
+        -- Выводим значения в чат
+        print("|cFF00FF00Текущие значения фильтров логов:|r")
+        print(string.format("|cFFFFFF00Количество:|r %s", count))
+        print(string.format("|cFFFFFF00Время:|r %s", time))
+        print(string.format("|cFFFFFF00РЛ:|r %s", rl))
+        print(string.format("|cFFFFFF00Рейд:|r %s", raid))
+        print(string.format("|cFFFFFF00Ник:|r %s", name))
+        gpDb:AddLogEntry("14:30", "РЛ_Игрок", "Мол_Крыла", "Цель_Игрок Игрок2 игрок4 Игрок5 Игрок6 Игрок7 Игрок8")
     end)
 
     -- Область с прокруткой для логов
     self.logWindow.scrollFrame = CreateFrame("ScrollFrame", "GpDbLogScrollFrame", self.logWindow, "UIPanelScrollFrameTemplate")
-    self.logWindow.scrollFrame:SetPoint("TOPLEFT", 0, -70)
+    self.logWindow.scrollFrame:SetPoint("TOPLEFT", 0, -35)
     self.logWindow.scrollFrame:SetPoint("BOTTOMRIGHT", 0, 10)
 
     self.logWindow.scrollChild = CreateFrame("Frame")
@@ -641,16 +655,35 @@ function GpDb:_CreateLogWindow()
     self.logRows = {}
     for i = 1, 50 do
         local row = CreateFrame("Frame", "GpDbLogRow"..i, self.logWindow.scrollChild)
-        row:SetSize(580, 20)
-        row:SetPoint("TOPLEFT", 0, -((i-1)*20))
+        row:SetSize(580, 40) -- Увеличиваем высоту для переноса строк
+        row:SetPoint("TOPLEFT", 0, -((i-1)*40))
 
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         row.text:SetAllPoints(true)
         row.text:SetJustifyH("LEFT")
+        row.text:SetJustifyV("TOP")
+        row.text:SetWordWrap(true) -- Включаем перенос слов
         row.text:SetText("")
 
         self.logRows[i] = row
     end
+end
+
+function GpDb:ClearLog()
+    -- Очищаем данные лога
+    self.logData = {}
+    
+    -- Очищаем фильтры
+    self.logWindow.countFilter:SetText("Кол-во")
+    self.logWindow.timeFilter:SetText("Время")
+    self.logWindow.rlFilter:SetText("РЛ")
+    self.logWindow.raidFilter:SetText("Рейд")
+    self.logWindow.nameFilter:SetText("Ник")
+    
+    -- Обновляем отображение
+    self:UpdateLogDisplay()
+    
+    print("|cFFFF0000ГП:|r Лог успешно очищен")
 end
 
 function GpDb:_CreateWindow()
@@ -950,67 +983,53 @@ end
 function GpDb:UpdateLogDisplay()
     if not self.logWindow or not self.logWindow:IsShown() then return end
     
-    local countFilter = self.logWindow.countFilter:GetText():lower()
-    local timeFilter = self.logWindow.timeFilter:GetText():lower()
-    local rlFilter = self.logWindow.rlFilter:GetText():lower()
-    local raidFilter = self.logWindow.raidFilter:GetText():lower()
-    local nameFilter = self.logWindow.nameFilter:GetText():lower()
-
-    local filteredData = {}
+    -- Вычисляем общую высоту контента
+    local totalHeight = 0
+    local rowHeights = {}
     
-    for _, logEntry in ipairs(self.logData) do
-        local matches = true
+    -- Предварительно вычисляем высоту каждой строки
+    for i, entry in ipairs(self.logData) do
+        local text = string.format("%s | %s | %s | %s", entry.time, entry.rl, entry.raid, entry.nick)
         
-        -- Фильтрация по количеству
-        if countFilter ~= "" and countFilter ~= "кол-во" and 
-           not tostring(logEntry.count):lower():find(countFilter, 1, true) then
-            matches = false
-        end
+        -- Создаем временный FontString для измерения
+        local tempText = self.logWindow.scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        tempText:SetWidth(580) -- Ширина строки
+        tempText:SetText(text)
+        tempText:SetWordWrap(true)
         
-        -- Фильтрация по времени
-        if matches and timeFilter ~= "" and timeFilter ~= "время" and 
-           not logEntry.time:lower():find(timeFilter, 1, true) then
-            matches = false
-        end
+        local textHeight = tempText:GetStringHeight() + 5 -- Добавляем небольшой отступ
+        rowHeights[i] = textHeight
+        totalHeight = totalHeight + textHeight
         
-        -- Фильтрация по РЛ
-        if matches and rlFilter ~= "" and rlFilter ~= "рл" and 
-           not logEntry.rl:lower():find(rlFilter, 1, true) then
-            matches = false
-        end
-        
-        -- Фильтрация по рейду
-        if matches and raidFilter ~= "" and raidFilter ~= "рейд" and 
-           not logEntry.raid:lower():find(raidFilter, 1, true) then
-            matches = false
-        end
-        
-        -- Фильтрация по нику
-        if matches and nameFilter ~= "" and nameFilter ~= "ник" and 
-           not logEntry.nick:lower():find(nameFilter, 1, true) then
-            matches = false
-        end
-        
-        if matches then
-            table.insert(filteredData, logEntry)
-        end
+        tempText:Hide()
     end
 
-    -- Обновляем отображение
+    -- Позиционируем строки (новые снизу)
+    local currentY = 0
     for i, row in ipairs(self.logRows) do
-        if i <= #filteredData then
-            local entry = filteredData[i]
-            row.text:SetText(string.format("%d | %s | %s | %s | %s", 
-                entry.count, entry.time, entry.rl, entry.raid, entry.nick))
+        local dataIndex = #self.logData - i + 1
+        if dataIndex >= 1 then
+            local entry = self.logData[dataIndex]
+            local textHeight = rowHeights[dataIndex]
+            
+            row:SetHeight(textHeight)
+            row:SetPoint("TOPLEFT", 0, -currentY)
+            
+            row.text:SetText(string.format("%s | %s | %s | %s", entry.time, entry.rl, entry.raid, entry.nick))
             row:Show()
+            
+            currentY = currentY + textHeight
         else
             row:Hide()
         end
     end
 
     -- Обновляем высоту scrollChild
-    self.logWindow.scrollChild:SetHeight(#filteredData * 20)
+    self.logWindow.scrollChild:SetHeight(totalHeight)
     self.logWindow.scrollFrame:UpdateScrollChildRect()
+    
+    -- Прокручиваем вниз к новым записям
+    self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())
 end
 
 function GpDb:_UpdateSelectionCount()
@@ -1085,25 +1104,28 @@ function GpDb:AddLogEntry(count, time, rl, raid, nick)
         self:_CreateLogWindow()
     end
     
-    -- Добавляем новую запись в начало списка (новые записи сверху)
-    table.insert(self.logData, 1, {
-        count = tonumber(count) or 0,
-        time = time or date("%H:%M"),  -- Текущее время по умолчанию
+    -- Добавляем новую запись в КОНЕЦ списка (чтобы новые были внизу)
+    table.insert(self.logData, {
+        --count = tonumber(count) or 0,
+        time = time or date("%H:%M"),
         rl = rl or UnitName("player") or "Неизвестно",
         raid = raid or "Неизвестно",
         nick = nick or "Неизвестно"
     })
     
-    -- Ограничиваем количество хранимых записей (например, 200)
+    -- Ограничиваем количество записей (удаляем самые старые СВЕРХУ)
     if #self.logData > 200 then
-        table.remove(self.logData)  -- Удаляем самую старую запись
+        table.remove(self.logData, 1)
     end
     
-    -- Обновляем отображение, если окно видимо
+    -- Обновляем отображение
     if self.logWindow and self.logWindow:IsShown() then
         self:UpdateLogDisplay()
+        -- Автопрокрутка вниз к новой записи
+        self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())
     end
 end
+
 
 function GpDb:UpdateRaidWindowVisibility()
     if not self.raidWindow then return end
