@@ -106,14 +106,14 @@ end
 
 function unixToDate(unixTime)
     -- Проверка ввода
-    if type(unixTime) ~= "number" then
-        return "Invalid input", nil, nil
+    if type(unixTime) ~= "number" or unixTime < 0 then
+        return "Invalid Unix time", nil, nil
     end
 
     -- Получаем таблицу даты (в WoW используется date(), а не os.date())
     local dateTable = date("*t", unixTime)
     if not dateTable then
-        return "Invalid Unix time", nil, nil
+        return "Invalid date", nil, nil
     end
 
     -- Форматируем дату в строку
@@ -121,35 +121,82 @@ function unixToDate(unixTime)
         dateTable.year, dateTable.month, dateTable.day,
         dateTable.hour, dateTable.min, dateTable.sec)
 
-    -- Корректируем день недели (в WoW воскресенье = 1, понедельник = 2, и т.д.)
-    -- Приводим к стандарту ISO: понедельник = 1, воскресенье = 7
+    -- Корректно определяем день недели (ISO 8601: понедельник=1, воскресенье=7)
     local dayOfWeek = dateTable.wday - 1
-    if dayOfWeek == 0 then dayOfWeek = 7 end
+    if dayOfWeek == 0 then
+        dayOfWeek = 7  -- Воскресенье (в WoW wday=1) → в ISO=7
+    end
 
-    -- Вычисляем номер недели (по ISO 8601)
-    -- В WoW нет встроенной функции, поэтому реализуем вручную
+    -- Точный расчёт номера недели по ISO 8601
     local function getISOWeekNumber(y, m, d)
-        -- Простая реализация (может не учитывать все крайние случаи)
-        local jan1 = date("*t", time({year = y, month = 1, day = 1}))
-        local firstThursday
-        if jan1.wday <= 5 then  -- Пятница или раньше
-            firstThursday = 11 - jan1.wday
-        else  -- Суббота или воскресенье
-            firstThursday = 4 + (7 - jan1.wday)
+        -- Используем алгоритм, соответствующий стандарту
+        local t = { year = y, month = m, day = d }
+        local timestamp = time(t)
+        if not timestamp then return nil end
+
+        local dateInfo = date("*t", timestamp)
+        local year, month, day = dateInfo.year, dateInfo.month, dateInfo.day
+
+        -- Находим четверг этой недели (по ISO неделя начинается с понедельника)
+        local dayOfWeekISO = dayOfWeek  -- уже преобразован в ISO (пн=1, вск=7)
+        local thursdayOffset = 4 - dayOfWeekISO  -- 4 = четверг
+        local thursdayDay = day + thursdayOffset
+
+        -- Корректируем, если вышли за границы месяца
+        local thursdayTimestamp = time({
+            year = year,
+            month = month,
+            day = thursdayDay
+        })
+        if not thursdayTimestamp then
+            -- Если не удалось (например, 30 февраля), используем альтернативный метод
+            local tempDate = date("*t", timestamp + (thursdayOffset * 86400))
+            year, month, day = tempDate.year, tempDate.month, tempDate.day
+        else
+            local thursdayDate = date("*t", thursdayTimestamp)
+            year, month, day = thursdayDate.year, thursdayDate.month, thursdayDate.day
         end
+
+        -- Первая неделя года — это та, где есть 4 января
+        local jan4Timestamp = time({ year = year, month = 1, day = 4 })
+        if not jan4Timestamp then return nil end
+        local jan4Date = date("*t", jan4Timestamp)
+        local jan4Weekday = jan4Date.wday - 1
+        if jan4Weekday == 0 then jan4Weekday = 7 end  -- ISO коррекция
+
+        local yearStartTimestamp = time({ year = year, month = 1, day = 1 })
+        if not yearStartTimestamp then return nil end
+        local daysSinceYearStart = math.floor((timestamp - yearStartTimestamp) / 86400) + 1
+
+        local weekNum = math.floor((daysSinceYearStart + jan4Weekday - 1) / 7) - math.floor((jan4Weekday - 1) / 7)
         
-        local dayOfYear = dateTable.yday
-        local weekNum = math.floor((dayOfYear - firstThursday + 10) / 7)
-        
+        -- Коррекция для первых и последних недель года
         if weekNum < 1 then
             -- Это последняя неделя предыдущего года
-            return getISOWeekNumber(y - 1, 12, 31)
-        elseif weekNum > 52 and (date("*t", time({year = y, month = 12, day = 31}))).yday - firstThursday < 4 then
-            -- Это первая неделя следующего года
-            return 1
-        else
-            return weekNum
+            local lastYear = year - 1
+            local dec31Timestamp = time({ year = lastYear, month = 12, day = 31 })
+            if not dec31Timestamp then return 52 end  -- fallback
+            local dec31Weekday = date("*t", dec31Timestamp).wday - 1
+            if dec31Weekday == 0 then dec31Weekday = 7 end
+            if dec31Weekday <= 4 then
+                return 52
+            else
+                return 53
+            end
+        elseif weekNum > 52 then
+            -- Проверяем, может ли год иметь 53 недели
+            local dec31Timestamp = time({ year = year, month = 12, day = 31 })
+            if not dec31Timestamp then return 52 end  -- fallback
+            local dec31Weekday = date("*t", dec31Timestamp).wday - 1
+            if dec31Weekday == 0 then dec31Weekday = 7 end
+            if dec31Weekday >= 4 then  -- Если 31 декабря = четверг или позже → 53 недели
+                return 53
+            else
+                return 1  -- Иначе это уже 1 неделя следующего года
+            end
         end
+
+        return weekNum
     end
 
     local weekNumber = getISOWeekNumber(dateTable.year, dateTable.month, dateTable.day)

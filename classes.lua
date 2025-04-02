@@ -625,22 +625,25 @@ function GpDb:_CreateLogWindow()
     self.logWindow.showButton:SetPoint("LEFT", self.logWindow.nameFilter, "RIGHT", 5, 0)
     self.logWindow.showButton:SetText("Показать")
     self.logWindow.showButton:SetScript("OnClick", function()
-        gpDb:ClearLog()
-        local count = self.logWindow.countFilter:GetText()
-        local time = self.logWindow.timeFilter:GetText()
-        local rl = self.logWindow.rlFilter:GetText()
-        local raid = self.logWindow.raidFilter:GetText()
-        local name = self.logWindow.nameFilter:GetText()
+        
+        local function processFilterText(text)
+            -- Проверяем, содержит ли текст пробелы (несколько слов)
+            if text:find("%s") then
+                -- Заменяем все последовательности пробелов на один символ '_'
+                text = text:gsub("%s+", "_")
+            end
+            return text
+        end
 
-        -- Выводим значения в чат
-        print("|cFF00FF00Текущие значения фильтров логов:|r")
-        print(string.format("|cFFFFFF00Количество:|r %s", count))
-        print(string.format("|cFFFFFF00Время:|r %s", time))
-        print(string.format("|cFFFFFF00РЛ:|r %s", rl))
-        print(string.format("|cFFFFFF00Рейд:|r %s", raid))
-        print(string.format("|cFFFFFF00Ник:|r %s", name))
-        gpDb:AddLogEntry("14:30", 5, "Шеф", "Мол_Крыла", "Шеф Годвар Витинари")
-        gpDb:AddLogEntry("14:35", -5, "Шеф", "Мол_Крыла", "Шеф Годвар Витинари")
+        local count = processFilterText(self.logWindow.countFilter:GetText())
+        local time = processFilterText(self.logWindow.timeFilter:GetText())
+        local rl = processFilterText(self.logWindow.rlFilter:GetText())
+        local raid = processFilterText(self.logWindow.raidFilter:GetText())
+        local name = processFilterText(self.logWindow.nameFilter:GetText())
+
+        gpDb:ClearLog()
+        
+        SendAddonMessage("NSShowMeLogs", count.. " " ..time.. " " ..rl.. " " ..raid.. " " ..name, "guild")
     end)
 
     -- Область с прокруткой для логов
