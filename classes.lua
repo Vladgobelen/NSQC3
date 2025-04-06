@@ -3117,7 +3117,7 @@ mDB = {}
 mDB.__index = mDB
 
 function mDB:new()
-    local private = setmetatable({}, { __mode = "k" }) -- слабые ключи для сборки мусора
+    local private = setmetatable({}, self)
     local obj = setmetatable({
         getArg = function(self, index)
             return private[index]
@@ -5053,7 +5053,101 @@ end
 -- questUI:Show()
 
 
+NSQS_UID = {}
+NSQS_UID.__index = NSQS_UID
 
+-- Конструктор класса теперь принимает внешнюю таблицу
+function NSQS_UID:new(externalDict)
+    -- Если externalDict не передан, создаём новую таблицу
+    local instance = {
+        dict = externalDict,
+        reverseDict = {},
+        counter = 1
+    }
+
+    -- Настраиваем метатаблицу (важно ДО setmetatable!)
+    self.__index = self
+    setmetatable(instance, self)
+
+    -- Заполняем reverseDict
+    for name, id in pairs(instance.dict) do
+        instance.reverseDict[id] = name
+    end
+
+    -- Если словарь пуст, добавляем "Шефа"
+    if not next(instance.dict) then
+        instance:addUser("Шеф", true)
+    end
+
+    return instance
+end
+
+-- Метод добавления пользователя
+function NSQS_UID:addUser(name, flag)
+    -- Проверяем, есть ли уже такой пользователь
+    if self.dict[name] then
+        return self.dict[name]
+    end
+
+    -- Получаем имя игрока и проверяем gPoint
+    local playerName = GetUnitName("player")
+    local isGuildLeader = playerName and gPoint and gPoint(playerName) == 1
+
+    -- Если gPoint вернул nil
+    if not isGuildLeader then
+        if flag == nil then
+            -- Если flag не задан, просто запрашиваем имя
+            SendAddonMessage("nsShmUNAME", name, "guild")
+            return nil
+        else
+            -- Если flag задан, добавляем пользователя без рассылки
+            
+            self.dict[name] = flag
+            self.reverseDict[flag] = name
+            return flag
+        end
+    end
+
+    -- Если мы гильдлидер (gPoint == 1), добавляем пользователя с рассылкой
+    local id
+    if flag == true then
+        id = 10000 -- Для специального случая (Шеф)
+    else
+        id = 10000 + self.counter
+        self.counter = self.counter + 1
+    end
+
+    local encodedId = en85(id)
+    self.dict[name] = encodedId
+    self.reverseDict[encodedId] = name
+    
+    -- Рассылаем информацию о новом пользователе
+    SendAddonMessage("ns85UID", name .. " " .. encodedId, "guild")
+    
+    return encodedId
+end
+
+-- Метод получения ника по ID
+function NSQS_UID:getNameById(id)
+    -- Сначала проверяем обратную таблицу
+    if self.reverseDict[id] then
+        return self.reverseDict[id]
+    end
+    
+    -- Если нет в обратной таблице, ищем в основной
+    for name, encodedId in pairs(self.dict) do
+        if encodedId == id then
+            -- Обновляем обратную таблицу
+            self.reverseDict[id] = name
+            return name
+        end
+    end
+    
+    -- Если ID не найден
+    print("Ошибка: айди не найден в базе данных: " .. tostring(id))
+    SendAddonMessage("nsShmUID", tostring(id), "guild")
+    return nil
+end
 
 
 

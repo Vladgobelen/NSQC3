@@ -727,11 +727,18 @@ function getPoint()
 end
 
 function gPoint(name)
-    for i=1,#mFld:getArg("gPoint") do
-        if name == mFld:getArg("gPoint")[i] then
+    local gPointList = mFld:getArg("gPoint")
+    if not gPointList then
+        getPoint()
+    end
+    
+    for i = 1, #gPointList do
+        if name == gPointList[i] then
             return 1
         end
     end
+    
+    return nil -- или return 0, если нужно явное отсутствие прав
 end
 
 function isMod(obj)
@@ -1210,3 +1217,10 @@ function Base85.Decode(input)
     
     return table.concat(result)
 end
+
+
+
+
+
+
+

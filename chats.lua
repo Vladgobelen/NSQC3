@@ -231,40 +231,41 @@ local triggersByAddress = {
     },
 }
 ---ИСПРАВИТЬ БЛЯТЬ ОБЯЗАТЕЛЬНО. Нужно изменить способ хранения ников убрать testQ
-function nsYourLog(channel, text, sender, prefix)
-    -- Парсим строку вида "1743534269 Шеф 9134_Рубиновое_святилище_10 5 18sP"
-    local timestamp, rl, raid_id, gp, targets = text:match("^(%d+)%s+(%S+)%s+(%S+)%s+([-+]?%d+)%s+(.+)$")
+-- function nsYourLog(channel, text, sender, prefix)
+--     print()
+--     -- Парсим строку вида "1743534269 Шеф 9134_Рубиновое_святилище_10 5 18sP"
+--     local timestamp, rl, raid_id, gp, targets = text:match("^(%d+)%s+(%S+)%s+(%S+)%s+([-+]?%d+)%s+(.+)$")
     
-    if not timestamp then
-        print("Не удалось распарсить строку:", text)
-        return
-    end
+--     if not timestamp then
+--         print("Не удалось распарсить строку:", text)
+--         return
+--     end
     
-    -- Преобразуем timestamp в "ЧЧ:ММ"
-    local time = date("%H:%M", timestamp)
+--     -- Преобразуем timestamp в "ЧЧ:ММ"
+--     local time = date("%H:%M", timestamp)
     
-    -- Преобразуем raid_id в читаемое название (убираем цифры в начале, если есть)
-    local raid = raid_id:gsub("^%d+_", "")
+--     -- Преобразуем raid_id в читаемое название (убираем цифры в начале, если есть)
+--     local raid = raid_id:gsub("^%d+_", "")
     
-    -- Получаем имя текущего игрока
-    local playerName = GetUnitName("player")
+--     -- Получаем имя текущего игрока
+--     local playerName = GetUnitName("player")
     
-    -- Обрабатываем targets
-    local decodedTargets = {}
-    for word in targets:gmatch("%S+") do
-        -- Проверяем, есть ли это слово в кодах для текущего игрока
-        if testQ[playerName] and testQ[playerName]["коды"] and testQ[playerName]["коды"][word] then
-            table.insert(decodedTargets, testQ[playerName]["коды"][word])
-        else
-            table.insert(decodedTargets, word)
-        end
-    end
+--     -- Обрабатываем targets
+--     local decodedTargets = {}
+--     for word in targets:gmatch("%S+") do
+--         -- Проверяем, есть ли это слово в кодах для текущего игрока
+--         if testQ[playerName] and testQ[playerName]["коды"] and testQ[playerName]["коды"][word] then
+--             table.insert(decodedTargets, testQ[playerName]["коды"][word])
+--         else
+--             table.insert(decodedTargets, word)
+--         end
+--     end
     
-    -- Собираем обратно в строку
-    local finalTargets = table.concat(decodedTargets, " ")
+--     -- Собираем обратно в строку
+--     local finalTargets = table.concat(decodedTargets, " ")
     
-    gpDb:AddLogEntry(time, gp, rl, raid, finalTargets)
-end
+--     gpDb:AddLogEntry(time, gp, rl, raid, finalTargets)
+-- end
 
 function postroit_c(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
@@ -388,6 +389,7 @@ function OnAnyTrigger1(channel, text, sender, prefix)
     if myNome == sender then
         sendAch("Копирайтер", 1, 1)
     end
+    nSQS_UID:addUser(sender)
     -- local msg = mysplit(text)
     -- if string.find(string.lower(text), "привет") then
     --     infoFrame1 = infoFrame1 or UniversalInfoFrame:new(5, testQ['uniFrame'])

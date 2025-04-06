@@ -3,7 +3,7 @@
 ## Notes: NSQC3
 ## Author: Vladgobelen
 ## Version: 3.0
-## SavedVariables: nsqc_fld, nsqc_quests
+## SavedVariables: nsqc_fld, nsqc_quests, GENTI_UID
 ##SavedVariablesPerCharacter: nsDbc, nsqc3_ach
 
 main.lua
