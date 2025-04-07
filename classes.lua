@@ -1338,10 +1338,23 @@ function GpDb:_UpdateFromGuild()
         for j = 1, GetNumGuildMembers() do
             local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
             if name then
+                -- Парсим офицерскую заметку для получения ID
+                local playerID = nil
+                if officerNote then
+                    local words = {}
+                    for word in officerNote:gmatch("%S+") do
+                        table.insert(words, word)
+                    end
+                    if #words >= 2 then
+                        playerID = words[2] -- Берем ID из второго слова
+                    end
+                end
+                
                 guildRosterInfo[name] = {
                     publicNote = publicNote,
                     officerNote = officerNote,
-                    classFileName = classFileName
+                    classFileName = classFileName,
+                    playerID = playerID
                 }
             end
         end
@@ -1364,7 +1377,7 @@ function GpDb:_UpdateFromGuild()
                     end
                 end
             end
-
+            
             -- Если есть чужие игроки - сообщаем и выходим
             if not raidCheckPassed then
                 print("|cFFFF0000ГП:|r В рейде есть не члены гильдии: "..table.concat(invalidPlayers, ", "))
@@ -1409,7 +1422,8 @@ function GpDb:_UpdateFromGuild()
                             original_nick = raidName,
                             gp = gp,
                             classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
-                            classFileName = classFileName
+                            classFileName = classFileName,
+                            playerID = guildInfo.playerID -- Добавляем ID игрока
                         })
                     end
                 end
@@ -1427,6 +1441,8 @@ function GpDb:_UpdateFromGuild()
                     
                     if #words >= 3 then
                         local gp = tonumber(words[3]) or 0
+                        local playerID = words[2] -- Берем ID из второго слова
+                        
                         if gp ~= 0 then
                             totalWithGP = totalWithGP + 1
                             local displayName = name
@@ -1439,7 +1455,8 @@ function GpDb:_UpdateFromGuild()
                                 original_nick = name,
                                 gp = gp,
                                 classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
-                                classFileName = classFileName
+                                classFileName = classFileName,
+                                playerID = playerID -- Добавляем ID игрока
                             })
                         end
                     end
@@ -1475,11 +1492,12 @@ function GpDb:Show()
     end)
 end
 
-function GpDb:AddGpEntry(nick, gp)
+function GpDb:AddGpEntry(nick, gp, playerID)
     table.insert(self.gp_data, {
         nick = nick,
         original_nick = nick,
-        gp = tonumber(gp) or 0
+        gp = tonumber(gp) or 0,
+        playerID = playerID -- Добавляем ID игрока
     })
     self:SortData()
     self:UpdateWindow()
@@ -1866,13 +1884,13 @@ function GpDb:_CreateRaidSelectionWindow()
             logStr = string.format("%s %d", cleanOtherText, gpValue)
         end
 
-        -- Добавляем игроков в сообщение
+        -- Добавляем игроков в сообщение (используем сохраненный playerID)
         for index in pairs(self.selected_indices) do
             if self.gp_data[index] then
                 local nick = self.gp_data[index].original_nick
+                local playerID = self.gp_data[index].playerID or "UNKNOWN" -- Используем сохраненный ID
                 SendAddonMessage("nsGP" .. " " .. gpValue, nick, "guild")
-                local _, _, nickID = getIDnome("","",nick,"")
-                logStr = logStr .. " " .. nickID
+                logStr = logStr .. " " .. playerID
                 
                 -- Добавляем запись в лог
                 self:AddLogEntry(gpValue, date("%H:%M"), UnitName("player"), 
@@ -5051,108 +5069,5 @@ end
 -- questUI:AddLocationItem("Сундук", function() print("Сундук открыт!") end)
 -- questUI:AddAction("Атаковать", function() print("Атака!") end)
 -- questUI:Show()
-
-
-NSQS_UID = {}
-NSQS_UID.__index = NSQS_UID
-
--- Конструктор класса теперь принимает внешнюю таблицу
-function NSQS_UID:new(externalDict)
-    -- Если externalDict не передан, создаём новую таблицу
-    local instance = {
-        dict = externalDict,
-        reverseDict = {},
-        counter = 1
-    }
-
-    -- Настраиваем метатаблицу (важно ДО setmetatable!)
-    self.__index = self
-    setmetatable(instance, self)
-
-    -- Заполняем reverseDict
-    for name, id in pairs(instance.dict) do
-        instance.reverseDict[id] = name
-    end
-
-    -- Если словарь пуст, добавляем "Шефа"
-    if not next(instance.dict) then
-        instance:addUser("Шеф", true)
-    end
-
-    return instance
-end
-
--- Метод добавления пользователя
-function NSQS_UID:addUser(name, flag)
-    -- Проверяем, есть ли уже такой пользователь
-    if self.dict[name] then
-        return self.dict[name]
-    end
-
-    -- Получаем имя игрока и проверяем gPoint
-    local playerName = GetUnitName("player")
-    local isGuildLeader = playerName and gPoint and gPoint(playerName) == 1
-
-    -- Если gPoint вернул nil
-    if not isGuildLeader then
-        if flag == nil then
-            -- Если flag не задан, просто запрашиваем имя
-            SendAddonMessage("nsShmUNAME", name, "guild")
-            return nil
-        else
-            -- Если flag задан, добавляем пользователя без рассылки
-            
-            self.dict[name] = flag
-            self.reverseDict[flag] = name
-            return flag
-        end
-    end
-
-    -- Если мы гильдлидер (gPoint == 1), добавляем пользователя с рассылкой
-    local id
-    if flag == true then
-        id = 10000 -- Для специального случая (Шеф)
-    else
-        id = 10000 + self.counter
-        self.counter = self.counter + 1
-    end
-
-    local encodedId = en85(id)
-    self.dict[name] = encodedId
-    self.reverseDict[encodedId] = name
-    
-    -- Рассылаем информацию о новом пользователе
-    SendAddonMessage("ns85UID", name .. " " .. encodedId, "guild")
-    
-    return encodedId
-end
-
--- Метод получения ника по ID
-function NSQS_UID:getNameById(id)
-    -- Сначала проверяем обратную таблицу
-    if self.reverseDict[id] then
-        return self.reverseDict[id]
-    end
-    
-    -- Если нет в обратной таблице, ищем в основной
-    for name, encodedId in pairs(self.dict) do
-        if encodedId == id then
-            -- Обновляем обратную таблицу
-            self.reverseDict[id] = name
-            return name
-        end
-    end
-    
-    -- Если ID не найден
-    print("Ошибка: айди не найден в базе данных: " .. tostring(id))
-    SendAddonMessage("nsShmUID", tostring(id), "guild")
-    return nil
-end
-
-
-
-
-
-
 
 

@@ -15,10 +15,6 @@ local function OnEvent(self, event, isLogin, isReload)
         getPoint()
         gpDb = gpDb or GpDb:new({})
 
-        GENTI_UID = GENTI_UID or {}
-        print(GENTI_UID)
-        nSQS_UID = nSQS_UID or NSQS_UID:new(GENTI_UID)
-
         nsDBC_ach_table = nsDBC_ach_table or create_table:new("nsqc3_ach")
         nsDBC_ach = nsDBC_ach or NsDb:new(nsDBC_ach_table:get_table(), nil, nil, nil, 100000)
         mFldObj = mFldObj or NsDb:new(ns_tooltips, nil, nil, nil, 100000)
