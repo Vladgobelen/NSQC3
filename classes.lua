@@ -1093,23 +1093,22 @@ function GpDb:GetSelectedEntries()
     return selected
 end
 
-function GpDb:AddLogEntry(time, gp, rl, raid, targets)
+function GpDb:AddLogEntry(timeStr, gpValue, rl, raid, targets)
+    print(timeStr, gpValue, rl, raid, targets)
     -- Проверяем наличие окна логов
     if not self.logWindow then
         self:_CreateLogWindow()
     end
-    
+
     -- Функция для получения цвета класса игрока
     local function GetClassColor(name)
         if not name or type(name) ~= "string" or name == "" then 
             return "|cFFFFFFFF" 
         end
         
-        local plainName = name:match("^(.-)-") or name
-        
         for i = 1, GetNumGuildMembers() do
             local guildName, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
-            if guildName and guildName == plainName then
+            if guildName and guildName == name then
                 local color = RAID_CLASS_COLORS[classFileName]
                 if color then
                     return string.format("|cFF%02x%02x%02x", color.r*255, color.g*255, color.b*255)
@@ -1122,26 +1121,45 @@ function GpDb:AddLogEntry(time, gp, rl, raid, targets)
     end
     
     -- Получаем числовое значение ГП
-    local gpValue = tonumber(gp) or 0
+    local gpNumValue = tonumber(gpValue) or 0
     
     -- Форматируем компоненты
-    local formattedTime = "|cFFA0A0A0" .. (time or date("%H:%M")) .. "|r"
-    local rlName = type(rl) == "string" and rl or UnitName("player") or "Неизвестно"
-    local formattedRl = GetClassColor(rlName) .. rlName .. "|r"
-    local gpColor = gpValue >= 0 and "|cFF00FF00" or "|cFFFF0000"
-    local formattedGp = gpColor .. tostring(gpValue) .. "|r" -- Явное преобразование в строку
-    local raidName = type(raid) == "string" and raid or "Неизвестно"
-    local formattedRaid = "|cFFFFFF00" .. raidName .. "|r"
+    local formattedTime = "|cFFA0A0A0" .. (timeStr or "??:??") .. "|r"
+    local formattedRl = GetClassColor(rl) .. (rl or "Неизвестно") .. "|r"
+    local gpColor = gpNumValue >= 0 and "|cFF00FF00" or "|cFFFF0000"
+    local formattedGp = gpColor .. tostring(gpNumValue) .. "|r"
+    local formattedRaid = "|cFFFFFF00" .. (raid or "Неизвестно") .. "|r"
     
-    -- Форматируем цели
-    local targetsList = type(targets) == "string" and targets or "Неизвестно"
+    -- Функция для поиска имени игрока по коду
+    local function GetPlayerNameByCode(code)
+        if not code or type(code) ~= "string" then return code end
+        
+        for i = 1, GetNumGuildMembers() do
+            local name, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(i)
+            if name and officerNote then
+                local words = {}
+                for word in officerNote:gmatch("%S+") do
+                    table.insert(words, word)
+                end
+                if #words >= 2 and words[2] == code then
+                    return name
+                end
+            end
+        end
+        return code -- Возвращаем код, если не нашли игрока
+    end
+    
+    -- Форматируем цели (заменяем коды на имена)
     local formattedTargets = {}
-    for name in targetsList:gmatch("%S+") do
-        table.insert(formattedTargets, GetClassColor(name) .. name .. "|r")
+    if type(targets) == "string" then
+        for code in targets:gmatch("%S+") do
+            local playerName = GetPlayerNameByCode(code)
+            table.insert(formattedTargets, GetClassColor(playerName) .. playerName .. "|r")
+        end
     end
     local formattedTargetsText = table.concat(formattedTargets, " ")
-    
-    -- Собираем строку лога (правильный порядок)
+
+    -- Собираем строку лога (время | РЛ | ГП | подземелье | игроки)
     local logText = string.format("%s | %s | %s | %s | %s", 
         formattedTime, 
         formattedRl,
@@ -1149,19 +1167,19 @@ function GpDb:AddLogEntry(time, gp, rl, raid, targets)
         formattedRaid, 
         formattedTargetsText)
     
-    -- Добавляем новую запись В КОНЕЦ таблицы (для отображения снизу)
+    -- Добавляем новую запись
     table.insert(self.logData, {
         text = logText,
         raw = {
-            time = time or date("%H:%M"),
-            rl = rlName,
-            gp = gpValue, -- Сохраняем числовое значение
-            raid = raidName,
-            targets = targetsList
+            time = timeStr,
+            rl = rl,
+            gp = gpNumValue,
+            raid = raid,
+            targets = targets
         }
     })
     
-    -- Ограничиваем количество записей (удаляем старые сверху)
+    -- Ограничиваем количество записей
     if #self.logData > 200 then
         table.remove(self.logData, 1)
     end
@@ -1169,7 +1187,6 @@ function GpDb:AddLogEntry(time, gp, rl, raid, targets)
     -- Обновляем отображение
     if self.logWindow and self.logWindow:IsShown() then
         self:UpdateLogDisplay()
-        -- Прокручиваем вниз к новым записям
         self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())
     end
 end
@@ -1367,7 +1384,7 @@ function GpDb:_UpdateFromGuild()
 
             -- Проверяем всех игроков рейда на принадлежность к гильдии
             for i = 1, numRaidMembers do
-                local raidName, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, isConnected = GetRaidRosterInfo(i)
+                local raidName, _, _, _, _, classFileName, _, _, _, _, _, _, _, _, _, _, _, isConnected = GetRaidRosterInfo(i)
                 if raidName then
                     -- Удаляем серверную часть имени для сравнения
                     local plainName = raidName:match("^(.-)-") or raidName
@@ -1412,14 +1429,14 @@ function GpDb:_UpdateFromGuild()
                             totalWithGP = totalWithGP + 1
                         end
 
-                        local displayName = raidName
+                        local displayName = raidName -- Используем полное имя с сервером
                         if publicNote and publicNote ~= "" then
                             displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
                         end
 
                         table.insert(self.gp_data, {
                             nick = displayName,
-                            original_nick = raidName,
+                            original_nick = raidName, -- Сохраняем полное имя с сервером
                             gp = gp,
                             classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                             classFileName = classFileName,
