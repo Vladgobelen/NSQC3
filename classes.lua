@@ -2624,9 +2624,15 @@ end
 function AdaptiveFrame:SetText(text)
     if self.textField then
         self.textField:SetText(text)
-        print(text)
-    else
-        print("Ошибка: Текстовое поле не инициализировано.")
+        
+        -- Обновляем видимость всех иконок
+        for cellIndex, child in ipairs(self.children or {}) do
+            if child.icons then
+                for corner in pairs(child.icons) do
+                    self:UpdateIconVisibility(cellIndex, corner)
+                end
+            end
+        end
     end
 end
 
@@ -3096,56 +3102,76 @@ function AdaptiveFrame:SetCellIcon(cellIndex, texture, corner, room, visible)
     if not self.children or not self.children[cellIndex] then return end
     local cell = self.children[cellIndex]
     
-    -- Удаление иконки если текстура не указана
+    -- Инициализация таблицы иконок, если ее нет
+    if not cell.icons then
+        cell.icons = {}
+    end
+    
+    -- Если текстура не указана - удаляем все иконки в указанном углу
     if not texture then
-        if cell.icon then
-            cell.icon:Hide()
-            cell.icon = nil
+        if cell.icons[corner] then
+            cell.icons[corner].texture = nil
+            cell.icons[corner]:Hide()
+            cell.icons[corner] = nil
         end
         return
     end
     
-    -- Проверка комнаты (если параметр room указан)
-    local roomMismatch = false
-    if room then
-        local headerText = self.textField:GetText() or ""
-        local currentRoom = headerText:match(".-%-(.*)") and headerText:match(".-%-(.*)"):trim() or ""
-        roomMismatch = (currentRoom ~= room:trim())
-    end
+    -- Угол должен быть от 1 до 8
+    corner = math.min(math.max(corner or 1, 1), 8)
     
-    -- Логика видимости:
-    -- 1. Если visible=false - скрываем всегда
-    -- 2. Если visible не указан и комната не совпадает - скрываем
-    -- 3. Во всех остальных случаях - показываем
-    local shouldShow = not ((visible == false) or (visible == nil and roomMismatch))
-    
-    if not shouldShow then
-        if cell.icon then
-            cell.icon:Hide()
-        end
-        return
-    end
-    
-    -- Создание/обновление иконки
-    if not cell.icon then
-        cell.icon = cell.frame:CreateTexture(nil, "OVERLAY")
-        cell.icon:SetSize(16, 16)
+    -- Создаем новую иконку, если ее еще нет
+    if not cell.icons[corner] then
+        cell.icons[corner] = cell.frame:CreateTexture(nil, "OVERLAY")
+        cell.icons[corner]:SetSize(16, 16)
         
         local positions = {
-            [1] = {"TOPLEFT", 5, -5}, [2] = {"TOP", 0, -5},
-            [3] = {"TOPRIGHT", -5, -5}, [4] = {"RIGHT", -5, 0},
-            [5] = {"BOTTOMRIGHT", -5, 5}, [6] = {"BOTTOM", 0, 5},
-            [7] = {"BOTTOMLEFT", 5, 5}, [8] = {"LEFT", 5, 0}
+            [1] = {"TOPLEFT", 5, -5},    [2] = {"TOP", 0, -5},
+            [3] = {"TOPRIGHT", -5, -5},  [4] = {"RIGHT", -5, 0},
+            [5] = {"BOTTOMRIGHT", -5, 5},[6] = {"BOTTOM", 0, 5},
+            [7] = {"BOTTOMLEFT", 5, 5},  [8] = {"LEFT", 5, 0}
         }
         
-        corner = math.min(math.max(corner or 1, 1), 8)
         local pos = positions[corner]
-        cell.icon:SetPoint(pos[1], cell.frame, pos[1], pos[2], pos[3])
+        cell.icons[corner]:SetPoint(pos[1], cell.frame, pos[1], pos[2], pos[3])
     end
     
-    -- Установка текстуры
-    cell.icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\"..texture..".tga")
-    cell.icon:Show()
+    -- Сохраняем метаданные об иконке
+    cell.icons[corner].texture = texture
+    cell.icons[corner].room = room and room:trim() or nil
+    cell.icons[corner].forcedVisible = visible
+    
+    -- Обновляем видимость иконки
+    self:UpdateIconVisibility(cellIndex, corner)
+end
+
+function AdaptiveFrame:UpdateIconVisibility(cellIndex, corner)
+    if not self.children or not self.children[cellIndex] then return end
+    local cell = self.children[cellIndex]
+    if not cell.icons or not cell.icons[corner] then return end
+    
+    local icon = cell.icons[corner]
+    local headerText = self.textField:GetText() or ""
+    local currentRoom = headerText:match(".-%-(.*)") and headerText:match(".-%-(.*)"):trim() or ""
+    
+    -- Определяем, должна ли иконка быть видимой
+    local shouldShow = true
+    
+    -- Если явно указана видимость - используем ее
+    if icon.forcedVisible ~= nil then
+        shouldShow = icon.forcedVisible
+    -- Иначе проверяем соответствие комнаты
+    elseif icon.room and icon.room ~= currentRoom then
+        shouldShow = false
+    end
+    
+    -- Устанавливаем видимость
+    if shouldShow then
+        icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\"..icon.texture..".tga")
+        icon:Show()
+    else
+        icon:Hide()
+    end
 end
 
 PopupPanel = {}
