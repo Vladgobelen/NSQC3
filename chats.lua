@@ -400,7 +400,7 @@ function displayFld2(channel, text, sender, prefix)
         adaptiveFrame.children[j]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(j)).tooltips)
     end
     adaptiveFrame:Show()
-    adaptiveFrame:SetText(mFldName)
+    adaptiveFrame:SetText(mFldName .. " - участок")
     mFld:setArg("onEnterFlag", nil)
 end
 

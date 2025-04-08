@@ -729,7 +729,7 @@ end
 function gPoint(name)
     local gPointList = mFld:getArg("gPoint")
     if not gPointList then
-        getPoint()
+        return 0
     end
     
     for i = 1, #gPointList do
@@ -1217,10 +1217,3 @@ function Base85.Decode(input)
     
     return table.concat(result)
 end
-
-
-
-
-
-
-

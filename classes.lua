@@ -2624,6 +2624,7 @@ end
 function AdaptiveFrame:SetText(text)
     if self.textField then
         self.textField:SetText(text)
+        print(text)
     else
         print("Ошибка: Текстовое поле не инициализировано.")
     end
@@ -3088,6 +3089,63 @@ function AdaptiveFrame:HideSideFrame()
     if self.sideFrame then
         self.sideFrame:Hide()
     end
+end
+
+function AdaptiveFrame:SetCellIcon(cellIndex, texture, corner, room, visible)
+    -- Проверка клетки
+    if not self.children or not self.children[cellIndex] then return end
+    local cell = self.children[cellIndex]
+    
+    -- Удаление иконки если текстура не указана
+    if not texture then
+        if cell.icon then
+            cell.icon:Hide()
+            cell.icon = nil
+        end
+        return
+    end
+    
+    -- Проверка комнаты (если параметр room указан)
+    local roomMismatch = false
+    if room then
+        local headerText = self.textField:GetText() or ""
+        local currentRoom = headerText:match(".-%-(.*)") and headerText:match(".-%-(.*)"):trim() or ""
+        roomMismatch = (currentRoom ~= room:trim())
+    end
+    
+    -- Логика видимости:
+    -- 1. Если visible=false - скрываем всегда
+    -- 2. Если visible не указан и комната не совпадает - скрываем
+    -- 3. Во всех остальных случаях - показываем
+    local shouldShow = not ((visible == false) or (visible == nil and roomMismatch))
+    
+    if not shouldShow then
+        if cell.icon then
+            cell.icon:Hide()
+        end
+        return
+    end
+    
+    -- Создание/обновление иконки
+    if not cell.icon then
+        cell.icon = cell.frame:CreateTexture(nil, "OVERLAY")
+        cell.icon:SetSize(16, 16)
+        
+        local positions = {
+            [1] = {"TOPLEFT", 5, -5}, [2] = {"TOP", 0, -5},
+            [3] = {"TOPRIGHT", -5, -5}, [4] = {"RIGHT", -5, 0},
+            [5] = {"BOTTOMRIGHT", -5, 5}, [6] = {"BOTTOM", 0, 5},
+            [7] = {"BOTTOMLEFT", 5, 5}, [8] = {"LEFT", 5, 0}
+        }
+        
+        corner = math.min(math.max(corner or 1, 1), 8)
+        local pos = positions[corner]
+        cell.icon:SetPoint(pos[1], cell.frame, pos[1], pos[2], pos[3])
+    end
+    
+    -- Установка текстуры
+    cell.icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\"..texture..".tga")
+    cell.icon:Show()
 end
 
 PopupPanel = {}
