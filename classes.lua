@@ -87,6 +87,90 @@ function NsDb:getStaticStr(nik, nStr, nArg)
     return str and (nArg and str_sub(str, (nArg-1)*3 + 1, nArg*3) or str)
 end
 
+function NsDb:addDeepStaticStr(...)
+    local args = {...}
+    local n = #args
+
+    if n < 2 then return end
+
+    self.input_table = self.input_table or {}
+    local current = self.input_table
+
+    -- Проверяем, является ли предпоследний аргумент nil
+    local hasNil = (args[n-1] == nil)
+
+    -- Определяем ключ и значение для записи
+    local key = args[n-2]
+    local value = args[n]
+
+    -- Построение пути до родительской таблицы
+    for i = 1, n-3 do
+        local part = args[i]
+        current[part] = current[part] or {}
+        current = current[part]
+    end
+
+    if hasNil then
+        -- Если предпоследний аргумент nil, записываем значение напрямую
+        current[key] = value
+    else
+        -- Иначе обновляем строку по указанному индексу
+        local index = args[n-1]
+        local currentStr = current[key] or ""
+        local formattedValue = ("   " .. value):sub(-3) -- Форматируем до 3 символов
+        local start = (index - 1) * 3 + 1 -- Начало замены
+        local end_pos = index * 3
+
+        -- Обновляем строку
+        current[key] = currentStr:sub(1, start - 1) 
+                        .. formattedValue 
+                        .. currentStr:sub(end_pos + 1)
+    end
+end
+
+function NsDb:getDeepStaticStr(...)
+    local args = {...}
+    local n = #args
+    
+    if n == 0 then return nil end
+    
+    local current = self.input_table
+    if not current then return nil end
+    
+    -- Идем по всем аргументам
+    for i = 1, n do
+        if not current then return nil end
+        
+        local arg = args[i]
+        local nextData = current[arg]
+        
+        -- Если это последний аргумент
+        if i == n then
+            if type(nextData) == "string" then
+                -- Если следующий элемент - строка, возвращаем её
+                return nextData
+            else
+                -- Иначе возвращаем сам элемент
+                return nextData
+            end
+        else
+            -- Если следующий элемент - строка, но есть ещё аргументы
+            if type(nextData) == "string" then
+                -- Возвращаем подстроку по следующему аргументу (индексу)
+                local index = args[i+1]
+                if type(index) == "number" then
+                    return nextData:sub((index-1)*3 + 1, index*3)
+                else
+                    return nil
+                end
+            end
+            current = nextData
+        end
+    end
+    
+    return current
+end
+
 function NsDb:addStr(message)
     local msg_len = utf8len(message) -- Длина входящего сообщения
     -- Если адрес последней строки превысил лимит или это первая строка
@@ -1094,7 +1178,6 @@ function GpDb:GetSelectedEntries()
 end
 
 function GpDb:AddLogEntry(timeStr, gpValue, rl, raid, targets)
-    print(timeStr, gpValue, rl, raid, targets)
     -- Проверяем наличие окна логов
     if not self.logWindow then
         self:_CreateLogWindow()
@@ -1620,12 +1703,6 @@ function GpDb:UpdateWindow()
     
     self.window.scrollChild:SetHeight(#self.gp_data * 25)
     self.window.scrollFrame:UpdateScrollChildRect()
-end
-
-function GpDb:SaveToNsDb()
-    for _, entry in ipairs(self.gp_data) do
-        self.ns_db:addStaticStr("GP_DATA", entry.original_nick, nil, tostring(entry.gp))
-    end
 end
 
 function GpDb:LoadFromNsDb()
