@@ -429,6 +429,9 @@ function set_miniButton()
     end)
 
     miniMapButton:SetScript("OnClick", function(self)
+        if FriendsFrame:IsVisible() then
+            FriendsFrameCloseButton:Click()
+        end
         sendAch("Великий открыватор", -1)
         mFldName = GetUnitName("player")
         SendAddonMessage("getFld " .. mFldName, "", "guild")
@@ -912,10 +915,10 @@ GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
         if selectedName and selectedName ~= mFldName then
             mFldName = selectedName -- Обновляем предыдущее значение
             if adaptiveFrame:isVisible() then
-                SendAddonMessage("getFld " .. mFldName, "", "guild")
                 for i = 1, 100 do
                     adaptiveFrame.children[i]:SetTextT("")
                 end
+                SendAddonMessage("getFld " .. mFldName, "", "guild")
             end
         end
     end

@@ -323,15 +323,17 @@ end
 
 function postroit_c(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
+    local flag = tonumber(prefix:match(WORD_POSITION_PATTERNS[5]))
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
-    print(obj, objHP)
     adaptiveFrame.children[id]:SetTexture(obj, obj)
     if mFldObj:getKey(adaptiveFrame:getTexture(id)).viewHP > en10(objHP) then
         adaptiveFrame.children[id]:SetTextT(en10(objHP))
     end
     adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
-    --setTooltip(BT4Button1, "Текст", 1)
+    if flag then
+        adaptiveFrame:SetCellIcon(id, "00f", 7, "участок")
+    end
 end
 
 function objEnParent(channel, text, sender, prefix)
@@ -441,8 +443,13 @@ end
 
 function nsqc_RawRes1(channel, text, sender, prefix)
     for i = 1, 50 do
+        if i == 3 then
+            print(text:sub((i*3)-2, i*3))
+        end
         if text:sub((i*3)-2, i*3) ~= "nil" then
             adaptiveFrame:SetCellIcon(i, text:sub((i*3)-2, i*3), 7, "участок")
+        else
+            adaptiveFrame:SetCellIcon(i, nil, 7, "участок")
         end
     end
 end
@@ -451,6 +458,8 @@ function nsqc_RawRes2(channel, text, sender, prefix)
         local j = i + 50
         if text:sub((i*3)-2, i*3) ~= "nil" then
             adaptiveFrame:SetCellIcon(j, text:sub((i*3)-2, i*3), 7, "участок")
+        else
+            adaptiveFrame:SetCellIcon(j, nil, 7, "участок")
         end
     end
 end
