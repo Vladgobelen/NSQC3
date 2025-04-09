@@ -45,6 +45,40 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:nsqc_RawRes1"] = {
+        {
+            keyword = {
+                { word = "nsqc_RawRes1", position = 1, source = "prefix" },
+            },
+            func = "nsqc_RawRes1",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kodMsg = mysplit(prefix)
+                    local myNome = GetUnitName("player")
+                    return kodMsg[2] == myNome
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:nsqc_RawRes2"] = {
+        {
+            keyword = {
+                { word = "nsqc_RawRes2", position = 1, source = "prefix" },
+            },
+            func = "nsqc_RawRes2",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kodMsg = mysplit(prefix)
+                    local myNome = GetUnitName("player")
+                    return kodMsg[2] == myNome
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
     ["message:\"стат"] = {
         {
             keyword = {  -- Ключевые слова, которые должны быть в сообщении
@@ -308,6 +342,7 @@ function objEnParent(channel, text, sender, prefix)
     adaptiveFrame.children[id]:SetTexture(obj, obj)
     adaptiveFrame.children[id]:SetTextT(en10(objHP))
     adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
+    adaptiveFrame:SetCellIcon(id, "00t", 7, "участок")
 end
 
 function newObjHP(channel, text, sender, prefix)
@@ -402,6 +437,22 @@ function displayFld2(channel, text, sender, prefix)
     adaptiveFrame:Show()
     adaptiveFrame:SetText(mFldName .. " - участок")
     mFld:setArg("onEnterFlag", nil)
+end
+
+function nsqc_RawRes1(channel, text, sender, prefix)
+    for i = 1, 50 do
+        if text:sub((i*3)-2, i*3) ~= "nil" then
+            adaptiveFrame:SetCellIcon(i, text:sub((i*3)-2, i*3), 7, "участок")
+        end
+    end
+end
+function nsqc_RawRes2(channel, text, sender, prefix)
+    for i = 1, 50 do
+        local j = i + 50
+        if text:sub((i*3)-2, i*3) ~= "nil" then
+            adaptiveFrame:SetCellIcon(j, text:sub((i*3)-2, i*3), 7, "участок")
+        end
+    end
 end
 
 function OnAnyTrigger1(channel, text, sender, prefix)

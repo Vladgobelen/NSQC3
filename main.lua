@@ -12,7 +12,7 @@ local function OnEvent(self, event, isLogin, isReload)
         NS3Menu(NSQC3_version, NSQC3_subversion)         -- Вызов функции для отображения меню
         createFld()
         mFld = mDB:new()
-        getPoint()
+
         gpDb = gpDb or GpDb:new({})
 
         nsDBC_ach_table = nsDBC_ach_table or create_table:new("nsqc3_ach")
@@ -20,13 +20,14 @@ local function OnEvent(self, event, isLogin, isReload)
         mFldObj = mFldObj or NsDb:new(ns_tooltips, nil, nil, nil, 100000)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
-        C_Timer(5, function()
-            if UnitLevel("player") >= 5 then
+        C_Timer(2, function()
+            if UnitLevel("player") >= 10 then
                 if AchievementMicroButton:IsEnabled() == 1 then
                     AchievementMicroButton:Click()
                     AchievementFrameCloseButton:Click()
                 end
             end
+            getPoint()
         end)
 
         C_Timer(10, function()
