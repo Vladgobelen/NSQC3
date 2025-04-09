@@ -3309,6 +3309,27 @@ function PopupPanel:Show(parentButton, secondaryTriggers)
     end)
 end
 
+-- Метод для получения количества объектов в инвентаре по базовому имени
+function AdaptiveFrame:GetSideTextCount(baseText)
+    if not self.sideFrame or not self.sideTextLines then return 0 end
+    
+    local totalCount = 0
+    baseText = baseText:gsub("%(%d+%)$", ""):trim()
+    
+    for _, lineFrame in ipairs(self.sideTextLines) do
+        local lineText = lineFrame.text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            -- Извлекаем число из скобок, если есть
+            local count = tonumber(lineText:match("%((%d+)%)$")) or 1
+            totalCount = totalCount + count
+        end
+    end
+    
+    return totalCount
+end
+
 mDB = {}
 mDB.__index = mDB
 

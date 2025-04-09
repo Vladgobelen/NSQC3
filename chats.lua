@@ -304,8 +304,47 @@ local triggersByAddress = {
 }
 
 function nsqc_RawResCount(channel, text, sender, prefix)
+    if adaptiveFrame:GetSideTextCount("Бревна") ~= text:match(WORD_POSITION_PATTERNS[1]) then
+        adaptiveFrame:RemoveSideText("Бревна")
+    end
     for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[1])) do
-        adaptiveFrame:AddSideText(text)
+        adaptiveFrame:AddSideText("Бревна")
+    end
+    if adaptiveFrame:GetSideTextCount("Трава") ~= text:match(WORD_POSITION_PATTERNS[2]) then
+        adaptiveFrame:RemoveSideText("Трава")
+    end
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[2])) do
+        adaptiveFrame:AddSideText("Трава")
+    end
+    if adaptiveFrame:GetSideTextCount("Камень") ~= text:match(WORD_POSITION_PATTERNS[3]) then
+        adaptiveFrame:RemoveSideText("Камень")
+    end
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[3])) do
+        adaptiveFrame:AddSideText("Камень")
+    end
+    if adaptiveFrame:GetSideTextCount("Бетон") ~= text:match(WORD_POSITION_PATTERNS[4]) then
+        adaptiveFrame:RemoveSideText("Бетон")
+    end
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[4])) do
+        adaptiveFrame:AddSideText("Бетон")
+    end
+    if adaptiveFrame:GetSideTextCount("Самогон") ~= text:match(WORD_POSITION_PATTERNS[5]) then
+        adaptiveFrame:RemoveSideText("Самогон")
+    end
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[5])) do
+        adaptiveFrame:AddSideText("Самогон")
+    end
+    if adaptiveFrame:GetSideTextCount("Доски") ~= text:match(WORD_POSITION_PATTERNS[6]) then
+        adaptiveFrame:RemoveSideText("Доски")
+    end
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[6])) do
+        adaptiveFrame:AddSideText("Доски")
+    end
+    if adaptiveFrame:GetSideTextCount("Кирпич") ~= text:match(WORD_POSITION_PATTERNS[7]) then
+        adaptiveFrame:RemoveSideText("Кирпич")
+    end
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[7])) do
+        adaptiveFrame:AddSideText("Кирпич")
     end
 end
 
@@ -469,7 +508,6 @@ end
 function nsqc_RawRes1(channel, text, sender, prefix)
     for i = 1, 50 do
         if i == 3 then
-            print(text:sub((i*3)-2, i*3))
         end
         if text:sub((i*3)-2, i*3) ~= "nil" then
             adaptiveFrame:SetCellIcon(i, text:sub((i*3)-2, i*3), 7, "участок")
