@@ -282,7 +282,32 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:nsqc_RawResCount"] = {
+        {
+            keyword = {
+                { word = "nsqc_RawResCount", position = 1, source = "prefix" },
+            },
+            func = "nsqc_RawResCount",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function nsqc_RawResCount(channel, text, sender, prefix)
+    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[1])) do
+        adaptiveFrame:AddSideText(text)
+    end
+end
 
 function ns85UID(channel, text, sender, prefix)
     local name = text:match(WORD_POSITION_PATTERNS[1])
