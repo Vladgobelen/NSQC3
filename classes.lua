@@ -3204,14 +3204,17 @@ function AdaptiveFrame:HideAllCellTexts()
 end
 
 function AdaptiveFrame:SetupPopupTriggers()
+    -- Проверяем наличие таблицы триггеров
     if not ns_triggers then return end
     
+    -- Создаем панель только если она еще не существует
     if not self.popupPanel then
         self.popupPanel = PopupPanel:Create(50, 50, 6, 0)
         if not self.popupPanel then return end
     end
-    
-    local function createTextureTrigger(textureKey)
+
+    -- Функция для создания триггера по текстуре
+    local function createTextureTrigger(triggerKey)
         return function(parentButton)
             local texture = parentButton:GetNormalTexture()
             if not texture then return false end
@@ -3224,8 +3227,9 @@ function AdaptiveFrame:SetupPopupTriggers()
             -- Сравниваем только последние 3 символа
             local shortTexture = textureFile:sub(-3)
             
-            if shortTexture == textureKey and ns_triggers[textureKey] then
+            if shortTexture == triggerKey and ns_triggers[triggerKey] then
                 local cellIndex
+                -- Находим индекс клетки по фрейму
                 for i = 1, 100 do
                     if self.children[i] and self.children[i].frame == parentButton then
                         cellIndex = i
@@ -3236,22 +3240,31 @@ function AdaptiveFrame:SetupPopupTriggers()
                 
                 local buttonDataList = {}
                 
-                for btnTexture, btnData in pairs(ns_triggers[textureKey]) do
+                -- Формируем данные для кнопок
+                for btnTexture, btnData in pairs(ns_triggers[triggerKey]) do
                     local func, tooltip
+                    -- Извлекаем ключ текстуры (последние 3 символа)
+                    local textureKey = btnTexture:match("[^\\]+$"):sub(-3)
+                    
                     if type(btnData) == "function" then
-                        func = function() btnData(cellIndex) end
+                        -- Обертываем функцию для передачи cellIndex и textureKey
+                        func = function() 
+                            btnData(cellIndex, textureKey) 
+                        end
                         tooltip = "Действие"
                     elseif type(btnData) == "table" then
-                        func = function() btnData.func(cellIndex) end
+                        -- Обертываем функцию из таблицы
+                        func = function() 
+                            btnData.func(cellIndex, textureKey) 
+                        end
                         tooltip = btnData.tooltip
                     end
                     
                     if func then
-                        -- Используем полный путь к текстуре из ns_triggers
                         table.insert(buttonDataList, {
                             texture = btnTexture,
                             func = func,
-                            tooltip = tooltip
+                            tooltip = tooltip or "Действие: " .. textureKey
                         })
                     end
                 end
@@ -3265,11 +3278,13 @@ function AdaptiveFrame:SetupPopupTriggers()
         end
     end
     
+    -- Собираем все уникальные триггеры
     local allTriggers = {}
     for textureKey in pairs(ns_triggers) do
         table.insert(allTriggers, createTextureTrigger(textureKey))
     end
     
+    -- Обновляем триггеры для всех клеток
     for i = 1, 100 do
         if self.children[i] and self.children[i].frame then
             self.popupPanel:Show(self.children[i].frame, allTriggers)
@@ -3335,7 +3350,18 @@ function PopupPanel:CreateButtons(buttonDataList)
         button:SetHighlightTexture(data.texture)
 
         -- Обработчик клика
-        button:SetScript("OnClick", data.func)
+        button:SetScript("OnClick", function()
+            -- Сначала вызываем оригинальную функцию
+            if data.func then
+                data.func()
+            end
+            
+            -- Затем скрываем панель
+            self.panel:Hide()
+            
+            -- Дополнительно скрываем тултип
+            GameTooltip:Hide()
+        end)
 
         -- Взаимодействие с панелью
         button:SetScript("OnEnter", function() 

@@ -128,7 +128,7 @@ ns_tooltips = {
             "|cFF6495EDНесокрушимая скала",
             "|cffFFCF40Ее нельзя обидеть, обмануть, разрушить...",
             " ",
-            "|cff99ff99ЛКМ: |cffFFCF40добывать камень |cff99ff99(шансы: 1 из 500 кликов)"
+            "|cff99ff99ПКМ: |cffFFCF40добывать камень |cff99ff99(шансы: 1 из 500 кликов)"
         }
     },
     ["00h"] = {
@@ -140,6 +140,35 @@ ns_tooltips = {
             " ",
             "Я серьезно: |cff99ff99ЛКМ: " .. "|cffFFCF40получить квест",
             "|cff99ff99ПКМ: " .. "|cffFFCF40разрушить"
+        }
+    },
+    ["0hs"] = {
+        mod = 1,
+        viewHP = 999,
+        tooltips = {
+            "|cFF6495EDХижина (строительство)",
+            " ",
+            "|cff99ff99ЛКМ: " .. "|cffFFCF40cтроить",
+            "|cff99ff99ПКМ: " .. "|cffFFCF40разрушить"
+        }
+    },
+    ["0uz"] = {
+        mod = 1,
+        viewHP = 999,
+        tooltips = {
+            "|cFF6495EDПочти ровная земля. Еще пару топ-топов...",
+            " ",
+            "|cff99ff99ЛКМ: " .. "|cffFFCF40топтать",
+            "|cff99ff99ПКМ: " .. "|cffFFCF40рыть"
+        }
+    },
+    ["0zt"] = {
+        mod = 1,
+        viewHP = 1,
+        tooltips = {
+            "|cFF6495EDОчень хорошо утоптанная земля, молодец.",
+            " ",
+            "|cff99ff99ПКМ: " .. "|cffFFCF40рыть"
         }
     },
     ["0ob"] = {
@@ -192,10 +221,20 @@ ns_tooltips = {
 }
 
 ns_triggers = {
-    ["00z"] = {
-        ["Interface\\AddOns\\NSQC3\\libs\\00h"] = {
-            func = function(cellIndex) ns_crtH(cellIndex) end,
+    ["0zt"] = {
+        ["Interface\\AddOns\\NSQC3\\libs\\0hs"] = {
+            func = function(cellIndex, textureKey) 
+                ns_crtH(cellIndex, textureKey)
+            end,
             tooltip = "Построить хижину. Надо же где то жить, логично?"
+        },
+    },
+    ["00z"] = {
+        ["Interface\\AddOns\\NSQC3\\libs\\0uz"] = {
+            func = function(cellIndex, textureKey) 
+                ns_crtH(cellIndex, textureKey)
+            end,
+            tooltip = "Утоптать и выровнять землю"
         },
     }
 }

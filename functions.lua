@@ -696,8 +696,8 @@ function fBtnClick(id, obj)
     end)
 end
 
-function ns_crtH(id)
-    SendAddonMessage("ns_crtH " .. mFldName, id, "GUILD")
+function ns_crtH(id, obj)
+    SendAddonMessage("ns_crtH " .. mFldName, obj .. " " .. id, "GUILD")
 end
 
 function fBtnEnter(id, obj)

@@ -449,6 +449,7 @@ function postroit_c(channel, text, sender, prefix)
     if flag then
         adaptiveFrame:SetCellIcon(id, "00f", 7, "участок")
     end
+    adaptiveFrame:SetupPopupTriggers()
 end
 
 function objEnParent(channel, text, sender, prefix)
@@ -456,10 +457,18 @@ function objEnParent(channel, text, sender, prefix)
     local id = tonumber(prefix:match(WORD_POSITION_PATTERNS[4]))
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local objHP = text:match(WORD_POSITION_PATTERNS[2])
+    local res = text:match(WORD_POSITION_PATTERNS[3])
     adaptiveFrame.children[id]:SetTexture(obj, obj)
-    adaptiveFrame.children[id]:SetTextT(en10(objHP))
+    if objHP ~= nil then
+        adaptiveFrame.children[id]:SetTextT(en10(objHP))
+    else
+        adaptiveFrame.children[id]:SetTextT("")
+    end
     adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
-    adaptiveFrame:SetCellIcon(id, "00t", 7, "участок")
+    if res ~= nil then
+        adaptiveFrame:SetCellIcon(id, res, 7, "участок")
+    end
+    adaptiveFrame:SetupPopupTriggers()
 end
 
 function newObjHP(channel, text, sender, prefix)
@@ -524,6 +533,7 @@ function achive_complit(channel, text, sender, prefix)
 end
 
 function displayFld1(channel, text, sender, prefix)
+    adaptiveFrame:SetupPopupTriggers()
     for i = 1, 50 do
         --mFld:setArg(i, text:sub((i*3)-2, i*3))
         adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
