@@ -3216,6 +3216,10 @@ function AdaptiveFrame:SetupPopupTriggers()
     -- Функция для создания триггера по текстуре
     local function createTextureTrigger(triggerKey)
         return function(parentButton)
+            -- Получаем текущий скрипт OnEnter (если есть)
+            local oldOnEnter = parentButton:GetScript("OnEnter")
+            local oldOnLeave = parentButton:GetScript("OnLeave")
+            
             local texture = parentButton:GetNormalTexture()
             if not texture then return false end
             
@@ -3270,6 +3274,21 @@ function AdaptiveFrame:SetupPopupTriggers()
                 end
                 
                 if #buttonDataList > 0 then
+                    -- Восстанавливаем старые обработчики тултипов
+                    if oldOnEnter then
+                        parentButton:SetScript("OnEnter", function(self)
+                            oldOnEnter(self)
+                            -- Дополнительные действия при наведении (если нужно)
+                        end)
+                    end
+                    
+                    if oldOnLeave then
+                        parentButton:SetScript("OnLeave", function(self)
+                            oldOnLeave(self)
+                            -- Дополнительные действия при уходе курсора (если нужно)
+                        end)
+                    end
+                    
                     return true, buttonDataList
                 end
             end
@@ -3287,7 +3306,28 @@ function AdaptiveFrame:SetupPopupTriggers()
     -- Обновляем триггеры для всех клеток
     for i = 1, 100 do
         if self.children[i] and self.children[i].frame then
-            self.popupPanel:Show(self.children[i].frame, allTriggers)
+            -- Сохраняем текущие скрипты перед добавлением панели
+            local frame = self.children[i].frame
+            local oldOnEnter = frame:GetScript("OnEnter")
+            local oldOnLeave = frame:GetScript("OnLeave")
+            
+            -- Добавляем панель
+            self.popupPanel:Show(frame, allTriggers)
+            
+            -- Восстанавливаем скрипты после добавления панели
+            if oldOnEnter then
+                frame:SetScript("OnEnter", function(self)
+                    oldOnEnter(self)
+                    -- Дополнительные действия при наведении (если нужно)
+                end)
+            end
+            
+            if oldOnLeave then
+                frame:SetScript("OnLeave", function(self)
+                    oldOnLeave(self)
+                    -- Дополнительные действия при уходе курсора (если нужно)
+                end)
+            end
         end
     end
 end
