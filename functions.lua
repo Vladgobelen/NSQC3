@@ -915,9 +915,7 @@ GuildMemberDetailFrame:HookScript("OnUpdate", function(self, elapsed)
         if selectedName and selectedName ~= mFldName then
             mFldName = selectedName -- Обновляем предыдущее значение
             if adaptiveFrame:isVisible() then
-                for i = 1, 100 do
-                    adaptiveFrame.children[i]:SetTextT("")
-                end
+                adaptiveFrame:HideAllCellTexts()
                 SendAddonMessage("getFld " .. mFldName, "", "guild")
             end
         end

@@ -3015,7 +3015,7 @@ function AdaptiveFrame:AddSideText(text)
     end)
     
     lineFrame.text = line
-    table.insert(self.sideTextLines, lineFrame)
+    table.insert(self.sideTextLines, 1, lineFrame)
     self:UpdateSideFrame()
 end
 
@@ -3328,6 +3328,14 @@ function AdaptiveFrame:GetSideTextCount(baseText)
     end
     
     return totalCount
+end
+
+function AdaptiveFrame:HideAllCellTexts()
+    for cellIndex, child in ipairs(self.children or {}) do
+        if child and child.SetTextT then
+            child:SetTextT("")  -- Устанавливаем пустой текст
+        end
+    end
 end
 
 mDB = {}

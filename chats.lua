@@ -197,8 +197,17 @@ local triggersByAddress = {
             func = "newObjHP",
             conditions = {
                 function(channel, text, sender, prefix)
-                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
-                    return kod2 == mFldName
+                    local target = prefix:match(WORD_POSITION_PATTERNS[3])
+                    local sender = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    if target == myNome and sender ~= myNome then
+                        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\00t.ogg")
+                    end
+                    return true
+                end,
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
                 end,
                 function(channel, text, sender, prefix)
                     return adaptiveFrame:isVisible()
@@ -290,8 +299,64 @@ local triggersByAddress = {
             func = "nsqc_RawResCount",
             conditions = {
                 function(channel, text, sender, prefix)
-                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[3])
                     return kod2 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:ns_0kb"] = {
+        {
+            keyword = {
+                { word = "ns_0kb", position = 1, source = "prefix" },
+            },
+            func = "ns_0kb",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local target = prefix:match(WORD_POSITION_PATTERNS[3])
+                    local sender = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    if target == myNome and sender ~= myNome then
+                        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\0kb.ogg")
+                    end
+                    return true
+                end,
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:ns_0ka"] = {
+        {
+            keyword = {
+                { word = "ns_0ka", position = 1, source = "prefix" },
+            },
+            func = "ns_0ka",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local target = prefix:match(WORD_POSITION_PATTERNS[3])
+                    local sender = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    if target == myNome and sender ~= myNome then
+                        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\0ka.ogg")
+                    end
+                    return true
+                end,
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
                 end,
                 function(channel, text, sender, prefix)
                     return adaptiveFrame:isVisible()
@@ -303,56 +368,42 @@ local triggersByAddress = {
     },
 }
 
+function ns_0ka(channel, text, sender, prefix)
+    local id = tonumber(text:match(WORD_POSITION_PATTERNS[1]))
+    local num = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
+    adaptiveFrame.children[id]:SetTextT(num, "808080")
+end
+function ns_0kb(channel, text, sender, prefix)
+    local id = tonumber(text:match(WORD_POSITION_PATTERNS[1]))
+    adaptiveFrame:SetCellIcon(id, "0ka", 7, "участок")
+    adaptiveFrame.children[id]:SetTextT("500", "FF0000")
+    PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\0kb.ogg")
+end
+
 function nsqc_RawResCount(channel, text, sender, prefix)
-    if adaptiveFrame:GetSideTextCount("Бревна") ~= text:match(WORD_POSITION_PATTERNS[1]) then
-        adaptiveFrame:RemoveSideText("Бревна")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[1])) do
-        adaptiveFrame:AddSideText("Бревна")
-    end
-    if adaptiveFrame:GetSideTextCount("Трава") ~= text:match(WORD_POSITION_PATTERNS[2]) then
-        adaptiveFrame:RemoveSideText("Трава")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[2])) do
-        adaptiveFrame:AddSideText("Трава")
-    end
-    if adaptiveFrame:GetSideTextCount("Камень") ~= text:match(WORD_POSITION_PATTERNS[3]) then
-        adaptiveFrame:RemoveSideText("Камень")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[3])) do
-        adaptiveFrame:AddSideText("Камень")
-    end
-    if adaptiveFrame:GetSideTextCount("Бетон") ~= text:match(WORD_POSITION_PATTERNS[4]) then
-        adaptiveFrame:RemoveSideText("Бетон")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[4])) do
-        adaptiveFrame:AddSideText("Бетон")
-    end
-    if adaptiveFrame:GetSideTextCount("Самогон") ~= text:match(WORD_POSITION_PATTERNS[5]) then
-        adaptiveFrame:RemoveSideText("Самогон")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[5])) do
-        adaptiveFrame:AddSideText("Самогон")
-    end
-    if adaptiveFrame:GetSideTextCount("Доски") ~= text:match(WORD_POSITION_PATTERNS[6]) then
-        adaptiveFrame:RemoveSideText("Доски")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[6])) do
-        adaptiveFrame:AddSideText("Доски")
-    end
-    if adaptiveFrame:GetSideTextCount("Кирпич") ~= text:match(WORD_POSITION_PATTERNS[7]) then
-        adaptiveFrame:RemoveSideText("Кирпич")
-    end
-    for i = 1, tonumber(text:match(WORD_POSITION_PATTERNS[7])) do
-        adaptiveFrame:AddSideText("Кирпич")
+    local resources = {
+        "Бревна", 
+        "Трава", 
+        "Камень", 
+        "Бетон", 
+        "Самогон", 
+        "Доски", 
+        "Кирпич"
+    }
+    for index, resource in ipairs(resources) do
+        local current_count = adaptiveFrame:GetSideTextCount(resource)
+        local new_count = tonumber(text:match(WORD_POSITION_PATTERNS[index]))
+        
+        if tonumber(current_count) ~= new_count then
+            adaptiveFrame:RemoveSideText(resource)
+            
+            for i = 1, new_count do
+                adaptiveFrame:AddSideText(resource)
+            end
+        end
     end
 end
 
-function ns85UID(channel, text, sender, prefix)
-    local name = text:match(WORD_POSITION_PATTERNS[1])
-    local id = text:match(WORD_POSITION_PATTERNS[2])
-    print(name, id)
-end
 
 function nsYourLog(channel, text, sender, prefix)
     local timestamp, rl, raid_id, gp, targets = text:match("^(%d+)%s+(%S+)%s+(%S+)%s+([-+]?%d+)%s+(.+)$")
