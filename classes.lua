@@ -3174,6 +3174,109 @@ function AdaptiveFrame:UpdateIconVisibility(cellIndex, corner)
     end
 end
 
+-- Метод для получения количества объектов в инвентаре по базовому имени
+function AdaptiveFrame:GetSideTextCount(baseText)
+    if not self.sideFrame or not self.sideTextLines then return 0 end
+    
+    local totalCount = 0
+    baseText = baseText:gsub("%(%d+%)$", ""):trim()
+    
+    for _, lineFrame in ipairs(self.sideTextLines) do
+        local lineText = lineFrame.text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            -- Извлекаем число из скобок, если есть
+            local count = tonumber(lineText:match("%((%d+)%)$")) or 1
+            totalCount = totalCount + count
+        end
+    end
+    
+    return totalCount
+end
+
+function AdaptiveFrame:HideAllCellTexts()
+    for cellIndex, child in ipairs(self.children or {}) do
+        if child and child.SetTextT then
+            child:SetTextT("")  -- Устанавливаем пустой текст
+        end
+    end
+end
+
+function AdaptiveFrame:SetupPopupTriggers()
+    if not ns_triggers then return end
+    
+    if not self.popupPanel then
+        self.popupPanel = PopupPanel:Create(50, 50, 6, 0)
+        if not self.popupPanel then return end
+    end
+    
+    local function createTextureTrigger(textureKey)
+        return function(parentButton)
+            local texture = parentButton:GetNormalTexture()
+            if not texture then return false end
+            
+            local texturePath = texture:GetTexture()
+            if not texturePath then return false end
+            
+            -- Получаем только имя файла текстуры (последнюю часть пути)
+            local textureFile = texturePath:match("[^\\]+$") or ""
+            -- Сравниваем только последние 3 символа
+            local shortTexture = textureFile:sub(-3)
+            
+            if shortTexture == textureKey and ns_triggers[textureKey] then
+                local cellIndex
+                for i = 1, 100 do
+                    if self.children[i] and self.children[i].frame == parentButton then
+                        cellIndex = i
+                        break
+                    end
+                end
+                if not cellIndex then return false end
+                
+                local buttonDataList = {}
+                
+                for btnTexture, btnData in pairs(ns_triggers[textureKey]) do
+                    local func, tooltip
+                    if type(btnData) == "function" then
+                        func = function() btnData(cellIndex) end
+                        tooltip = "Действие"
+                    elseif type(btnData) == "table" then
+                        func = function() btnData.func(cellIndex) end
+                        tooltip = btnData.tooltip
+                    end
+                    
+                    if func then
+                        -- Используем полный путь к текстуре из ns_triggers
+                        table.insert(buttonDataList, {
+                            texture = btnTexture,
+                            func = func,
+                            tooltip = tooltip
+                        })
+                    end
+                end
+                
+                if #buttonDataList > 0 then
+                    return true, buttonDataList
+                end
+            end
+            
+            return false
+        end
+    end
+    
+    local allTriggers = {}
+    for textureKey in pairs(ns_triggers) do
+        table.insert(allTriggers, createTextureTrigger(textureKey))
+    end
+    
+    for i = 1, 100 do
+        if self.children[i] and self.children[i].frame then
+            self.popupPanel:Show(self.children[i].frame, allTriggers)
+        end
+    end
+end
+
 PopupPanel = {}
 PopupPanel.__index = PopupPanel
 
@@ -3307,35 +3410,6 @@ function PopupPanel:Show(parentButton, secondaryTriggers)
             self.panel:Hide()
         --end
     end)
-end
-
--- Метод для получения количества объектов в инвентаре по базовому имени
-function AdaptiveFrame:GetSideTextCount(baseText)
-    if not self.sideFrame or not self.sideTextLines then return 0 end
-    
-    local totalCount = 0
-    baseText = baseText:gsub("%(%d+%)$", ""):trim()
-    
-    for _, lineFrame in ipairs(self.sideTextLines) do
-        local lineText = lineFrame.text:GetText()
-        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
-        
-        if lineBase == baseText then
-            -- Извлекаем число из скобок, если есть
-            local count = tonumber(lineText:match("%((%d+)%)$")) or 1
-            totalCount = totalCount + count
-        end
-    end
-    
-    return totalCount
-end
-
-function AdaptiveFrame:HideAllCellTexts()
-    for cellIndex, child in ipairs(self.children or {}) do
-        if child and child.SetTextT then
-            child:SetTextT("")  -- Устанавливаем пустой текст
-        end
-    end
 end
 
 mDB = {}
