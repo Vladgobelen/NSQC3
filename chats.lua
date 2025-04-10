@@ -467,6 +467,8 @@ function objEnParent(channel, text, sender, prefix)
     adaptiveFrame.children[id]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(id)).tooltips)
     if res ~= nil then
         adaptiveFrame:SetCellIcon(id, res, 7, "участок")
+    else
+        adaptiveFrame:SetCellIcon(id, nil, 7, "участок")
     end
     adaptiveFrame:SetupPopupTriggers()
 end
