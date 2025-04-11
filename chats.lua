@@ -255,6 +255,44 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:nsqc_00h1"] = {
+        {
+            keyword = {
+                { word = "nsqc_00h1", position = 1, source = "prefix" },
+            },
+            func = "nsqc_00h1",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:nsqc_00h2"] = {
+        {
+            keyword = {
+                { word = "nsqc_00h2", position = 1, source = "prefix" },
+            },
+            func = "nsqc_00h2",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
     ["prefix:nsYourLog"] = {
         {
             keyword = {
@@ -367,6 +405,39 @@ local triggersByAddress = {
         }
     },
 }
+
+function nsqc_00h1(channel, text, sender, prefix)
+    for i = 1, 50 do
+        adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        
+        adaptiveFrame.children[i]:SetOnEnter(function()
+            fBtnEnter(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
+        end)
+        adaptiveFrame.children[i]:SetOnClick(function()
+            fBtnClick(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
+        end)
+        adaptiveFrame.children[i]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(i)).tooltips)
+        adaptiveFrame.children[i]:SetTextT("")
+    end
+end
+
+function nsqc_00h2(channel, text, sender, prefix)
+    for i = 1, 50 do
+        local j = i + 50
+        adaptiveFrame.children[j]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        adaptiveFrame.children[j]:SetOnEnter(function()
+            fBtnEnter(j, adaptiveFrame.children[j].frame:GetNormalTexture():GetTexture():sub(-3))
+        end)
+        adaptiveFrame.children[j]:SetOnClick(function()
+            fBtnClick(j, adaptiveFrame.children[j].frame:GetNormalTexture():GetTexture():sub(-3))
+        end)
+        adaptiveFrame.children[j]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(j)).tooltips)
+        adaptiveFrame.children[i]:SetTextT("")
+    end
+    adaptiveFrame:SetText(mFldName .. " - хижина")
+    mFld:setArg("onEnterFlag", nil)
+    adaptiveFrame:SetupPopupTriggers()
+end
 
 function ns_0ka(channel, text, sender, prefix)
     local id = tonumber(text:match(WORD_POSITION_PATTERNS[1]))
@@ -554,7 +625,6 @@ function displayFld2(channel, text, sender, prefix)
         local j = i + 50
         --mFld:setArg(i, text:sub((i*3)-2, i*3))
         adaptiveFrame.children[j]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
-        adaptiveFrame.children[j]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(j)).tooltips)
         adaptiveFrame.children[j]:SetOnEnter(function()
             fBtnEnter(j, adaptiveFrame.children[j].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
