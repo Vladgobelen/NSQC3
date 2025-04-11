@@ -304,6 +304,14 @@ function NsDb:add_line(message)
     end
 end
 
+function NsDb:add_log(message)
+    self.input_table = self.input_table or {}
+    table.insert(self.input_table, message)
+    if #self.input_table > 10000 then
+        table.remove(self.input_table, 1)
+    end
+end
+
 -- Метод для добавления словаря
 function NsDb:add_dict(message, kod)
     local num = #self.input_table
@@ -454,6 +462,11 @@ function NsDb:Len()
         end
     end
     return Len
+end
+
+function NsDb:logLen()
+    if not self.input_table then return 0 end
+    return #self.input_table  -- Просто количество элементов в массиве
 end
 
 function NsDb:modKey(...)
