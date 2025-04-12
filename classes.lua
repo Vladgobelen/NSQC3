@@ -2558,7 +2558,11 @@ function AdaptiveFrame:new(parent)
     self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
     self.closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING+5, -PADDING)
     self.closeButton:SetScript("OnClick", function()
-        self:Hide()
+        if self.textField:GetText():match(WORD_POSITION_PATTERNS[3]) ~= "участок" then
+            SendAddonMessage("getFld " .. mFldName, "", "guild")
+        else
+            self:Hide()
+        end
         for i = 1, 100 do
             if self.children[i] then
                 self.children[i]:SetTextT("")
@@ -2571,7 +2575,6 @@ function AdaptiveFrame:new(parent)
     self.toggleSideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
     self.toggleSideButton:SetPoint("TOPRIGHT", self.closeButton, "BOTTOMRIGHT", 5, -5)
     
-    -- Текстуры для кнопки (используем стандартные стрелки из WoW)
     self.toggleSideButton:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
     self.toggleSideButton:GetNormalTexture():SetDesaturated(true)
     self.toggleSideButton:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
