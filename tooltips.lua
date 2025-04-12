@@ -226,7 +226,7 @@ ns_tooltips = {
 }
 
 ns_triggers = {
-    ["0zt"] = {
+    ["0hp"] = {
         ["Interface\\AddOns\\NSQC3\\libs\\0hs"] = {
             func = function(cellIndex, textureKey) 
                 ns_crtH(cellIndex, textureKey)
@@ -240,6 +240,15 @@ ns_triggers = {
                 ns_crtH(cellIndex, textureKey)
             end,
             tooltip = "Утоптать и выровнять землю"
+        },
+    },
+    ["0hp"] = {
+        ["Interface\\AddOns\\NSQC3\\libs\\0uz"] = {
+            func = function(cellIndex, textureKey) 
+                print(1111)
+            end,
+            tooltip = "Утоптать и выровнять землю",
+            craft = true
         },
     }
 }

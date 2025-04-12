@@ -2439,7 +2439,17 @@ function ButtonManager:SetMovable(isMovable)
     end
 end
 
+-- Таблицы
+local CRAFT_ENABLED_LOCATIONS = {
+    ["хижина"] = true,
+}
 -- Константы
+local CRAFT_BUTTON_SIZE = 32
+local CRAFT_BUTTON_ACTIVE_ALPHA = 1.0
+local CRAFT_BUTTON_INACTIVE_ALPHA = 0.4
+local CRAFT_BUTTON_COLOR_ACTIVE = {0.1, 0.8, 0.1} -- Зеленый
+local CRAFT_BUTTON_COLOR_INACTIVE = {0.5, 0.5, 0.5} -- Серый
+
 local CLOSE_BUTTON_SIZE = 32
 local PADDING = 15
 local SCREEN_PADDING = -40  -- Отступ от краев экрана
@@ -2631,15 +2641,126 @@ function AdaptiveFrame:new(parent)
         self:AdjustSizeAndPosition()
     end)
 
+    self.craftButton = CreateFrame("Button", nil, self.frame)
+    self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
+    self.craftButton:SetPoint("TOPRIGHT", self.toggleSideButton, "BOTTOMRIGHT", 0, -5)
+    
+    -- Текстуры состояний
+    self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+    self.craftButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
+    self.craftButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    
+    -- Иконка крафта
+    self.craftButton.icon = self.craftButton:CreateTexture(nil, "OVERLAY")
+    self.craftButton.icon:SetTexture("Interface\\ICONS\\Trade_BlackSmithing")
+    self.craftButton.icon:SetAllPoints()
+    
+    -- Инициализация состояния
+    self.craftSettings = {
+        active = false,
+        visibleCells = {},
+        enabledLocations = CRAFT_ENABLED_LOCATIONS  -- Сохраняем таблицу локаций
+    }
+    -- Обработчик клика
+    self.craftButton:SetScript("OnClick", function()
+        self.craftSettings.active = not self.craftSettings.active
+        self:UpdateCraftButtonState()
+        ns_dbc:modKey("настройки", "CRAFT_ACTIVE", self.craftSettings.active)
+    end)
+    
+    self.craftButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.craftButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Режим крафта")
+        GameTooltip:AddLine("ЛКМ - активация/деактивация", 1,1,1)
+        GameTooltip:Show()
+    end)
+    self.craftButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    -- Загрузка сохраненного состояния
+    self.craftSettings.active = ns_dbc:getKey("настройки", "CRAFT_ACTIVE") or false
+    self:UpdateCraftButtonState()
+
     -- Инициализация списка дочерних элементов
     self.children = {}
     
     return self
 end
 
+function AdaptiveFrame:UpdateCraftButtonState()
+    local currentLocation = self:GetCurrentLocation()
+    local isLocationAllowed = self.craftSettings.enabledLocations[currentLocation] or false
+    
+    -- Обновляем видимость кнопки
+    if isLocationAllowed then
+        self.craftButton:Show()
+    else
+        self.craftButton:Hide()
+    end
+    
+    -- Если локация не разрешена, деактивируем кнопку
+    if not isLocationAllowed then
+        self.craftSettings.active = false
+    end
+    
+    local color = self.craftSettings.active and CRAFT_BUTTON_COLOR_ACTIVE or CRAFT_BUTTON_COLOR_INACTIVE
+    local alpha = self.craftSettings.active and CRAFT_BUTTON_ACTIVE_ALPHA or CRAFT_BUTTON_INACTIVE_ALPHA
+    
+    self.craftButton.icon:SetVertexColor(unpack(color))
+    self.craftButton:SetAlpha(alpha)
+    
+    self:UpdateCraftIconsVisibility()
+end
+
+function AdaptiveFrame:GetCurrentLocation()
+    if not self.textField or not self.textField.GetText then return "" end
+    local headerText = self.textField:GetText() or ""
+    
+    if WORD_POSITION_PATTERNS and WORD_POSITION_PATTERNS[3] then
+        return headerText:match(WORD_POSITION_PATTERNS[3]) or ""
+    end
+    return ""
+end
+
+function AdaptiveFrame:SetCraftVisibleCells(cellIndices)
+    self.craftSettings.visibleCells = {}
+    for _, index in ipairs(cellIndices) do
+        self.craftSettings.visibleCells[index] = true
+    end
+    self:UpdateCraftIconsVisibility()
+end
+
+function AdaptiveFrame:UpdateCraftIconsVisibility()
+    local currentLocation = self:GetCurrentLocation()
+    local isLocationAllowed = self.craftSettings.enabledLocations[currentLocation] or false
+    
+    -- Обновляем иконки только если локация разрешена и кнопка активна
+    if isLocationAllowed then
+        for cellIndex in pairs(self.craftSettings.visibleCells or {}) do
+            local shouldShow = self.craftSettings.active
+            self:SetCellIcon(cellIndex, shouldShow and "craft_icon" or nil, 5, currentLocation, shouldShow)
+        end
+    else
+        -- Скрываем все иконки крафта если локация не разрешена
+        for cellIndex in pairs(self.craftSettings.visibleCells or {}) do
+            self:SetCellIcon(cellIndex, nil, 5)
+        end
+    end
+end
+
+function AdaptiveFrame:SetCraftEnabledLocations(locationsTable)
+    self.craftSettings.enabledLocations = {}
+    for location, enabled in pairs(locationsTable or {}) do
+        self.craftSettings.enabledLocations[location] = enabled
+    end
+    self:UpdateCraftButtonState()
+end
+
 function AdaptiveFrame:SetText(text)
     if self.textField then
-        self.textField:SetText(text)
+        self.textField:SetText(text or "")
+        
+        -- При изменении текста проверяем нужно ли обновить кнопку крафта
+        self:UpdateCraftButtonState()
         
         -- Обновляем видимость всех иконок
         for cellIndex, child in ipairs(self.children or {}) do
