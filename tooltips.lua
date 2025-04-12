@@ -226,7 +226,7 @@ ns_tooltips = {
 }
 
 ns_triggers = {
-    ["0hp"] = {
+    ["0zt"] = {
         ["Interface\\AddOns\\NSQC3\\libs\\0hs"] = {
             func = function(cellIndex, textureKey) 
                 ns_crtH(cellIndex, textureKey)
@@ -243,6 +243,13 @@ ns_triggers = {
         },
     },
     ["0hp"] = {
+        ["Interface\\AddOns\\NSQC3\\libs\\0hs"] = {
+            func = function(cellIndex, textureKey) 
+                ns_crtH(cellIndex, textureKey)
+            end,
+            tooltip = "Построить хижину. Надо же где то жить, логично?",
+            craft = false -- явно указываем, что это обычное действие
+        },
         ["Interface\\AddOns\\NSQC3\\libs\\0uz"] = {
             func = function(cellIndex, textureKey) 
                 print(1111)

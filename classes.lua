@@ -2687,28 +2687,41 @@ function AdaptiveFrame:new(parent)
 end
 
 function AdaptiveFrame:UpdateCraftButtonState()
+    -- Проверяем необходимые объекты
+    if not self.craftButton or not self.textField then 
+        return 
+    end
+
+    -- Получаем текущую локацию
     local currentLocation = self:GetCurrentLocation()
     local isLocationAllowed = self.craftSettings.enabledLocations[currentLocation] or false
     
-    -- Обновляем видимость кнопки
+    -- Управление видимостью кнопки
     if isLocationAllowed then
         self.craftButton:Show()
     else
         self.craftButton:Hide()
+        if self.craftSettings then
+            self.craftSettings.active = false
+        end
     end
-    
-    -- Если локация не разрешена, деактивируем кнопку
-    if not isLocationAllowed then
-        self.craftSettings.active = false
+
+    -- Устанавливаем цвет и прозрачность
+    if self.craftSettings then
+        local color = self.craftSettings.active and CRAFT_BUTTON_COLOR_ACTIVE or CRAFT_BUTTON_COLOR_INACTIVE
+        local alpha = self.craftSettings.active and CRAFT_BUTTON_ACTIVE_ALPHA or CRAFT_BUTTON_INACTIVE_ALPHA
+        
+        if self.craftButton.icon then
+            self.craftButton.icon:SetVertexColor(unpack(color))
+        end
+        self.craftButton:SetAlpha(alpha)
     end
-    
-    local color = self.craftSettings.active and CRAFT_BUTTON_COLOR_ACTIVE or CRAFT_BUTTON_COLOR_INACTIVE
-    local alpha = self.craftSettings.active and CRAFT_BUTTON_ACTIVE_ALPHA or CRAFT_BUTTON_INACTIVE_ALPHA
-    
-    self.craftButton.icon:SetVertexColor(unpack(color))
-    self.craftButton:SetAlpha(alpha)
-    
+
+    -- Обновляем иконки крафта
     self:UpdateCraftIconsVisibility()
+    
+    -- Обновляем триггеры панели
+    self:SetupPopupTriggers()
 end
 
 function AdaptiveFrame:GetCurrentLocation()
@@ -3371,7 +3384,7 @@ function AdaptiveFrame:SetupPopupTriggers()
             if shortTexture == triggerKey and ns_triggers[triggerKey] then
                 local cellIndex
                 -- Находим индекс клетки по фрейму
-                for i = 1, 100 do
+                for i = 1, #(self.children or {}) do
                     if self.children[i] and self.children[i].frame == parentButton then
                         cellIndex = i
                         break
@@ -3380,33 +3393,43 @@ function AdaptiveFrame:SetupPopupTriggers()
                 if not cellIndex then return false end
                 
                 local buttonDataList = {}
+                local craftModeActive = self.craftSettings and self.craftSettings.active or false
                 
                 -- Формируем данные для кнопок
                 for btnTexture, btnData in pairs(ns_triggers[triggerKey]) do
-                    local func, tooltip
-                    -- Извлекаем ключ текстуры (последние 3 символа)
-                    local textureKey = btnTexture:match("[^\\]+$"):sub(-3)
+                    -- Проверяем флаг craft (если есть)
+                    local isCraftAction = type(btnData) == "table" and btnData.craft or false
                     
-                    if type(btnData) == "function" then
-                        -- Обертываем функцию для передачи cellIndex и textureKey
-                        func = function() 
-                            btnData(cellIndex, textureKey) 
+                    -- Показываем кнопку если:
+                    -- 1. Режим крафта ВКЛ и действие для крафта
+                    -- 2. Режим крафта ВЫКЛ и действие НЕ для крафта
+                    if (craftModeActive and isCraftAction) or (not craftModeActive and not isCraftAction) then
+                        local func, tooltip
+                        
+                        -- Извлекаем ключ текстуры (последние 3 символа)
+                        local btnTextureKey = btnTexture:match("[^\\]+$"):sub(-3)
+                        
+                        if type(btnData) == "function" then
+                            -- Обертываем функцию для передачи cellIndex и textureKey
+                            func = function() 
+                                btnData(cellIndex, btnTextureKey) 
+                            end
+                            tooltip = "Действие"
+                        elseif type(btnData) == "table" then
+                            -- Обертываем функцию из таблицы
+                            func = function() 
+                                btnData.func(cellIndex, btnTextureKey) 
+                            end
+                            tooltip = btnData.tooltip
                         end
-                        tooltip = "Действие"
-                    elseif type(btnData) == "table" then
-                        -- Обертываем функцию из таблицы
-                        func = function() 
-                            btnData.func(cellIndex, textureKey) 
+                        
+                        if func then
+                            table.insert(buttonDataList, {
+                                texture = btnTexture,
+                                func = func,
+                                tooltip = tooltip or "Действие: " .. btnTextureKey
+                            })
                         end
-                        tooltip = btnData.tooltip
-                    end
-                    
-                    if func then
-                        table.insert(buttonDataList, {
-                            texture = btnTexture,
-                            func = func,
-                            tooltip = tooltip or "Действие: " .. textureKey
-                        })
                     end
                 end
                 
@@ -3415,14 +3438,12 @@ function AdaptiveFrame:SetupPopupTriggers()
                     if oldOnEnter then
                         parentButton:SetScript("OnEnter", function(self)
                             oldOnEnter(self)
-                            -- Дополнительные действия при наведении (если нужно)
                         end)
                     end
                     
                     if oldOnLeave then
                         parentButton:SetScript("OnLeave", function(self)
                             oldOnLeave(self)
-                            -- Дополнительные действия при уходе курсора (если нужно)
                         end)
                     end
                     
@@ -3441,9 +3462,8 @@ function AdaptiveFrame:SetupPopupTriggers()
     end
     
     -- Обновляем триггеры для всех клеток
-    for i = 1, 100 do
+    for i = 1, #(self.children or {}) do
         if self.children[i] and self.children[i].frame then
-            -- Сохраняем текущие скрипты перед добавлением панели
             local frame = self.children[i].frame
             local oldOnEnter = frame:GetScript("OnEnter")
             local oldOnLeave = frame:GetScript("OnLeave")
@@ -3455,14 +3475,12 @@ function AdaptiveFrame:SetupPopupTriggers()
             if oldOnEnter then
                 frame:SetScript("OnEnter", function(self)
                     oldOnEnter(self)
-                    -- Дополнительные действия при наведении (если нужно)
                 end)
             end
             
             if oldOnLeave then
                 frame:SetScript("OnLeave", function(self)
                     oldOnLeave(self)
-                    -- Дополнительные действия при уходе курсора (если нужно)
                 end)
             end
         end
