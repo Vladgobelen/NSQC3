@@ -231,7 +231,7 @@ ns_triggers = {
             func = function(cellIndex, textureKey) 
                 ns_crtH(cellIndex, textureKey)
             end,
-            tooltip = "Построить хижину. Надо же где то жить, логично?"
+            tooltip = "Построить хижину. Надо же где то жить, логично?",
         },
     },
     ["00z"] = {
@@ -251,8 +251,8 @@ ns_triggers = {
             craft = false -- явно указываем, что это обычное действие
         },
         ["Interface\\AddOns\\NSQC3\\libs\\0uz"] = {
-            func = function(cellIndex, textureKey) 
-                print(1111)
+            func = function(cellIndex, textureKey, isCraft) 
+                print(cellIndex, textureKey, isCraft)
             end,
             tooltip = "Утоптать и выровнять землю",
             craft = true

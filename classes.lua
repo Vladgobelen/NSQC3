@@ -3416,9 +3416,9 @@ function AdaptiveFrame:SetupPopupTriggers()
                             end
                             tooltip = "Действие"
                         elseif type(btnData) == "table" then
-                            -- Обертываем функцию из таблицы
+                            -- Обертываем функцию из таблицы с передачей флага craft
                             func = function() 
-                                btnData.func(cellIndex, btnTextureKey) 
+                                btnData.func(cellIndex, btnTextureKey, btnData.craft) 
                             end
                             tooltip = btnData.tooltip
                         end

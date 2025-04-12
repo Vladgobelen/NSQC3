@@ -249,6 +249,9 @@ local triggersByAddress = {
                 end,
                 function(channel, text, sender, prefix)
                     return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:GetCurrentLocation() == "участок"
                 end
             },
             chatType = {"ADDON"},
@@ -312,18 +315,6 @@ local triggersByAddress = {
                         return false
                     end
                 end
-            },
-            chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
-        }
-    },
-    ["prefix:ns85UID"] = {
-        {
-            keyword = {
-                { word = "ns85UID", position = 1, source = "prefix" },
-            },
-            func = "ns85UID",
-            conditions = {
             },
             chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
