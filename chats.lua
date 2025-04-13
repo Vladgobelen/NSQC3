@@ -477,7 +477,6 @@ function ns_crftFail(channel, text, sender, prefix)
     local target = prefix:match(WORD_POSITION_PATTERNS[3])
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local id = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
-
     SendAddonMessage("NSQC3_clcl " .. mFldName .. " " .. id, "00h", "guild")
 end
 
@@ -544,7 +543,6 @@ function nsqc_RawResCount(channel, text, sender, prefix)
         "Доски", 
         "Кирпич"
     }
-    print(sender, text, prefix)
     for index, resource in ipairs(resources) do
         local current_count = adaptiveFrame:GetSideTextCount(resource)
         local new_count = tonumber(text:match(WORD_POSITION_PATTERNS[index]))
