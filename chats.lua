@@ -258,6 +258,75 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:ns_crftStart"] = {
+        {
+            keyword = {
+                { word = "ns_crftStart", position = 1, source = "prefix" },
+            },
+            func = "ns_crftStart",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = channel:match(WORD_POSITION_PATTERNS[3])
+                    return adaptiveFrame:GetCurrentLocation() == lok
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:ns_crftFail"] = {
+        {
+            keyword = {
+                { word = "ns_crftFail", position = 1, source = "prefix" },
+            },
+            func = "ns_crftFail",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = channel:match(WORD_POSITION_PATTERNS[3])
+                    return adaptiveFrame:GetCurrentLocation() == lok
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:ns_crftFinish"] = {
+        {
+            keyword = {
+                { word = "ns_crftFinish", position = 1, source = "prefix" },
+            },
+            func = "ns_crftFinish",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = channel:match(WORD_POSITION_PATTERNS[3])
+                    return adaptiveFrame:GetCurrentLocation() == lok
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
     ["prefix:nsqc_00h1"] = {
         {
             keyword = {
@@ -396,8 +465,32 @@ local triggersByAddress = {
         }
     },
 }
+function ns_crftFinish(channel, text, sender, prefix)
+    local target = prefix:match(WORD_POSITION_PATTERNS[3])
+    local obj = text:match(WORD_POSITION_PATTERNS[1])
+    local id = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
+
+    SendAddonMessage("NSQC3_clcl " .. mFldName .. " " .. id, "00h", "guild")
+end
+
+function ns_crftFail(channel, text, sender, prefix)
+    local target = prefix:match(WORD_POSITION_PATTERNS[3])
+    local obj = text:match(WORD_POSITION_PATTERNS[1])
+    local id = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
+
+    SendAddonMessage("NSQC3_clcl " .. mFldName .. " " .. id, "00h", "guild")
+end
+
+function ns_crftStart(channel, text, sender, prefix)
+    local target = prefix:match(WORD_POSITION_PATTERNS[3])
+    local obj = text:match(WORD_POSITION_PATTERNS[1])
+    local id = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
+
+    adaptiveFrame.children[id]:SetTexture(obj, obj)
+end
 
 function nsqc_00h1(channel, text, sender, prefix)
+    print('fdsfdsafdsafsdafdsafsad')
     for i = 1, 50 do
         adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
         

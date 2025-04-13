@@ -698,38 +698,40 @@ end
 
 function ns_crtH(id, obj, craft)
     if craft then
-        SendAddonMessage("ns_craft " .. mFldName, obj .. " " .. id, "GUILD")
+        SendAddonMessage("ns_craft " .. mFldName, obj .. " " .. id .. " " .. adaptiveFrame:GetCurrentLocation(), "GUILD")
     else
         SendAddonMessage("ns_crtH " .. mFldName, obj .. " " .. id, "GUILD")
     end
 end
 
 function fBtnEnter(id, obj)
-    -- Проверка наличия модификатора для текущей текстуры
-    local textureKey = adaptiveFrame:getTexture(id)
-    if not mFldObj:getKey(textureKey).mod then 
-        return 
-    end
-
-    -- Логика управления флагом
-    local currentFlag = mFld:getArg("onEnterFlag")
-    local shouldSendRequest = false
-    
-    -- Обновляем флаг только при изменении объекта
-    if currentFlag ~= obj then
-        mFld:setArg("onEnterFlag", obj)
-        shouldSendRequest = true
-    end
-
-    -- Отправка запроса при необходимости
-    if shouldSendRequest then
-        local activeCount = 0
-        for i = 1, 100 do
-            if adaptiveFrame:getTexture(id) == adaptiveFrame:getTexture(i) then
-                activeCount = activeCount + 1
-            end
+    if adaptiveFrame:GetCurrentLocation() == "участок" then
+        -- Проверка наличия модификатора для текущей текстуры
+        local textureKey = adaptiveFrame:getTexture(id)
+        if not mFldObj:getKey(textureKey).mod then 
+            return 
         end
-        SendAddonMessage((activeCount <= 50 and "nsGetObj1 " or "nsGetObj2 ") .. mFldName, obj, "guild")
+
+        -- Логика управления флагом
+        local currentFlag = mFld:getArg("onEnterFlag")
+        local shouldSendRequest = false
+        
+        -- Обновляем флаг только при изменении объекта
+        if currentFlag ~= obj then
+            mFld:setArg("onEnterFlag", obj)
+            shouldSendRequest = true
+        end
+
+        -- Отправка запроса при необходимости
+        if shouldSendRequest then
+            local activeCount = 0
+            for i = 1, 100 do
+                if adaptiveFrame:getTexture(id) == adaptiveFrame:getTexture(i) then
+                    activeCount = activeCount + 1
+                end
+            end
+            SendAddonMessage((activeCount <= 50 and "nsGetObj1 " or "nsGetObj2 ") .. mFldName, obj, "guild")
+        end
     end
 end
 
