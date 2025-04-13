@@ -490,7 +490,6 @@ function ns_crftStart(channel, text, sender, prefix)
 end
 
 function nsqc_00h1(channel, text, sender, prefix)
-    print('fdsfdsafdsafsdafdsafsad')
     for i = 1, 50 do
         adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
         
@@ -545,6 +544,7 @@ function nsqc_RawResCount(channel, text, sender, prefix)
         "Доски", 
         "Кирпич"
     }
+    print(sender, text, prefix)
     for index, resource in ipairs(resources) do
         local current_count = adaptiveFrame:GetSideTextCount(resource)
         local new_count = tonumber(text:match(WORD_POSITION_PATTERNS[index]))
