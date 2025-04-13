@@ -696,8 +696,12 @@ function fBtnClick(id, obj)
     end)
 end
 
-function ns_crtH(id, obj)
-    SendAddonMessage("ns_crtH " .. mFldName, obj .. " " .. id, "GUILD")
+function ns_crtH(id, obj, craft)
+    if craft then
+        SendAddonMessage("ns_craft " .. mFldName, obj .. " " .. id, "GUILD")
+    else
+        SendAddonMessage("ns_crtH " .. mFldName, obj .. " " .. id, "GUILD")
+    end
 end
 
 function fBtnEnter(id, obj)

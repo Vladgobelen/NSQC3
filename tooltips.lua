@@ -243,19 +243,43 @@ ns_triggers = {
         },
     },
     ["0hp"] = {
-        ["Interface\\AddOns\\NSQC3\\libs\\0hs"] = {
-            func = function(cellIndex, textureKey) 
-                ns_crtH(cellIndex, textureKey)
-            end,
-            tooltip = "Построить хижину. Надо же где то жить, логично?",
-            craft = false -- явно указываем, что это обычное действие
-        },
-        ["Interface\\AddOns\\NSQC3\\libs\\0uz"] = {
+        -- ["Interface\\AddOns\\NSQC3\\libs\\0hs"] = {
+        --     func = function(cellIndex, textureKey) 
+        --         ns_crtH(cellIndex, textureKey)
+        --     end,
+        --     tooltip = "Построить хижину. Надо же где то жить, логично?",
+        --     craft = false
+        -- },
+        ["Interface\\AddOns\\NSQC3\\libs\\00b"] = {
             func = function(cellIndex, textureKey, isCraft) 
-                print(cellIndex, textureKey, isCraft)
+                 ns_crtH(cellIndex, textureKey, isCraft)
             end,
-            tooltip = "Утоптать и выровнять землю",
+            tooltip = "Мастерски установить неструганное бревно",
+            craft = true
+        },
+        ["Interface\\AddOns\\NSQC3\\libs\\0ka"] = {
+            func = function(cellIndex, textureKey, isCraft) 
+                 ns_crtH(cellIndex, textureKey, isCraft)
+            end,
+            tooltip = "Брутально установить камень строго в нужное место",
             craft = true
         },
     }
+}
+
+ns_recipes = {
+    stol = {
+        [1] = "00b",
+        [2] = "0ka",
+        [5] = "00b",
+        [6] = "0ka"
+    },
+    stul = {
+        [1] = "00b",
+        [2] = "00b",
+        [5] = "0ka",
+        [6] = "0ka",
+        [8] = "00b",
+        [9] = "00b",
+    },
 }
