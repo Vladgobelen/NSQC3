@@ -1,12 +1,16 @@
 # Игнорировать всё
 *
-!.gitignore
-!*.lua
-!*.tga
-!*.md
-!*.toc
 
-# Разрешить структуру libs кроме конкретной папки
+# Не игнорировать основные файлы
+!.gitignore
+!example.lua
+!functions.lua
+!main.lua
+!tooltips.lua
+!emblem.tga
+!classes.lua
+!chats.lua
+
+# Рекурсивно разрешить всё внутри libs/
 !libs/
 !libs/**/*
-libs/тест/
