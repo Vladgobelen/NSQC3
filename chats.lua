@@ -340,6 +340,14 @@ local triggersByAddress = {
                 end,
                 function(channel, text, sender, prefix)
                     return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = prefix:match(WORD_POSITION_PATTERNS[4])
+                    if prefix:match(WORD_POSITION_PATTERNS[2]) == GetUnitName("player") then
+                        return true
+                    else
+                        return adaptiveFrame:GetCurrentLocation():match(WORD_POSITION_PATTERNS[2]) == lok
+                    end
                 end
             },
             chatType = {"ADDON"},
@@ -359,6 +367,14 @@ local triggersByAddress = {
                 end,
                 function(channel, text, sender, prefix)
                     return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = prefix:match(WORD_POSITION_PATTERNS[4])
+                    if prefix:match(WORD_POSITION_PATTERNS[2]) == GetUnitName("player") then
+                        return true
+                    else
+                        return adaptiveFrame:GetCurrentLocation():match(WORD_POSITION_PATTERNS[2]) == lok
+                    end
                 end
             },
             chatType = {"ADDON"},
