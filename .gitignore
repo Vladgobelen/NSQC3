@@ -10,6 +10,7 @@
 !emblem.tga
 !classes.lua
 !chats.lua
+!NSQC3.toc
 
 # Рекурсивно разрешить всё внутри libs/
 !libs/
