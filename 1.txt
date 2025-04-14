@@ -1,0 +1,171 @@
+calculate mysqld # /etc/init.d/mysql status
+ * status: crashed
+calculate mysqld # /etc/init.d/mysql stop
+mysql                     | * Stopping mysql ...
+mysql                     | * start-stop-daemon: no matching processes found                                                                                                       [ ok ]
+calculate mysqld # 
+calculate mysqld # /etc/init.d/mysql status
+ * status: stopped
+calculate mysqld # /etc/init.d/mysql start
+mysql                     | * Checking mysqld configuration for mysql ...                                                                                                          [ ok ]
+mysql                     | * Starting mysql ...                                                                                                                                   [ ok ]
+calculate mysqld # /etc/init.d/mysql status
+ * status: crashed
+calculate mysqld # /etc/init.d/mysql restart
+mysql                     | * Checking mysqld configuration for mysql ...                                                                                                          [ ok ]
+mysql                     | * Stopping mysql ...                                                                                                                                   [ ok ]
+mysql                     | * Starting mysql ...                                                                                                                                   [ ok ]
+calculate mysqld # /etc/init.d/mysql status
+
+
+2025-02-09 14:01:13 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:01:13 0 [ERROR] mariadbd: Can't lock aria control file '/var/lib/mysql/aria_log_control' for exclusive use, error: 11. Will retry for 30 seconds
+2025-02-09 14:01:13 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:01:13 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:01:13 0 [Note] InnoDB: Using liburing
+2025-02-09 14:01:13 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:01:13 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:01:13 0 [Note] InnoDB: Starting crash recovery from checkpoint LSN=42940,42940
+2025-02-09 14:01:13 0 [Note] InnoDB: 128 rollback segments are active.
+2025-02-09 14:01:13 0 [Note] InnoDB: Removed temporary tablespace data file: "./ibtmp1"
+2025-02-09 14:01:13 0 [Note] InnoDB: Creating shared tablespace for temporary tables
+2025-02-09 14:01:13 0 [Note] InnoDB: Setting file './ibtmp1' size to 12 MB. Physically writing the file full; Please wait ...
+2025-02-09 14:01:13 0 [Note] InnoDB: File './ibtmp1' size is now 12 MB.
+2025-02-09 14:01:13 0 [Note] InnoDB: 10.6.17 started; log sequence number 43052; transaction id 16
+2025-02-09 14:01:13 0 [Note] InnoDB: Loading buffer pool(s) from /var/lib/mysql/ib_buffer_pool
+2025-02-09 14:01:13 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:01:13 0 [Note] Recovering after a crash using mariadb-bin
+2025-02-09 14:01:13 0 [Note] Starting table crash recovery...
+2025-02-09 14:01:13 0 [Note] Crash table recovery finished.
+2025-02-09 14:01:13 0 [Note] InnoDB: Buffer pool(s) load completed at 250209 14:01:13
+2025-02-09 14:01:13 0 [Note] Server socket created on IP: '127.0.0.1'.
+2025-02-09 14:01:13 0 [Note] /usr/sbin/mariadbd: ready for connections.
+Version: '10.6.17-MariaDB-log'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  Source distribution
+2025-02-09 14:01:43 0 [ERROR] mariadbd: Got error 'Could not get an exclusive lock; file is probably in use by another process' when trying to use aria control file '/var/lib/mysql/aria_log_control'
+2025-02-09 14:01:43 0 [ERROR] Plugin 'Aria' registration as a STORAGE ENGINE failed.
+2025-02-09 14:01:43 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:01:43 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:01:43 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:01:43 0 [Note] InnoDB: Using liburing
+2025-02-09 14:01:43 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:01:43 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:01:43 0 [ERROR] InnoDB: Unable to lock ./ibdata1 error: 11
+2025-02-09 14:01:43 0 [Note] InnoDB: Check that you do not already have another mariadbd process using the same InnoDB data or log files.
+2025-02-09 14:01:43 0 [ERROR] InnoDB: Plugin initialization aborted with error Generic error
+2025-02-09 14:01:43 0 [Note] InnoDB: Starting shutdown...
+2025-02-09 14:01:43 0 [ERROR] Plugin 'InnoDB' registration as a STORAGE ENGINE failed.
+2025-02-09 14:01:43 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:01:43 0 [ERROR] Failed to initialize plugins.
+2025-02-09 14:01:43 0 [ERROR] Aborting
+250209 14:01:43 mysqld_safe Number of processes running now: 1
+250209 14:01:43 mysqld_safe mariadbd process hanging, pid 27247 - killed
+250209 14:01:43 mysqld_safe mysqld restarted
+250209 14:01:43 mysqld_safe Number of processes running now: 0
+250209 14:01:43 mysqld_safe mysqld restarted
+2025-02-09 14:01:43 0 [Note] Starting MariaDB 10.6.17-MariaDB-log source revision 15c75ad083a55e198ae78324f22970694b72f22b as process 28026
+2025-02-09 14:01:43 0 [Warning] No argument was provided to --log-bin and neither --log-basename or --log-bin-index where used;  This may cause repliction to break when this server acts as a master and has its hostname changed! Please use '--log-basename=calculate' or '--log-bin=mariadb-bin' to avoid this problem.
+2025-02-09 14:01:43 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:01:43 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:01:43 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:01:43 0 [Note] InnoDB: Using liburing
+2025-02-09 14:01:43 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:01:43 0 [Note] Starting MariaDB 10.6.17-MariaDB-log source revision 15c75ad083a55e198ae78324f22970694b72f22b as process 28048
+2025-02-09 14:01:43 0 [Warning] No argument was provided to --log-bin and neither --log-basename or --log-bin-index where used;  This may cause repliction to break when this server acts as a master and has its hostname changed! Please use '--log-basename=calculate' or '--log-bin=mariadb-bin' to avoid this problem.
+2025-02-09 14:01:43 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:01:43 0 [Note] InnoDB: Starting crash recovery from checkpoint LSN=43064,43064
+2025-02-09 14:01:43 0 [ERROR] mariadbd: Can't lock aria control file '/var/lib/mysql/aria_log_control' for exclusive use, error: 11. Will retry for 30 seconds
+2025-02-09 14:01:43 0 [Note] InnoDB: 128 rollback segments are active.
+2025-02-09 14:01:43 0 [Note] InnoDB: Removed temporary tablespace data file: "./ibtmp1"
+2025-02-09 14:01:43 0 [Note] InnoDB: Creating shared tablespace for temporary tables
+2025-02-09 14:01:43 0 [Note] InnoDB: Setting file './ibtmp1' size to 12 MB. Physically writing the file full; Please wait ...
+2025-02-09 14:01:43 0 [Note] InnoDB: File './ibtmp1' size is now 12 MB.
+2025-02-09 14:01:43 0 [Note] InnoDB: 10.6.17 started; log sequence number 43076; transaction id 16
+2025-02-09 14:01:43 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:01:43 0 [Note] InnoDB: Loading buffer pool(s) from /var/lib/mysql/ib_buffer_pool
+2025-02-09 14:01:43 0 [Note] Recovering after a crash using mariadb-bin
+2025-02-09 14:01:43 0 [Note] Starting table crash recovery...
+2025-02-09 14:01:43 0 [Note] Crash table recovery finished.
+2025-02-09 14:01:43 0 [Note] InnoDB: Buffer pool(s) load completed at 250209 14:01:43
+2025-02-09 14:01:43 0 [Note] Server socket created on IP: '127.0.0.1'.
+2025-02-09 14:01:43 0 [Note] /usr/sbin/mariadbd: ready for connections.
+Version: '10.6.17-MariaDB-log'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  Source distribution
+2025-02-09 14:01:56 0 [Note] Starting MariaDB 10.6.17-MariaDB-log source revision 15c75ad083a55e198ae78324f22970694b72f22b as process 28487
+2025-02-09 14:01:56 0 [Warning] No argument was provided to --log-bin and neither --log-basename or --log-bin-index where used;  This may cause repliction to break when this server acts as a master and has its hostname changed! Please use '--log-basename=calculate' or '--log-bin=mariadb-bin' to avoid this problem.
+2025-02-09 14:01:56 0 [ERROR] mysqld: Can't lock aria control file '/var/lib/mysql/aria_log_control' for exclusive use, error: 11. Will retry for 30 seconds
+2025-02-09 14:02:13 0 [ERROR] mariadbd: Got error 'Could not get an exclusive lock; file is probably in use by another process' when trying to use aria control file '/var/lib/mysql/aria_log_control'
+2025-02-09 14:02:13 0 [ERROR] Plugin 'Aria' registration as a STORAGE ENGINE failed.
+2025-02-09 14:02:13 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:02:13 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:02:13 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:02:13 0 [Note] InnoDB: Using liburing
+2025-02-09 14:02:13 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:02:13 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:02:13 0 [ERROR] InnoDB: Unable to lock ./ibdata1 error: 11
+2025-02-09 14:02:13 0 [Note] InnoDB: Check that you do not already have another mariadbd process using the same InnoDB data or log files.
+2025-02-09 14:02:13 0 [ERROR] InnoDB: Plugin initialization aborted with error Generic error
+2025-02-09 14:02:13 0 [Note] InnoDB: Starting shutdown...
+2025-02-09 14:02:13 0 [ERROR] Plugin 'InnoDB' registration as a STORAGE ENGINE failed.
+2025-02-09 14:02:13 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:02:13 0 [ERROR] Failed to initialize plugins.
+2025-02-09 14:02:13 0 [ERROR] Aborting
+250209 14:02:13 mysqld_safe mysqld from pid file /var/run/mysqld/mariadb.pid ended
+2025-02-09 14:02:26 0 [ERROR] mysqld: Got error 'Could not get an exclusive lock; file is probably in use by another process' when trying to use aria control file '/var/lib/mysql/aria_log_control'
+2025-02-09 14:02:26 0 [ERROR] Plugin 'Aria' registration as a STORAGE ENGINE failed.
+2025-02-09 14:02:26 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:02:26 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:02:26 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:02:26 0 [Note] InnoDB: Using liburing
+2025-02-09 14:02:26 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:02:26 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:02:26 0 [ERROR] InnoDB: Unable to lock ./ibdata1 error: 11
+2025-02-09 14:02:26 0 [Note] InnoDB: Check that you do not already have another mariadbd process using the same InnoDB data or log files.
+2025-02-09 14:02:26 0 [ERROR] InnoDB: Plugin initialization aborted with error Generic error
+2025-02-09 14:02:26 0 [Note] InnoDB: Starting shutdown...
+2025-02-09 14:02:27 0 [ERROR] Plugin 'InnoDB' registration as a STORAGE ENGINE failed.
+2025-02-09 14:02:27 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:02:27 0 [ERROR] Could not open mysql.plugin table: "Unknown storage engine 'Aria'". Some plugins may be not loaded
+2025-02-09 14:02:27 0 [ERROR] Failed to initialize plugins.
+2025-02-09 14:02:27 0 [ERROR] Aborting
+2025-02-09 14:03:45 0 [Note] Starting MariaDB 10.6.17-MariaDB-log source revision 15c75ad083a55e198ae78324f22970694b72f22b as process 31366
+2025-02-09 14:03:45 0 [Warning] No argument was provided to --log-bin and neither --log-basename or --log-bin-index where used;  This may cause repliction to break when this server acts as a master and has its hostname changed! Please use '--log-basename=calculate' or '--log-bin=mariadb-bin' to avoid this problem.
+2025-02-09 14:03:45 0 [ERROR] mysqld: Can't lock aria control file '/var/lib/mysql/aria_log_control' for exclusive use, error: 11. Will retry for 30 seconds
+2025-02-09 14:04:15 0 [ERROR] mysqld: Got error 'Could not get an exclusive lock; file is probably in use by another process' when trying to use aria control file '/var/lib/mysql/aria_log_control'
+2025-02-09 14:04:15 0 [ERROR] Plugin 'Aria' registration as a STORAGE ENGINE failed.
+2025-02-09 14:04:15 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:04:15 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:04:15 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:04:15 0 [Note] InnoDB: Using liburing
+2025-02-09 14:04:15 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:04:15 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:04:15 0 [ERROR] InnoDB: Unable to lock ./ibdata1 error: 11
+2025-02-09 14:04:15 0 [Note] InnoDB: Check that you do not already have another mariadbd process using the same InnoDB data or log files.
+2025-02-09 14:04:15 0 [ERROR] InnoDB: Plugin initialization aborted with error Generic error
+2025-02-09 14:04:15 0 [Note] InnoDB: Starting shutdown...
+2025-02-09 14:04:15 0 [ERROR] Plugin 'InnoDB' registration as a STORAGE ENGINE failed.
+2025-02-09 14:04:15 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:04:15 0 [ERROR] Could not open mysql.plugin table: "Unknown storage engine 'Aria'". Some plugins may be not loaded
+2025-02-09 14:04:15 0 [ERROR] Failed to initialize plugins.
+2025-02-09 14:04:15 0 [ERROR] Aborting
+2025-02-09 14:07:03 0 [Note] Starting MariaDB 10.6.17-MariaDB-log source revision 15c75ad083a55e198ae78324f22970694b72f22b as process 4738
+2025-02-09 14:07:03 0 [Warning] No argument was provided to --log-bin and neither --log-basename or --log-bin-index where used;  This may cause repliction to break when this server acts as a master and has its hostname changed! Please use '--log-basename=calculate' or '--log-bin=mariadb-bin' to avoid this problem.
+2025-02-09 14:07:03 0 [ERROR] mysqld: Can't lock aria control file '/var/lib/mysql/aria_log_control' for exclusive use, error: 11. Will retry for 30 seconds
+2025-02-09 14:07:33 0 [ERROR] mysqld: Got error 'Could not get an exclusive lock; file is probably in use by another process' when trying to use aria control file '/var/lib/mysql/aria_log_control'
+2025-02-09 14:07:33 0 [ERROR] Plugin 'Aria' registration as a STORAGE ENGINE failed.
+2025-02-09 14:07:33 0 [Note] InnoDB: Compressed tables use zlib 1.3.1
+2025-02-09 14:07:33 0 [Note] InnoDB: Number of pools: 1
+2025-02-09 14:07:33 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2025-02-09 14:07:33 0 [Note] InnoDB: Using liburing
+2025-02-09 14:07:33 0 [Note] InnoDB: Initializing buffer pool, total size = 134217728, chunk size = 134217728
+2025-02-09 14:07:33 0 [Note] InnoDB: Completed initialization of buffer pool
+2025-02-09 14:07:33 0 [ERROR] InnoDB: Unable to lock ./ibdata1 error: 11
+2025-02-09 14:07:33 0 [Note] InnoDB: Check that you do not already have another mariadbd process using the same InnoDB data or log files.
+2025-02-09 14:07:33 0 [ERROR] InnoDB: Plugin initialization aborted with error Generic error
+2025-02-09 14:07:33 0 [Note] InnoDB: Starting shutdown...
+2025-02-09 14:07:33 0 [ERROR] Plugin 'InnoDB' registration as a STORAGE ENGINE failed.
+2025-02-09 14:07:33 0 [Note] Plugin 'FEEDBACK' is disabled.
+2025-02-09 14:07:33 0 [ERROR] Could not open mysql.plugin table: "Unknown storage engine 'Aria'". Some plugins may be not loaded
+2025-02-09 14:07:33 0 [ERROR] Failed to initialize plugins.
+2025-02-09 14:07:33 0 [ERROR] Aborting
+2025-02-09 14:07:33 0 [Note] Starting MariaDB 10.6.17-MariaDB-log source revision 15c75ad083a55e198ae78324f22970694b72f22b as process 5668
+2025-02-09 14:07:33 0 [Warning] No argument was provided to --log-bin and neither --log-basename or --log-bin-index where used;  This may cause repliction to break when this server acts as a master and has its hostname changed! Please use '--log-basename=calculate' or '--log-bin=mariadb-bin' to avoid this problem.
+2025-02-09 14:07:33 0 [ERROR] mysqld: Can't lock aria control file '/var/lib/mysql/aria_log_control' for exclusive use, error: 11. Will retry for 30 seconds

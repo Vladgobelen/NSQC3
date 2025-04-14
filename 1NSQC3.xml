@@ -1,0 +1,19 @@
+<Button name="AchievementCategoryTemplate1" virtual="true">
+  <Size>
+    <AbsDimension x="165" y="24"/>
+  </Size>
+  <Layers>
+    <Layer level="BACKGROUND">
+      <Texture name="$parentBackground" file="Interface\AchievementFrame\UI-Achievement-Category-Background">
+        <Size>
+          <AbsDimension x="170" y="32"/>
+        </Size>
+        <Anchors>
+          <Anchor point="TOPLEFT"/>
+          <Anchor point="TOPRIGHT"/>
+        </Anchors>
+        <TexCoords left="0" right="0.6640625" top="0" bottom="1"/>
+      </Texture>
+    </Layer>
+  </Layers>
+</Button>

@@ -1,0 +1,912 @@
+-- Константы
+local CLOSE_BUTTON_SIZE = 32
+local PADDING = 15
+local SCREEN_PADDING = -40  -- Отступ от краев экрана
+local MIN_WIDTH = 200
+local MIN_HEIGHT = 200
+local BUTTON_PADDING = 0
+local F_PAD = 40
+local MOVE_ALPHA = 0
+-- Добавляем константы прозрачности
+local FRAME_ALPHA = 0
+local BUTTON_ALPHA = 1
+-- Определяем класс AdaptiveFrame
+AdaptiveFrame = {}
+AdaptiveFrame.__index = AdaptiveFrame
+
+function AdaptiveFrame:new(parent)
+    local self = setmetatable({}, AdaptiveFrame)
+    self.parent = parent or UIParent
+    self.width = 600
+    self.height = 600
+    self.initialAspectRatio = self.width / self.height
+    self.buttonsPerRow = 5
+    self.skipSizeCheck = true
+    
+    -- Создаем основной фрейм
+    self.frame = CreateFrame("Frame", "AdaptiveFrame_"..math.random(10000), self.parent)
+    self.frame:SetSize(self.width, self.height)
+    self.skipSizeCheck = false
+    self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
+    self.frame:SetFrameStrata("HIGH")
+    self.frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    
+    FRAME_ALPHA = ns_dbc:getKey("настройки", "FRAME_ALPHA") or FRAME_ALPHA
+    BUTTON_ALPHA = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or BUTTON_ALPHA
+    self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)
+    self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
+
+    -- Текстовое поле
+    self.textField = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    self.textField:SetPoint("TOP", self.frame, "TOP", 0, -5)
+    self.textField:SetText("")
+    self.textField:SetTextColor(1, 1, 1, 1)
+
+    -- Настройки перемещения и изменения размера
+    self.frame:SetMovable(true)
+    self.frame:SetResizable(true)
+    self.frame:EnableMouse(true)
+    self.frame:RegisterForDrag("LeftButton", "RightButton")
+    
+    -- Обработчики событий мыши
+    self.frame:SetScript("OnMouseDown", function(_, button)
+        if button == "RightButton" then
+            self:ToggleFrameAlpha()
+        elseif button == "LeftButton" then
+            self:StartMoving()
+        end
+    end)
+    
+    local startX = 0
+    local isDragging = false
+    self.frame:SetScript("OnMouseUp", function(_, button)
+        if button == "RightButton" then
+            isDragging = false
+            self.frame:SetScript("OnUpdate", nil)
+        else
+            self:StopMovingOrSizing()
+        end
+    end)
+    
+    self.frame:SetScript("OnDragStart", function(_, button)
+        if button == "RightButton" then
+            startX = GetCursorPosition()
+            isDragging = true
+            self.frame:SetScript("OnUpdate", function()
+                if isDragging then
+                    local currentX = GetCursorPosition()
+                    local deltaX = currentX - startX
+                    startX = currentX
+                    for _, child in ipairs(self.children) do
+                        local currentAlpha = child.frame:GetAlpha()
+                        if deltaX > 0 then
+                            local newAlpha = math.min(currentAlpha + math.abs(deltaX)/1000, 1)
+                            child.frame:SetAlpha(newAlpha)
+                            ns_dbc:modKey("настройки", "BUTTON_ALPHA", newAlpha)
+                            BUTTON_ALPHA = newAlpha
+                        elseif deltaX < 0 then
+                            local newAlpha = math.max(currentAlpha - math.abs(deltaX)/1000, 0)
+                            child.frame:SetAlpha(newAlpha)
+                            ns_dbc:modKey("настройки", "BUTTON_ALPHA", newAlpha)
+                            BUTTON_ALPHA = newAlpha
+                        end
+                    end
+                end
+            end)
+        else
+            self:StartMoving()
+        end
+    end)
+    
+    self.frame:SetScript("OnDragStop", function(_, button)
+        if button == "RightButton" then
+            isDragging = false
+            self.frame:SetScript("OnUpdate", nil)
+        else
+            self:StopMovingOrSizing()
+        end
+    end)
+
+    -- Кнопка закрытия
+    self.closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
+    self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING+5, -PADDING)
+    self.closeButton:SetScript("OnClick", function()
+        if self.textField:GetText():match(WORD_POSITION_PATTERNS[3]) ~= "участок" then
+            SendAddonMessage("getFld " .. mFldName, "", "guild")
+        else
+            self:Hide()
+        end
+        for i = 1, 100 do
+            if self.children[i] then
+                self.children[i]:SetTextT("")
+            end
+        end
+    end)
+
+    -- Кнопка управления боковой панелью
+    self.toggleSideButton = CreateFrame("Button", nil, self.frame)
+    self.toggleSideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.toggleSideButton:SetPoint("TOPRIGHT", self.closeButton, "BOTTOMRIGHT", 5, -5)
+    
+    self.toggleSideButton:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+    self.toggleSideButton:GetNormalTexture():SetDesaturated(true)
+    self.toggleSideButton:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+    self.toggleSideButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    
+    self.toggleSideButton:SetScript("OnClick", function()
+        if not self.sideFrame then
+            self:CreateSideFrame()
+            self:ShowSideFrame()
+            self.toggleSideButton:GetNormalTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
+            self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down")
+        elseif self.sideFrame:IsShown() then
+            self:HideSideFrame()
+            self.toggleSideButton:GetNormalTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+            self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+        else
+            self:ShowSideFrame()
+            self.toggleSideButton:GetNormalTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
+            self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down")
+        end
+    end)
+    
+    -- Подсказка для кнопки
+    self.toggleSideButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.toggleSideButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Показать/скрыть инвентарь")
+        GameTooltip:Show()
+    end)
+    self.toggleSideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Ручка изменения размера
+    self.resizeHandle = CreateFrame("Button", nil, self.frame)
+    self.resizeHandle:SetSize(16, 16)
+    self.resizeHandle:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -40, 40)
+    self.resizeHandle:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    self.resizeHandle:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    self.resizeHandle:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    self.resizeHandle:SetScript("OnMouseDown", function() self.frame:StartSizing("BOTTOMRIGHT") end)
+    self.resizeHandle:SetScript("OnMouseUp", function() 
+        self.frame:StopMovingOrSizing()
+        local x, y = self:GetSize()
+        ns_dbc:modKey("настройки", "mfldRX", x)
+        self:AdjustSizeAndPosition()
+    end)
+
+    -- Обработчик изменения размера
+    self.frame:SetScript("OnSizeChanged", function(_, width, height)
+        if self.skipSizeCheck then
+            self.skipSizeCheck = false
+            return
+        end
+        width, height = self:CheckFrameSize(width, height)
+        self.frame:SetSize(width, height)
+        self:AdjustSizeAndPosition()
+    end)
+
+    -- Инициализация списка дочерних элементов
+    self.children = {}
+    
+    return self
+end
+
+function AdaptiveFrame:SetText(text)
+    if self.textField then
+        self.textField:SetText(text)
+        
+        -- Обновляем видимость всех иконок
+        for cellIndex, child in ipairs(self.children or {}) do
+            if child.icons then
+                for corner in pairs(child.icons) do
+                    self:UpdateIconVisibility(cellIndex, corner)
+                end
+            end
+        end
+    end
+end
+
+-- Метод для переключения прозрачности основного фрейма
+function AdaptiveFrame:ToggleFrameAlpha()
+    local currentAlpha = select(4, self.frame:GetBackdropColor())
+    FRAME_ALPHA = ns_dbc:getKey("настройки", "FRAME_ALPHA") or FRAME_ALPHA
+    if not ns_dbc:getKey("настройки", "fullAlphaFrame") then
+        if FRAME_ALPHA ~= 0 then
+            if currentAlpha > FRAME_ALPHA - 0.05 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
+            elseif currentAlpha == 0 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)  -- Возвращаем исходную прозрачность
+            end
+        else
+            if currentAlpha > 0.1 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, 0)  -- Сбрасываем прозрачность до нуля
+            elseif currentAlpha == 0 then
+                self.frame:SetBackdropColor(0.1, 0.1, 0.1, 1)  -- Возвращаем исходную прозрачность
+            end
+        end
+    end
+end
+
+-- Метод для начала перемещения фрейма
+function AdaptiveFrame:StartMoving()
+    self.frame:StartMoving()
+end
+
+-- Метод для остановки перемещения или изменения размера фрейма
+function AdaptiveFrame:StopMovingOrSizing()
+    self.frame:StopMovingOrSizing()
+    local x, y = self:GetPosition()
+    ns_dbc:modKey("настройки", "mfldX", x)
+    ns_dbc:modKey("настройки", "mfldY", y)
+    self:AdjustSizeAndPosition()
+end
+
+-- Метод для скрытия фрейма
+function AdaptiveFrame:Hide()
+    self.frame:Hide()
+end
+
+-- Метод для отображения фрейма
+function AdaptiveFrame:Show()
+    self.frame:Show()
+    self:AdjustSizeAndPosition()
+end
+
+-- Метод для получения размеров фрейма
+function AdaptiveFrame:GetSize()
+    local width, height = self.frame:GetSize()
+    return width, height
+end
+
+function AdaptiveFrame:CheckFrameSize(width, height)
+    local screenWidth, screenHeight = WorldFrame:GetWidth(), WorldFrame:GetHeight()
+    local maxFrameHeight = screenHeight + 200 -- Максимальная высота фрейма
+    local minFrameHeight = MIN_HEIGHT
+    -- Ограничиваем высоту фрейма максимальной доступной высотой
+    if height > maxFrameHeight then
+        height = maxFrameHeight
+    end
+    -- Проверяем минимальную высоту
+    if height < minFrameHeight then
+        height = minFrameHeight
+    end
+    -- Возвращаем высоту как ширину и высоту для сохранения пропорций
+    return height, height
+end
+
+-- Метод для позиционирования и размеров кнопок
+function AdaptiveFrame:AdjustSizeAndPosition()
+    local buttonsPerRow = 10  -- Фиксируем 10 столбцов
+    local numChildren = #self.children
+    local rows = math.ceil(numChildren / buttonsPerRow)
+    local frameWidth, frameHeight = self.frame:GetSize()
+    local buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
+    local buttonHeight = buttonWidth
+    local requiredWidth = 2 * F_PAD + buttonsPerRow * buttonWidth + (buttonsPerRow - 1) * BUTTON_PADDING
+    local requiredHeight = 2 * F_PAD + rows * buttonHeight + (rows - 1) * BUTTON_PADDING
+    if frameWidth < requiredWidth or frameHeight < requiredHeight then
+        self.frame:SetSize(requiredWidth, requiredHeight)
+        frameWidth, frameHeight = requiredWidth, requiredHeight
+        buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
+        buttonHeight = buttonWidth
+    end
+    for i, child in ipairs(self.children) do
+        local row = math.floor((i - 1) / buttonsPerRow)
+        local col = (i - 1) % buttonsPerRow
+        local x = F_PAD + col * (buttonWidth + BUTTON_PADDING)
+        local y = F_PAD + row * (buttonHeight + BUTTON_PADDING)
+        if ButtonManager.SetSize and ButtonManager.SetPoint then
+            ButtonManager.SetSize(child, buttonWidth, buttonHeight)
+            ButtonManager.SetPoint(child, "BOTTOMLEFT", self.frame, "BOTTOMLEFT", x, y)
+        else
+            print("Error: Child does not support required methods")
+        end
+    end
+    local screenWidth, screenHeight = UIParent:GetSize()
+    local x, y = self.frame:GetLeft(), self.frame:GetBottom()
+    SCREEN_PADDING = ns_dbc:getKey("настройки", "SCREEN_PADDING") or SCREEN_PADDING
+    x = math.max(SCREEN_PADDING, math.min(x, screenWidth - frameWidth - SCREEN_PADDING))
+    y = math.max(SCREEN_PADDING, math.min(y, screenHeight - frameHeight - SCREEN_PADDING))
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)
+end
+
+-- Метод для добавления массива кнопок на фрейм
+function AdaptiveFrame:AddButtons(numButtons, buttonsPerRow, size, texture, highlightTexture)
+    self.buttonsPerRow = buttonsPerRow or self.buttonsPerRow
+    local buttonWidth = size
+    local buttonHeight = size
+    local buttonTexture = texture
+    local buttonHighlightTexture = highlightTexture
+    local buttonText = ""
+    for i = 1, numButtons do
+        local buttonName = "button"..i
+        local button = ButtonManager:new(buttonName, self.frame, buttonWidth, buttonHeight, buttonText, '', nil)
+        button.frame:RegisterForClicks("LeftButtonUp", "LeftButtonDown", "RightButtonUp", "RightButtonDown", "MiddleButtonDown", "Button4Up", "Button5Up", "Button5Down")
+        button.frame:EnableMouseWheel(true)
+        button.frame:SetAlpha(BUTTON_ALPHA)  -- Устанавливаем прозрачность кнопки
+        table.insert(self.children, button)
+    end
+    self:AdjustSizeAndPosition()
+end
+
+-- Метод для управления прозрачностью дочерних кнопок при движении персонажа
+function AdaptiveFrame:StartMovementAlphaTracking()
+    if self.movementFrame then return end -- Уже отслеживается
+    local movementFrame = CreateFrame("Frame")
+    self.movementFrame = movementFrame
+    movementFrame.parent = self
+    MOVE_ALPHA = ns_dbc:getKey("настройки", "MOVE_ALPHA") or MOVE_ALPHA
+    movementFrame.targetAlpha = MOVE_ALPHA
+    movementFrame.currentAlpha = BUTTON_ALPHA
+    movementFrame.alphaSpeed = 2
+    movementFrame.BUTTON_ALPHA = BUTTON_ALPHA  -- Сохраняем исходное значение
+    movementFrame:SetScript("OnUpdate", function(self, elapsed)
+        local isMoving = GetUnitSpeed("player") > 0
+        local shouldUpdate = false
+        -- Определение целевой прозрачности
+        if isMoving then
+            self.targetAlpha = MOVE_ALPHA
+            if ns_dbc:getKey("настройки", "disableFld") then
+                self.parent.frame:EnableMouse(self.targetAlpha > MOVE_ALPHA + 0.1)
+            end
+            shouldUpdate = true
+        else
+            self.targetAlpha = self.BUTTON_ALPHA  -- Возвращаемся к BUTTON_ALPHA при остановке
+            shouldUpdate = true
+        end
+        -- Плавное изменение прозрачности
+        if shouldUpdate and math.abs(self.currentAlpha - self.targetAlpha) > 0.01 then
+            self.currentAlpha = self.currentAlpha + (self.targetAlpha - self.currentAlpha) * self.alphaSpeed * elapsed
+            self.currentAlpha = math.min(math.max(self.currentAlpha, 0), 1)
+            -- Обновление кнопок2
+            for _, child in ipairs(self.parent.children) do
+                if child.frame and child.frame.SetAlpha then
+                    child.frame:SetAlpha(self.currentAlpha)
+                    if ns_dbc:getKey("настройки", "disableFld") then
+                        child.frame:EnableMouse(self.currentAlpha > MOVE_ALPHA + 0.1)
+                    end
+                    if self.currentAlpha < MOVE_ALPHA + 0.1 then
+                        if ns_dbc:getKey("настройки", "closeFld") then
+                            self.parent:Hide()
+                        end
+                    end
+                end
+            end
+        end
+        -- Автоматическая остановка при достижении цели
+        if not isMoving and math.abs(self.currentAlpha - self.targetAlpha) < 0.01 then
+            self.currentAlpha = BUTTON_ALPHA  -- Точно устанавливаем конечное значение
+            self.parent.frame:EnableMouse(true)
+            self.parent.frame:StopMovingOrSizing()
+            self.parent:StopMovementAlphaTracking()
+        end
+    end)
+end
+
+function AdaptiveFrame:getTexture(id)
+    return self.children[id].frame:GetNormalTexture():GetTexture():sub(-3)
+end
+
+-- Метод для остановки отслеживания движения и очистки скрипта
+function AdaptiveFrame:StopMovementAlphaTracking()
+    if self.movementFrame then
+        self.movementFrame:SetScript("OnUpdate", nil)  -- Удаляем обработчик OnUpdate
+        self.movementFrame = nil  -- Очищаем ссылку на movementFrame
+    end
+end
+
+-- Метод для получения текущих координат фрейма относительно родителя
+function AdaptiveFrame:GetPosition()
+    return self.frame:GetCenter()
+end
+
+-- Метод для установки координат фрейма
+function AdaptiveFrame:SetPoint(x, y)
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+end
+
+function AdaptiveFrame:isVisible()
+    -- Проверяем, существует ли фрейм
+    if not self.frame then
+        return false
+    end
+
+    -- Проверяем, видим ли фрейм
+    return self.frame:IsVisible()
+end
+
+function AdaptiveFrame:CreateSideFrame()
+    if self.sideFrame then return end
+    
+    -- Увеличиваем дополнительные отступы
+    self.sideTextHeight = 15
+    self.sideTextPadding = 5
+    self.scrollBarWidth = 16
+    self.framePadding = 10
+    self.textExtraSpace = 500  -- Увеличено с 10 до 25 для гарантии
+    
+    -- Главный фрейм
+    self.sideFrame = CreateFrame("Frame", "MyAddonSideFrame", self.frame)
+    self.sideFrame:SetFrameStrata("HIGH")
+    self.sideFrame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = self.framePadding, right = self.framePadding, 
+                 top = self.framePadding, bottom = self.framePadding }
+    })
+    self.sideFrame:SetBackdropColor(0, 0, 0, 1)
+    self.sideFrame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0.6)
+
+    -- Фрейм для скроллинга с именем
+    self.sideScrollFrame = CreateFrame("ScrollFrame", "MyAddonScrollFrame", self.sideFrame, "UIPanelScrollFrameTemplate")
+    self.sideScrollFrame:SetPoint("TOPLEFT", self.framePadding, -self.framePadding)
+    self.sideScrollFrame:SetPoint("BOTTOMRIGHT", -self.scrollBarWidth-self.framePadding, self.framePadding)
+
+    -- Контентная область с запасом по ширине
+    self.sideContent = CreateFrame("Frame", nil, self.sideScrollFrame)
+    self.sideContent:SetSize(100, 100)
+    self.sideScrollFrame:SetScrollChild(self.sideContent)
+
+    -- Скроллбар
+    self.sideScrollBar = _G[self.sideScrollFrame:GetName().."ScrollBar"]
+    self.sideScrollBar.scrollStep = self.sideTextHeight + self.sideTextPadding
+    
+    self.sideTextLines = {}
+    self:HideSideFrame()
+end
+
+function AdaptiveFrame:UpdateSideFrame()
+    if not self.sideFrame or not self.sideFrame:IsShown() then 
+        return 
+    end
+    
+    local mainWidth, mainHeight = self.frame:GetSize()
+    local maxTextWidth = 0
+    local extraPadding = 40
+    
+    -- Сначала обновляем все тексты и находим максимальную ширину
+    for _, lineFrame in ipairs(self.sideTextLines) do
+        lineFrame.text:SetWidth(0) -- Сбрасываем ширину для корректного расчета
+        local textWidth = lineFrame.text:GetStringWidth()
+        maxTextWidth = math.max(maxTextWidth, textWidth)
+    end
+    
+    -- Увеличиваем максимальную ширину на 30 пикселей для учета возможных итераторов
+    maxTextWidth = maxTextWidth + 30
+    
+    -- Рассчитываем итоговые ширины
+    local contentWidth = maxTextWidth + extraPadding
+    local frameWidth = math.max(100, contentWidth)
+    
+    -- Устанавливаем размеры sideFrame
+    self.sideFrame:SetSize(frameWidth, mainHeight)
+    self.sideFrame:SetPoint("LEFT", self.frame, "RIGHT", 5, 0)
+    
+    -- Обновляем размер контента
+    local totalHeight = #self.sideTextLines * (self.sideTextHeight + self.sideTextPadding)
+    local visibleHeight = self.sideScrollFrame:GetHeight()
+    self.sideContent:SetSize(frameWidth, math.max(totalHeight, visibleHeight))
+    
+    -- Настраиваем скроллбар
+    self.sideScrollBar:SetMinMaxValues(0, math.max(0, totalHeight - visibleHeight))
+    
+    -- Позиционируем строки с учетом новой ширины
+    for i, lineFrame in ipairs(self.sideTextLines) do
+        lineFrame:ClearAllPoints()
+        lineFrame:SetWidth(frameWidth - 20) -- Оставляем отступ для скроллбара
+        lineFrame:SetHeight(self.sideTextHeight)
+        local yOffset = -(i-1)*(self.sideTextHeight + self.sideTextPadding)
+        lineFrame:SetPoint("TOPLEFT", self.sideContent, "TOPLEFT", 10, yOffset)
+        
+        lineFrame.text:SetWidth(frameWidth - 30) -- Устанавливаем ширину текста с запасом
+        lineFrame.text:SetPoint("LEFT", lineFrame, "LEFT", 5, 0)
+    end
+end
+
+function AdaptiveFrame:RemoveSideText(baseText)
+    if not self.sideFrame or not self.sideTextLines then return 0 end
+    
+    local removedCount = 0
+    baseText = baseText:gsub("%(%d+%)$", ""):trim()
+    
+    for i = #self.sideTextLines, 1, -1 do
+        local lineText = self.sideTextLines[i].text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            self.sideTextLines[i]:Hide()
+            table.remove(self.sideTextLines, i)
+            removedCount = removedCount + 1
+        end
+    end
+    
+    if removedCount > 0 then
+        self:UpdateSideFrame()
+    end
+    return removedCount
+end
+
+-- Модифицированный метод AddSideText
+function AdaptiveFrame:AddSideText(text)
+    if not self.sideFrame then self:CreateSideFrame() end
+    
+    -- Парсим базовое имя и счетчик
+    local baseText = text:gsub("%(%d+%)$", ""):trim()
+    local maxCount = 0
+    local existingIndex = -1
+    
+    -- Ищем существующие строки с таким же базовым именем
+    for i, lineFrame in ipairs(self.sideTextLines) do
+        local lineText = lineFrame.text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            -- Извлекаем текущий счетчик
+            local currentCount = tonumber(lineText:match("%((%d+)%)$")) or 1
+            if currentCount > maxCount then
+                maxCount = currentCount
+                existingIndex = i
+            end
+        end
+    end
+    
+    -- Если нашли существующую строку - обновляем ее
+    if existingIndex ~= -1 then
+        local lineFrame = self.sideTextLines[existingIndex]
+        local newCount = maxCount + 1
+        local newText = baseText .. "(" .. newCount .. ")"
+        
+        lineFrame.text:SetText(newText)
+        self:UpdateSideFrame() -- Принудительно обновляем фрейм после изменения
+        return
+    end
+    
+    -- Если строка не найдена - добавляем новую
+    local lineFrame = CreateFrame("Frame", nil, self.sideContent)
+    lineFrame:SetSize(100, self.sideTextHeight)
+    
+    local line = lineFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    line:SetPoint("LEFT", lineFrame, "LEFT", 0, 0)
+    line:SetJustifyH("LEFT")
+    line:SetText(text)
+    line:SetTextColor(1, 1, 1, 1)
+    line:SetHeight(self.sideTextHeight)
+    
+    lineFrame:EnableMouse(true)
+    lineFrame:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then
+            self:MoveLineUp(lineFrame)
+        elseif button == "RightButton" then
+            self:ShowDeleteConfirmation(lineFrame)
+        end
+    end)
+    
+    lineFrame.text = line
+    table.insert(self.sideTextLines, 1, lineFrame)
+    self:UpdateSideFrame()
+end
+
+-- Вспомогательный метод для парсинга текста и номера
+function AdaptiveFrame:ParseExistingText(text)
+    if not text then return nil, nil end
+    
+    -- Проверяем формат "текст(число)"
+    local base, count = text:match("^(.-)%((%d+)%)$")
+    if base and count then
+        return base:trim(), tonumber(count)
+    end
+    
+    -- Если нет числа в скобках - возвращаем исходный текст
+    return text:trim(), 1
+end
+
+function AdaptiveFrame:MoveLineUp(lineFrame)
+    for i, frame in ipairs(self.sideTextLines) do
+        if frame == lineFrame and i > 1 then
+            -- Меняем местами с предыдущей строкой
+            self.sideTextLines[i], self.sideTextLines[i-1] = self.sideTextLines[i-1], self.sideTextLines[i]
+            
+            -- Обновляем текст (чтобы сохранить порядок)
+            local tempText = lineFrame.text:GetText()
+            lineFrame.text:SetText(self.sideTextLines[i-1].text:GetText())
+            self.sideTextLines[i-1].text:SetText(tempText)
+            
+            self:UpdateSideFrame()
+            break
+        end
+    end
+end
+
+-- Новый метод для показа подтверждения удаления
+function AdaptiveFrame:ShowDeleteConfirmation(lineFrame)
+    local textToDelete = lineFrame.text:GetText()
+    
+    StaticPopupDialogs["CONFIRM_DELETE_LINE"] = {
+        text = "Вы хотите удалить \""..textToDelete.."\"?",
+        button1 = "Да",
+        button2 = "Нет",
+        OnAccept = function()
+            self:DeleteLine(lineFrame)
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+    
+    StaticPopup_Show("CONFIRM_DELETE_LINE")
+end
+
+-- Метод для удаления строки
+function AdaptiveFrame:DeleteLine(lineFrame)
+    for i, frame in ipairs(self.sideTextLines) do
+        if frame == lineFrame then
+            frame:Hide()
+            frame:SetParent(nil)
+            table.remove(self.sideTextLines, i)
+            self:UpdateSideFrame()
+            break
+        end
+    end
+end
+
+-- Метод для показа бокового фрейма
+function AdaptiveFrame:ShowSideFrame()
+    if not self.sideFrame then self:CreateSideFrame() end
+    self.sideFrame:Show()
+    self:UpdateSideFrame()
+end
+
+-- Метод для скрытия бокового фрейма
+function AdaptiveFrame:HideSideFrame()
+    if self.sideFrame then
+        self.sideFrame:Hide()
+    end
+end
+
+function AdaptiveFrame:SetCellIcon(cellIndex, texture, corner, room, visible)
+    -- Проверка клетки
+    if not self.children or not self.children[cellIndex] then return end
+    local cell = self.children[cellIndex]
+    
+    -- Инициализация таблицы иконок, если ее нет
+    if not cell.icons then
+        cell.icons = {}
+    end
+    
+    -- Если текстура не указана - удаляем все иконки в указанном углу
+    if not texture then
+        if cell.icons[corner] then
+            cell.icons[corner].texture = nil
+            cell.icons[corner]:Hide()
+            cell.icons[corner] = nil
+        end
+        return
+    end
+    
+    -- Угол должен быть от 1 до 8
+    corner = math.min(math.max(corner or 1, 1), 8)
+    
+    -- Создаем новую иконку, если ее еще нет
+    if not cell.icons[corner] then
+        cell.icons[corner] = cell.frame:CreateTexture(nil, "OVERLAY")
+        cell.icons[corner]:SetSize(16, 16)
+        
+        local positions = {
+            [1] = {"TOPLEFT", 5, -5},    [2] = {"TOP", 0, -5},
+            [3] = {"TOPRIGHT", -5, -5},  [4] = {"RIGHT", -5, 0},
+            [5] = {"BOTTOMRIGHT", -5, 5},[6] = {"BOTTOM", 0, 5},
+            [7] = {"BOTTOMLEFT", 5, 5},  [8] = {"LEFT", 5, 0}
+        }
+        
+        local pos = positions[corner]
+        cell.icons[corner]:SetPoint(pos[1], cell.frame, pos[1], pos[2], pos[3])
+    end
+    
+    -- Сохраняем метаданные об иконке
+    cell.icons[corner].texture = texture
+    cell.icons[corner].room = room and room:trim() or nil
+    cell.icons[corner].forcedVisible = visible
+    
+    -- Обновляем видимость иконки
+    self:UpdateIconVisibility(cellIndex, corner)
+end
+
+function AdaptiveFrame:UpdateIconVisibility(cellIndex, corner)
+    if not self.children or not self.children[cellIndex] then return end
+    local cell = self.children[cellIndex]
+    if not cell.icons or not cell.icons[corner] then return end
+    
+    local icon = cell.icons[corner]
+    local headerText = self.textField:GetText() or ""
+    local currentRoom = headerText:match(".-%-(.*)") and headerText:match(".-%-(.*)"):trim() or ""
+    
+    -- Определяем, должна ли иконка быть видимой
+    local shouldShow = true
+    
+    -- Если явно указана видимость - используем ее
+    if icon.forcedVisible ~= nil then
+        shouldShow = icon.forcedVisible
+    -- Иначе проверяем соответствие комнаты
+    elseif icon.room and icon.room ~= currentRoom then
+        shouldShow = false
+    end
+    
+    -- Устанавливаем видимость
+    if shouldShow then
+        icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\"..icon.texture..".tga")
+        icon:Show()
+    else
+        icon:Hide()
+    end
+end
+
+-- Метод для получения количества объектов в инвентаре по базовому имени
+function AdaptiveFrame:GetSideTextCount(baseText)
+    if not self.sideFrame or not self.sideTextLines then return 0 end
+    
+    local totalCount = 0
+    baseText = baseText:gsub("%(%d+%)$", ""):trim()
+    
+    for _, lineFrame in ipairs(self.sideTextLines) do
+        local lineText = lineFrame.text:GetText()
+        local lineBase = lineText:gsub("%(%d+%)$", ""):trim()
+        
+        if lineBase == baseText then
+            -- Извлекаем число из скобок, если есть
+            local count = tonumber(lineText:match("%((%d+)%)$")) or 1
+            totalCount = totalCount + count
+        end
+    end
+    
+    return totalCount
+end
+
+function AdaptiveFrame:HideAllCellTexts()
+    for cellIndex, child in ipairs(self.children or {}) do
+        if child and child.SetTextT then
+            child:SetTextT("")  -- Устанавливаем пустой текст
+        end
+    end
+end
+
+function AdaptiveFrame:SetupPopupTriggers()
+    -- Проверяем наличие таблицы триггеров
+    if not ns_triggers then return end
+    
+    -- Создаем панель только если она еще не существует
+    if not self.popupPanel then
+        self.popupPanel = PopupPanel:Create(50, 50, 6, 0)
+        if not self.popupPanel then return end
+    end
+
+    -- Функция для создания триггера по текстуре
+    local function createTextureTrigger(triggerKey)
+        return function(parentButton)
+            -- Получаем текущий скрипт OnEnter (если есть)
+            local oldOnEnter = parentButton:GetScript("OnEnter")
+            local oldOnLeave = parentButton:GetScript("OnLeave")
+            
+            local texture = parentButton:GetNormalTexture()
+            if not texture then return false end
+            
+            local texturePath = texture:GetTexture()
+            if not texturePath then return false end
+            
+            -- Получаем только имя файла текстуры (последнюю часть пути)
+            local textureFile = texturePath:match("[^\\]+$") or ""
+            -- Сравниваем только последние 3 символа
+            local shortTexture = textureFile:sub(-3)
+            
+            if shortTexture == triggerKey and ns_triggers[triggerKey] then
+                local cellIndex
+                -- Находим индекс клетки по фрейму
+                for i = 1, 100 do
+                    if self.children[i] and self.children[i].frame == parentButton then
+                        cellIndex = i
+                        break
+                    end
+                end
+                if not cellIndex then return false end
+                
+                local buttonDataList = {}
+                
+                -- Формируем данные для кнопок
+                for btnTexture, btnData in pairs(ns_triggers[triggerKey]) do
+                    local func, tooltip
+                    -- Извлекаем ключ текстуры (последние 3 символа)
+                    local textureKey = btnTexture:match("[^\\]+$"):sub(-3)
+                    
+                    if type(btnData) == "function" then
+                        -- Обертываем функцию для передачи cellIndex и textureKey
+                        func = function() 
+                            btnData(cellIndex, textureKey) 
+                        end
+                        tooltip = "Действие"
+                    elseif type(btnData) == "table" then
+                        -- Обертываем функцию из таблицы
+                        func = function() 
+                            btnData.func(cellIndex, textureKey) 
+                        end
+                        tooltip = btnData.tooltip
+                    end
+                    
+                    if func then
+                        table.insert(buttonDataList, {
+                            texture = btnTexture,
+                            func = func,
+                            tooltip = tooltip or "Действие: " .. textureKey
+                        })
+                    end
+                end
+                
+                if #buttonDataList > 0 then
+                    -- Восстанавливаем старые обработчики тултипов
+                    if oldOnEnter then
+                        parentButton:SetScript("OnEnter", function(self)
+                            oldOnEnter(self)
+                            -- Дополнительные действия при наведении (если нужно)
+                        end)
+                    end
+                    
+                    if oldOnLeave then
+                        parentButton:SetScript("OnLeave", function(self)
+                            oldOnLeave(self)
+                            -- Дополнительные действия при уходе курсора (если нужно)
+                        end)
+                    end
+                    
+                    return true, buttonDataList
+                end
+            end
+            
+            return false
+        end
+    end
+    
+    -- Собираем все уникальные триггеры
+    local allTriggers = {}
+    for textureKey in pairs(ns_triggers) do
+        table.insert(allTriggers, createTextureTrigger(textureKey))
+    end
+    
+    -- Обновляем триггеры для всех клеток
+    for i = 1, 100 do
+        if self.children[i] and self.children[i].frame then
+            -- Сохраняем текущие скрипты перед добавлением панели
+            local frame = self.children[i].frame
+            local oldOnEnter = frame:GetScript("OnEnter")
+            local oldOnLeave = frame:GetScript("OnLeave")
+            
+            -- Добавляем панель
+            self.popupPanel:Show(frame, allTriggers)
+            
+            -- Восстанавливаем скрипты после добавления панели
+            if oldOnEnter then
+                frame:SetScript("OnEnter", function(self)
+                    oldOnEnter(self)
+                    -- Дополнительные действия при наведении (если нужно)
+                end)
+            end
+            
+            if oldOnLeave then
+                frame:SetScript("OnLeave", function(self)
+                    oldOnLeave(self)
+                    -- Дополнительные действия при уходе курсора (если нужно)
+                end)
+            end
+        end
+    end
+end
+
+Нужно добавить кнопку крафта. Она должна отображаться под кнопкой разворачивания боковой панели. У нее должна быть таблица настроек, в которой должны быть указаны кнопки, в которых будет отображаться эта кнопка. Название участка берется так: self.textField:GetText():match(WORD_POSITION_PATTERNS[3])
+
+Кнопка должна менять состояние при нажатии. При активации должна становиться цветной и полностью непрозрачной, при еще одном нажатии должна становиться серой и полупрозрачной
