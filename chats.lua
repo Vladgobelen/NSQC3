@@ -274,7 +274,7 @@ local triggersByAddress = {
                 end,
                 function(channel, text, sender, prefix)
                     local lok = channel:match(WORD_POSITION_PATTERNS[3])
-                    return adaptiveFrame:GetCurrentLocation() == lok
+                    return adaptiveFrame:GetCurrentLocation():match(WORD_POSITION_PATTERNS[2]) == lok
                 end
             },
             chatType = {"ADDON"},
@@ -484,7 +484,6 @@ function ns_crftStart(channel, text, sender, prefix)
     local target = prefix:match(WORD_POSITION_PATTERNS[3])
     local obj = text:match(WORD_POSITION_PATTERNS[1])
     local id = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
-
     adaptiveFrame.children[id]:SetTexture(obj, obj)
 end
 
@@ -516,7 +515,7 @@ function nsqc_00h2(channel, text, sender, prefix)
         adaptiveFrame.children[j]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(j)).tooltips)
         adaptiveFrame.children[i]:SetTextT("")
     end
-    adaptiveFrame:SetText(mFldName .. " - хижина")
+    adaptiveFrame:SetText(mFldName .. " - хижина - " .. prefix:match(WORD_POSITION_PATTERNS[4]))
     mFld:setArg("onEnterFlag", nil)
     adaptiveFrame:SetupPopupTriggers()
 end

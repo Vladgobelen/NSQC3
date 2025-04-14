@@ -2693,9 +2693,8 @@ function AdaptiveFrame:UpdateCraftButtonState()
     end
 
     -- Получаем текущую локацию
-    local currentLocation = self:GetCurrentLocation()
+    local currentLocation = self:GetCurrentLocation():match(WORD_POSITION_PATTERNS[1])
     local isLocationAllowed = self.craftSettings.enabledLocations[currentLocation] or false
-    
     -- Управление видимостью кнопки
     if isLocationAllowed then
         self.craftButton:Show()
@@ -2729,7 +2728,11 @@ function AdaptiveFrame:GetCurrentLocation()
     local headerText = self.textField:GetText() or ""
     
     if WORD_POSITION_PATTERNS and WORD_POSITION_PATTERNS[3] then
-        return headerText:match(WORD_POSITION_PATTERNS[3]) or ""
+        if headerText:match(WORD_POSITION_PATTERNS[5]) then
+            return headerText:match(WORD_POSITION_PATTERNS[3]) .. " " .. headerText:match(WORD_POSITION_PATTERNS[5])
+        else
+            return headerText:match(WORD_POSITION_PATTERNS[3]) or ""
+        end
     end
     return ""
 end
