@@ -5576,3 +5576,188 @@ end
 -- questUI:Show()
 
 
+QuestManagerClient = {}
+QuestManagerClient.__index = QuestManagerClient
+
+function QuestManagerClient:new()
+    local obj = setmetatable({}, self)
+    obj.questData = {}
+    return obj
+end
+
+function QuestManagerClient:CreateQuestWindow()
+    -- Создаем основное окно
+    self.questWindow = CreateFrame("Frame", "QuestTrackerWindow", UIParent)
+    self.questWindow:SetFrameStrata("DIALOG")
+    self.questWindow:SetSize(400, 500)
+    self.questWindow:SetPoint("LEFT", 5, 100)
+    self.questWindow:SetMovable(true)
+    self.questWindow:EnableMouse(true)
+    self.questWindow:RegisterForDrag("LeftButton")
+    self.questWindow:SetScript("OnDragStart", self.questWindow.StartMoving)
+    self.questWindow:SetScript("OnDragStop", function()
+        self.questWindow:StopMovingOrSizing()
+        -- добавить сохранение позиции
+    end)
+    self.questWindow:Hide()
+
+    -- Черный непрозрачный фон
+    self.questWindow.background = self.questWindow:CreateTexture(nil, "BACKGROUND")
+    self.questWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.questWindow.background:SetVertexColor(0, 0, 0, 1)
+    self.questWindow.background:SetAllPoints(true)
+
+    -- Граница окна
+    self.questWindow.border = CreateFrame("Frame", nil, self.questWindow)
+    self.questWindow.border:SetPoint("TOPLEFT", -3, 3)
+    self.questWindow.border:SetPoint("BOTTOMRIGHT", 3, -3)
+    self.questWindow.border:SetBackdrop({
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        edgeSize = 16,
+        insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+
+    -- Заголовок окна
+    self.questWindow.title = self.questWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.questWindow.title:SetPoint("TOP", 0, -15)
+    self.questWindow.title:SetText("Трекер квестов")
+
+    -- Кнопка закрытия
+    self.questWindow.closeButton = CreateFrame("Button", nil, self.questWindow, "UIPanelCloseButton")
+    self.questWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
+    self.questWindow.closeButton:SetScript("OnClick", function()
+        self.questWindow:Hide()
+    end)
+
+    -- Область с прокруткой
+    self.questWindow.scrollFrame = CreateFrame("ScrollFrame", "QuestTrackerScrollFrame", self.questWindow, "UIPanelScrollFrameTemplate")
+    self.questWindow.scrollFrame:SetPoint("TOPLEFT", 10, -40)
+    self.questWindow.scrollFrame:SetPoint("BOTTOMRIGHT", -30, 40)
+    
+    -- Ползунок прокрутки
+    self.questWindow.scrollBar = _G["QuestTrackerScrollFrameScrollBar"]
+    self.questWindow.scrollBar:SetValue(0)
+
+    -- Дочерний фрейм с поддержкой HTML
+    self.questWindow.scrollChild = CreateFrame("SimpleHTML", "QuestTrackerHTML", self.questWindow.scrollFrame)
+    self.questWindow.scrollChild:SetWidth(360)
+    self.questWindow.scrollFrame:SetScrollChild(self.questWindow.scrollChild)
+
+    -- Настройка HTML-текста
+    self.questWindow.scrollChild:SetPoint("TOPLEFT", 5, -5)
+    self.questWindow.scrollChild:SetWidth(350)
+    self.questWindow.scrollChild:SetFontObject("GameFontNormal")
+    self.questWindow.scrollChild:SetSpacing(3)
+    self.questWindow.scrollChild:SetText("")
+
+    -- Обработчики для интерактивных ссылок
+    self.questWindow.scrollChild:SetScript("OnHyperlinkEnter", function(_, link, text)
+        if link:find("^achievement:") then
+            GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+            GameTooltip:SetHyperlink("|H"..link.."|h["..text.."]|h")
+            GameTooltip:Show()
+        end
+    end)
+
+    self.questWindow.scrollChild:SetScript("OnHyperlinkLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    self.questWindow.scrollChild:SetScript("OnHyperlinkClick", function(_, link, text, button)
+        if link:find("^achievement:") then
+            local achievementID = tonumber(link:match("achievement:(%d+)"))
+            
+            if IsShiftKeyDown() then
+                -- Копирование в чат при Shift+клике
+                ChatEdit_InsertLink(text)
+                return
+            end
+
+            -- Безопасное открытие окна достижений
+            local success, err = pcall(function()
+                if not AchievementFrame then
+                    LoadAddOn("Blizzard_AchievementUI")
+                end
+                
+                if AchievementFrame then
+                    AchievementFrame_Show()
+                    AchievementFrame_SelectAchievement(achievementID)
+                else
+                    -- Fallback: открываем через стандартный интерфейс
+                    OpenAchievementFrame(achievementID)
+                end
+            end)
+            
+            if not success then
+                -- Если все варианты не сработали, показываем подсказку
+                GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+                GameTooltip:SetHyperlink("|H"..link.."|h["..text.."]|h")
+                GameTooltip:Show()
+            end
+        end
+    end)
+
+    -- Кнопка принятия квеста
+    self.questWindow.acceptButton = CreateFrame("Button", nil, self.questWindow, "UIPanelButtonTemplate")
+    self.questWindow.acceptButton:SetSize(120, 25)
+    self.questWindow.acceptButton:SetPoint("BOTTOMLEFT", 10, 10)
+    self.questWindow.acceptButton:SetText("Принять")
+    self.questWindow.acceptButton:SetScript("OnClick", function()
+        SendAddonMessage("NS_QUEST_ACCEPT", "accept", "WHISPER", UnitName("player"))
+        self.questWindow:Hide()
+    end)
+
+    -- Кнопка отказа от квеста
+    self.questWindow.declineButton = CreateFrame("Button", nil, self.questWindow, "UIPanelButtonTemplate")
+    self.questWindow.declineButton:SetSize(120, 25)
+    self.questWindow.declineButton:SetPoint("BOTTOMRIGHT", -10, 10)
+    self.questWindow.declineButton:SetText("Отказаться")
+    self.questWindow.declineButton:SetScript("OnClick", function()
+        SendAddonMessage("NS_QUEST_DECLINE", "decline", "WHISPER", UnitName("player"))
+        self.questWindow:Hide()
+    end)
+
+    -- Кнопка просмотра ачивки
+    self.questWindow.viewAchievementBtn = CreateFrame("Button", nil, self.questWindow, "UIPanelButtonTemplate")
+    self.questWindow.viewAchievementBtn:SetSize(150, 25)
+    self.questWindow.viewAchievementBtn:SetPoint("BOTTOM", 0, 40)
+    self.questWindow.viewAchievementBtn:SetText("Просмотр ачивки")
+    self.questWindow.viewAchievementBtn:Hide()
+    self.questWindow.viewAchievementBtn:SetScript("OnClick", function()
+        if self.currentAchievementID then
+            if not AchievementFrame then
+                LoadAddOn("Blizzard_AchievementUI")
+            end
+            if AchievementFrame then
+                AchievementFrame_Show()
+                AchievementFrame_SelectAchievement(self.currentAchievementID)
+            end
+        end
+    end)
+end
+
+function QuestManagerClient:ShowQuest(questTitle, questText)
+    if not self.questWindow then
+        self:CreateQuestWindow()
+    end
+
+    -- Устанавливаем текст
+    self.questWindow.title:SetText(questTitle or "Новый квест")
+    self.questWindow.scrollChild:SetText(questText or "Описание квеста...")
+
+    -- Рассчитываем высоту (эмпирически)
+    local lineCount = select(2, string.gsub(questText or "", "\n", "")) + 1
+    local approxHeight = lineCount * 15 + 20
+    
+    self.questWindow.scrollChild:SetHeight(approxHeight)
+    self.questWindow.scrollFrame:UpdateScrollChildRect()
+    self.questWindow.scrollFrame:SetVerticalScroll(0)
+
+    self.questWindow:Show()
+end
+
+function QuestManagerClient:Hide()
+    if self.questWindow then
+        self.questWindow:Hide()
+    end
+end

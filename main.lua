@@ -28,6 +28,7 @@ local function OnEvent(self, event, isLogin, isReload)
                 end
             end
             getPoint()
+            questManagerClient = QuestManagerClient:new()
         end)
 
         C_Timer(10, function()

@@ -480,7 +480,79 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:ns_q00hstart"] = {
+        {
+            keyword = {
+                { word = "ns_q00hstart", position = 1, source = "prefix" },
+            },
+            func = "ns_q00hstart",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:ns_q00hresume"] = {
+        {
+            keyword = {
+                { word = "ns_q00hresume", position = 1, source = "prefix" },
+            },
+            func = "ns_q00hresume",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function ns_q00hresume(channel, text, sender, prefix)
+    print(text)
+    print(sender)
+    print(prefix)
+end
+
+function ns_q00hstart(channel, text, sender, prefix)
+    -- Проверяем, что text является числом (ID достижения)
+    local achievementID = tonumber(text)
+    
+    -- Получаем информацию о достижении
+    local _, name, _, completed = GetAchievementInfo(achievementID)
+    local link = GetAchievementLink(153)
+    if not name then
+        SendChatMessage(sender.. ", достижение с ID " ..achievementID.. " не найдено.", "OFFICER")
+        return
+    end
+    
+    if completed then
+        SendChatMessage(sender.. ", достижение " ..link.. " уже выполнено!", "OFFICER")
+    else
+        questManagerClient:ShowQuest("Хижина", "Нужно выполнить ачивку: \n" ..link)
+    end
+end
+
 function ns_crftFinish(channel, text, sender, prefix)
     local target = prefix:match(WORD_POSITION_PATTERNS[3])
     local obj = text:match(WORD_POSITION_PATTERNS[1])
