@@ -5653,6 +5653,7 @@ function QuestManagerClient:CreateQuestWindow()
     -- Обработчики для интерактивных ссылок
     self.questWindow.scrollChild:SetScript("OnHyperlinkEnter", function(_, link, text)
         if link:find("^achievement:") then
+            self.currentAchievementID = tonumber(link:match("achievement:(%d+)"))
             GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
             GameTooltip:SetHyperlink("|H"..link.."|h["..text.."]|h")
             GameTooltip:Show()
@@ -5665,15 +5666,13 @@ function QuestManagerClient:CreateQuestWindow()
 
     self.questWindow.scrollChild:SetScript("OnHyperlinkClick", function(_, link, text, button)
         if link:find("^achievement:") then
-            local achievementID = tonumber(link:match("achievement:(%d+)"))
+            self.currentAchievementID = tonumber(link:match("achievement:(%d+)"))
             
             if IsShiftKeyDown() then
-                -- Копирование в чат при Shift+клике
                 ChatEdit_InsertLink(text)
                 return
             end
 
-            -- Безопасное открытие окна достижений
             local success, err = pcall(function()
                 if not AchievementFrame then
                     LoadAddOn("Blizzard_AchievementUI")
@@ -5681,15 +5680,13 @@ function QuestManagerClient:CreateQuestWindow()
                 
                 if AchievementFrame then
                     AchievementFrame_Show()
-                    AchievementFrame_SelectAchievement(achievementID)
+                    AchievementFrame_SelectAchievement(self.currentAchievementID)
                 else
-                    -- Fallback: открываем через стандартный интерфейс
-                    OpenAchievementFrame(achievementID)
+                    OpenAchievementFrame(self.currentAchievementID)
                 end
             end)
             
             if not success then
-                -- Если все варианты не сработали, показываем подсказку
                 GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
                 GameTooltip:SetHyperlink("|H"..link.."|h["..text.."]|h")
                 GameTooltip:Show()
@@ -5703,8 +5700,17 @@ function QuestManagerClient:CreateQuestWindow()
     self.questWindow.acceptButton:SetPoint("BOTTOMLEFT", 10, 10)
     self.questWindow.acceptButton:SetText("Принять")
     self.questWindow.acceptButton:SetScript("OnClick", function()
-        SendAddonMessage("NS_QUEST_ACCEPT", "accept", "WHISPER", UnitName("player"))
-        self.questWindow:Hide()
+        if self.currentAchievementID then
+            local link = GetAchievementLink(self.currentAchievementID)
+            if link then
+                SendChatMessage("Принята ачивка: "..link, "OFFICER")
+            else
+                print("Ошибка: не удалось получить ссылку на ачивку")
+            end
+            self.questWindow:Hide()
+        else
+            print("Ошибка: ID ачивки не установлен")
+        end
     end)
 
     -- Кнопка отказа от квеста
@@ -5745,7 +5751,19 @@ function QuestManagerClient:ShowQuest(questTitle, questText)
     self.questWindow.title:SetText(questTitle or "Новый квест")
     self.questWindow.scrollChild:SetText(questText or "Описание квеста...")
 
-    -- Рассчитываем высоту (эмпирически)
+    -- Парсим ID ачивки из текста
+    self.currentAchievementID = nil
+    if questText then
+        local achievementID = questText:match("achievement:(%d+)")
+        if achievementID then
+            self.currentAchievementID = tonumber(achievementID)
+            self.questWindow.viewAchievementBtn:Hide() -- Показываем кнопку просмотра
+        else
+            self.questWindow.viewAchievementBtn:Hide() -- Скрываем кнопку просмотра
+        end
+    end
+
+    -- Рассчитываем высоту
     local lineCount = select(2, string.gsub(questText or "", "\n", "")) + 1
     local approxHeight = lineCount * 15 + 20
     
