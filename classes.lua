@@ -5713,7 +5713,7 @@ function QuestManagerClient:CreateQuestWindow()
     self.questWindow.declineButton:SetPoint("BOTTOMRIGHT", -10, 10)
     self.questWindow.declineButton:SetText("Отказаться")
     self.questWindow.declineButton:SetScript("OnClick", function()
-        SendAddonMessage("NS_QUEST_DECLINE", "decline", "WHISPER", UnitName("player"))
+        SendAddonMessage("ns_achiv00h_decline ", "achievementID", "guild")
         self.questWindow:Hide()
     end)
 

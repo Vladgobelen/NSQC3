@@ -529,9 +529,7 @@ local triggersByAddress = {
 }
 
 function ns_q00hresume(channel, text, sender, prefix)
-    print(text)
-    print(sender)
-    print(prefix)
+    questManagerClient:ShowQuest("Хижина", "Нужно выполнить ачивку: \n" ..GetAchievementLink(tonumber(text)))
 end
 
 function ns_q00hstart(channel, text, sender, prefix)
@@ -540,16 +538,17 @@ function ns_q00hstart(channel, text, sender, prefix)
     
     -- Получаем информацию о достижении
     local _, name, _, completed = GetAchievementInfo(achievementID)
-    local link = GetAchievementLink(153)
+    local link = GetAchievementLink(achievementID)
     if not name then
         SendChatMessage(sender.. ", достижение с ID " ..achievementID.. " не найдено.", "OFFICER")
         return
     end
     
     if completed then
-        SendChatMessage(sender.. ", достижение " ..link.. " уже выполнено!", "OFFICER")
+        SendAddonMessage("ns_achivComplit " .. mFldName, achievementID, "guild")
     else
         questManagerClient:ShowQuest("Хижина", "Нужно выполнить ачивку: \n" ..link)
+        SendAddonMessage("ns_isAchiv00h ", achievementID, "guild")
     end
 end
 
