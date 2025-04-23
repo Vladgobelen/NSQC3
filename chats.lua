@@ -381,6 +381,60 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:nsqc_00hNIL1"] = {
+        {
+            keyword = {
+                { word = "nsqc_00hNIL1", position = 1, source = "prefix" },
+            },
+            func = "nsqc_00hNIL1",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = prefix:match(WORD_POSITION_PATTERNS[4])
+                    if prefix:match(WORD_POSITION_PATTERNS[2]) == GetUnitName("player") then
+                        return true
+                    else
+                        return adaptiveFrame:GetCurrentLocation():match(WORD_POSITION_PATTERNS[2]) == lok
+                    end
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:nsqc_00hNIL2"] = {
+        {
+            keyword = {
+                { word = "nsqc_00hNIL2", position = 1, source = "prefix" },
+            },
+            func = "nsqc_00hNIL2",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local lok = prefix:match(WORD_POSITION_PATTERNS[4])
+                    if prefix:match(WORD_POSITION_PATTERNS[2]) == GetUnitName("player") then
+                        return true
+                    else
+                        return adaptiveFrame:GetCurrentLocation():match(WORD_POSITION_PATTERNS[2]) == lok
+                    end
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
     ["prefix:nsYourLog"] = {
         {
             keyword = {
@@ -526,7 +580,43 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:nsqc_timer"] = {
+        {
+            keyword = {
+                { word = "nsqc_timer", position = 1, source = "prefix" },
+            },
+            func = "nsqc_timer",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function nsqc_timer(channel, text, sender, prefix)
+    if text ~= "-1" then
+        nsqc3Timer = tonumber(text)
+        for i = 1, 100 do
+            if adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3) == "NIL" then
+                nsqc3Timer = nsqc3Timer + 3600
+            end
+        end
+    else
+        nsqc3Timer = nil
+    end
+end
 
 function ns_q00hresume(channel, text, sender, prefix)
     questManagerClient:ShowQuest("Хижина", "Нужно выполнить ачивку: \n" ..GetAchievementLink(tonumber(text)))
@@ -605,6 +695,23 @@ function nsqc_00h2(channel, text, sender, prefix)
     adaptiveFrame:SetText(mFldName .. " - хижина - " .. prefix:match(WORD_POSITION_PATTERNS[4]))
     mFld:setArg("onEnterFlag", nil)
     adaptiveFrame:SetupPopupTriggers()
+end
+
+function nsqc_00hNIL1(channel, text, sender, prefix)
+    for i = 1, 50 do
+        if text:sub((i*3)-2, i*3) == "NIL" then
+            adaptiveFrame.children[i]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        end
+    end
+end
+
+function nsqc_00hNIL2(channel, text, sender, prefix)
+    for i = 1, 50 do
+        local j = i + 50
+        if text:sub((i*3)-2, i*3) == "NIL" then
+            adaptiveFrame.children[j]:SetTexture(text:sub((i*3)-2, i*3), text:sub((i*3)-2, i*3))
+        end
+    end
 end
 
 function ns_0ka(channel, text, sender, prefix)

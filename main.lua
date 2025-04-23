@@ -29,10 +29,28 @@ local function OnEvent(self, event, isLogin, isReload)
             end
             getPoint()
             questManagerClient = QuestManagerClient:new()
+            nsDbc.skills3 = nsDbc.skills3 or {}
+            sq = SpellQueue:Create("MySpellQueue", 300, 50, "CENTER")
+            sq:SetIconsTable(tblIcons)
+            sq:UpdateSkillTables()
         end)
 
-        C_Timer(10, function()
+        C_Timer(1, function()
             UpdateAddOnMemoryUsage()
+            if nsqc3Timer then
+                if adaptiveFrame:isVisible() then
+                    for i = 1, 100 do
+                        if adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3) == "stl" then
+                            adaptiveFrame.children[i]:SetTextT(nsqc3Timer)
+                        end
+                    end
+                end
+                if nsqc3Timer >=1 then
+                    nsqc3Timer = nsqc3Timer - 1
+                else
+                    nsqc3Timer = nil
+                end
+            end
         end, true)
 
         C_Timer(100, function()
