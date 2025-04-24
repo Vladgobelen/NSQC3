@@ -5786,8 +5786,28 @@ SpellQueue = {}
 SpellQueue.__index = SpellQueue
 
 -- Константы
+local RESOURCE_TYPES = {
+    MANA = 0,      -- Правильный индекс для маны
+    RAGE = 1,      -- Правильный индекс для ярости
+    FOCUS = 2,     -- Добавлено для полноты
+    ENERGY = 3,    -- Энергия
+    RUNIC_POWER = 6,-- Сила рун (правильный индекс для WotLK)
+    RUNES = 5,     -- Руны
+    COMBO_POINTS = 14 -- Комбо-поинты
+}
+
+local RESOURCE_NAMES = {
+    [0] = "Мана",
+    [1] = "Ярость",
+    [3] = "Энергия",
+    [6] = "Сила рун",
+    [5] = "Руны",
+    [14] = "Комбо-поинты"
+}
+
 local PLAYER_KEY = UnitName("player")
 local RETURN_DELAY = 0.1
+local DEBUFF_UPDATE_DELAY = 0.5
 
 local READY_ALPHA = 1.0
 local COOLDOWN_ALPHA = 0.6
@@ -5796,6 +5816,9 @@ local READY_GLOW_COLOR = {0, 1, 0, 0.3}
 local COOLDOWN_GLOW_COLOR = {1, 0, 0, 0.2}
 local INACTIVE_ALPHA = 0.2
 local BUFF_PRIORITY_POSITION = -100
+
+local MODE_COMBAT_ONLY = 1
+local MODE_ALWAYS_VISIBLE = 2
 
 
 function SpellQueue:UpdateDebuffState(spellName)
@@ -5808,14 +5831,16 @@ function SpellQueue:UpdateDebuffState(spellName)
     -- Проверяем наличие дебаффа на цели
     local hasDebuff = self:HasDebuff(debuffName)
     
+    -- Запоминаем предыдущее состояние
+    local hadDebuff = spell.hasDebuff
+    
     -- Обновляем состояние дебаффа
     spell.hasDebuff = hasDebuff
     
-    -- Для скиллов с дебафами всегда обновляем прозрачность
+    -- Устанавливаем прозрачность в зависимости от состояния дебаффа
     if hasDebuff then
         spell.icon:SetAlpha(DEBUFF_ALPHA)
-    else
-        -- Возвращаем стандартную прозрачность в зависимости от состояния скилла
+    elseif hadDebuff then -- Если дебафф только что спал
         if spell.isReady then
             spell.icon:SetAlpha(READY_ALPHA)
         else
@@ -5880,7 +5905,7 @@ end
 function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     local frame = CreateFrame("Frame", name, parentFrame or UIParent)
     local self = setmetatable({}, SpellQueue)
-    
+    self.playerClass = select(2, UnitClass("player"))
     -- Базовые настройки фрейма
     self.frame = frame
     self.width = width or 300
@@ -5893,7 +5918,7 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     self.scale = 1.0
     self.inCombat = false
     self.combatRegistered = false
-    
+    self.displayMode = MODE_COMBAT_ONLY
     -- Настройка размеров и позиционирования
     frame:SetWidth(self.width)
     frame:SetHeight(self.height)
@@ -5951,23 +5976,42 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
 
     -- Система обновления
     frame:SetScript("OnUpdate", function(_, elapsed)
-        if not self.inCombat then return end
-        -- Обновление позиций активных скиллов
-        for spellName, spell in pairs(self.spells) do
-            if spell.active and not spell.isReady then
-                self:UpdateSpellPosition(spellName)
+        -- Всегда обновляем если панель видима
+        if self.frame:IsShown() then
+            -- Обновление позиций активных скиллов
+            for spellName, spell in pairs(self.spells) do
+                if spell.active and not spell.isReady then
+                    self:UpdateSpellPosition(spellName)
+                end
             end
-        end
-        
-        -- Плавное обновление прозрачности
-        if self.frame:GetAlpha() ~= self.alpha then
-            self.frame:SetAlpha(self.inCombat and self.alpha or INACTIVE_ALPHA)
+            
+            if self.frame:GetAlpha() ~= self.alpha then
+                self.frame:SetAlpha(self.alpha)
+            end
         end
     end)
     
     self:UpdateSkillTables()
     _G.SpellQueueInstance = self
     return self
+end
+
+function SpellQueue:ToggleDisplayMode()
+    if self.displayMode == MODE_COMBAT_ONLY then
+        self.displayMode = MODE_ALWAYS_VISIBLE
+        print("SpellQueue: Режим 'Всегда видимый'")
+        self.frame:SetAlpha(self.alpha)
+        self.frame:Show()
+        -- Принудительное обновление при смене режима
+        self:ForceUpdateAllSpells()
+    else
+        self.displayMode = MODE_COMBAT_ONLY
+        print("SpellQueue: Режим 'Только в бою'")
+        if not self.inCombat then
+            self.frame:SetAlpha(INACTIVE_ALPHA)
+            self.frame:Hide()
+        end
+    end
 end
 
 function SpellQueue:RegisterAllEvents()
@@ -6031,8 +6075,14 @@ end
 
 function SpellQueue:LeaveCombat()
     self.inCombat = false
-    self.frame:SetAlpha(INACTIVE_ALPHA)
-    self.frame:Hide()
+    if self.displayMode == MODE_COMBAT_ONLY then
+        self.frame:SetAlpha(INACTIVE_ALPHA)
+        self.frame:Hide()
+    else
+        -- В режиме всегда видимой продолжаем обновление
+        self.frame:SetAlpha(self.alpha)
+        self.frame:Show()
+    end
 end
 
 function SpellQueue:EnterCombat()
@@ -6134,65 +6184,52 @@ function SpellQueue:SetIconsTable(tblIcons)
     end
 end
 
-function SpellQueue:UpdateAllSpells()
-    local activeCount = 0
-    for spellName, spell in pairs(self.spells) do
-        -- Проверка на комбо-поинты
-        if spell.data.combo and spell.data.combo > 0 then
-            local hasEnoughCombo = self:HasEnoughComboPoints(spell.data.combo)
-            if not hasEnoughCombo then
-                spell.icon:Hide()
-                spell.glow:Hide()
-                spell.cooldownText:Hide()
-                do break end
-            end
-        end
-        
-        -- Проверка на бафф
-        if spell.data.buf == 1 then
-            spell.hasBuff = self:HasBuff(spellName)
-            if spell.hasBuff then
-                spell.active = false
-                spell.isReady = false
-                spell.icon:Hide()
-                spell.glow:Hide()
-                spell.cooldownText:Hide()
-                do break end
-            end
-        end
-        
-        -- Обновляем кулдаун
-        local remaining, fullDuration = self:GetSpellCooldown(spellName)
-        spell.active = (remaining ~= nil and remaining > 0)
-        spell.isReady = (remaining == 0 or remaining == nil)
-        
-        -- Для скиллов с дебафами проверяем состояние сразу
-        if spell.data.debuf then
-            self:UpdateDebuffState(spellName)
-        end
-                
-        self:UpdateSpellPosition(spellName)
-        
-        -- Показываем иконку, если не скрыто из-за комбо или баффа
-        spell.icon:Show()
-        spell.glow:Show()
-        
-        -- Обновляем текст кулдауна
-        if remaining and remaining > 0 then
-            if remaining > 3 then
-                spell.cooldownText:SetText(math.floor(remaining))
-            else
-                spell.cooldownText:SetText(string.format("%.1f", remaining))
-            end
-            spell.cooldownText:Show()
-        else
-            spell.cooldownText:Hide()
-        end
-        
-        activeCount = activeCount + 1
+function SpellQueue:HasEnoughResource(spellName)
+    local spell = self.spells[spellName]
+    if not spell or not spell.data.resource then return true end
+    
+    local resourceType = spell.data.resource.type
+    local requiredAmount = spell.data.resource.amount or 0
+    
+    -- Для силы рун используем специальный индекс
+    if resourceType == RESOURCE_TYPES.RUNIC_POWER then
+        local current = UnitPower("player", 6)
+        return current >= requiredAmount
     end
     
-    self:UpdateSpellsPriority()
+    -- Для рун считаем количество доступных
+    if resourceType == RESOURCE_TYPES.RUNES then
+        return self:GetAvailableRunes() >= requiredAmount
+    end
+    
+    -- Для остальных ресурсов
+    local current = UnitPower("player", resourceType)
+    return current >= requiredAmount
+end
+
+function SpellQueue:GetAvailableRunes()
+    local count = 0
+    for i = 1, 6 do
+        local start, duration, runeReady = GetRuneCooldown(i)
+        if runeReady or (start == 0 and duration == 0) then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+function SpellQueue:HasEnoughRunes(required)
+    local count = 0
+    for i = 1, 6 do
+        local start, duration, runeReady = GetRuneCooldown(i)
+        if runeReady or (start == 0 and duration == 0) then
+            count = count + 1
+            if count >= required then
+                return true
+            end
+        end
+    end
+    return count >= required
 end
 
 function SpellQueue:HasEnoughComboPoints(required)
@@ -6249,9 +6286,14 @@ function SpellQueue:SpellUsed(spellName)
     
     self:UpdateSpellPosition(spellName)
     self:UpdateSpellsPriority()
+    
+    -- Добавляем проверку на рыцаря смерти и запуск таймера
+    --if self.playerClass == "DEATHKNIGHT" then
+        C_Timer(0.1, function()
+            self:ForceUpdateAllSpells()
+        end)
+    --end
 end
-
-
 
 function SpellQueue:UpdateSpellPosition(spellName)
     local spell = self.spells[spellName]
@@ -6260,6 +6302,16 @@ function SpellQueue:UpdateSpellPosition(spellName)
     -- Проверка на комбо-поинты
     if spell.data.combo and spell.data.combo > 0 then
         if not self:HasEnoughComboPoints(spell.data.combo) then
+            spell.icon:Hide()
+            spell.glow:Hide()
+            spell.cooldownText:Hide()
+            return
+        end
+    end
+    
+    -- Проверка на ресурсы
+    if spell.data.resource then
+        if not self:HasEnoughResource(spellName) then
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
@@ -6296,10 +6348,19 @@ function SpellQueue:UpdateSpellPosition(spellName)
         spell.cooldownText:Hide()
     end
 
+    -- Не меняем прозрачность для дебаффов, если они активны
+    if not spell.data.debuf or not spell.hasDebuff then
+        if spell.isReady then
+            spell.icon:SetAlpha(READY_ALPHA)
+            spell.glow:SetVertexColor(unpack(READY_GLOW_COLOR))
+        else
+            spell.icon:SetAlpha(COOLDOWN_ALPHA)
+            spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
+        end
+    end
+
     if spell.isReady then
         -- Если скилл готов - используем стандартное позиционирование
-        spell.icon:SetAlpha(READY_ALPHA)
-        spell.glow:SetVertexColor(unpack(READY_GLOW_COLOR))
         self:UpdateSpellsPriority()
     else
         -- Рассчитываем стартовую позицию скилла (без учета кулдауна)
@@ -6326,35 +6387,13 @@ function SpellQueue:UpdateSpellPosition(spellName)
         local maxPosition = self.width - (self.height - 10)
         spell.position = math.min(spell.position, maxPosition)
 
-        -- Устанавливаем визуальные параметры
-        spell.icon:SetAlpha(COOLDOWN_ALPHA)
-        spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
+        -- Позиционируем иконку
         spell.icon:ClearAllPoints()
         spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
     end
 
     spell.icon:Show()
     spell.glow:Show()
-end
-
-function SpellQueue:UpdateSpellDisplay(spellName)
-    local spell = self.spells[spellName]
-    if not spell then return end
-    if spell.active then
-        if not spell.isReady then
-            local progress = spell.remaining / spell.total
-            spell.position = self.width * progress
-            spell.icon:SetAlpha(COOLDOWN_ALPHA)
-        else
-            spell.position = 0
-            spell.icon:SetAlpha(READY_ALPHA)
-        end
-        spell.icon:ClearAllPoints()
-        spell.icon:SetPoint("CENTER", self.frame, "LEFT", spell.position, 0)
-        spell.icon:Show()
-    else
-        spell.icon:Hide()
-    end
 end
 
 function SpellQueue:GetSpellCooldown(spellName)
@@ -6374,15 +6413,6 @@ function SpellQueue:HasBuff(buffName)
         if name == buffName then return true end
     end
     return false
-end
-
-function SpellQueue:OnUpdate(elapsed)
-    if not self.inCombat then return end
-    for spellName, spell in pairs(self.spells) do
-        if spell.active then
-            self:UpdateSpellPosition(spellName)
-        end
-    end
 end
 
 function SpellQueue:UpdateSpellsPriority()
@@ -6452,7 +6482,7 @@ function SpellQueue:CreateConfigWindow()
     local configFrame = CreateFrame("Frame", "SpellQueueConfig", UIParent)
     configFrame.parent = self
     configFrame.spellQueue = self
-    configFrame:SetSize(350, 400) -- Увеличили размер для новых элементов
+    configFrame:SetSize(350, 450)
     configFrame:SetPoint("CENTER")
     configFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -6604,7 +6634,6 @@ function SpellQueue:CreateConfigWindow()
     UIDropDownMenu_Initialize(comboDropdown, ComboDropDown_Initialize)
     UIDropDownMenu_SetSelectedValue(comboDropdown, 1)
     
-    -- Обработчик изменения состояния чекбокса комбо-поинтов
     comboCheckButton:SetScript("OnClick", function(self)
         if self:GetChecked() then
             comboDropdown:SetAlpha(1)
@@ -6613,10 +6642,67 @@ function SpellQueue:CreateConfigWindow()
         end
     end)
 
+    -- Чекбокс ресурса
+    local resourceCheckButton = CreateFrame("CheckButton", "SpellQueueResourceCheckButton", configFrame, "UICheckButtonTemplate")
+    resourceCheckButton:SetSize(24, 24)
+    resourceCheckButton:SetPoint("TOPLEFT", comboCheckButton, "BOTTOMLEFT", 0, -10)
+    resourceCheckButton.text = resourceCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    resourceCheckButton.text:SetText("Ресурс:")
+    resourceCheckButton.text:SetPoint("LEFT", resourceCheckButton, "RIGHT", 5, 0)
+    
+    -- Выпадающий список ресурсов (скрыт по умолчанию)
+    local resourceDropdown = CreateFrame("Frame", "SpellQueueResourceDropdown", configFrame, "UIDropDownMenuTemplate")
+    resourceDropdown:SetPoint("LEFT", resourceCheckButton.text, "RIGHT", 10, 0)
+    resourceDropdown:SetAlpha(0)
+    UIDropDownMenu_SetWidth(resourceDropdown, 120)
+    
+    local function ResourceDropDown_Initialize()
+        local info = UIDropDownMenu_CreateInfo()
+        local resourcesInOrder = {
+            RESOURCE_TYPES.MANA,
+            RESOURCE_TYPES.RAGE,
+            RESOURCE_TYPES.ENERGY,
+            RESOURCE_TYPES.RUNIC_POWER,
+            RESOURCE_TYPES.RUNES,
+            RESOURCE_TYPES.COMBO_POINTS
+        }
+        
+        for _, resourceType in ipairs(resourcesInOrder) do
+            info.text = RESOURCE_NAMES[resourceType]
+            info.value = resourceType
+            info.func = function() 
+                UIDropDownMenu_SetSelectedValue(resourceDropdown, resourceType) 
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end
+    UIDropDownMenu_Initialize(resourceDropdown, ResourceDropDown_Initialize)
+    UIDropDownMenu_SetSelectedValue(resourceDropdown, 1)
+    
+    -- Поле ввода количества ресурса (скрыто по умолчанию)
+    local resourceAmountEditBox = CreateFrame("EditBox", "SpellQueueResourceAmountEditBox", configFrame, "InputBoxTemplate")
+    resourceAmountEditBox:SetSize(50, 20)
+    resourceAmountEditBox:SetPoint("LEFT", resourceDropdown, "RIGHT", 10, 0)
+    resourceAmountEditBox:SetAutoFocus(false)
+    resourceAmountEditBox:Hide()
+    resourceAmountEditBox:SetText("0")
+    
+    -- Обработчик изменения состояния чекбокса ресурса
+    resourceCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            resourceDropdown:SetAlpha(1)
+            resourceAmountEditBox:Show()
+        else
+            resourceDropdown:SetAlpha(0)
+            resourceAmountEditBox:Hide()
+            resourceAmountEditBox:SetText("0")
+        end
+    end)
+
     -- Кнопка добавления
     local addButton = CreateFrame("Button", "SpellQueueAddButton", configFrame, "UIPanelButtonTemplate")
     addButton:SetSize(120, 25)
-    addButton:SetPoint("BOTTOM", 0, 75)
+    addButton:SetPoint("BOTTOM", 0, 85)
     addButton:SetText("Добавить")
     addButton:SetScript("OnClick", function()
         local spellName = editBox:GetText()
@@ -6631,6 +6717,16 @@ function SpellQueue:CreateConfigWindow()
         local comboValue = 0
         if comboCheckButton:GetChecked() then
             comboValue = UIDropDownMenu_GetSelectedValue(comboDropdown)
+        end
+        
+        -- Определяем параметр ресурса
+        local resourceValue = nil
+        if resourceCheckButton:GetChecked() then
+            local amount = tonumber(resourceAmountEditBox:GetText()) or 0
+            resourceValue = {
+                type = UIDropDownMenu_GetSelectedValue(resourceDropdown),
+                amount = amount
+            }
         end
         
         -- Определяем параметр баффа
@@ -6652,10 +6748,10 @@ function SpellQueue:CreateConfigWindow()
             buf = buffParam,
             debuf = debuffParam,
             combo = comboValue,
+            resource = resourceValue,
             icon = icon
         }
         
-        -- Используем глобальную ссылку
         _G.SpellQueueInstance:UpdateSkillTables()
         
         if _G.SpellQueueInstance.inCombat then
@@ -6672,6 +6768,10 @@ function SpellQueue:CreateConfigWindow()
         debuffNameEditBox:Hide()
         comboCheckButton:SetChecked(false)
         comboDropdown:SetAlpha(0)
+        resourceCheckButton:SetChecked(false)
+        resourceDropdown:SetAlpha(0)
+        resourceAmountEditBox:SetText("0")
+        resourceAmountEditBox:Hide()
         
         message("Скилл "..name.." добавлен!")
     end)
@@ -6679,7 +6779,7 @@ function SpellQueue:CreateConfigWindow()
     -- Кнопка закрытия
     local closeButton = CreateFrame("Button", "SpellQueueCloseButton", configFrame, "UIPanelButtonTemplate")
     closeButton:SetSize(100, 25)
-    closeButton:SetPoint("BOTTOM", 0, 45)
+    closeButton:SetPoint("BOTTOM", 0, 55)
     closeButton:SetText("Закрыть")
     closeButton:SetScript("OnClick", function() configFrame:Hide() end)
 
@@ -6699,6 +6799,10 @@ function SpellQueue:UpdateSkillTables()
     if self.tblIcons then
         for k, v in pairs(self.tblIcons) do
             combined[k] = v
+            -- Добавляем поле resource если его нет
+            if not combined[k].resource then
+                combined[k].resource = nil
+            end
         end
     end
     
@@ -6707,6 +6811,10 @@ function SpellQueue:UpdateSkillTables()
         for k, v in pairs(_G.nsDbc.skills3[PLAYER_KEY]) do
             if not combined[k] then
                 combined[k] = v
+                -- Добавляем поле resource если его нет
+                if not combined[k].resource then
+                    combined[k].resource = nil
+                end
             else
                 print(string.format("  Skipped (duplicate): %s", k))
             end
@@ -6717,6 +6825,59 @@ function SpellQueue:UpdateSkillTables()
     self:SetIconsTable(combined)
 end
 
+function SpellQueue:ForceUpdateAllSpells()
+    -- Принудительно обновляем состояние всех скиллов
+    for spellName, spell in pairs(self.spells) do
+        -- Проверка на ресурсы
+        if spell.data.resource then
+            if not self:HasEnoughResource(spellName) then
+                spell.icon:Hide()
+                spell.glow:Hide()
+                spell.cooldownText:Hide()
+                do break end
+            end
+        end
+        
+        -- Проверка на комбо-поинты
+        if spell.data.combo and spell.data.combo > 0 then
+            if not self:HasEnoughComboPoints(spell.data.combo) then
+                spell.icon:Hide()
+                spell.glow:Hide()
+                spell.cooldownText:Hide()
+                do break end
+            end
+        end
+        
+        -- Обновляем кулдаун
+        local remaining, fullDuration = self:GetSpellCooldown(spellName)
+        spell.active = remaining and remaining > 0
+        spell.isReady = not spell.active
+        
+        -- Обновляем баффы
+        if spell.data.buf == 1 then
+            spell.hasBuff = self:HasBuff(spellName)
+        end
+        
+        -- Обновляем дебаффы
+        if spell.data.debuf then
+            self:UpdateDebuffState(spellName)
+        elseif spell.isReady then
+            spell.icon:SetAlpha(READY_ALPHA)
+        else
+            spell.icon:SetAlpha(COOLDOWN_ALPHA)
+        end
+        
+        -- Полная перерисовка позиции
+        self:UpdateSpellPosition(spellName)
+    end
+    
+    -- Обновление приоритетов и группировки
+    self:UpdateSpellsPriority()
+    
+    -- Принудительное обновление фрейма
+    self.frame:Show() -- На случай если фрейм был скрыт
+end
+
 SlashCmdList["SPELLQUEUE"] = function()
     if not _G.SpellQueueConfig then
         SpellQueue:CreateConfigWindow()
@@ -6724,3 +6885,12 @@ SlashCmdList["SPELLQUEUE"] = function()
     SpellQueue.configFrame:Show()
 end
 SLASH_SPELLQUEUE1 = "/sq"
+
+SlashCmdList["SPELLQUEUEMODE"] = function()
+    if _G.SpellQueueInstance then
+        _G.SpellQueueInstance:ToggleDisplayMode()
+    else
+        print("SpellQueue не инициализирован")
+    end
+end
+SLASH_SPELLQUEUEMODE1 = "/sqmode"
