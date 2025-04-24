@@ -5786,6 +5786,36 @@ SpellQueue = {}
 SpellQueue.__index = SpellQueue
 
 -- Константы
+local COMBO_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga" 
+local POISON_TEXTURE = "IInterface\\AddOns\\NSQC3\\libs\\00t.tga"
+
+local DEBUG = false -- включить отладку
+local function debug(msg)
+    if DEBUG then print("SQ_DEBUG:", msg) end
+end
+
+local FEATURE_HP = 1
+local FEATURE_RESOURCE = 2
+local FEATURE_TARGET = 4
+local FEATURE_COMBO = 8
+local FEATURE_POISON = 16
+
+local FEATURE_COLORS = {
+    MANA = {0.0, 0.82, 1.0},
+    RAGE = {1.0, 0.0, 0.0},
+    ENERGY = {1.0, 1.0, 0.0},
+    RUNIC_POWER = {0.0, 0.82, 1.0}, 
+    HEALTH = {1.0, 0.0, 0.0},    
+    COMBO_ACTIVE = {1.0, 0.5, 0.0}, 
+    POISON_ACTIVE = {0.0, 1.0, 0.0}, 
+    COMBO_EMPTY = {0.1, 0.1, 0.1},      -- Черный
+    COMBO_FILLED = {1.0, 0.5, 0.0},     -- Оранжевый
+    COMBO_FULL = {0.5, 0.0, 1.0},       -- Фиолетовый
+    POISON_EMPTY = {0.1, 0.1, 0.1},     -- Черный
+    POISON_FILLED = {0.0, 1.0, 0.0},    -- Зеленый
+    POISON_FULL = {0.5, 0.0, 1.0}       -- Фиолетовый
+}
+
 local RESOURCE_TYPES = {
     MANA = 0,      -- Правильный индекс для маны
     RAGE = 1,      -- Правильный индекс для ярости
@@ -5803,6 +5833,19 @@ local RESOURCE_NAMES = {
     [6] = "Сила рун",
     [5] = "Руны",
     [14] = "Комбо-поинты"
+}
+
+local RESOURCE_TYPES = {
+    DEATHKNIGHT = 6,  -- Сила рун
+    DRUID = 0,        -- Мана/Энергия (в зависимости от формы)
+    HUNTER = 2,       -- Фокус
+    MAGE = 0,         -- Мана
+    PALADIN = 0,      -- Мана
+    PRIEST = 0,       -- Мана
+    ROGUE = 3,        -- Энергия
+    SHAMAN = 0,       -- Мана
+    WARLOCK = 0,      -- Мана
+    WARRIOR = 1       -- Ярость
 }
 
 local PLAYER_KEY = UnitName("player")
@@ -5906,7 +5949,14 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     local frame = CreateFrame("Frame", name, parentFrame or UIParent)
     local self = setmetatable({}, SpellQueue)
     self.playerClass = select(2, UnitClass("player"))
-    -- Базовые настройки фрейма
+    
+    self.resourceTypeNames = {
+        [0] = "MANA",
+        [1] = "RAGE",
+        [3] = "ENERGY",
+        [6] = "RUNIC_POWER"
+    }
+        -- Базовые настройки фрейма
     self.frame = frame
     self.width = width or 300
     self.height = height or 50
@@ -5919,6 +5969,15 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     self.inCombat = false
     self.combatRegistered = false
     self.displayMode = MODE_COMBAT_ONLY
+    self.features = bit.bor(
+        FEATURE_HP,
+        FEATURE_RESOURCE,
+        FEATURE_TARGET,
+        FEATURE_COMBO,
+        FEATURE_POISON
+    )
+    self.frame:SetClampedToScreen(true)
+    debug(string.format("Initial features: %d", self.features))
     -- Настройка размеров и позиционирования
     frame:SetWidth(self.width)
     frame:SetHeight(self.height)
@@ -5930,11 +5989,12 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     frame:SetScale(self.scale)
     frame:Hide()
 
+    -- Фоновый цвет
     local bg = frame:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetTexture(0.1, 0.1, 0.1, 0.8)
-    bg:SetVertexColor(0.1, 0.1, 0.1) -- Устанавливаем цвет
-    bg:SetAlpha(0.8) -- Устанавливаем прозрачность
+    bg:SetVertexColor(0.1, 0.1, 0.1)
+    bg:SetAlpha(0.8)
     self.background = bg
 
     -- Временная шкала
@@ -5947,7 +6007,7 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     timeLine:SetAlpha(0.3)
     self.timeLine = timeLine
 
-    -- Нулевая точка отсчета
+    -- Нулевая точка
     local zeroPoint = frame:CreateTexture(nil, "OVERLAY")
     zeroPoint:SetWidth(2)
     zeroPoint:SetHeight(height - 20)
@@ -5957,9 +6017,41 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     zeroPoint:SetAlpha(0.5)
     self.zeroPoint = zeroPoint
 
-    self:SetupDrag()
-    self:UpdateClickThrough()
-    self:RegisterAllEvents()
+    -- Удаляем старые элементы
+    self.comboPoints = nil
+    self.poisonStacks = nil
+    
+    -- Создаем новые элементы
+    self:CreateComboPoisonElements()
+
+    -- Полосы здоровья и ресурсов
+    self:CreateResourceBars()
+    
+    -- Комбо-поинты
+    self.comboPoints = {}
+    local comboSize = self.height * 0.8
+    for i = 1, 5 do
+        local point = frame:CreateTexture(nil, "OVERLAY")
+        point:SetSize(comboSize, comboSize)
+        point:SetTexture("Interface\\TargetingFrame\\UI-Combopoint")
+        point:SetPoint("LEFT", frame, "LEFT", -comboSize * (6 - i), 0)
+        point:SetVertexColor(0.1, 0.1, 0.1)
+        point:Hide()
+        table.insert(self.comboPoints, point)
+    end
+
+    -- Стаки ядов
+    self.poisonStacks = {}
+    local poisonSize = self.height * 0.8
+    for i = 1, 5 do
+        local stack = frame:CreateTexture(nil, "OVERLAY")
+        stack:SetSize(poisonSize, poisonSize)
+        stack:SetTexture("Interface\\TargetingFrame\\UI-Combopoint")
+        stack:SetPoint("RIGHT", frame, "RIGHT", poisonSize * (i - 3), 0)
+        stack:SetVertexColor(0.1, 0.1, 0.1)
+        stack:Hide()
+        table.insert(self.poisonStacks, stack)
+    end
 
     -- Кнопка настроек
     local configButton = CreateFrame("Button", nil, frame)
@@ -5976,24 +6068,256 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
 
     -- Система обновления
     frame:SetScript("OnUpdate", function(_, elapsed)
-        -- Всегда обновляем если панель видима
         if self.frame:IsShown() then
-            -- Обновление позиций активных скиллов
+            -- Обновление скиллов
             for spellName, spell in pairs(self.spells) do
                 if spell.active and not spell.isReady then
                     self:UpdateSpellPosition(spellName)
                 end
             end
             
+            -- Обновление новых элементов
+            self:UpdateResourceBars()
+            self:UpdateComboPoints()
+            self:UpdatePoisonStacks()
+            
+            -- Плавное обновление прозрачности
             if self.frame:GetAlpha() ~= self.alpha then
                 self.frame:SetAlpha(self.alpha)
             end
         end
     end)
     
+    self:SetupDrag()
+    self:UpdateClickThrough()
+    self:RegisterAllEvents()
     self:UpdateSkillTables()
     _G.SpellQueueInstance = self
+    self:ForceUpdateAllSpells()
+    self:UpdateComboPoints()
+    self:UpdatePoisonStacks()
     return self
+end
+
+
+function SpellQueue:CreateResourceBars()
+    -- Полоса здоровья игрока
+    self.healthBar = self.frame:CreateTexture(nil, "OVERLAY")
+    self.healthBar:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.healthBar:SetHeight(5)
+    self.healthBar:SetWidth(self.width)
+    self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, 10)
+    self.healthBar:SetVertexColor(1, 0, 0)
+    self.healthBar:Hide()
+
+    -- Полоса ресурса игрока
+    self.resourceBar = self.frame:CreateTexture(nil, "OVERLAY")
+    self.resourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.resourceBar:SetHeight(5)
+    self.resourceBar:SetWidth(self.width)
+    self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, -1)
+    self.resourceBar:Hide()
+
+    -- Полоса здоровья цели
+    self.targetHealthBar = self.frame:CreateTexture(nil, "OVERLAY")
+    self.targetHealthBar:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.targetHealthBar:SetHeight(5)
+    self.targetHealthBar:SetWidth(self.width)
+    self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, -10)
+    self.targetHealthBar:SetVertexColor(1, 0, 0)
+    self.targetHealthBar:Hide()
+
+    -- Полоса ресурса цели
+    self.targetResourceBar = self.frame:CreateTexture(nil, "OVERLAY")
+    self.targetResourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.targetResourceBar:SetHeight(5)
+    self.targetResourceBar:SetWidth(self.width)
+    self.targetResourceBar:SetPoint("BOTTOM", self.targetHealthBar, "TOP", 0, 1)
+    self.targetResourceBar:Hide()
+end
+
+function SpellQueue:CreateComboPoints()
+    self.comboPoints = {}
+    local comboSize = 14 -- Размер точки
+    local baseX = 20 -- Стартовое смещение слева
+    local yOffset = -10 -- Смещение по вертикали
+    
+    for i = 1, 5 do
+        local point = self.frame:CreateTexture(nil, "BACKGROUND")
+        point:SetTexture("Interface\\TargetingFrame\\UI-Combopoint") -- Стандартная текстура WoW
+        point:SetSize(comboSize, comboSize)
+        -- Привязка к нижней части фрейма с горизонтальным смещением
+        point:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", baseX + (i-1)*25, yOffset)
+        point:SetVertexColor(0.2, 0.2, 0.2) -- Цвет неактивных точек
+        table.insert(self.comboPoints, point)
+    end
+    debug("Комбо-поинты созданы")
+end
+
+
+function SpellQueue:CreatePoisonStacks()
+    self.poisonStacks = {}
+    local poisonSize = self.height * 0.8
+    debug(string.format("Creating poison stacks (size: %d)", poisonSize))
+    
+    for i = 1, 5 do
+        local stack = self.frame:CreateTexture(nil, "OVERLAY")
+        stack:SetSize(poisonSize, poisonSize)
+        stack:SetTexture("Interface\\TargetingFrame\\UI-Combopoint")
+        stack:SetPoint("RIGHT", self.frame, "RIGHT", -poisonSize * (i - 3), 0)
+        stack:SetVertexColor(0.1, 0.1, 0.1)
+        stack:SetAlpha(1.0)
+        debug(string.format("Poison stack %d position: %d", i, -poisonSize * (i - 3)))
+        table.insert(self.poisonStacks, stack)
+    end
+end
+
+
+function SpellQueue:GetPlayerResourceType()
+    local _, class = UnitClass("player")
+    debug(string.format("Class: %s", class))
+    
+    if class == "DRUID" then
+        local form = GetShapeshiftForm()
+        debug(string.format("Druid form: %d", form))
+        -- 1: Медведь, 3: Кошка, 4: Лунный облик
+        if form == 1 then
+            debug("Bear form - Rage")
+            return 1 -- RAGE
+        elseif form == 3 then
+            debug("Cat form - Energy")
+            return 3 -- ENERGY
+        else
+            debug("Other form - Mana")
+            return 0 -- MANA
+        end
+    end
+    
+    local resource = RESOURCE_TYPES[class] or 0
+    debug(string.format("Resource type: %d (%s)", resource, RESOURCE_NAMES[resource] or "unknown"))
+    return resource
+end
+
+
+function SpellQueue:GetTargetResourceType()
+    if UnitIsPlayer("target") then
+        local _, class = UnitClass("target")
+        return RESOURCE_TYPES[class] or 0
+    end
+    return 0 -- Для NPC используем ману по умолчанию
+end
+
+function SpellQueue:UpdateResourceBars()
+    -- Для игрока
+    if bit.band(self.features, FEATURE_HP) ~= 0 then
+        local maxHP = UnitHealthMax("player")
+        local hp = maxHP > 0 and (UnitHealth("player") / maxHP) or 0
+        debug(string.format("Player HP: %.1f%%", hp*100))
+        self.healthBar:SetWidth(self.width * hp)
+        self.healthBar:Show()
+    else
+        self.healthBar:Hide()
+    end
+
+    if bit.band(self.features, FEATURE_RESOURCE) ~= 0 then
+        local resourceType = self:GetPlayerResourceType()
+        local current = UnitPower("player", resourceType)
+        local max = UnitPowerMax("player", resourceType)
+        debug(string.format("Player resource: %d/%d (type %d)", current, max, resourceType))
+        
+        local colorName = self.resourceTypeNames[resourceType] or "UNKNOWN"
+        local color = FEATURE_COLORS[colorName] or {1,1,1} -- дефолтный белый если нет цвета
+        debug(string.format("Resource color: %s", colorName))
+        
+        self.resourceBar:SetWidth(max > 0 and (current/max)*self.width or 0)
+        self.resourceBar:SetVertexColor(unpack(color))
+        self.resourceBar:Show()
+    else
+        self.resourceBar:Hide()
+    end
+
+    -- Для цели
+    if UnitExists("target") then
+        debug("Target exists")
+        if bit.band(self.features, FEATURE_TARGET) ~= 0 then
+            -- Здоровье цели
+            local maxHP = UnitHealthMax("target")
+            local hp = maxHP > 0 and (UnitHealth("target") / maxHP) or 0
+            debug(string.format("Target HP: %.1f%%", hp*100))
+            self.targetHealthBar:SetWidth(self.width * hp)
+            self.targetHealthBar:Show()
+            
+            -- Ресурс цели
+            local resourceType = self:GetTargetResourceType()
+            local current = UnitPower("target", resourceType)
+            local max = UnitPowerMax("target", resourceType)
+            debug(string.format("Target resource: %d/%d (type %d)", current, max, resourceType))
+            
+            local colorName = self.resourceTypeNames[resourceType] or "UNKNOWN"
+            local color = FEATURE_COLORS[colorName] or {1,1,1}
+            self.targetResourceBar:SetWidth(max > 0 and (current/max)*self.width or 0)
+            self.targetResourceBar:SetVertexColor(unpack(color))
+            self.targetResourceBar:Show()
+        else
+            debug("Target features disabled")
+            self.targetHealthBar:Hide()
+            self.targetResourceBar:Hide()
+        end
+    else
+        debug("No target")
+        self.targetHealthBar:Hide()
+        self.targetResourceBar:Hide()
+    end
+end
+
+function SpellQueue:UpdateComboPoints()
+    if bit.band(self.features, FEATURE_COMBO) == 0 then 
+        self.comboFrame:Hide()
+        return 
+    end
+    self.comboFrame:Show()
+    
+    local cp = GetComboPoints("player", "target")
+    local isFull = cp == 5
+    
+    for i = 1, 5 do
+        local color
+        if isFull then
+            color = FEATURE_COLORS.COMBO_FULL
+        else
+            color = i <= cp and FEATURE_COLORS.COMBO_FILLED or FEATURE_COLORS.COMBO_EMPTY
+        end
+        self.comboSquares[i]:SetVertexColor(unpack(color))
+    end
+end
+
+function SpellQueue:UpdatePoisonStacks()
+    if bit.band(self.features, FEATURE_POISON) == 0 then 
+        self.poisonFrame:Hide()
+        return 
+    end
+    self.poisonFrame:Show()
+    
+    -- Проверяем наличие яда на оружии
+    local hasPoison = self:HasWeaponEnchant()
+    local stacks = hasPoison and 5 or 0 -- Пример: всегда 5 стаков если есть яд
+    local isFull = stacks == 5
+    
+    for i = 1, 5 do
+        local color
+        if isFull then
+            color = FEATURE_COLORS.POISON_FULL
+        else
+            color = i <= stacks and FEATURE_COLORS.POISON_FILLED or FEATURE_COLORS.POISON_EMPTY
+        end
+        self.poisonSquares[i]:SetVertexColor(unpack(color))
+    end
+end
+
+function SpellQueue:HasWeaponEnchant()
+    -- Возвращает true если есть хотя бы один яд на оружии
+    local hasMainHandEnchant, _, _, hasOffHandEnchant = GetWeaponEnchantInfo()
+    return hasMainHandEnchant or hasOffHandEnchant
 end
 
 function SpellQueue:ToggleDisplayMode()
@@ -6826,7 +7150,16 @@ function SpellQueue:UpdateSkillTables()
 end
 
 function SpellQueue:ForceUpdateAllSpells()
-    -- Принудительно обновляем состояние всех скиллов
+    -- Принудительно обновляем размеры фрейма
+    self.frame:SetWidth(self.width)
+    self.frame:SetHeight(self.height)
+    
+    -- Обновляем все видимые элементы
+    self:UpdateComboPoints()
+    self:UpdatePoisonStacks()
+    self:UpdateResourceBars()
+    
+    -- Основная логика обновления заклинаний
     for spellName, spell in pairs(self.spells) do
         -- Проверка на ресурсы
         if spell.data.resource then
@@ -6867,15 +7200,178 @@ function SpellQueue:ForceUpdateAllSpells()
             spell.icon:SetAlpha(COOLDOWN_ALPHA)
         end
         
-        -- Полная перерисовка позиции
+        -- Перерисовываем позицию
         self:UpdateSpellPosition(spellName)
     end
     
-    -- Обновление приоритетов и группировки
+    -- Финализируем обновления
     self:UpdateSpellsPriority()
+    self.frame:Show() -- Гарантируем видимость
+end
+
+function SpellQueue:SetAppearanceSettings(options)
+    -- Основные параметры панели
+    if options.width then
+        self.width = options.width
+        self.frame:SetWidth(self.width)
+    end
+    if options.height then
+        self.height = options.height
+        self.frame:SetHeight(self.height)
+    end
+    if options.scale then
+        self.scale = options.scale
+        self.frame:SetScale(self.scale)
+    end
+
+    -- Настройки прозрачности
+    if options.alpha then
+        self.alpha = options.alpha
+        if self.inCombat then
+            self.frame:SetAlpha(self.alpha)
+        end
+    end
+    if options.inactiveAlpha then
+        INACTIVE_ALPHA = options.inactiveAlpha
+        if not self.inCombat then
+            self.frame:SetAlpha(INACTIVE_ALPHA)
+        end
+    end
+
+    -- Размеры иконок скиллов
+    if options.iconSize then
+        for spellName, spell in pairs(self.spells) do
+            spell.icon:SetSize(options.iconSize, options.iconSize)
+            spell.glow:SetSize(options.iconSize + 10, options.iconSize + 10)
+            spell.highlight:SetSize(options.iconSize + 15, options.iconSize + 15)
+        end
+    end
+
+    -- Полосы здоровья и ресурсов
+    local function updateBar(bar, height, color)
+        if height then bar:SetHeight(height) end
+        if color then bar:SetVertexColor(unpack(color)) end
+    end
     
-    -- Принудительное обновление фрейма
-    self.frame:Show() -- На случай если фрейм был скрыт
+    updateBar(self.healthBar, options.healthBarHeight, options.healthColor)
+    updateBar(self.resourceBar, options.resourceBarHeight, options.resourceColor)
+    updateBar(self.targetHealthBar, options.targetHealthHeight, options.targetHealthColor)
+    updateBar(self.targetResourceBar, options.targetResourceHeight, options.targetResourceColor)
+
+    -- Позиционирование полос
+    if options.healthBarOffset then
+        self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, options.healthBarOffset)
+    end
+    if options.resourceBarOffset then
+        self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, options.resourceBarOffset)
+    end
+    if options.targetHealthBarOffset then
+        self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, options.targetHealthBarOffset)
+    end
+    if options.targetResourceBarOffset then
+        self.targetResourceBar:SetPoint("BOTTOM", self.targetHealthBar, "TOP", 0, options.targetResourceBarOffset)
+    end
+
+    -- Комбо-поинты
+    if options.comboSize or options.comboSpacing or options.comboOffset then
+        local size = options.comboSize or 6
+        local spacing = options.comboSpacing or 0
+        local offsetX = options.comboOffset and options.comboOffset.x or -10
+        local offsetY = options.comboOffset and options.comboOffset.y or 0
+        
+        -- Обновляем размеры
+        for i, square in ipairs(self.comboSquares) do
+            square:SetSize(size, size)
+        end
+        
+        -- Пересчитываем позиции
+        for i = 1, 5 do
+            self.comboSquares[i]:ClearAllPoints()
+            self.comboSquares[i]:SetPoint(
+                "BOTTOM", 
+                self.comboFrame, 
+                "BOTTOM", 
+                0, 
+                (i-1)*(size + spacing))
+        end
+        
+        -- Позиция фрейма
+        self.comboFrame:SetPoint("RIGHT", self.frame, "LEFT", offsetX, offsetY)
+    end
+
+    -- Яды
+    if options.poisonSize or options.poisonSpacing or options.poisonOffset then
+        local size = options.poisonSize or 6
+        local spacing = options.poisonSpacing or 0
+        local offsetX = options.poisonOffset and options.poisonOffset.x or 10
+        local offsetY = options.poisonOffset and options.poisonOffset.y or 0
+        
+        -- Обновляем размеры
+        for i, square in ipairs(self.poisonSquares) do
+            square:SetSize(size, size)
+        end
+        
+        -- Пересчитываем позиции
+        for i = 1, 5 do
+            self.poisonSquares[i]:ClearAllPoints()
+            self.poisonSquares[i]:SetPoint(
+                "BOTTOM", 
+                self.poisonFrame, 
+                "BOTTOM", 
+                0, 
+                (i-1)*(size + spacing))
+        end
+        
+        -- Позиция фрейма
+        self.poisonFrame:SetPoint("LEFT", self.frame, "RIGHT", offsetX, offsetY)
+    end
+
+    -- Временная линия
+    if options.timeLinePosition then
+        self.timeLine:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 0, self.height/2 - options.timeLinePosition)
+    end
+
+    -- Принудительное обновление
+    self:ForceUpdateAllSpells()
+end
+
+function SpellQueue:CreateComboPoisonElements()
+    -- Настройки
+    local square_size = 12
+    local spacing = 4
+    local total_height = (square_size + spacing) * 5 - spacing
+    
+    -- Фрейм для комбо-поинтов (слева)
+    self.comboFrame = CreateFrame("Frame", nil, self.frame)
+    self.comboFrame:SetSize(square_size, total_height)
+    self.comboFrame:SetPoint("RIGHT", self.frame, "LEFT", -10, 0)
+    
+    -- Комбо-поинты
+    self.comboSquares = {}
+    for i = 1, 5 do
+        local square = self.comboFrame:CreateTexture(nil, "OVERLAY")
+        square:SetSize(square_size, square_size)
+        square:SetTexture("Interface\\Buttons\\WHITE8X8")
+        square:SetPoint("BOTTOM", self.comboFrame, "BOTTOM", 0, (i-1)*(square_size + spacing))
+        square:SetVertexColor(unpack(FEATURE_COLORS.COMBO_EMPTY))
+        table.insert(self.comboSquares, square)
+    end
+
+    -- Фрейм для ядов (справа)
+    self.poisonFrame = CreateFrame("Frame", nil, self.frame)
+    self.poisonFrame:SetSize(square_size, total_height)
+    self.poisonFrame:SetPoint("LEFT", self.frame, "RIGHT", 10, 0)
+    
+    -- Яды
+    self.poisonSquares = {}
+    for i = 1, 5 do
+        local square = self.poisonFrame:CreateTexture(nil, "OVERLAY")
+        square:SetSize(square_size, square_size)
+        square:SetTexture("Interface\\Buttons\\WHITE8X8")
+        square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i-1)*(square_size + spacing))
+        square:SetVertexColor(unpack(FEATURE_COLORS.POISON_EMPTY))
+        table.insert(self.poisonSquares, square)
+    end
 end
 
 SlashCmdList["SPELLQUEUE"] = function()
@@ -6894,3 +7390,51 @@ SlashCmdList["SPELLQUEUEMODE"] = function()
     end
 end
 SLASH_SPELLQUEUEMODE1 = "/sqmode"
+
+SlashCmdList["SPELLQUEUE_HP"] = function()
+    SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_HP)
+    if bit.band(SpellQueueInstance.features, FEATURE_HP) ~= 0 then
+        SpellQueueInstance.healthBar:Show()
+    else
+        SpellQueueInstance.healthBar:Hide()
+    end
+end
+SLASH_SPELLQUEUE_HP1 = "/sqhp"
+
+SlashCmdList["SPELLQUEUE_RES"] = function()
+    SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_RESOURCE)
+    if bit.band(SpellQueueInstance.features, FEATURE_RESOURCE) ~= 0 then
+        SpellQueueInstance.resourceBar:Show()
+    else
+        SpellQueueInstance.resourceBar:Hide()
+    end
+end
+SLASH_SPELLQUEUE_RES1 = "/sqres"
+
+SlashCmdList["SPELLQUEUE_COMBO"] = function()
+    SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_COMBO)
+    for _, point in ipairs(SpellQueueInstance.comboPoints) do
+        if point then
+            if bit.band(SpellQueueInstance.features, FEATURE_COMBO) ~= 0 then
+                point:Show()
+            else
+                point:Hide()
+            end
+        end
+    end
+end
+SLASH_SPELLQUEUE_COMBO1 = "/sqcp"
+
+SlashCmdList["SPELLQUEUE_POISON"] = function()
+    SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_POISON)
+    for _, stack in ipairs(SpellQueueInstance.poisonStacks) do
+        if stack then
+            if bit.band(SpellQueueInstance.features, FEATURE_POISON) ~= 0 then
+                stack:Show()
+            else
+                stack:Hide()
+            end
+        end
+    end
+end
+SLASH_SPELLQUEUE_POISON1 = "/sqps"

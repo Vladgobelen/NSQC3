@@ -32,6 +32,48 @@ local function OnEvent(self, event, isLogin, isReload)
             nsDbc.skills3 = nsDbc.skills3 or {}
             sq = SpellQueue:Create("MySpellQueue", 300, 50, "CENTER")
             sq:SetIconsTable(tblIcons)
+            local appearanceSettings = {
+                -- Основные параметры
+                width = 200,              -- Ширина всей панели
+                height = 32,              -- Высота панели
+                scale = 1,                -- Масштаб интерфейса
+                alpha = 0.9,              -- Прозрачность в бою
+                inactiveAlpha = 0.4,      -- Прозрачность вне боя
+                
+                -- Игрок
+                healthColor = {1, 0, 0},                 -- Цвет здоровья игрока (RGB)
+                healthBarHeight = 3,                     -- Высота полосы здоровья
+                healthBarOffset = 3,                     -- Смещение от верха панели
+                
+                resourceColor = {0, 0.8, 1},             -- Цвет ресурса (мана/ярость и т.д.)
+                resourceBarHeight = 3,                   -- Высота полосы ресурса
+                resourceBarOffset = 0,                   -- Смещение от полосы здоровья
+                
+                -- Цель
+                targetHealthColor = {1, 0, 0},         -- Цвет здоровья цели
+                targetHealthHeight = 3,                  -- Высота полосы здоровья цели
+                targetHealthBarOffset = -3,              -- Смещение от низа панели (отрицательное - вверх)
+                
+                targetResourceColor = {0.5, 0, 1},       -- Цвет ресурса цели
+                targetResourceHeight = 3,                -- Высота полосы ресурса цели
+                targetResourceBarOffset = 0,             -- Смещение от полосы здоровья цели
+                
+                -- Другие элементы
+                iconSize = 32,              -- Размер иконок способностей
+                comboSize = 18,             -- Размер комбо-поинтов
+                poisonSize = 16,            -- Размер стаков ядов
+                timeLinePosition = 15,      -- Позиция временной линии
+                -- Комбо-поинты
+                comboSize = 6,               -- Размер квадрата
+                comboSpacing = 0,            -- Расстояние между квадратами
+                comboOffset = {x = 0, y = 24}, -- Смещение от панели
+                
+                -- Яды
+                poisonSize = 6,              -- Размер квадрата
+                poisonSpacing = 0,           -- Расстояние между квадратами
+                poisonOffset = {x = 0, y = 24}, -- Смещение от панели
+            }
+            sq:SetAppearanceSettings(appearanceSettings)
             sq:UpdateSkillTables()
         end)
 
