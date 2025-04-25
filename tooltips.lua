@@ -313,3 +313,7 @@ ns_recipes = {
         ["текстура"] = "tst"
     },
 }
+
+ns_textures = {
+    
+}
