@@ -6554,15 +6554,22 @@ function SpellQueue:SetIconsTable(tblIcons)
             highlight:SetPoint("CENTER", icon, "CENTER")
             highlight:Hide()
 
+            -- Создаем полную копию данных скилла, включая ресурсы
+            local newData = {
+                pos = spellData.pos or 0,
+                buf = spellData.buf or 0,
+                debuf = spellData.debuf or nil,
+                combo = spellData.combo or 0,
+                icon = spellData.icon or "Interface\\Icons\\INV_Misc_QuestionMark",
+                name = spellName,
+                resource = spellData.resource and {
+                    type = spellData.resource.type,
+                    amount = spellData.resource.amount
+                } or nil
+            }
+
             self.spells[spellName] = {
-                data = {
-                    pos = spellData.pos or 0,
-                    buf = spellData.buf or 0,
-                    debuf = spellData.debuf or nil,
-                    combo = spellData.combo or 0,
-                    icon = spellData.icon or "Interface\\Icons\\INV_Misc_QuestionMark",
-                    name = spellName
-                },
+                data = newData,
                 icon = icon,
                 glow = glow,
                 cooldownText = cooldownText,
@@ -6580,7 +6587,6 @@ function SpellQueue:SetIconsTable(tblIcons)
             createdCount = createdCount + 1
         end
     end
-    
 end
 
 function SpellQueue:HasEnoughResource(spellName)
@@ -6967,6 +6973,11 @@ function SpellQueue:CreateConfigWindow()
     title:SetPoint("TOP", 0, -15)
     title:SetText("Настройки SpellQueue")
 
+    -- Кнопка закрытия в правом верхнем углу
+    local closeButton = CreateFrame("Button", nil, configFrame, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", -5, -5)
+    closeButton:SetScript("OnClick", function() configFrame:Hide() end)
+
     -- Поле ввода названия с кнопкой удаления
     local nameLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameLabel:SetPoint("TOPLEFT", 15, -45)
@@ -7123,26 +7134,26 @@ function SpellQueue:CreateConfigWindow()
     
     local function ResourceDropDown_Initialize()
         local info = UIDropDownMenu_CreateInfo()
-        local resourcesInOrder = {
-            RESOURCE_TYPES.MANA,
-            RESOURCE_TYPES.RAGE,
-            RESOURCE_TYPES.ENERGY,
-            RESOURCE_TYPES.RUNIC_POWER,
-            RESOURCE_TYPES.RUNES,
-            RESOURCE_TYPES.COMBO_POINTS
+        local resources = {
+            {text = "Мана", value = 0},
+            {text = "Ярость", value = 1},
+            {text = "Энергия", value = 3},
+            {text = "Сила рун", value = 6},
+            {text = "Руны", value = 5},
+            {text = "Комбо-поинты", value = 14}
         }
         
-        for _, resourceType in ipairs(resourcesInOrder) do
-            info.text = RESOURCE_NAMES[resourceType]
-            info.value = resourceType
+        for _, resource in ipairs(resources) do
+            info.text = resource.text
+            info.value = resource.value
             info.func = function() 
-                UIDropDownMenu_SetSelectedValue(resourceDropdown, resourceType) 
+                UIDropDownMenu_SetSelectedValue(resourceDropdown, resource.value) 
             end
             UIDropDownMenu_AddButton(info)
         end
     end
     UIDropDownMenu_Initialize(resourceDropdown, ResourceDropDown_Initialize)
-    UIDropDownMenu_SetSelectedValue(resourceDropdown, 1)
+    UIDropDownMenu_SetSelectedValue(resourceDropdown, 0)
     
     -- Поле ввода количества ресурса (скрыто по умолчанию)
     local resourceAmountEditBox = CreateFrame("EditBox", "SpellQueueResourceAmountEditBox", configFrame, "InputBoxTemplate")
@@ -7240,13 +7251,6 @@ function SpellQueue:CreateConfigWindow()
         
         message("Скилл "..name.." добавлен!")
     end)
-
-    -- Кнопка закрытия
-    local closeButton = CreateFrame("Button", "SpellQueueCloseButton", configFrame, "UIPanelButtonTemplate")
-    closeButton:SetSize(100, 25)
-    closeButton:SetPoint("BOTTOM", 0, 55)
-    closeButton:SetText("Закрыть")
-    closeButton:SetScript("OnClick", function() configFrame:Hide() end)
 
     self.configFrame = configFrame
 end
@@ -7634,3 +7638,4 @@ SlashCmdList["SPELLQUEUE_POISON"] = function()
     end
 end
 SLASH_SPELLQUEUE_POISON1 = "/sqps"
+

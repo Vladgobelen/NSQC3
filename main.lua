@@ -31,7 +31,7 @@ local function OnEvent(self, event, isLogin, isReload)
             questManagerClient = QuestManagerClient:new()
             nsDbc.skills3 = nsDbc.skills3 or {}
             sq = SpellQueue:Create("MySpellQueue", 600, 350, "CENTER")
-            sq:SetIconsTable(tblIcons)
+            sq:SetIconsTable()
             local appearanceSettings = {
                 -- Основные параметры
                 width = 200,              -- Ширина всей панели
@@ -84,7 +84,7 @@ local function OnEvent(self, event, isLogin, isReload)
                 targetHealthBarOffset = -6,
                 targetResourceBarHeight = 3,
                 targetResourceBarOffset = 0,
-                clickThrough = false
+                clickThrough = 0
             }
             if not ns_dbc:getKey("настройки", "Skill Queue") then
                 ns_dbc:modKey("настройки", "Skill Queue", appearanceSettings)
