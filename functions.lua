@@ -301,6 +301,485 @@ function NS3Menu(ver, subver)
         "Версия", 
         "Текущая версия: " .. ver .. "." .. subver
     )
+
+    local skillPanel = menu:addSubMenu("  Очередь скиллов", generalSub)
+
+    menu:addCheckbox(skillPanel, {
+        name = "Видимость панели вне боя",
+        label = "Показывать панель, если персонаж не в бою",
+        default = (ns_dbc:getKey("настройки", "Skill Queue mode") == 2),
+        tooltip = "Показывать панель, если персонаж не в бою",
+        onClick = function(checked)
+            local mode = checked and 2 or 1
+            ns_dbc:modKey("настройки", "Skill Queue mode", mode)
+            
+            -- Обновляем displayMode в объекте SpellQueue
+            sq.displayMode = mode
+            
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addCheckbox(skillPanel, {
+        name = "Взаимодействие с мышью",
+        label = "Взаимодействие с мышью",
+        -- Преобразуем значение из базы данных в булево значение
+        default = (ns_dbc:getKey("настройки", "Skill Queue", "clickThrough") == 1), -- 1 -> true, 0 -> false
+        tooltip = "Если установить, панель не будет взаимодействовать с мышью",
+        onClick = function(checked)
+            -- Сохраняем значение в базу данных как число: true -> 1, false -> 0
+            ns_dbc:modKey("настройки", "Skill Queue", "clickThrough", checked and 1 or 0) -- true -> 1, false -> 0
+            
+            -- Устанавливаем режим взаимодействия с мышью
+            sq:SetClickThrough(checked) -- Если чекбокс включен (true), панель пропускает клики насквозь
+        end
+    })
+
+     menu:addSlider(skillPanel, {
+        name = "sqAlpha",
+        label = "Прозрачность панели",
+        min = .1,
+        max = 1,
+        step = .1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "alpha") or 0.9,
+        tooltip = "Ширина панели очереди скиллов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "alpha", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqSizeShirinaSlider",
+        label = "Ширина панели",
+        min = 50,
+        max = 1000,
+        step = 5,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "width") or 200,
+        tooltip = "Ширина панели очереди скиллов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "width", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqSizeVysotaSlider",
+        label = "Высота панели",
+        min = 0,
+        max = 300,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "height") or 32,
+        tooltip = "Высота панели очереди скиллов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "height", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqSizeIcons",
+        label = "Размер иконок",
+        min = 5,
+        max = 300,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "iconSize") or 32,
+        tooltip = "Размер иконок",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "iconSize", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqIconSpacing",
+        label = "Расстояние между скиллами",
+        min = 0,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "iconSpacing") or 0,
+        tooltip = "Расстояние между скиллами",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "iconSpacing", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqGlowSizeOffset",
+        label = "Размер свечения иконки",
+        min = 0,
+        max = 300,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "glowSizeOffset") or 32,
+        tooltip = "Размер свечения иконки",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "glowSizeOffset", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqComboSize",
+        label = "Размер квадрата комбопоинтов",
+        min = 0,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "comboSize") or 6,
+        tooltip = "Размер квадрата комбопоинтов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "comboSize", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqComboSpacing",
+        label = "Расстояние между квадратами комбо-поинтов",
+        min = 0,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "comboSpacing") or 6,
+        tooltip = "Расстояние между квадратами комбо-поинтов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "comboSpacing", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqcomboOffsetx",
+        label = "Смещение комбопоинтов по горизонтали",
+        min = -50,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "comboOffset", "x") or 6,
+        tooltip = "Смещение комбопоинтов по горизонтали",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "comboOffset", "x", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqcomboOffsety",
+        label = "Смещение комбопоинтов по вертикали",
+        min = -100,
+        max = 100,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "comboOffset", "y") or 6,
+        tooltip = "Смещение комбопоинтов по вертикали",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "comboOffset", "y", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqpoisonSize",
+        label = "Размер квадрата ядов",
+        min = 0,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "poisonSize") or 6,
+        tooltip = "Размер квадрата ядов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "poisonSize", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqpoisonSpacing",
+        label = "Расстояние между квадратами ядов",
+        min = 0,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "poisonSpacing") or 6,
+        tooltip = "Расстояние между квадратами ядов",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "poisonSpacing", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqpoisonOffsetx",
+        label = "Смещение ядов по горизонтали",
+        min = -50,
+        max = 50,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "poisonOffset", "x") or 6,
+        tooltip = "Смещение ядов по горизонтали",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "poisonOffset", "x", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqcomboOffsety",
+        label = "Смещение комбопоинтов по вертикали",
+        min = -100,
+        max = 100,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "poisonOffset", "y") or 6,
+        tooltip = "Смещение комбопоинтов по вертикали",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "poisonOffset", "y", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqhealthBarHeight",
+        label = "Высота полоски хп игрока",
+        min = 1,
+        max = 20,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "healthBarHeight") or 6,
+        tooltip = "Высота полоски хп игрока",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "healthBarHeight", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqhealthBarOffset",
+        label = "Расстояние полоски хп игрока до панели",
+        min = -200,
+        max = 200,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "healthBarOffset") or 6,
+        tooltip = "Расстояние полоски хп игрока до панели",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "healthBarOffset", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqresourceBarHeight",
+        label = "Высота полоски маны игрока",
+        min = 1,
+        max = 20,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "resourceBarHeight") or 6,
+        tooltip = "Высота полоски маны игрока",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "resourceBarHeight", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqresourceBarOffset",
+        label = "Расстояние полоски маны игрока до панели",
+        min = -200,
+        max = 200,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "resourceBarOffset") or 6,
+        tooltip = "Расстояние полоски маны игрока до панели",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "resourceBarOffset", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqtargetHealthBarHeight",
+        label = "Высота полоски хп цели",
+        min = 1,
+        max = 20,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "targetHealthBarHeight") or 6,
+        tooltip = "Высота полоски хп цели",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "targetHealthBarHeight", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqtargetHealthBarOffset",
+        label = "Расстояние полоски хп цели до панели",
+        min = -200,
+        max = 200,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "targetHealthBarOffset") or 6,
+        tooltip = "Расстояние полоски хп цели до панели",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "targetHealthBarOffset", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqtargetResourceBarHeight",
+        label = "Высота полоски маны цели",
+        min = 1,
+        max = 20,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "targetResourceBarHeight") or 6,
+        tooltip = "Высота полоски маны цели",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "targetResourceBarHeight", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addSlider(skillPanel, {
+        name = "sqtargetResourceBarOffset",
+        label = "Расстояние полоски маны цели до панели",
+        min = -200,
+        max = 200,
+        step = 1,
+        default = ns_dbc:getKey("настройки", "Skill Queue", "targetResourceBarOffset") or 6,
+        tooltip = "Расстояние полоски маны цели до панели",
+        onChange = function(value) 
+            ns_dbc:modKey("настройки", "Skill Queue", "targetResourceBarOffset", value)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
+
+    menu:addButton(skillPanel, {
+        name = "ResetButton", -- Уникальное имя кнопки
+        label = "Сброс настроек", -- Текст на кнопке
+        width = 150, -- Ширина кнопки
+        height = 30, -- Высота кнопки
+        tooltip = "Это уничтожит все настроенное и скинет все настройки на дефолт", -- Подсказка при наведении
+        onClick = function()
+            local appearanceSettings = {
+                -- Основные параметры
+                width = 200,              -- Ширина всей панели
+                height = 32,              -- Высота панели
+                scale = 1,                -- Масштаб интерфейса
+                alpha = 0.9,              -- Прозрачность в бою
+                inactiveAlpha = 0.4,      -- Прозрачность вне боя
+                iconSpacing = 0,          -- расстояние между иконками
+                glowSizeOffset = 10,      -- На сколько больше иконки будет glow
+                highlightSizeOffset = 15, -- На сколько больше иконки будет highlight
+                glowAlpha = 0.3,          -- Прозрачность glow
+                
+                -- Игрок
+                healthColor = {1, 0, 0},                 -- Цвет здоровья игрока (RGB)
+                healthBarHeight = 3,                     -- Высота полосы здоровья
+                healthBarOffset = 3,                     -- Смещение от верха панели
+                
+                resourceColor = {0, 0.8, 1},             -- Цвет ресурса (мана/ярость и т.д.)
+                resourceBarHeight = 3,                   -- Высота полосы ресурса
+                resourceBarOffset = 0,                   -- Смещение от полосы здоровья
+                
+                -- Цель
+                targetHealthColor = {1, 0, 0},         -- Цвет здоровья цели
+                targetHealthHeight = 3,                  -- Высота полосы здоровья цели
+                targetHealthBarOffset = -3,              -- Смещение от низа панели (отрицательное - вверх)
+                
+                targetResourceColor = {0.5, 0, 1},       -- Цвет ресурса цели
+                targetResourceHeight = 3,                -- Высота полосы ресурса цели
+                targetResourceBarOffset = 0,             -- Смещение от полосы здоровья цели
+                
+                -- Другие элементы
+                iconSize = 32,              -- Размер иконок способностей
+                comboSize = 18,             -- Размер комбо-поинтов
+                poisonSize = 16,            -- Размер стаков ядов
+                timeLinePosition = 15,      -- Позиция временной линии
+                -- Комбо-поинты
+                comboSize = 6,               -- Размер квадрата
+                comboSpacing = 0,            -- Расстояние между квадратами
+                comboOffset = {x = 0, y = 24}, -- Смещение от панели
+                
+                -- Яды
+                poisonSize = 6,              -- Размер квадрата
+                poisonSpacing = 0,           -- Расстояние между квадратами
+                poisonOffset = {x = 0, y = 24}, -- Смещение от панели
+                healthBarHeight = 3,          -- высота полоски хп игрока
+                healthBarOffset = 6,          -- расстояние полоски хп до панели
+                resourceBarHeight = 3,
+                resourceBarOffset = 0,
+                targetHealthBarHeight = 3,
+                targetHealthBarOffset = -6,
+                targetResourceBarHeight = 3,
+                targetResourceBarOffset = 0,
+                clickThrough = 0
+            }
+            ns_dbc:modKey("настройки", "Skill Queue", appearanceSettings)
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+            sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
+        end
+    })
 end
 
 function CalculateAverageItemLevel(unit)

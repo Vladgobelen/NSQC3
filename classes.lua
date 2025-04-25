@@ -5168,42 +5168,69 @@ function NSQCMenu:getStringWidth(frame, text, font)
 end
 
 -- Метод для создания подменю
-function NSQCMenu:addSubMenu(menuName)
-    local subFrame = CreateFrame("Frame", self.addonName..menuName.."SubFrame", InterfaceOptionsFramePanelContainer)
+function NSQCMenu:addSubMenu(menuName, parentMenu)
+    -- Определяем родительское меню (по умолчанию - self)
+    parentMenu = parentMenu or self
+    
+    -- Создаем уникальное имя для фрейма
+    local frameName = self.addonName..menuName.."SubFrame"
+    
+    -- Создаем основной фрейм подменю
+    local subFrame = CreateFrame("Frame", frameName, InterfaceOptionsFramePanelContainer)
     subFrame.name = menuName
-    subFrame.parent = self.addonName
+    subFrame.parent = parentMenu.addonName or parentMenu.name
     subFrame:Hide()
+    
     -- Создаем ScrollFrame
-    local scrollFrame = CreateFrame("ScrollFrame", menuName.."ScrollFrame", subFrame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -40)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -10, 10)
+    local scrollFrame = CreateFrame("ScrollFrame", frameName.."ScrollFrame", subFrame, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 16, -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -32, 16)
+    
     -- Создаем контент для скролла
-    local scrollContent = CreateFrame("Frame", menuName.."ScrollContent", scrollFrame)
+    local scrollContent = CreateFrame("Frame", frameName.."ScrollContent", scrollFrame)
     scrollContent:SetWidth(scrollFrame:GetWidth() - 20)
-    scrollContent:SetHeight(1)
+    scrollContent:SetHeight(1) -- Начальная высота
     scrollFrame:SetScrollChild(scrollContent)
+    
     -- Настраиваем скроллбар
-    local scrollBar = _G[menuName.."ScrollFrameScrollBar"]
-    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -20, -16)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -20, 16)
+    local scrollBar = _G[frameName.."ScrollFrameScrollBar"]
+    scrollBar:ClearAllPoints()
+    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 12, -16)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 12, 16)
+    
     -- Заголовок подменю
     local title = subFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(menuName)
+    
+    -- Регистрируем подменю в интерфейсе WoW
     InterfaceOptions_AddCategory(subFrame)
+    
+    -- Создаем объект подменю
     local subMenu = {
         frame = subFrame,
         scrollFrame = scrollFrame,
         scrollContent = scrollContent,
         elements = {},
-        lastY = 0, -- Теперь отсчет от верхнего края scrollContent
+        lastY = 0,
         totalHeight = 0,
-        maxHeight = scrollFrame:GetHeight()
+        maxHeight = scrollFrame:GetHeight(),
+        parent = parentMenu,
+        name = menuName
     }
+    
+    -- Добавляем подменю в список
     table.insert(self.subMenus, subMenu)
+    
     return subMenu
 end
 
+function NSQCMenu:showSubMenu(subMenu)
+    if subMenu.parent then
+        subMenu.parent.frame:Hide()
+    end
+    subMenu.frame:Show()
+end
 -- Методы для добавления элементов в подменю
 function NSQCMenu:addSlider(parentMenu, options)
     local slider = CreateFrame("Slider", parentMenu.frame:GetName()..options.name, parentMenu.scrollContent, "OptionsSliderTemplate")
@@ -5306,6 +5333,50 @@ function NSQCMenu:updateScrollRange(parentMenu)
     scrollBar:SetMinMaxValues(0, maxRange)
     scrollBar:SetValue(0)
     scrollFrame:UpdateScrollChildRect()
+end
+
+-- Метод для добавления кнопки
+function NSQCMenu:addButton(parentMenu, options)
+    -- Создаем кнопку
+    local button = CreateFrame("Button", parentMenu.frame:GetName()..options.name, parentMenu.scrollContent, "UIPanelButtonTemplate")
+    button:SetPoint("TOPLEFT", 16, -parentMenu.lastY)
+    button:SetSize(options.width or 120, options.height or 24) -- Размеры кнопки (по умолчанию 120x24)
+    button:SetText(options.label or "Кнопка") -- Текст на кнопке
+
+    -- Обработчик нажатия
+    button:SetScript("OnClick", function(self)
+        if options.onClick then
+            options.onClick() -- Вызываем пользовательскую функцию
+        end
+    end)
+
+    -- Добавляем тултип, если указан
+    if options.tooltip then
+        button.tooltipText = options.tooltip
+        button:SetScript("OnEnter", function(self)
+            if self.tooltipText then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(self.tooltipText, 1, 1, 1, true)
+                GameTooltip:Show()
+            end
+        end)
+        button:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
+        end)
+    end
+
+    -- Обновляем высоту контента
+    parentMenu.lastY = parentMenu.lastY + (options.height or 24) + 10 -- Добавляем отступ
+    parentMenu.totalHeight = parentMenu.totalHeight + (options.height or 24) + 10
+    parentMenu.scrollContent:SetHeight(parentMenu.totalHeight)
+
+    -- Добавляем кнопку в список элементов
+    table.insert(parentMenu.elements, button)
+
+    -- Обновляем диапазон прокрутки
+    self:updateScrollRange(parentMenu)
+
+    return button
 end
 
 QuestUI = {}
@@ -5968,7 +6039,7 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     self.scale = 1.0
     self.inCombat = false
     self.combatRegistered = false
-    self.displayMode = MODE_COMBAT_ONLY
+    
     self.features = bit.bor(
         FEATURE_HP,
         FEATURE_RESOURCE,
@@ -5981,13 +6052,22 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     -- Настройка размеров и позиционирования
     frame:SetWidth(self.width)
     frame:SetHeight(self.height)
-    frame:SetPoint(self.anchorPoint)
+    if _G.nsDbc.SpellQueuePosition then
+        -- Восстанавливаем сохраненную позицию
+        local pos = _G.nsDbc.SpellQueuePosition
+        frame:SetPoint(pos.point, UIParent, pos.relativePoint, ns_dbc:getKey("настройки", "Skill Queue position", "x"), ns_dbc:getKey("настройки", "Skill Queue position", "y"))
+    else
+        -- Дефолтное позиционирование
+        frame:SetPoint(self.anchorPoint)
+    end
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)
     frame:SetAlpha(INACTIVE_ALPHA)
     frame:SetScale(self.scale)
     frame:Hide()
+
+    self.isClickThrough = false
 
     -- Фоновый цвет
     local bg = frame:CreateTexture(nil, "BACKGROUND")
@@ -6010,7 +6090,7 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     -- Нулевая точка
     local zeroPoint = frame:CreateTexture(nil, "OVERLAY")
     zeroPoint:SetWidth(2)
-    zeroPoint:SetHeight(height - 20)
+    zeroPoint:SetHeight(1)
     zeroPoint:SetPoint("LEFT", frame, "LEFT", 0, 0)
     zeroPoint:SetTexture(1, 0.2, 0.2)
     zeroPoint:SetVertexColor(1, 0.2, 0.2)
@@ -6087,7 +6167,10 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
             end
         end
     end)
-    
+
+    self.displayMode = ns_dbc:getKey("настройки", "Skill Queue mode") or MODE_COMBAT_ONLY
+    self:ApplyDisplayMode()
+
     self:SetupDrag()
     self:UpdateClickThrough()
     self:RegisterAllEvents()
@@ -6099,6 +6182,14 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     return self
 end
 
+function SpellQueue:ApplyDisplayMode()
+    if self.displayMode == MODE_ALWAYS_VISIBLE then
+        self.frame:SetAlpha(INACTIVE_ALPHA)
+        self.frame:Show()
+    else
+        self.frame:Hide()
+    end
+end
 
 function SpellQueue:CreateResourceBars()
     -- Полоса здоровья игрока
@@ -6321,21 +6412,10 @@ function SpellQueue:HasWeaponEnchant()
 end
 
 function SpellQueue:ToggleDisplayMode()
-    if self.displayMode == MODE_COMBAT_ONLY then
-        self.displayMode = MODE_ALWAYS_VISIBLE
-        print("SpellQueue: Режим 'Всегда видимый'")
-        self.frame:SetAlpha(self.alpha)
-        self.frame:Show()
-        -- Принудительное обновление при смене режима
-        self:ForceUpdateAllSpells()
-    else
-        self.displayMode = MODE_COMBAT_ONLY
-        print("SpellQueue: Режим 'Только в бою'")
-        if not self.inCombat then
-            self.frame:SetAlpha(INACTIVE_ALPHA)
-            self.frame:Hide()
-        end
-    end
+    self.displayMode = (self.displayMode == MODE_COMBAT_ONLY) and MODE_ALWAYS_VISIBLE or MODE_COMBAT_ONLY
+    ns_dbc:modKey("настройки", "Skill Queue mode", self.displayMode)
+    self:ApplyDisplayMode()
+    print("SpellQueue: Режим "..(self.displayMode == MODE_ALWAYS_VISIBLE and "'Всегда видимый'" or "'Только в бою'"))
 end
 
 function SpellQueue:RegisterAllEvents()
@@ -6443,17 +6523,20 @@ function SpellQueue:SetIconsTable(tblIcons)
     for spellName, spellData in pairs(self.tblIcons) do
         -- Проверка валидности данных
         if type(spellName) == "string" and type(spellData) == "table" then
+            local iconSize = self.iconSize or (self.height - 10)
+            local glowSize = iconSize + (self.glowSizeOffset or 10)
+            local highlightSize = iconSize + (self.highlightSizeOffset or 15)
             
             local icon = self.frame:CreateTexture(nil, "OVERLAY")
             icon:SetTexture(spellData.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-            icon:SetSize(self.height - 10, self.height - 10)
+            icon:SetSize(iconSize, iconSize)
             icon:Hide()
 
             local glow = self.frame:CreateTexture(nil, "ARTWORK")
             glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
             glow:SetBlendMode("ADD")
-            glow:SetAlpha(0)
-            glow:SetSize(self.height + 10, self.height + 10)
+            glow:SetAlpha(self.glowAlpha or 0.3)
+            glow:SetSize(glowSize, glowSize)
             glow:SetPoint("CENTER", icon, "CENTER")
             glow:Hide()
 
@@ -6467,11 +6550,10 @@ function SpellQueue:SetIconsTable(tblIcons)
             highlight:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
             highlight:SetBlendMode("ADD")
             highlight:SetAlpha(0)
-            highlight:SetSize(self.height + 15, self.height + 15)
+            highlight:SetSize(highlightSize, highlightSize)
             highlight:SetPoint("CENTER", icon, "CENTER")
             highlight:Hide()
 
-            -- Инициализация дефолтных значений
             self.spells[spellName] = {
                 data = {
                     pos = spellData.pos or 0,
@@ -6496,16 +6578,9 @@ function SpellQueue:SetIconsTable(tblIcons)
                 endTime = nil
             }
             createdCount = createdCount + 1
-        else
-            print(string.format("WARNING: Invalid spell data for %s (type: %s)", 
-                  tostring(spellName), type(spellData)))
         end
     end
-        
-    -- Обновление отображения если в бою
-    if self.inCombat and self.frame:IsShown() then
-        self:UpdateAllSpells()
-    end
+    
 end
 
 function SpellQueue:HasEnoughResource(spellName)
@@ -6577,23 +6652,88 @@ function SpellQueue:SetAnchored(anchored)
 end
 
 function SpellQueue:UpdateClickThrough()
-    self.frame:EnableMouse(not self.isAnchored)
-    self.frame:SetMovable(not self.isAnchored)
+    -- Полностью отключаем или включаем взаимодействие с мышью
+    self.frame:EnableMouse(not self.isClickThrough)
+    self.frame:SetMovable(not self.isClickThrough)
+    
+    if self.isClickThrough then
+        self.frame:RegisterForDrag() -- Отменяем регистрацию драга
+    else
+        self.frame:RegisterForDrag("LeftButton") -- Возвращаем драг
+    end
+    
+    -- Обновляем кнопку настроек
+    if self.configButton then
+        self.configButton:EnableMouse(not self.isClickThrough)
+    end
 end
+
 
 function SpellQueue:SetupDrag()
     self.frame:SetScript("OnMouseDown", function(frame, button)
+        if self.isClickThrough then return end
         if not self.isAnchored and button == "LeftButton" then
             frame:StartMoving()
         end
     end)
+    
     self.frame:SetScript("OnMouseUp", function(frame, button)
+        if self.isClickThrough then return end
+        
         if button == "LeftButton" then
             frame:StopMovingOrSizing()
+            local point, _, relativePoint, x, y = frame:GetPoint(1)
+            ns_dbc:modKey("настройки", "Skill Queue position", "x", x)
+            ns_dbc:modKey("настройки", "Skill Queue position", "y", y)
+            _G.nsDbc.SpellQueuePosition = {
+                point = point,
+                relativePoint = relativePoint,
+                x = x,
+                y = y
+            }
         elseif button == "RightButton" then
-            self:SetAnchored(not self.isAnchored)
+            self.isAnchored = false
+            self.isClickThrough = not self.isClickThrough
+            self.frame:EnableMouse(not self.isClickThrough)
+            self.frame:SetMovable(not self.isClickThrough)
+            if self.isClickThrough then
+                self.frame:RegisterForDrag()
+                self.frame:SetAlpha(INACTIVE_ALPHA)
+            else
+                self.frame:RegisterForDrag("LeftButton")
+                self.frame:SetAlpha(self.alpha)
+            end
         end
     end)
+
+    -- Кнопка настроек
+    local configButton = CreateFrame("Button", nil, self.frame)
+    configButton:SetSize(20, 20)
+    configButton:SetPoint("BOTTOMRIGHT", -2, 2)
+    configButton:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+    configButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+    configButton:SetScript("OnClick", function() 
+        if not self.configFrame then
+            self:CreateConfigWindow()
+        end
+        self.configFrame:Show()
+    end)
+    configButton:SetScript("OnMouseUp", function(_, button)
+        if button == "RightButton" then
+            self.isAnchored = false
+            self.isClickThrough = false
+            self.frame:EnableMouse(true)
+            self.frame:SetMovable(true)
+            self.frame:RegisterForDrag("LeftButton")
+            self.frame:SetAlpha(self.alpha)
+        end
+    end)
+end
+
+function SpellQueue:SetClickThrough(enable)
+    self.isClickThrough = enable == 1
+    self:UpdateClickThrough()
+    print(string.format("SpellQueue: ClickThrough %s", self.isClickThrough and "enabled" or "disabled"))
 end
 
 function SpellQueue:SpellUsed(spellName)
@@ -6740,8 +6880,8 @@ function SpellQueue:HasBuff(buffName)
 end
 
 function SpellQueue:UpdateSpellsPriority()
-    local iconSize = self.height - 10
-    local spacing = 5
+    local iconSize = self.iconSize or (self.height - 10)
+    local spacing = self.iconSpacing or 5
     local maxPosition = self.width - iconSize
     
     -- Группируем скиллы по позициям из данных
@@ -6779,10 +6919,11 @@ function SpellQueue:UpdateSpellsPriority()
             table.sort(spells, function(a, b) return a.data.name < b.data.name end)
             
             -- Базовая позиция из настроек (от левого края)
-            local baseX = pos * iconSize
+            -- Учитываем iconSize вместо жестко заданного self.height - 10
+            local baseX = pos * (iconSize + spacing)
             
             for i, spell in ipairs(spells) do
-                -- Смещение внутри группы (для нескольких скиллов на одной позиции)
+                -- Смещение внутри группы
                 local offset = (i-1) * (iconSize + spacing)
                 spell.position = math.min(baseX + offset, maxPosition)
                 
@@ -7210,6 +7351,51 @@ function SpellQueue:ForceUpdateAllSpells()
 end
 
 function SpellQueue:SetAppearanceSettings(options)
+    -- Сохраняем основные настройки glow
+    self.glowSizeOffset = options.glowSizeOffset or 10
+    self.glowAlpha = options.glowAlpha or 0.3
+    self.highlightSizeOffset = options.highlightSizeOffset or 15
+    self.iconSize = options.iconSize or (self.height - 10)
+    self.iconSpacing = options.iconSpacing or 5
+    print(111, options.clickThrough)
+    if options.clickThrough ~= nil then
+        if options.clickThrough == 1 then
+            self.isAnchored = false
+            self.isClickThrough = true
+            self.frame:EnableMouse(false)
+            self.frame:SetMovable(false)
+            self.frame:RegisterForDrag()
+            self.frame:SetAlpha(INACTIVE_ALPHA)
+        else
+            self.isAnchored = false
+            self.isClickThrough = false
+            self.frame:EnableMouse(true)
+            self.frame:SetMovable(true)
+            self.frame:RegisterForDrag("LeftButton")
+            self.frame:SetAlpha(self.alpha)
+        end
+    end
+
+    -- Обновляем все glow-текстуры
+    for _, spell in pairs(self.spells) do
+        if spell.icon then
+            spell.icon:SetSize(self.iconSize, self.iconSize)
+        end
+        
+        if spell.glow then
+            local glowSize = self.iconSize + self.glowSizeOffset
+            spell.glow:SetSize(glowSize, glowSize)
+            spell.glow:SetAlpha(self.glowAlpha)
+            spell.glow:SetPoint("CENTER", spell.icon, "CENTER")
+        end
+        
+        if spell.highlight then
+            local highlightSize = self.iconSize + self.highlightSizeOffset
+            spell.highlight:SetSize(highlightSize, highlightSize)
+            spell.highlight:SetPoint("CENTER", spell.icon, "CENTER")
+        end
+    end
+
     -- Основные параметры панели
     if options.width then
         self.width = options.width
@@ -7238,64 +7424,67 @@ function SpellQueue:SetAppearanceSettings(options)
         end
     end
 
-    -- Размеры иконок скиллов
-    if options.iconSize then
-        for spellName, spell in pairs(self.spells) do
-            spell.icon:SetSize(options.iconSize, options.iconSize)
-            spell.glow:SetSize(options.iconSize + 10, options.iconSize + 10)
-            spell.highlight:SetSize(options.iconSize + 15, options.iconSize + 15)
-        end
+    -- Полоса здоровья игрока
+    if options.healthBarHeight then
+        self.healthBar:SetHeight(options.healthBarHeight)
     end
-
-    -- Полосы здоровья и ресурсов
-    local function updateBar(bar, height, color)
-        if height then bar:SetHeight(height) end
-        if color then bar:SetVertexColor(unpack(color)) end
-    end
-    
-    updateBar(self.healthBar, options.healthBarHeight, options.healthColor)
-    updateBar(self.resourceBar, options.resourceBarHeight, options.resourceColor)
-    updateBar(self.targetHealthBar, options.targetHealthHeight, options.targetHealthColor)
-    updateBar(self.targetResourceBar, options.targetResourceHeight, options.targetResourceColor)
-
-    -- Позиционирование полос
     if options.healthBarOffset then
-        self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, options.healthBarOffset)
+        self.healthBar:ClearAllPoints()
+        self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, options.healthBarOffset or 10)
+    end
+    if options.healthBarColor then
+        self.healthBar:SetVertexColor(unpack(options.healthBarColor))
+    end
+
+    -- Полоса ресурса игрока
+    if options.resourceBarHeight then
+        self.resourceBar:SetHeight(options.resourceBarHeight)
     end
     if options.resourceBarOffset then
-        self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, options.resourceBarOffset)
+        self.resourceBar:ClearAllPoints()
+        self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, options.resourceBarOffset or -1)
+    end
+    if options.resourceBarColor then
+        self.resourceBar:SetVertexColor(unpack(options.resourceBarColor))
+    end
+
+    -- Полоса здоровья цели
+    if options.targetHealthBarHeight then
+        self.targetHealthBar:SetHeight(options.targetHealthBarHeight)
     end
     if options.targetHealthBarOffset then
-        self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, options.targetHealthBarOffset)
+        self.targetHealthBar:ClearAllPoints()
+        self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, options.targetHealthBarOffset or -10)
+    end
+    if options.targetHealthBarColor then
+        self.targetHealthBar:SetVertexColor(unpack(options.targetHealthBarColor))
+    end
+
+    -- Полоса ресурса цели
+    if options.targetResourceBarHeight then
+        self.targetResourceBar:SetHeight(options.targetResourceBarHeight)
     end
     if options.targetResourceBarOffset then
-        self.targetResourceBar:SetPoint("BOTTOM", self.targetHealthBar, "TOP", 0, options.targetResourceBarOffset)
+        self.targetResourceBar:ClearAllPoints()
+        self.targetResourceBar:SetPoint("BOTTOM", self.targetHealthBar, "TOP", 0, options.targetResourceBarOffset or 1)
+    end
+    if options.targetResourceBarColor then
+        self.targetResourceBar:SetVertexColor(unpack(options.targetResourceBarColor))
     end
 
     -- Комбо-поинты
     if options.comboSize or options.comboSpacing or options.comboOffset then
         local size = options.comboSize or 6
         local spacing = options.comboSpacing or 0
-        local offsetX = options.comboOffset and options.comboOffset.x or -10
-        local offsetY = options.comboOffset and options.comboOffset.y or 0
+        local offsetX = options.comboOffset and options.comboOffset.x or 0
+        local offsetY = options.comboOffset and options.comboOffset.y or 24
         
-        -- Обновляем размеры
         for i, square in ipairs(self.comboSquares) do
             square:SetSize(size, size)
+            square:ClearAllPoints()
+            square:SetPoint("BOTTOM", self.comboFrame, "BOTTOM", 0, (i-1)*(size + spacing))
         end
         
-        -- Пересчитываем позиции
-        for i = 1, 5 do
-            self.comboSquares[i]:ClearAllPoints()
-            self.comboSquares[i]:SetPoint(
-                "BOTTOM", 
-                self.comboFrame, 
-                "BOTTOM", 
-                0, 
-                (i-1)*(size + spacing))
-        end
-        
-        -- Позиция фрейма
         self.comboFrame:SetPoint("RIGHT", self.frame, "LEFT", offsetX, offsetY)
     end
 
@@ -7303,26 +7492,15 @@ function SpellQueue:SetAppearanceSettings(options)
     if options.poisonSize or options.poisonSpacing or options.poisonOffset then
         local size = options.poisonSize or 6
         local spacing = options.poisonSpacing or 0
-        local offsetX = options.poisonOffset and options.poisonOffset.x or 10
-        local offsetY = options.poisonOffset and options.poisonOffset.y or 0
+        local offsetX = options.poisonOffset and options.poisonOffset.x or 0
+        local offsetY = options.poisonOffset and options.poisonOffset.y or 24
         
-        -- Обновляем размеры
         for i, square in ipairs(self.poisonSquares) do
             square:SetSize(size, size)
+            square:ClearAllPoints()
+            square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i-1)*(size + spacing))
         end
         
-        -- Пересчитываем позиции
-        for i = 1, 5 do
-            self.poisonSquares[i]:ClearAllPoints()
-            self.poisonSquares[i]:SetPoint(
-                "BOTTOM", 
-                self.poisonFrame, 
-                "BOTTOM", 
-                0, 
-                (i-1)*(size + spacing))
-        end
-        
-        -- Позиция фрейма
         self.poisonFrame:SetPoint("LEFT", self.frame, "RIGHT", offsetX, offsetY)
     end
 
@@ -7371,6 +7549,24 @@ function SpellQueue:CreateComboPoisonElements()
         square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i-1)*(square_size + spacing))
         square:SetVertexColor(unpack(FEATURE_COLORS.POISON_EMPTY))
         table.insert(self.poisonSquares, square)
+    end
+end
+
+function SpellQueue:UpdateGlowSettings()
+    if not self.iconSize then return end
+    
+    local glowOffset = self.glowSizeOffset or 10
+    local glowAlpha = self.glowAlpha or 0.3
+    local highlightOffset = self.highlightSizeOffset or 15
+    
+    for _, spell in pairs(self.spells) do
+        if spell.glow then
+            spell.glow:SetSize(self.iconSize + glowOffset, self.iconSize + glowOffset)
+            spell.glow:SetAlpha(glowAlpha)
+        end
+        if spell.highlight then
+            spell.highlight:SetSize(self.iconSize + highlightOffset, self.iconSize + highlightOffset)
+        end
     end
 end
 

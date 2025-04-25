@@ -30,7 +30,7 @@ local function OnEvent(self, event, isLogin, isReload)
             getPoint()
             questManagerClient = QuestManagerClient:new()
             nsDbc.skills3 = nsDbc.skills3 or {}
-            sq = SpellQueue:Create("MySpellQueue", 300, 50, "CENTER")
+            sq = SpellQueue:Create("MySpellQueue", 600, 350, "CENTER")
             sq:SetIconsTable(tblIcons)
             local appearanceSettings = {
                 -- Основные параметры
@@ -39,6 +39,10 @@ local function OnEvent(self, event, isLogin, isReload)
                 scale = 1,                -- Масштаб интерфейса
                 alpha = 0.9,              -- Прозрачность в бою
                 inactiveAlpha = 0.4,      -- Прозрачность вне боя
+                iconSpacing = 0,          -- расстояние между иконками
+                glowSizeOffset = 10,      -- На сколько больше иконки будет glow
+                highlightSizeOffset = 15, -- На сколько больше иконки будет highlight
+                glowAlpha = 0.3,          -- Прозрачность glow
                 
                 -- Игрок
                 healthColor = {1, 0, 0},                 -- Цвет здоровья игрока (RGB)
@@ -72,9 +76,23 @@ local function OnEvent(self, event, isLogin, isReload)
                 poisonSize = 6,              -- Размер квадрата
                 poisonSpacing = 0,           -- Расстояние между квадратами
                 poisonOffset = {x = 0, y = 24}, -- Смещение от панели
+                healthBarHeight = 3,          -- высота полоски хп игрока
+                healthBarOffset = 6,          -- расстояние полоски хп до панели
+                resourceBarHeight = 3,
+                resourceBarOffset = 0,
+                targetHealthBarHeight = 3,
+                targetHealthBarOffset = -6,
+                targetResourceBarHeight = 3,
+                targetResourceBarOffset = 0,
+                clickThrough = false
             }
-            sq:SetAppearanceSettings(appearanceSettings)
+            if not ns_dbc:getKey("настройки", "Skill Queue") then
+                ns_dbc:modKey("настройки", "Skill Queue", appearanceSettings)
+            end
+            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
             sq:UpdateSkillTables()
+            sq:ForceUpdateAllSpells()
+            sq:ApplyDisplayMode()
         end)
 
         C_Timer(1, function()
