@@ -780,6 +780,41 @@ function NS3Menu(ver, subver)
             sq:ApplyDisplayMode()
         end
     })
+
+     local questPanel = menu:addSubMenu("  Список квестов", generalSub)
+
+     menu:addCheckbox(questPanel, {
+        name = "Скрывать список квестов",
+        label = "Скрывать список квестов",
+        -- Преобразуем значение из базы данных в булево значение
+        default = (ns_dbc:getKey("настройки", "questWhatchPanel") == 1), -- 1 -> true, 0 -> false
+        tooltip = "Если установить, список квестов справа будет по-умолчанию скрыт",
+        onClick = function(checked)
+            -- Сохраняем значение в базу данных как число: true -> 1, false -> 0
+            ns_dbc:modKey("настройки", "questWhatchPanel", checked and 1 or 0) -- true -> 1, false -> 0
+            
+            -- Устанавливаем режим взаимодействия с мышью
+            sq:SetClickThrough(checked) -- Если чекбокс включен (true), панель пропускает клики насквозь
+        end
+    })
+
+    local classSettings = menu:addSubMenu("  Классовые настройки", generalSub)
+    local hunters = menu:addSubMenu("    Охотники", classSettings)
+    
+    menu:addCheckbox(hunters, {
+        name = "Автосмена отслеживания целей на миникарте",
+        label = "Автосмена отслеживания целей на миникарте",
+        -- Преобразуем значение из базы данных в булево значение
+        default = (ns_dbc:getKey("настройки", "hunterTarget") == 0), -- 1 -> true, 0 -> false
+        tooltip = "Если установить, цели на миникарте будут отслеживаться автоматически те, что нужны для бонуса охотника",
+        onClick = function(checked)
+            -- Сохраняем значение в базу данных как число: true -> 1, false -> 0
+            ns_dbc:modKey("настройки", "hunterTarget", checked and 1 or 0) -- true -> 1, false -> 0
+            
+            -- Устанавливаем режим взаимодействия с мышью
+            sq:SetClickThrough(checked) -- Если чекбокс включен (true), панель пропускает клики насквозь
+        end
+    })
 end
 
 function CalculateAverageItemLevel(unit)
@@ -1715,6 +1750,59 @@ function HideBossFrames()
             bossFrame:UnregisterAllEvents()  -- Отключаем все события
             bossFrame:Hide()                 -- Скрываем фрейм
             bossFrame.Show = function() end  -- Блокируем возможность появления
+        end
+    end
+end
+
+function questWhatchPanel()
+    local blockAutoExpand = ns_dbc:getKey("настройки", "questWhatchPanel")  -- Блокируем авторазворачивание, но разрешаем ручное
+
+    -- Сворачиваем список при старте (если ещё не свёрнут)
+    if not WatchFrame.collapsed then
+        WatchFrame_Collapse(WatchFrame)
+    end
+
+    -- Перехватываем клик по кнопке и временно отключаем блокировку
+    WatchFrameCollapseExpandButton:HookScript("PreClick", function()
+        blockAutoExpand = false  -- Разрешаем разворот
+    end)
+
+    -- После клика снова включаем блокировку
+    WatchFrameCollapseExpandButton:HookScript("PostClick", function()
+        blockAutoExpand = true
+    end)
+
+    -- Блокируем авторазворачивание, если включено
+    hooksecurefunc("WatchFrame_Expand", function()
+        if blockAutoExpand then
+            WatchFrame_Collapse(WatchFrame)
+        end
+    end)
+
+    -- Отключаем события, которые могут принудительно разворачивать список
+    WatchFrame:UnregisterEvent("QUEST_LOG_UPDATE")
+    WatchFrame:UnregisterEvent("QUEST_WATCH_UPDATE")
+end
+
+function hunterCheck()
+    local _, classUnit = UnitClass("player")
+    if testQ["метка охотника"] then
+        if classUnit == "HUNTER" then
+            for slot = 1, 24, 1 do
+                local debuffName = UnitDebuff("target", slot);
+                if debuffName == "Метка охотника" then
+                    for trackingIndex = 1, GetNumTrackingTypes(), 1 do
+                        local name, texture, active, category = GetTrackingInfo(trackingIndex);
+                        if UnitCreatureType("target") ~= nil then
+                            if string.find(name, string.utf8sub(UnitCreatureType("target"), 2, 6)) then
+                                if texture ~= GetTrackingTexture(trackingIndex) then
+                                    SetTracking(trackingIndex);
+                                end;
+                            end;
+                        end;
+                    end;
+                end;
+            end;
         end
     end
 end

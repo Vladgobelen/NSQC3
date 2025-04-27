@@ -21,6 +21,7 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
         C_Timer(2, function()
+            questWhatchPanel()
             nsDbc.proks = nsDbc.proks or {}
             ProkIconManager:Initialize(nsDbc.proks)
             if UnitLevel("player") >= 10 then
@@ -99,6 +100,9 @@ local function OnEvent(self, event, isLogin, isReload)
 
         C_Timer(1, function()
             UpdateAddOnMemoryUsage()
+            if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
+                hunterCheck()
+            end
             if nsqc3Timer then
                 if adaptiveFrame:isVisible() then
                     for i = 1, 100 do
