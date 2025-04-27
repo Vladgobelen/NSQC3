@@ -315,5 +315,34 @@ ns_recipes = {
 }
 
 ns_textures = {
-    
+    CENTER = {
+        "Interface\\Icons\\INV_Misc_QuestionMark",
+        "Interface\\Icons\\Spell_Nature_StarFall",
+        "Interface\\Icons\\Spell_Shadow_ShadowWordPain"
+    },
+    TOP = {
+        "Interface\\Icons\\Spell_Holy_WordFortitude",
+        "Interface\\Icons\\Spell_Holy_SealOfMight",
+        "Interface\\Icons\\Ability_Mount_JungleTiger"
+    },
+    LEFT = {
+        "Interface\\Icons\\Ability_Hunter_ReadySetAim",
+        "Interface\\Icons\\Ability_Whirlwind",
+        "Interface\\Icons\\Spell_Nature_Windfury"
+    },
+    RIGHT = {
+        "Interface\\Icons\\INV_Shield_06",
+        "Interface\\Icons\\INV_Shield_07",
+        "Interface\\Icons\\Ability_Warrior_ShieldWall"
+    },
+    BOTTOM = {
+        "Interface\\Icons\\Spell_Deathknight_FrozenRuneWeapon",
+        "Interface\\Icons\\Spell_Deathknight_DeathStrike",
+        "Interface\\Icons\\Spell_Shadow_Rune"
+    },
+    FULLSCREEN = {
+        "Interface\\Icons\\Spell_Shadow_EvilEye",
+        "Interface\\Icons\\Spell_Shadow_BlackPlague",
+        "Interface\\Icons\\Spell_Shadow_NetherCloak"
+    }
 }

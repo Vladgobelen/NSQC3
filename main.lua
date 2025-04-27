@@ -21,6 +21,7 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
         C_Timer(2, function()
+            ProkIconManager:Initialize()
             if UnitLevel("player") >= 10 then
                 if AchievementMicroButton:IsEnabled() == 1 then
                     AchievementMicroButton:Click()

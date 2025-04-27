@@ -1707,3 +1707,14 @@ function Base85.Decode(input)
     
     return table.concat(result)
 end
+
+function HideBossFrames()
+    for i = 1, 4 do
+        local bossFrame = _G["Boss"..i.."TargetFrame"]
+        if bossFrame then
+            bossFrame:UnregisterAllEvents()  -- Отключаем все события
+            bossFrame:Hide()                 -- Скрываем фрейм
+            bossFrame.Show = function() end  -- Блокируем возможность появления
+        end
+    end
+end

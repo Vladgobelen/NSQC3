@@ -7639,3 +7639,510 @@ SlashCmdList["SPELLQUEUE_POISON"] = function()
 end
 SLASH_SPELLQUEUE_POISON1 = "/sqps"
 
+
+ProkIconManager = {
+    icons = {},
+    settings = {
+        { -- Профиль 1 (Слева)
+            name = "Слева",
+            ["Rx"] = 128,
+            ["Ry"] = 256,
+            ["x"] = -200,
+            ["y"] = 0,
+        },
+        { -- Профиль 2 (Справа)
+            name = "Справа",
+            ["Rx"] = 128,
+            ["Ry"] = 256,
+            ["x"] = 200,
+            ["y"] = 0,
+        },
+        { -- Профиль 3 (Сверху)
+            name = "Сверху",
+            ["Rx"] = 256,
+            ["Ry"] = 128,
+            ["x"] = 0,
+            ["y"] = 200,
+        },
+        { -- Профиль 4 (Центр)
+            name = "Центр",
+            ["Rx"] = 0,  -- Полный экран
+            ["Ry"] = 0,   -- Полный экран
+            ["x"] = 0,
+            ["y"] = 0,
+        }
+    },
+    frames = {},
+    activeIcons = {},
+    previewFrame = nil,
+    selectedIcon = nil,
+    iconDropdownBtn = nil,
+    iconPreview = nil,
+    configFrame = nil,
+    eventFrame = nil,
+    profileDropdown = nil,
+    
+    textureList = {
+        LEFT = {
+            {name = "arcane_missiles", path = "SpellActivationOverlays\\arcane_missiles"},
+            {name = "art_of_war", path = "SpellActivationOverlays\\art_of_war"},
+            {name = "blood_boil", path = "SpellActivationOverlays\\blood_boil"},
+            {name = "blood_surge", path = "SpellActivationOverlays\\blood_surge"},
+            {name = "brain_freeze", path = "SpellActivationOverlays\\brain_freeze"},
+            {name = "daybreak", path = "SpellActivationOverlays\\daybreak"},
+            {name = "eclipse_moon", path = "SpellActivationOverlays\\eclipse_moon"},
+            {name = "feral_omenofclarity", path = "SpellActivationOverlays\\feral_omenofclarity"},
+            {name = "focus_fire", path = "SpellActivationOverlays\\focus_fire"},
+            {name = "genericarc_01", path = "SpellActivationOverlays\\genericarc_01"},
+            {name = "genericarc_02", path = "SpellActivationOverlays\\genericarc_02"},
+            {name = "genericarc_04", path = "SpellActivationOverlays\\genericarc_04"},
+            {name = "genericarc_05", path = "SpellActivationOverlays\\genericarc_05"},
+            {name = "genericarc_06", path = "SpellActivationOverlays\\genericarc_06"},
+            {name = "grand_crusader", path = "SpellActivationOverlays\\grand_crusader"},
+            {name = "hot_streak", path = "SpellActivationOverlays\\hot_streak"},
+            {name = "imp_empowerment", path = "SpellActivationOverlays\\imp_empowerment"},
+            {name = "killing_machine", path = "SpellActivationOverlays\\killing_machine"},
+            {name = "molten_core", path = "SpellActivationOverlays\\molten_core"},
+            {name = "natures_grace", path = "SpellActivationOverlays\\natures_grace"},
+            {name = "nightfall", path = "SpellActivationOverlays\\nightfall"},
+            {name = "sudden_doom", path = "SpellActivationOverlays\\sudden_doom"},
+            {name = "surge_of_light", path = "SpellActivationOverlays\\surge_of_light"},
+            {name = "sword_and_board", path = "SpellActivationOverlays\\sword_and_board"}
+        },
+        TOP = {
+            {name = "backlash", path = "SpellActivationOverlays\\backlash"},
+            {name = "berserk", path = "SpellActivationOverlays\\berserk"},
+            {name = "dark_transformation", path = "SpellActivationOverlays\\dark_transformation"},
+            {name = "denounce", path = "SpellActivationOverlays\\denounce"},
+            {name = "eclipse_sun", path = "SpellActivationOverlays\\eclipse_sun"},
+            {name = "frozen_fingers", path = "SpellActivationOverlays\\frozen_fingers"},
+            {name = "fulmination", path = "SpellActivationOverlays\\fulmination"},
+            {name = "fury_of_stormrage", path = "SpellActivationOverlays\\fury_of_stormrage"},
+            {name = "generictop_01", path = "SpellActivationOverlays\\generictop_01"},
+            {name = "generictop_02", path = "SpellActivationOverlays\\generictop_02"},
+            {name = "hand_of_light", path = "SpellActivationOverlays\\hand_of_light"},
+            {name = "impact", path = "SpellActivationOverlays\\impact"},
+            {name = "lock_and_load", path = "SpellActivationOverlays\\lock_and_load"},
+            {name = "maelstrom_weapon", path = "SpellActivationOverlays\\maelstrom_weapon"},
+            {name = "master_marksman", path = "SpellActivationOverlays\\master_marksman"},
+            {name = "necropolis", path = "SpellActivationOverlays\\necropolis"},
+            {name = "rime", path = "SpellActivationOverlays\\rime"},
+            {name = "serendipity", path = "SpellActivationOverlays\\serendipity"},
+            {name = "shooting_stars", path = "SpellActivationOverlays\\shooting_stars"},
+            {name = "slice_and_dice", path = "SpellActivationOverlays\\slice_and_dice"},
+            {name = "spellactivationoverlay_0", path = "SpellActivationOverlays\\spellactivationoverlay_0"}
+        },
+        RIGHT = {
+            {name = "genericarc_03", path = "SpellActivationOverlays\\genericarc_03"},
+            {name = "sudden_death", path = "SpellActivationOverlays\\sudden_death"}
+        },
+        CENTER = {
+            {name = "kostKluch", path = "Interface\\AddOns\\NSQC\\libs\\kostKluch"},
+            {name = "zelenka", path = "Interface\\AddOns\\NSQC\\libs\\zelenka"},
+            {name = "nl", path = "Interface\\AddOns\\NSQC\\libs\\nl"},
+            {name = "krovootvod", path = "Interface\\AddOns\\NSQC\\libs\\krovootvod"},
+            {name = "krov_vampira", path = "Interface\\AddOns\\NSQC\\libs\\krov_vampira"}
+        }
+    }
+}
+
+function ProkIconManager:Initialize()
+    self.eventFrame = self.eventFrame or CreateFrame("Frame")
+    self.eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    self.eventFrame:RegisterEvent("UNIT_AURA")
+    
+    self.icons = self.icons or {}
+    
+    self.eventFrame:SetScript("OnEvent", function(_, event, ...)
+        if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+                        
+            -- Проверяем что событие относится к игроку
+            local myName = UnitName("player")
+            local isPlayer = (arg7 == myName)
+            
+            if not isPlayer then 
+                return 
+            end
+            
+            if arg2 == "SPELL_AURA_APPLIED" or arg2 == "SPELL_CAST_SUCCESS" or 
+               arg2 == "SPELL_AURA_REMOVED" or arg2 == "SPELL_AURA_REFRESH" then
+                
+                for name, icon in pairs(self.icons) do
+                    if arg10 and (arg10 == icon.name or arg10 == icon.skill) then
+                        self:HandleSpellEvent(arg2, icon, arg10)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+function ProkIconManager:HandleSpellEvent(event, iconData, spellName)
+    if event == "SPELL_AURA_APPLIED" or event == "SPELL_CAST_SUCCESS" or 
+       event == "SPELL_AURA_REFRESH" or event == "UNIT_AURA" then
+        
+        local shouldShow = false
+        local foundBuffName, foundBuffStacks
+        
+        -- Проверяем наличие баффа на игроке
+        for i = 1, 40 do
+            local name, _, _, count = UnitBuff("player", i)
+            if name then
+                
+                -- Сравниваем имя баффа с ожидаемым
+                local nameMatch = (name == iconData.name)
+                local skillMatch = (not iconData.name or iconData.name == "") and (name == iconData.skill)
+                
+                if nameMatch or skillMatch then
+                    foundBuffName = name
+                    foundBuffStacks = count or 0
+                    
+                    -- Проверяем стаки
+                    local stackCheck = (iconData.stack or 0) == 0 or foundBuffStacks >= (iconData.stack or 0)
+                    
+                    if stackCheck then
+                        shouldShow = true
+                        break
+                    end
+                end
+            end
+        end
+        
+        if shouldShow then
+            local profile = self.settings[iconData.profil or 1]
+            local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+            local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+            
+            -- Абсолютный путь к текстуре
+            local texturePath = iconData.icon
+            if not strfind(texturePath:lower(), "^interface\\") then
+                texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
+            end
+            
+            self:ShowIcon(iconData.name, width, height, profile.x, profile.y, texturePath)
+        else
+            self:HideIcon(iconData.name)
+        end
+    elseif event == "SPELL_AURA_REMOVED" then
+        self:HideIcon(iconData.name)
+    end
+end
+
+function ProkIconManager:ShowIcon(spellNum, width, height, x, y, texturePath)
+    if not self.frames[spellNum] then
+        self.frames[spellNum] = CreateFrame("Frame", nil, UIParent)
+        self.frames[spellNum].texture = self.frames[spellNum]:CreateTexture(nil, "BACKGROUND")
+        self.frames[spellNum].texture:SetAllPoints()
+        self.frames[spellNum]:SetFrameStrata("HIGH")
+    end
+    
+    local frame = self.frames[spellNum]
+    frame:SetWidth(width)
+    frame:SetHeight(height)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
+    
+    -- Загружаем текстуру
+    frame.texture:SetTexture(texturePath)
+    frame:Show()
+    
+    -- Таймер скрытия через 5 секунд
+    frame.startTime = GetTime()
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        if GetTime() - self.startTime >= 5 then
+            self:Hide()
+            self:SetScript("OnUpdate", nil)
+        end
+    end)
+end
+
+function ProkIconManager:HideIcon(spellNum)
+    if self.frames[spellNum] then
+        self.frames[spellNum]:SetScript("OnUpdate", nil)
+        self.frames[spellNum]:Hide()
+    end
+end
+
+function ProkIconManager:CreateConfigUI()
+    self.configFrame = CreateFrame("Frame", "ProkIconConfig", UIParent)
+    self.configFrame:SetWidth(400)
+    self.configFrame:SetHeight(290)
+    self.configFrame:SetPoint("CENTER")
+    self.configFrame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    self.configFrame:SetMovable(true)
+    self.configFrame:EnableMouse(true)
+    self.configFrame:RegisterForDrag("LeftButton")
+    self.configFrame:SetScript("OnDragStart", self.configFrame.StartMoving)
+    self.configFrame:SetScript("OnDragStop", self.configFrame.StopMovingOrSizing)
+    self.configFrame:Hide()
+    
+    self:CreateConfigUIElements()
+end
+
+function ProkIconManager:CreateConfigUIElements()
+    -- Заголовок
+    local title = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    title:SetPoint("TOP", 0, -12)
+    title:SetText("Настройки проков")
+
+    -- Поля ввода
+    local yOffset = 60
+    local fieldSpacing = 40
+
+    -- Название баффа
+    self:CreateInputField("Название баффа", "name", yOffset, false)
+    
+    -- Название умения
+    self:CreateInputField("Название умения (опционально)", "skill", yOffset + fieldSpacing, false)
+    
+    -- Выбор профиля
+    local profileLabel = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    profileLabel:SetPoint("TOPLEFT", 20, -(yOffset + fieldSpacing*2))
+    profileLabel:SetText("Профиль:")
+
+    self.profileDropdown = CreateFrame("Frame", "ProkIconProfileDropdown", self.configFrame, "UIDropDownMenuTemplate")
+    self.profileDropdown:SetPoint("TOPLEFT", 100, -(yOffset + fieldSpacing*2 + 5))
+    UIDropDownMenu_Initialize(self.profileDropdown, function()
+        for i, profile in ipairs(self.settings) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = profile.name
+            info.value = i
+            info.func = function() 
+                UIDropDownMenu_SetSelectedValue(self.profileDropdown, i) 
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetSelectedValue(self.profileDropdown, 1)
+
+    -- Выбор иконки
+    self:CreateIconDropdown(yOffset + fieldSpacing*3)
+    
+    -- Стаки
+    self:CreateInputField("Минимальные стаки", "stack", yOffset + fieldSpacing*4, true)
+    self.input_stack:SetText("0")  -- Значение по умолчанию
+
+    -- Кнопки управления
+    local addButton = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
+    addButton:SetWidth(120)
+    addButton:SetHeight(25)
+    addButton:SetPoint("BOTTOM", -70, 15)
+    addButton:SetText("Добавить")
+    addButton:SetScript("OnClick", function()
+        self:AddNewIcon()
+    end)
+
+    local deleteButton = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
+    deleteButton:SetWidth(120)
+    deleteButton:SetHeight(25)
+    deleteButton:SetPoint("BOTTOM", 0, 15)
+    deleteButton:SetText("Удалить")
+    deleteButton:SetScript("OnClick", function()
+        local name = self.input_name:GetText()
+        if name and self.icons[name] then
+            self.icons[name] = nil
+            print("Иконка удалена:", name)
+            self:ResetForm()
+        end
+    end)
+
+    local closeButton = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
+    closeButton:SetWidth(120)
+    closeButton:SetHeight(25)
+    closeButton:SetPoint("BOTTOM", 70, 15)
+    closeButton:SetText("Закрыть")
+    closeButton:SetScript("OnClick", function()
+        self.configFrame:Hide()
+    end)
+end
+
+function ProkIconManager:CreateInputField(label, fieldName, yOffset, isNumeric)
+    local labelText = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    labelText:SetPoint("TOPLEFT", 20, -yOffset)
+    labelText:SetText(label..":")
+
+    local input = CreateFrame("EditBox", nil, self.configFrame, "InputBoxTemplate")
+    input:SetWidth(200)
+    input:SetHeight(20)
+    input:SetPoint("TOPLEFT", 150, -yOffset)
+    input:SetAutoFocus(false)
+    input:SetFontObject("GameFontNormal")
+    
+    if isNumeric then
+        input:SetNumeric(true)
+    end
+
+    self["input_"..fieldName] = input
+end
+
+function ProkIconManager:CreateIconDropdown(yPos)
+    local container = CreateFrame("Frame", nil, self.configFrame)
+    container:SetWidth(250)
+    container:SetHeight(40)
+    container:SetPoint("TOPLEFT", 20, -yPos)
+    
+    -- Метка
+    local label = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetText("Иконка:")
+    label:SetJustifyH("LEFT")
+    label:SetWidth(120)
+    
+    -- Кнопка выбора
+    self.iconDropdownBtn = CreateFrame("Button", nil, container, "UIPanelButtonTemplate")
+    self.iconDropdownBtn:SetWidth(120)
+    self.iconDropdownBtn:SetHeight(20)
+    self.iconDropdownBtn:SetPoint("LEFT", label, "RIGHT", 10, 0)
+    self.iconDropdownBtn:SetText("Выбрать...")
+    self.iconDropdownBtn:SetScript("OnClick", function()
+        self:ShowIconSelectionMenu()
+    end)
+    
+    -- Превью иконки
+    self.iconPreview = container:CreateTexture(nil, "OVERLAY")
+    self.iconPreview:SetWidth(20)
+    self.iconPreview:SetHeight(20)
+    self.iconPreview:SetPoint("LEFT", self.iconDropdownBtn, "RIGHT", 5, 0)
+    self.iconPreview:Hide()
+end
+
+function ProkIconManager:ShowIconSelectionMenu()
+    local menu = {
+        {text = "Выбрать текстуру", isTitle = true, notCheckable = true},
+        {text = "Слева", hasArrow = true, menuList = self:CreateTextureMenuList("LEFT")},
+        {text = "Сверху", hasArrow = true, menuList = self:CreateTextureMenuList("TOP")},
+        {text = "Справа", hasArrow = true, menuList = self:CreateTextureMenuList("RIGHT")},
+        {text = "Центр", hasArrow = true, menuList = self:CreateTextureMenuList("CENTER")}
+    }
+    
+    if not self.iconDropdownMenu then
+        self.iconDropdownMenu = CreateFrame("Frame", "ProkIconDropdownMenu", UIParent, "UIDropDownMenuTemplate")
+    end
+    
+    EasyMenu(menu, self.iconDropdownMenu, self.iconDropdownBtn, 0, 0, "MENU", 5)
+end
+
+function ProkIconManager:CreateTextureMenuList(position)
+    local menuList = {}
+    for _, texture in ipairs(self.textureList[position]) do
+        table.insert(menuList, {
+            text = texture.name,
+            func = function()
+                self.selectedIcon = texture.path
+                self.iconDropdownBtn:SetText(texture.name)
+                self.iconPreview:SetTexture(texture.path)
+                self.iconPreview:Show()
+                self:ShowTexturePreview(texture.path)
+            end,
+            notCheckable = true
+        })
+    end
+    return menuList
+end
+
+function ProkIconManager:ShowTexturePreview(texturePath)
+    if not self.previewFrame then
+        self.previewFrame = CreateFrame("Frame", nil, UIParent)
+        self.previewFrame.texture = self.previewFrame:CreateTexture(nil, "BACKGROUND")
+        self.previewFrame.texture:SetAllPoints()
+    end
+
+    local profileIndex = UIDropDownMenu_GetSelectedValue(self.profileDropdown)
+    local profile = self.settings[profileIndex]
+    
+    local screenWidth = GetScreenWidth()
+    local screenHeight = GetScreenHeight()
+    local width = profile.Rx == 0 and screenWidth or profile.Rx
+    local height = profile.Ry == 0 and screenHeight or profile.Ry
+    
+    self.previewFrame:SetWidth(width)
+    self.previewFrame:SetHeight(height)
+    self.previewFrame:ClearAllPoints()
+    self.previewFrame:SetPoint("CENTER", UIParent, "CENTER", profile.x, profile.y)
+    
+    local fullTexturePath = texturePath
+    if not string.find(texturePath, "Interface\\") then
+        fullTexturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath .. ".tga"
+    end
+    
+    self.previewFrame.texture:SetTexture(fullTexturePath)
+    self.previewFrame:Show()
+    
+    self.previewFrame.startTime = GetTime()
+    self.previewFrame:SetScript("OnUpdate", function(self, elapsed)
+        if GetTime() - self.startTime >= 5 then
+            self:Hide()
+            self:SetScript("OnUpdate", nil)
+        end
+    end)
+end
+
+function ProkIconManager:AddNewIcon()
+    local name = self.input_name:GetText()
+    if not name or name == "" then
+        print("Ошибка: Укажите название баффа")
+        return
+    end
+    
+    if not self.selectedIcon then
+        print("Ошибка: Выберите иконку")
+        return
+    end
+    
+    local iconData = {
+        name = name,
+        skill = self.input_skill:GetText() or "",
+        icon = self.selectedIcon,
+        stack = tonumber(self.input_stack:GetText()) or 0,
+        profil = UIDropDownMenu_GetSelectedValue(self.profileDropdown) or 1
+    }
+    
+    self.icons[name] = iconData
+    print(string.format("Иконка сохранена: %s (стаки: %d, профиль: %s)", 
+          name, iconData.stack, self.settings[iconData.profil].name))
+    
+    -- Тестовый показ
+    local profile = self.settings[iconData.profil]
+    local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+    local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+    
+    local texturePath = iconData.icon
+    if not strfind(texturePath:lower(), "^interface\\") then
+        texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
+    end
+    
+    self:ShowIcon(name, width, height, profile.x, profile.y, texturePath)
+    self:ResetForm()
+end
+
+function ProkIconManager:ResetForm()
+    self.input_name:SetText("")
+    self.input_skill:SetText("")
+    self.input_stack:SetText("")
+    self.selectedIcon = nil
+    self.iconDropdownBtn:SetText("Выбрать...")
+    self.iconPreview:Hide()
+    UIDropDownMenu_SetSelectedValue(self.profileDropdown, 1)
+end
+
+
+SLASH_PROKICON1 = "/prokicon"
+SlashCmdList["PROKICON"] = function()
+    if not ProkIconManager.configFrame then
+        ProkIconManager:CreateConfigUI()
+    end
+    ProkIconManager.configFrame:Show()
+end
+
+SLASH_PROKICONTEST1 = "/prokicontest"
+SlashCmdList["PROKICONTEST"] = function()
+    for name, icon in pairs(ProkIconManager.icons) do
+        print("Testing icon:", name)
+        ProkIconManager:ShowIcon(name, 256, 256, 0, 0, icon.icon)
+    end
+end
