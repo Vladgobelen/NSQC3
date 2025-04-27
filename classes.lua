@@ -7681,6 +7681,7 @@ ProkIconManager = {
     configFrame = nil,
     eventFrame = nil,
     profileDropdown = nil,
+    externalIconsTable = nil,
     
     textureList = {
         LEFT = {
@@ -7746,64 +7747,85 @@ ProkIconManager = {
     }
 }
 
-function ProkIconManager:Initialize()
+function ProkIconManager:Initialize(externalIconsTable)
+    self.externalIconsTable = externalIconsTable or {}
+    
+    -- Копируем проки из внешней таблицы во внутреннюю
+    for name, iconData in pairs(self.externalIconsTable) do
+        self.icons[name] = iconData
+        
+        local profile = self.settings[iconData.profil or 1]
+        local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+        local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+        
+        -- Формируем полный путь к текстуре
+        local texturePath = iconData.icon
+        if not strfind(texturePath:lower(), "^interface\\") then
+            texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
+        end
+        
+        if not self.frames[name] then
+            self.frames[name] = CreateFrame("Frame", nil, UIParent)
+            self.frames[name].texture = self.frames[name]:CreateTexture(nil, "BACKGROUND")
+            self.frames[name].texture:SetAllPoints()
+            self.frames[name]:SetFrameStrata("HIGH")
+        end
+        
+        self.frames[name]:SetSize(width, height)
+        self.frames[name]:ClearAllPoints()
+        self.frames[name]:SetPoint("CENTER", UIParent, "CENTER", profile.x, profile.y)
+        self.frames[name].texture:SetTexture(texturePath)
+        self.frames[name]:Show() -- Показываем сразу, HandleSpellEvent потом скроет если нужно
+    end
+    
+    -- Инициализация фрейма событий
     self.eventFrame = self.eventFrame or CreateFrame("Frame")
     self.eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self.eventFrame:RegisterEvent("UNIT_AURA")
     
-    self.icons = self.icons or {}
-    
     self.eventFrame:SetScript("OnEvent", function(_, event, ...)
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-                        
-            -- Проверяем что событие относится к игроку
-            local myName = UnitName("player")
-            local isPlayer = (arg7 == myName)
+            local _, subEvent, _, _, _, _, _, destGUID, _, _, _, spellID, spellName = ...
+            local isPlayer = (destGUID == UnitGUID("player"))
             
-            if not isPlayer then 
-                return 
-            end
+            if not isPlayer then return end
             
-            if arg2 == "SPELL_AURA_APPLIED" or arg2 == "SPELL_CAST_SUCCESS" or 
-               arg2 == "SPELL_AURA_REMOVED" or arg2 == "SPELL_AURA_REFRESH" then
+            if subEvent == "SPELL_AURA_APPLIED" or subEvent == "SPELL_CAST_SUCCESS" or 
+               subEvent == "SPELL_AURA_REMOVED" or subEvent == "SPELL_AURA_REFRESH" then
                 
                 for name, icon in pairs(self.icons) do
-                    if arg10 and (arg10 == icon.name or arg10 == icon.skill) then
-                        self:HandleSpellEvent(arg2, icon, arg10)
+                    if spellName == icon.name or spellName == icon.skill then
+                        self:HandleSpellEvent(subEvent, icon, spellName)
                     end
                 end
             end
+            
+        elseif event == "UNIT_AURA" and ... == "player" then
+            for _, icon in pairs(self.icons) do
+                self:HandleSpellEvent("UNIT_AURA", icon)
+            end
         end
     end)
+    
+    -- Принудительно проверяем баффы после загрузки
+    for _, icon in pairs(self.icons) do
+        self:HandleSpellEvent("UNIT_AURA", icon)
+    end
 end
 
 function ProkIconManager:HandleSpellEvent(event, iconData, spellName)
+    -- Удаляем проверку по таймеру и переводим полностью на обработку событий
     if event == "SPELL_AURA_APPLIED" or event == "SPELL_CAST_SUCCESS" or 
        event == "SPELL_AURA_REFRESH" or event == "UNIT_AURA" then
         
+        -- Проверяем наличие баффа в реальном времени
         local shouldShow = false
-        local foundBuffName, foundBuffStacks
-        
-        -- Проверяем наличие баффа на игроке
         for i = 1, 40 do
             local name, _, _, count = UnitBuff("player", i)
-            if name then
-                
-                -- Сравниваем имя баффа с ожидаемым
-                local nameMatch = (name == iconData.name)
-                local skillMatch = (not iconData.name or iconData.name == "") and (name == iconData.skill)
-                
-                if nameMatch or skillMatch then
-                    foundBuffName = name
-                    foundBuffStacks = count or 0
-                    
-                    -- Проверяем стаки
-                    local stackCheck = (iconData.stack or 0) == 0 or foundBuffStacks >= (iconData.stack or 0)
-                    
-                    if stackCheck then
-                        shouldShow = true
-                        break
-                    end
+            if name and (name == iconData.name or name == iconData.skill) then
+                if (iconData.stack or 0) <= (count or 1) then
+                    shouldShow = true
+                    break
                 end
             end
         end
@@ -7813,17 +7835,13 @@ function ProkIconManager:HandleSpellEvent(event, iconData, spellName)
             local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
             local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
             
-            -- Абсолютный путь к текстуре
-            local texturePath = iconData.icon
-            if not strfind(texturePath:lower(), "^interface\\") then
-                texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
-            end
-            
-            self:ShowIcon(iconData.name, width, height, profile.x, profile.y, texturePath)
+            self:ShowIcon(iconData.name, width, height, profile.x, profile.y, iconData.icon)
         else
             self:HideIcon(iconData.name)
         end
+        
     elseif event == "SPELL_AURA_REMOVED" then
+        -- Мгновенно скрываем иконку при спадении баффа
         self:HideIcon(iconData.name)
     end
 end
@@ -7834,39 +7852,28 @@ function ProkIconManager:ShowIcon(spellNum, width, height, x, y, texturePath)
         self.frames[spellNum].texture = self.frames[spellNum]:CreateTexture(nil, "BACKGROUND")
         self.frames[spellNum].texture:SetAllPoints()
         self.frames[spellNum]:SetFrameStrata("HIGH")
+        
+        -- Убираем таймер автоскрытия
+        self.frames[spellNum]:SetScript("OnUpdate", nil)
     end
     
     local frame = self.frames[spellNum]
-    frame:SetWidth(width)
-    frame:SetHeight(height)
+    frame:SetSize(width, height)
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
-    
-    -- Загружаем текстуру
     frame.texture:SetTexture(texturePath)
     frame:Show()
-    
-    -- Таймер скрытия через 5 секунд
-    frame.startTime = GetTime()
-    frame:SetScript("OnUpdate", function(self, elapsed)
-        if GetTime() - self.startTime >= 5 then
-            self:Hide()
-            self:SetScript("OnUpdate", nil)
-        end
-    end)
 end
 
 function ProkIconManager:HideIcon(spellNum)
     if self.frames[spellNum] then
-        self.frames[spellNum]:SetScript("OnUpdate", nil)
         self.frames[spellNum]:Hide()
     end
 end
 
 function ProkIconManager:CreateConfigUI()
     self.configFrame = CreateFrame("Frame", "ProkIconConfig", UIParent)
-    self.configFrame:SetWidth(400)
-    self.configFrame:SetHeight(290)
+    self.configFrame:SetSize(400, 242) -- Увеличил высоту для нормального отображения
     self.configFrame:SetPoint("CENTER")
     self.configFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -7879,86 +7886,120 @@ function ProkIconManager:CreateConfigUI()
     self.configFrame:RegisterForDrag("LeftButton")
     self.configFrame:SetScript("OnDragStart", self.configFrame.StartMoving)
     self.configFrame:SetScript("OnDragStop", self.configFrame.StopMovingOrSizing)
-    self.configFrame:Hide()
     
+    -- Кнопка закрытия
+    local closeBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    
+    -- Заголовок
+    local title = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    title:SetPoint("TOP", 0, -18)
+    title:SetText("Управление проками")
+
     self:CreateConfigUIElements()
+    self.configFrame:Hide()
 end
 
 function ProkIconManager:CreateConfigUIElements()
-    -- Заголовок
-    local title = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText("Настройки проков")
-
-    -- Поля ввода
-    local yOffset = 60
-    local fieldSpacing = 40
-
-    -- Название баффа
-    self:CreateInputField("Название баффа", "name", yOffset, false)
+    local yPos = 50
+    local fieldHeight = 30
     
-    -- Название умения
-    self:CreateInputField("Название умения (опционально)", "skill", yOffset + fieldSpacing, false)
-    
+    -- Поле названия с кнопкой удаления
+    self:CreateInputField("Название", "name", yPos)
+    local delBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
+    delBtn:SetSize(24, 24)
+    delBtn:SetPoint("LEFT", self.input_name, "RIGHT", 5, 0)
+    delBtn:SetText("X")
+    delBtn:SetScript("OnClick", function()
+        if self.icons[self.input_name:GetText()] then
+            self.icons[self.input_name:GetText()] = nil
+            if self.externalIconsTable then
+                self.externalIconsTable[self.input_name:GetText()] = nil
+            end
+            self:ResetForm()
+            print("Иконка удалена:", self.input_name:GetText())
+        end
+    end)
+
+    -- Поле способности
+    yPos = yPos + fieldHeight
+    self:CreateInputField("Способность", "skill", yPos)
+
     -- Выбор профиля
+    yPos = yPos + fieldHeight
     local profileLabel = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    profileLabel:SetPoint("TOPLEFT", 20, -(yOffset + fieldSpacing*2))
+    profileLabel:SetPoint("TOPLEFT", 20, -yPos + 5)
     profileLabel:SetText("Профиль:")
-
-    self.profileDropdown = CreateFrame("Frame", "ProkIconProfileDropdown", self.configFrame, "UIDropDownMenuTemplate")
-    self.profileDropdown:SetPoint("TOPLEFT", 100, -(yOffset + fieldSpacing*2 + 5))
+    
+    self.profileDropdown = CreateFrame("Frame", "ProkProfileDropdown", self.configFrame, "UIDropDownMenuTemplate")
+    self.profileDropdown:SetPoint("TOPLEFT", 120, -yPos)
+    UIDropDownMenu_SetWidth(self.profileDropdown, 180)
     UIDropDownMenu_Initialize(self.profileDropdown, function()
-        for i, profile in ipairs(self.settings) do
+        for i, p in ipairs(self.settings) do
             local info = UIDropDownMenu_CreateInfo()
-            info.text = profile.name
+            info.text = p.name ~= "" and p.name or "Профиль "..i
             info.value = i
             info.func = function() 
-                UIDropDownMenu_SetSelectedValue(self.profileDropdown, i) 
+                UIDropDownMenu_SetSelectedValue(self.profileDropdown, i)
+                if self.selectedIcon then
+                    self:ShowTexturePreview(self.selectedIcon)
+                end
             end
             UIDropDownMenu_AddButton(info)
         end
     end)
     UIDropDownMenu_SetSelectedValue(self.profileDropdown, 1)
 
-    -- Выбор иконки
-    self:CreateIconDropdown(yOffset + fieldSpacing*3)
+    -- Выбор текстуры с вложенным меню
+    yPos = yPos + fieldHeight
+    local texLabel = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    texLabel:SetPoint("TOPLEFT", 20, -yPos + 5)
+    texLabel:SetText("Текстура:")
     
-    -- Стаки
-    self:CreateInputField("Минимальные стаки", "stack", yOffset + fieldSpacing*4, true)
-    self.input_stack:SetText("0")  -- Значение по умолчанию
-
-    -- Кнопки управления
-    local addButton = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
-    addButton:SetWidth(120)
-    addButton:SetHeight(25)
-    addButton:SetPoint("BOTTOM", -70, 15)
-    addButton:SetText("Добавить")
-    addButton:SetScript("OnClick", function()
-        self:AddNewIcon()
-    end)
-
-    local deleteButton = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
-    deleteButton:SetWidth(120)
-    deleteButton:SetHeight(25)
-    deleteButton:SetPoint("BOTTOM", 0, 15)
-    deleteButton:SetText("Удалить")
-    deleteButton:SetScript("OnClick", function()
-        local name = self.input_name:GetText()
-        if name and self.icons[name] then
-            self.icons[name] = nil
-            print("Иконка удалена:", name)
-            self:ResetForm()
+    self.texDropdown = CreateFrame("Frame", "ProkTexDropdown", self.configFrame, "UIDropDownMenuTemplate")
+    self.texDropdown:SetPoint("TOPLEFT", 120, -yPos)
+    UIDropDownMenu_SetWidth(self.texDropdown, 180)
+    UIDropDownMenu_Initialize(self.texDropdown, function(_, level)
+        if level == 1 then
+            for category in pairs(self.textureList) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = category
+                info.hasArrow = true
+                info.menuList = category
+                UIDropDownMenu_AddButton(info, level)
+            end
+        elseif level == 2 then
+            local category = UIDROPDOWNMENU_MENU_VALUE
+            for _, tex in ipairs(self.textureList[category]) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = tex.name
+                info.func = function() 
+                    self.selectedIcon = tex.path
+                    UIDropDownMenu_SetText(self.texDropdown, tex.name)
+                    self:ShowTexturePreview(tex.path)
+                    CloseDropDownMenus() -- Закрытие всех уровней меню
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
         end
     end)
+    UIDropDownMenu_SetText(self.texDropdown, "Выбрать текстуру")
 
-    local closeButton = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
-    closeButton:SetWidth(120)
-    closeButton:SetHeight(25)
-    closeButton:SetPoint("BOTTOM", 70, 15)
-    closeButton:SetText("Закрыть")
-    closeButton:SetScript("OnClick", function()
-        self.configFrame:Hide()
-    end)
+    -- Поле стаков
+    yPos = yPos + fieldHeight
+    self:CreateInputField("Стаки", "stack", yPos, true)
+    self.input_stack:SetText("0")
+
+    -- Кнопка добавления
+    local addBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
+    addBtn:SetSize(120, 24)
+    addBtn:SetPoint("BOTTOM", 0, 20)
+    addBtn:SetText("Добавить")
+    addBtn:SetScript("OnClick", function() 
+        self:AddNewIcon() 
+        CloseDropDownMenus() -- Закрытие меню при добавлении
+        self:ForceHideAllIcons()
+    end)    
 end
 
 function ProkIconManager:CreateInputField(label, fieldName, yOffset, isNumeric)
@@ -8014,10 +8055,10 @@ end
 function ProkIconManager:ShowIconSelectionMenu()
     local menu = {
         {text = "Выбрать текстуру", isTitle = true, notCheckable = true},
-        {text = "Слева", hasArrow = true, menuList = self:CreateTextureMenuList("LEFT")},
-        {text = "Сверху", hasArrow = true, menuList = self:CreateTextureMenuList("TOP")},
-        {text = "Справа", hasArrow = true, menuList = self:CreateTextureMenuList("RIGHT")},
-        {text = "Центр", hasArrow = true, menuList = self:CreateTextureMenuList("CENTER")}
+        {text = "Слева", hasArrow = true, menuList = self:CreateTextureMenuList("Слева")},
+        {text = "Сверху", hasArrow = true, menuList = self:CreateTextureMenuList("Сверху")},
+        {text = "Справа", hasArrow = true, menuList = self:CreateTextureMenuList("Справа")},
+        {text = "Центр", hasArrow = true, menuList = self:CreateTextureMenuList("Фулскрин")}
     }
     
     if not self.iconDropdownMenu then
@@ -8033,10 +8074,12 @@ function ProkIconManager:CreateTextureMenuList(position)
         table.insert(menuList, {
             text = texture.name,
             func = function()
+                -- Закрыть ВСЕ уровни меню
+                CloseDropDownMenus() 
+
+                -- Обновить интерфейс
                 self.selectedIcon = texture.path
-                self.iconDropdownBtn:SetText(texture.name)
-                self.iconPreview:SetTexture(texture.path)
-                self.iconPreview:Show()
+                UIDropDownMenu_SetText(self.texDropdown, texture.name)
                 self:ShowTexturePreview(texture.path)
             end,
             notCheckable = true
@@ -8085,12 +8128,12 @@ end
 function ProkIconManager:AddNewIcon()
     local name = self.input_name:GetText()
     if not name or name == "" then
-        print("Ошибка: Укажите название баффа")
+        print("Ошибка: не указано название")
         return
     end
     
     if not self.selectedIcon then
-        print("Ошибка: Выберите иконку")
+        print("Ошибка: не выбрана текстура")
         return
     end
     
@@ -8102,11 +8145,16 @@ function ProkIconManager:AddNewIcon()
         profil = UIDropDownMenu_GetSelectedValue(self.profileDropdown) or 1
     }
     
+    -- Добавляем в обе таблицы
     self.icons[name] = iconData
-    print(string.format("Иконка сохранена: %s (стаки: %d, профиль: %s)", 
+    if self.externalIconsTable then
+        self.externalIconsTable[name] = iconData
+    end
+    
+    print(string.format("Добавлена иконка: %s (стаки: %d, профиль: %s)", 
           name, iconData.stack, self.settings[iconData.profil].name))
     
-    -- Тестовый показ
+    -- Показываем иконку
     local profile = self.settings[iconData.profil]
     local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
     local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
@@ -8118,6 +8166,10 @@ function ProkIconManager:AddNewIcon()
     
     self:ShowIcon(name, width, height, profile.x, profile.y, texturePath)
     self:ResetForm()
+
+    if self.previewFrame then
+        self.previewFrame:Hide()
+    end
 end
 
 function ProkIconManager:ResetForm()
@@ -8125,11 +8177,24 @@ function ProkIconManager:ResetForm()
     self.input_skill:SetText("")
     self.input_stack:SetText("")
     self.selectedIcon = nil
-    self.iconDropdownBtn:SetText("Выбрать...")
-    self.iconPreview:Hide()
     UIDropDownMenu_SetSelectedValue(self.profileDropdown, 1)
 end
 
+function ProkIconManager:ForceHideAllIcons()
+    for spellNum, frame in pairs(self.frames) do
+        if frame then
+            frame:Hide()
+        end
+    end
+    if self.previewFrame then
+        self.previewFrame:Hide()
+    end
+end
+
+SLASH_PROKICONHIDE1 = "/prokiconhide"
+SlashCmdList["PROKICONHIDE"] = function()
+    ProkIconManager:ForceHideAllIcons()
+end
 
 SLASH_PROKICON1 = "/prokicon"
 SlashCmdList["PROKICON"] = function()
@@ -8137,12 +8202,4 @@ SlashCmdList["PROKICON"] = function()
         ProkIconManager:CreateConfigUI()
     end
     ProkIconManager.configFrame:Show()
-end
-
-SLASH_PROKICONTEST1 = "/prokicontest"
-SlashCmdList["PROKICONTEST"] = function()
-    for name, icon in pairs(ProkIconManager.icons) do
-        print("Testing icon:", name)
-        ProkIconManager:ShowIcon(name, 256, 256, 0, 0, icon.icon)
-    end
 end
