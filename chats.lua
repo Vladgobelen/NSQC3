@@ -626,7 +626,30 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:ns_bonusQuestFinal"] = {
+        {
+            keyword = {
+                { word = "ns_bonusQuestFinal", position = 1, source = "prefix" },
+            },
+            func = "ns_bonusQuestFinal",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function ns_bonusQuestFinal(channel, text, sender, prefix)
+    questManagerClient:ShowBonusQuest(text:match("^(.*)%s+%S+$"), text:match("%S+$"))
+end
 
 function ns_bonusQuest(channel, text, sender, prefix)
     questManagerClient:GetRandomProfessionSkill()

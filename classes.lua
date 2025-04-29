@@ -5770,17 +5770,22 @@ function QuestManagerClient:CreateQuestWindow()
     self.questWindow.acceptButton:SetPoint("BOTTOMLEFT", 10, 10)
     self.questWindow.acceptButton:SetText("Принять")
     self.questWindow.acceptButton:SetScript("OnClick", function()
-        if self.currentAchievementID then
-            local link = GetAchievementLink(self.currentAchievementID)
-            if link then
-                SendChatMessage("Принята ачивка: "..link, "OFFICER")
+        if self.questWindow.title:GetText() == "Хижина" then
+            if self.currentAchievementID then
+                local link = GetAchievementLink(self.currentAchievementID)
+                if link then
+                    SendChatMessage("Принята ачивка: "..link, "OFFICER")
+                else
+                    print("Ошибка: не удалось получить ссылку на ачивку")
+                end
             else
-                print("Ошибка: не удалось получить ссылку на ачивку")
+                print("Ошибка: ID ачивки не установлен")
             end
-            self.questWindow:Hide()
-        else
-            print("Ошибка: ID ачивки не установлен")
         end
+        if self.questWindow.title:GetText() == "Бонус" then
+            SendChatMessage("Мне нужно прислать шефу: " .. self.bonusQuestItemName .. " " .. self.bonusQuestItemCount .. " штук", "OFFICER")
+        end
+        self.questWindow:Hide()
     end)
 
     -- Кнопка отказа от квеста
@@ -5789,8 +5794,14 @@ function QuestManagerClient:CreateQuestWindow()
     self.questWindow.declineButton:SetPoint("BOTTOMRIGHT", -10, 10)
     self.questWindow.declineButton:SetText("Отказаться")
     self.questWindow.declineButton:SetScript("OnClick", function()
-        SendChatMessage("Я злонамеренно отказываюсь от выполнения ачивки: " .. GetAchievementLink(tonumber(self.currentAchievementID)), "OFFICER")
-        SendAddonMessage("ns_achiv00h_decline ", "achievementID", "guild")
+        if self.questWindow.title:GetText() == "Хижина" then
+            SendChatMessage("Я злонамеренно отказываюсь от выполнения ачивки: " .. GetAchievementLink(tonumber(self.currentAchievementID)), "OFFICER")
+            SendAddonMessage("ns_achiv00h_decline ", "achievementID", "guild")
+        end
+
+        if self.questWindow.title:GetText() == "Бонус" then
+            SendChatMessage("Я отказываюсь от квеста на добровольное отдание вот этого: " .. self.bonusQuestItemName .. " " .. self.bonusQuestItemCount .. " штук", "OFFICER")
+        end
         self.questWindow:Hide()
     end)
 
@@ -5845,6 +5856,117 @@ function QuestManagerClient:ShowQuest(questTitle, questText)
     self.questWindow:Show()
 end
 
+function QuestManagerClient:ShowBonusQuest(itemName, itemCount)
+    if not self.questWindow then
+        self:CreateQuestWindow()
+    end
+
+    -- Сохраняем данные в отдельные переменные класса
+    self.bonusQuestItemName = itemName or ""
+    self.bonusQuestItemCount = itemCount or ""
+    self.currentQuestTitle = "Бонус"
+    
+    -- Форматируем текст с цветами и ссылками
+    local mainText = "Мне нужно прислать Шефу:"
+    local instructionText = "(Переместить на почту нужное количество. Появится новая большая кнопка. Нажать ее.)"
+    local formattedText = mainText .. " \n\n"
+    
+    -- Добавляем ссылку на предмет (если есть название)
+    if self.bonusQuestItemName and self.bonusQuestItemName ~= "" then
+        local itemName = self.bonusQuestItemName:gsub("^%s*(.-)%s*$", "%1") -- Удаляем лишние пробелы
+        local itemLink, itemID, itemRarity, itemColor
+        
+        -- Поиск предмета в сумках
+        for bag = 0, NUM_BAG_SLOTS do
+            for slot = 1, GetContainerNumSlots(bag) do
+                local _, _, _, quality, _, _, link = GetContainerItemInfo(bag, slot)
+                if link then
+                    local name = GetItemInfo(link)
+                    if name and name:find(itemName) then
+                        itemLink = link
+                        itemID = tonumber(link:match("item:(%d+)"))
+                        itemRarity = quality
+                        break
+                    end
+                end
+            end
+            if itemLink then break end
+        end
+        
+        -- Если предмет не найден в сумках, ищем по имени
+        if not itemLink then
+            for id = 1, 50000 do -- Ограниченный диапазон
+                local name, link, rarity = GetItemInfo(id)
+                if name and name:find(itemName) then
+                    itemLink = link
+                    itemID = id
+                    itemRarity = rarity
+                    break
+                end
+            end
+        end
+        
+        -- Получаем цвет по редкости предмета
+        if itemRarity then
+            itemColor = select(4, GetItemQualityColor(itemRarity))
+        else
+            itemColor = "|cFFFFFFFF" -- Белый, если качество неизвестно
+        end
+        
+        if itemLink then
+            formattedText = formattedText .. itemColor .. "|Hitem:"..itemID.."|h["..itemName.."]|h|r "
+        else
+            formattedText = formattedText .. itemName .. " "
+        end
+    end
+    
+    -- Добавляем количество с цветом
+    if self.bonusQuestItemCount and self.bonusQuestItemCount ~= "" then
+        formattedText = formattedText .. "|cff99ff99" .. self.bonusQuestItemCount .. "|r штук\n\n"
+    else
+        formattedText = formattedText .. "\n\n"
+    end
+    
+    -- Добавляем инструкцию с цветом
+    formattedText = formattedText .. "|cFF6495ED" .. instructionText .. "|r"
+    
+    -- Устанавливаем текст в окно
+    self.questWindow.title:SetText(self.currentQuestTitle)
+    self.questWindow.scrollChild:SetText(formattedText)
+    
+    -- Обработчики для всплывающих подсказок
+    self.questWindow.scrollChild:SetScript("OnHyperlinkEnter", function(_, link, text)
+        local type, id = link:match("^(.-):(%-?%d+)")
+        if type == "item" then
+            GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+            GameTooltip:SetHyperlink(link)
+            GameTooltip:Show()
+        end
+    end)
+
+    self.questWindow.scrollChild:SetScript("OnHyperlinkLeave", GameTooltip_Hide)
+    self.questWindow.scrollChild:SetScript("OnHyperlinkClick", function(_, link, text, button)
+        if IsShiftKeyDown() then
+            ChatEdit_InsertLink(text)
+        end
+    end)
+    
+    -- Рассчитываем высоту
+    local lineCount = select(2, string.gsub(formattedText or "", "\n", "")) + 1
+    local approxHeight = lineCount * 15 + 20
+    
+    self.questWindow.scrollChild:SetHeight(approxHeight)
+    self.questWindow.scrollFrame:UpdateScrollChildRect()
+    self.questWindow.scrollFrame:SetVerticalScroll(0)
+    
+    -- Показываем кнопки
+    self.questWindow.acceptButton:Show()
+    self.questWindow.declineButton:Show()
+    self.questWindow.viewAchievementBtn:Hide()
+    
+    self.questWindow:Show()
+end
+
 function QuestManagerClient:Hide()
     if self.questWindow then
         self.questWindow:Hide()
@@ -5884,7 +6006,7 @@ function QuestManagerClient:GetRandomProfessionSkill()
     if #foundProfessions > 0 then
         -- Select a random profession from those found
         local randomProf = foundProfessions[math.random(1, #foundProfessions)]
-        SendAddonMessage("ns_myBonusQuest ", randomProf.name .. " " .. randomProf.level, "GUILD")
+        SendAddonMessage("ns_myBonusQuest " .. randomProf.level, randomProf.name, "GUILD")
         return
     else
         SendAddonMessage("ns_myBonusQuest ", "отсутствует", "GUILD")
@@ -7403,7 +7525,6 @@ function SpellQueue:SetAppearanceSettings(options)
     self.highlightSizeOffset = options.highlightSizeOffset or 15
     self.iconSize = options.iconSize or (self.height - 10)
     self.iconSpacing = options.iconSpacing or 5
-    print(111, options.clickThrough)
     if options.clickThrough ~= nil then
         if options.clickThrough == 1 then
             self.isAnchored = false
