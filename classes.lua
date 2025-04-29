@@ -5851,7 +5851,49 @@ function QuestManagerClient:Hide()
     end
 end
 
-
+function QuestManagerClient:GetRandomProfessionSkill()
+    -- Table of professions we're interested in
+    local targetProfessions = {
+        "Наложение чар",
+        "Горное дело",
+        "Алхимия",
+        "Травничество",
+        "Снятие шкур"
+    }
+    
+    local foundProfessions = {}
+    
+    -- Check all skill lines (assuming there are no more than 20 skill lines)
+    for i = 1, 20 do
+        local name, _, _, currentLevel = GetSkillLineInfo(i)
+        if name and currentLevel then
+            -- Check if this is one of our target professions
+            for _, profName in ipairs(targetProfessions) do
+                if name == profName then
+                    table.insert(foundProfessions, {
+                        name = name,
+                        level = currentLevel
+                    })
+                    break
+                end
+            end
+        end
+    end
+    
+    -- If we found any matching professions
+    if #foundProfessions > 0 then
+        -- Select a random profession from those found
+        local randomProf = foundProfessions[math.random(1, #foundProfessions)]
+        SendAddonMessage("ns_myBonusQuest ", randomProf.name .. " " .. randomProf.level, "GUILD")
+        return
+    else
+        SendAddonMessage("ns_myBonusQuest ", "отсутствует", "GUILD")
+        return
+    end
+    
+    -- Return nil if no matching professions were found
+    return nil, 0
+end
 
 SpellQueue = {}
 SpellQueue.__index = SpellQueue
@@ -8203,3 +8245,344 @@ SlashCmdList["PROKICON"] = function()
     end
     ProkIconManager.configFrame:Show()
 end
+
+
+-- Создаем основной фрейм аддона
+local SpiritTracker = CreateFrame("Frame")
+SpiritTracker:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+SpiritTracker.trackedSummons = {}
+SpiritTracker.timer = 0
+
+-- Функция для получения NPC ID из GUID
+local function GetNPCID(guid)
+    local _, _, _, _, _, npcID = strsplit("-", guid or "")
+    return tonumber(npcID)
+end
+
+-- Основная функция обработки событий
+SpiritTracker:SetScript("OnEvent", function(self, event, ...)
+    -- Получаем аргументы события
+    local timestamp, subEvent, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellID, spellName = select(1, ...)
+    
+    -- Отслеживаем все события призыва (SPELL_SUMMON)
+    if subEvent == "SPELL_SUMMON" then
+        -- Проверяем, что это дух Леди Смертный Шепот
+        if sourceName == "Леди Смертный Шепот" and spellName == "Призыв духа" then
+            -- Сохраняем информацию о призыве
+            self.trackedSummons[destGUID] = {
+                summoner = sourceName,
+                summonName = destName,
+                summonSpellID = spellID,
+                summonSpellName = spellName,
+                summonedTime = GetTime(),
+                targetFound = false
+            }
+            
+            -- Выводим сообщение о призыве
+            SendChatMessage(format("[Призыв Духа] Обнаружен призыв: %s (%d)",
+                destName, spellID), "RAID_WARNING")
+        end
+    end
+    
+    -- Отслеживаем применение аур
+    if subEvent == "SPELL_AURA_APPLIED" or subEvent == "SPELL_AURA_REFRESH" then
+        for guid, summonData in pairs(self.trackedSummons) do
+            if GetTime() - summonData.summonedTime < 10 then -- Проверяем только последние 10 секунд
+                if destGUID == guid then
+                    if not summonData.targetFound then
+                        -- Выводим сообщение о найденной цели
+                        SendChatMessage(format("[Цель Духа] Дух %s нацелен на: %s",
+                            summonData.summonName, destName), "RAID_WARNING")
+                        
+                        -- Обновляем данные
+                        summonData.targetFound = true
+                        summonData.targetName = destName
+                        
+                        -- Устанавливаем таймер для очистки записи через 15 секунд
+                        summonData.expirationTime = GetTime() + 15
+                    end
+                end
+            else
+                -- Удаляем старые записи
+                self.trackedSummons[guid] = nil
+            end
+        end
+    end
+end)
+
+-- Функция проверки аур у рейдовых участников
+SpiritTracker:SetScript("OnUpdate", function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    
+    -- Выполняем проверку каждые 0.2 секунды
+    if self.timer < 0.2 then return end
+    self.timer = 0
+    
+    -- Проверяем ауры у рейдовых участников
+    for i = 1, GetNumGroupMembers() do
+        local unit = "raid"..i
+        local guid = UnitGUID(unit)
+        
+        if guid and self.trackedSummons[guid] then
+            for j = 1, 40 do
+                local name, _, _, _, _, _, _, _, _, spellID = UnitDebuff(unit, j)
+                if name then
+                    local summonData = self.trackedSummons[guid]
+                    
+                    if not summonData.targetFound then
+                        -- Выводим сообщение о найденной цели
+                        SendChatMessage(format("[Аура Духа] Дух %s имеет цель: %s (Заклинание: %s [%d])",
+                            summonData.summonName, UnitName(unit), name, spellID), "RAID_WARNING")
+                        
+                        -- Обновляем данные
+                        summonData.targetFound = true
+                        summonData.targetName = UnitName(unit)
+                        
+                        -- Устанавливаем таймер для очистки записи через 15 секунд
+                        summonData.expirationTime = GetTime() + 15
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Очищаем старые записи
+    for guid, summonData in pairs(self.trackedSummons) do
+        if summonData.expirationTime and GetTime() > summonData.expirationTime then
+            self.trackedSummons[guid] = nil
+        end
+    end
+end)
+
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+frame:RegisterEvent("UNIT_THREAT_LIST_UPDATE")
+
+frame:SetScript("OnEvent", function(self, event, ...)
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+        local _, subEvent, _, sourceGUID, _, _, destGUID, _, _, spellID = select(1, ...)
+        
+        -- Проверяем призыв духа
+        if subEvent == "SPELL_SUMMON" and spellID == 71426 then
+            self:CheckForSpirit()
+        end
+        
+    elseif event == "UNIT_THREAT_LIST_UPDATE" then
+        self:CheckForSpirit()
+    end
+end)
+
+function frame:CheckForSpirit()
+    -- Проверяем ауру
+    for i=1,40 do
+        local name, _, _, _, _, _, _, _, _, spellID = UnitDebuff("player", i)
+        if name and spellID == 50536 then
+            -- Проверяем агро
+            local isTanking, status = select(2, UnitDetailedThreatSituation("player", "target"))
+            if status and status >= 2 then
+                print("ДУХ НА ТЕБЕ!")
+                PlaySoundFile("Interface\\AddOns\\SpiritTracker\\alarm.ogg", "Master")
+                return
+            end
+        end
+    end
+end
+
+-- Создаем основной фрейм аддона
+local SpiritTracker = CreateFrame("Frame")
+SpiritTracker:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+SpiritTracker.trackedSummons = {}
+SpiritTracker.timer = 0
+
+-- Список отслеживаемых заклинаний
+local trackedSpells = {
+    ["Нечестивая порча"] = true,
+    ["Порча"] = true,
+    ["Чахлость"] = true,
+}
+
+-- Функция для получения NPC ID из GUID
+local function GetNPCID(guid)
+    local _, _, _, _, _, npcID = strsplit("-", guid or "")
+    return tonumber(npcID)
+end
+
+-- Основная функция обработки событий
+SpiritTracker:SetScript("OnEvent", function(self, event, ...)
+    -- Получаем аргументы события
+    local timestamp, subEvent, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellID, spellName = select(1, ...)
+    
+    -- Отслеживаем все события призыва (SPELL_SUMMON)
+    if subEvent == "SPELL_SUMMON" then
+        -- Проверяем, что это дух Леди Смертный Шепот
+        if sourceName == "Леди Смертный Шепот" and spellName == "Призыв духа" then
+            -- Сохраняем информацию о призыве
+            self.trackedSummons[destGUID] = {
+                summoner = sourceName,
+                summonName = destName,
+                summonSpellID = spellID,
+                summonSpellName = spellName,
+                summonedTime = GetTime(),
+                targetFound = false
+            }
+            
+            -- Выводим сообщение о призыве
+            SendChatMessage(format("[Призыв Духа] Обнаружен призыв: %s (%s)",
+                destName, spellName), "RAID_WARNING")
+        end
+    end
+    
+    -- Отслеживаем применение аур
+    if subEvent == "SPELL_AURA_APPLIED" or subEvent == "SPELL_AURA_REFRESH" then
+        for guid, summonData in pairs(self.trackedSummons) do
+            if GetTime() - summonData.summonedTime < 10 then -- Проверяем только последние 10 секунд
+                if destGUID == guid then
+                    if not summonData.targetFound and trackedSpells[spellName] then
+                        -- Выводим сообщение о найденной цели
+                        SendChatMessage(format("[Цель Духа] Дух %s нацелен на: %s (Заклинание: %s)",
+                            summonData.summonName, destName, spellName), "RAID_WARNING")
+                        
+                        -- Обновляем данные
+                        summonData.targetFound = true
+                        summonData.targetName = destName
+                        
+                        -- Устанавливаем таймер для очистки записи через 15 секунд
+                        summonData.expirationTime = GetTime() + 15
+                    end
+                end
+            else
+                -- Удаляем старые записи
+                self.trackedSummons[guid] = nil
+            end
+        end
+    end
+end)
+
+-- Функция проверки аур у рейдовых участников
+SpiritTracker:SetScript("OnUpdate", function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    
+    -- Выполняем проверку каждые 0.2 секунды
+    if self.timer < 0.2 then return end
+    self.timer = 0
+    
+    -- Проверяем ауры у рейдовых участников
+    for i = 1, GetNumGroupMembers() do
+        local unit = "raid"..i
+        local guid = UnitGUID(unit)
+        
+        if guid and self.trackedSummons[guid] then
+            for j = 1, 40 do
+                local name, _, _, _, _, _, _, _, _, spellID = UnitDebuff(unit, j)
+                if name and trackedSpells[name] then
+                    local summonData = self.trackedSummons[guid]
+                    
+                    if not summonData.targetFound then
+                        -- Выводим сообщение о найденной цели
+                        SendChatMessage(format("[Аура Духа] Дух %s имеет цель: %s (Заклинание: %s [%d])",
+                            summonData.summonName, UnitName(unit), name, spellID), "RAID_WARNING")
+                        
+                        -- Обновляем данные
+                        summonData.targetFound = true
+                        summonData.targetName = UnitName(unit)
+                        
+                        -- Устанавливаем таймер для очистки записи через 15 секунд
+                        summonData.expirationTime = GetTime() + 15
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Очищаем старые записи
+    for guid, summonData in pairs(self.trackedSummons) do
+        if summonData.expirationTime and GetTime() > summonData.expirationTime then
+            self.trackedSummons[guid] = nil
+        end
+    end
+end)
+
+-- Создаем основной фрейм аддона
+local SpiritTracker = CreateFrame("Frame")
+SpiritTracker:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+SpiritTracker.trackedSummons = {}
+SpiritTracker.bossGUID = nil
+
+-- Функция для получения NPC ID из GUID
+local function GetNPCID(guid)
+    local _, _, _, _, _, npcID = strsplit("-", guid or "")
+    return tonumber(npcID)
+end
+
+-- Основная функция обработки событий
+SpiritTracker:SetScript("OnEvent", function(self, event, ...)
+    -- Получаем аргументы события
+    local timestamp, subEvent, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellID, spellName = select(1, ...)
+    
+    -- Отслеживаем все события призыва (SPELL_SUMMON)
+    if subEvent == "SPELL_SUMMON" then
+        -- Проверяем, что это дух Леди Смертный Шепот
+        if sourceName == "Леди Смертный Шепот" and spellName == "Призыв духа" then
+            -- Сохраняем информацию о призыве
+            self.trackedSummons[destGUID] = {
+                summoner = sourceName,
+                summonName = destName,
+                summonedTime = GetTime(),
+                targetFound = false
+            }
+            
+            -- Сохраняем GUID босса для исключения
+            self.bossGUID = sourceGUID
+            
+            -- Выводим сообщение о призыве
+            SendChatMessage(format("[Призыв Духа] Обнаружен призыв: %s (%s)",
+                destName, spellName), "RAID_WARNING")
+        end
+    end
+    
+    -- Отслеживаем изменение уровня угрозы
+    if subEvent == "UNIT_THREAT_LIST_UPDATE" then
+        for guid, summonData in pairs(self.trackedSummons) do
+            if GetTime() - summonData.summonedTime < 10 then -- Проверяем только последние 10 секунд
+                for i = 1, GetNumGroupMembers() do
+                    local unit = "raid"..i
+                    local unitGUID = UnitGUID(unit)
+                    
+                    -- Проверяем, есть ли агро на игроке
+                    local isTanking, status, threatpct = UnitDetailedThreatSituation(unit, "target")
+                    if status and status >= 2 and unitGUID ~= self.bossGUID then
+                        -- Убедимся, что это не босс
+                        local targetGUID = UnitGUID("target")
+                        if targetGUID == guid then
+                            if not summonData.targetFound then
+                                -- Выводим сообщение о найденной цели
+                                SendChatMessage(format("[Цель Духа] Дух %s нацелен на: %s",
+                                    summonData.summonName, UnitName(unit)), "RAID_WARNING")
+                                
+                                -- Обновляем данные
+                                summonData.targetFound = true
+                                summonData.targetName = UnitName(unit)
+                                
+                                -- Устанавливаем таймер для очистки записи через 15 секунд
+                                summonData.expirationTime = GetTime() + 15
+                            end
+                        end
+                    end
+                end
+            else
+                -- Удаляем старые записи
+                self.trackedSummons[guid] = nil
+            end
+        end
+    end
+end)
+
+-- Функция очистки старых записей
+SpiritTracker:SetScript("OnUpdate", function(self, elapsed)
+    -- Очищаем старые записи
+    for guid, summonData in pairs(self.trackedSummons) do
+        if summonData.expirationTime and GetTime() > summonData.expirationTime then
+            self.trackedSummons[guid] = nil
+        end
+    end
+end)

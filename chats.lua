@@ -603,7 +603,34 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:ns_bonusQuest"] = {
+        {
+            keyword = {
+                { word = "ns_bonusQuest", position = 1, source = "prefix" },
+            },
+            func = "ns_bonusQuest",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod3 = prefix:match(WORD_POSITION_PATTERNS[3])
+                    return kod3 == mFldName
+                end,
+                function(channel, text, sender, prefix)
+                    return adaptiveFrame:isVisible()
+                end,
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function ns_bonusQuest(channel, text, sender, prefix)
+    questManagerClient:GetRandomProfessionSkill()
+end
 
 function nsqc_timer(channel, text, sender, prefix)
     if text ~= "-1" then
