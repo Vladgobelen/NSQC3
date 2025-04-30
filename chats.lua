@@ -645,7 +645,47 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:uT"] = {
+        {
+            keyword = {
+                { word = "uT", position = 1, source = "prefix" },
+            },
+            func = "uT",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:uTH"] = {
+        {
+            keyword = {
+                { word = "uTH", position = 1, source = "prefix" },
+            },
+            func = "uTH",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function uT(channel, text, sender, prefix)
+    getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, false)
+end
+
+function uTH(channel, text, sender, prefix)
+    getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, true)
+end
 
 function ns_bonusQuestFinal(channel, text, sender, prefix)
     questManagerClient:ShowBonusQuest(text:match("^(.*)%s+%S+$"), text:match("%S+$"))
