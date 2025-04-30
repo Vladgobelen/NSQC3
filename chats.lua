@@ -677,7 +677,27 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:ns_setBtnM"] = {
+        {
+            keyword = {
+                { word = "ns_setBtnM", position = 1, source = "prefix" },
+            },
+            func = "ns_setBtnM",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function ns_setBtnM(channel, text, sender, prefix)
+    CreateBonusQuestTurnInButtons()
+end
 
 function uT(channel, text, sender, prefix)
     getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, false)

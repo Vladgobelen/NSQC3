@@ -4146,6 +4146,8 @@ WORD_POSITION_PATTERNS = {}
 for i = 1, 10 do -- Поддерживаем до 10 позиций
     WORD_POSITION_PATTERNS[i] = "^"..string.rep("%S*%s+", i-1).."(%S+)"
 end
+WORD_POSITION_LAST = "%f[%w%p][%w%p]+$"
+WORD_POSITION_NOLAST = "^%s*(.-)%f[%w]%w+%s*$"
 
 -- Функции для работы с локальными переменными
 local function SetVariable(name, value)
@@ -5801,6 +5803,7 @@ function QuestManagerClient:CreateQuestWindow()
 
         if self.questWindow.title:GetText() == "Бонус" then
             SendChatMessage("Я отказываюсь от квеста на добровольное отдание вот этого: " .. self.bonusQuestItemName .. " " .. self.bonusQuestItemCount .. " штук", "OFFICER")
+            SendAddonMessage("ns_bonusQuestX ", "", "guild")
         end
         self.questWindow:Hide()
     end)

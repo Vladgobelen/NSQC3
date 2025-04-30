@@ -1504,6 +1504,77 @@ function getInstId()
     end
 end
 
+local mailTabTracker = CreateFrame("Frame")
+
+local function OnMailTabClicked()
+    if PanelTemplates_GetSelectedTab(MailFrame) == 2 then
+        SendAddonMessage("ns_shBtnM", "", "guild")
+    end
+end
+
+for i = 1, 2 do
+    local tab = _G["MailFrameTab"..i]
+    if tab then
+        tab:HookScript("OnClick", OnMailTabClicked)
+    end
+end
+
+function CreateBonusQuestTurnInButtons()
+    if not SendMailFrame or not SendMailFrame:IsShown() then return end
+    
+    if _G["BonusQuestTurnInMainButton"] then return end
+    
+    local mainButton = CreateFrame("Button", "BonusQuestTurnInMainButton", SendMailFrame)
+    mainButton:SetSize(32, 32)
+    mainButton:SetPoint("LEFT", SendMailSubjectEditBox, "RIGHT", 25, 0)
+    
+    local icon = mainButton:CreateTexture(nil, "BACKGROUND")
+    icon:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon")
+    icon:SetAllPoints(mainButton)
+    
+    mainButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    mainButton:GetHighlightTexture():SetBlendMode("ADD")
+    
+    mainButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Сдать бонусный квест", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    mainButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    local actionButton = CreateFrame("Button", "BonusQuestTurnInActionButton", SendMailFrame, "UIPanelButtonTemplate")
+    actionButton:SetSize(SendMailMailButton:GetWidth(), SendMailMailButton:GetHeight())
+    actionButton:SetText("СДАТЬ")
+    actionButton:SetPoint("TOPLEFT", SendMailMailButton, "TOPLEFT")
+    actionButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+    actionButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
+    actionButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-Button-Highlight")
+    actionButton:Hide()
+    
+    mainButton:SetScript("OnClick", function()
+        if actionButton:IsShown() then
+            actionButton:Hide()
+            SendMailMailButton:Show()
+            SendMailCancelButton:Show()
+        else
+            actionButton:Show()
+            SendMailMailButton:Hide()
+            SendMailCancelButton:Hide()
+        end
+    end)
+    
+    actionButton:SetScript("OnClick", function()
+        SendAddonMessage("ns_checkBQ", "", "guild")
+    end)
+    
+    -- Очищаем при закрытии почты
+    MailFrame:HookScript("OnHide", function()
+        actionButton:Hide()
+        SendMailMailButton:Show()
+        SendMailCancelButton:Show()
+    end)
+end
+
 -- function SendGuildOfficerMessageWithBonus(message)
 --     local msg = mysplit(message)
 --     local myName = UnitName("player") -- Получаем имя текущего игрока
