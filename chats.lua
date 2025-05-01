@@ -98,7 +98,23 @@ local triggersByAddress = {
                 end
             },
             chatType = {"GUILD"},  -- Тип чата, на который реагирует триггер
-            stopOnMatch = false  -- Прервать обработку других триггеров после срабатывания этого222
+            stopOnMatch = false
+        }
+    },
+    ["message:-ачивка"] = {
+        {
+            keyword = {  -- Ключевые слова, которые должны быть в сообщении
+                { word = "-ачивка", position = 1, source = "message" },
+            },
+            func = "statisticAchievment",  -- Функция, которая будет вызвана при срабатывании триггера
+            conditions = {
+                function(text, sender)
+                    local myNome = GetUnitName("player")
+                    return text:match(WORD_POSITION_LAST) == myNome
+                end
+            },
+            chatType = {"GUILD"},  -- Тип чата, на который реагирует триггер
+            stopOnMatch = false
         }
     },
     ["prefix:NSQC3_ach_сomp"] = {
@@ -694,6 +710,10 @@ local triggersByAddress = {
         }
     },
 }
+
+function statisticAchievment(channel, text, sender)
+    achievementHelper:SearchAndShowAchievements(text:match(WORD_POSITION_MIDDLE), "OFFICER")
+end
 
 function ns_setBtnM(channel, text, sender, prefix)
     CreateBonusQuestTurnInButtons()

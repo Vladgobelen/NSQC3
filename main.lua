@@ -21,6 +21,7 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
         C_Timer(2, function()
+            achievementHelper = AchievementHelper:new()
             questWhatchPanel()
             nsDbc.proks = nsDbc.proks or {}
             ProkIconManager:Initialize(nsDbc.proks)

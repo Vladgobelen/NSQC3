@@ -4146,8 +4146,9 @@ WORD_POSITION_PATTERNS = {}
 for i = 1, 10 do -- Поддерживаем до 10 позиций
     WORD_POSITION_PATTERNS[i] = "^"..string.rep("%S*%s+", i-1).."(%S+)"
 end
-WORD_POSITION_LAST = "%f[%w%p][%w%p]+$"
+WORD_POSITION_LAST = "(%S+)$"
 WORD_POSITION_NOLAST = "^%s*(.-)%f[%w]%w+%s*$"
+WORD_POSITION_MIDDLE = "^%S+%s+(.+[^%s])%s+%S+$"
 
 -- Функции для работы с локальными переменными
 local function SetVariable(name, value)
@@ -8371,3 +8372,185 @@ SlashCmdList["PROKICON"] = function()
 end
 
 
+AchievementHelper = {
+    cachedAchievements = {},
+    achievementCategories = {},
+    maxOutputLines = 10,
+    achievementHandlers = {
+        [0] = "HandleCounterAchievement",
+        [5] = "HandleType5Achievement",
+        [10] = "HandleStandardAchievement",
+        [15] = "HandleType15Achievement",
+        [20] = "HandleType20Achievement",
+        [25] = "HandleType25Achievement",
+        [30] = "HandleType30Achievement",
+        [50] = "HandleType50Achievement"
+    }
+}
+
+function AchievementHelper:FormatMoney(copper)
+    copper = copper or 0
+    local gold = floor(copper / 10000)
+    local silver = floor((copper % 10000) / 100)
+    local copper = copper % 100
+    
+    local parts = {}
+    if gold > 0 then table.insert(parts, gold.."g") end
+    if silver > 0 then table.insert(parts, silver.."s") end
+    if copper > 0 or (#parts == 0) then table.insert(parts, copper.."c") end
+    
+    return table.concat(parts, " ")
+end
+
+function AchievementHelper:new()
+    local obj = {}
+    setmetatable(obj, self)
+    self.__index = self
+    return obj
+end
+
+function AchievementHelper:SearchAchievements(searchText)
+    if not searchText or string.trim(searchText) == "" then
+        return nil, "Ошибка: Введите текст для поиска"
+    end
+    
+    searchText = string.lower(string.trim(searchText))
+    local foundAchievements = {}
+    
+    for id = 1, 10000 do
+        local _, name, achievementType, _, _, _, _, description = GetAchievementInfo(id)
+        
+        if name and (string.find(string.lower(name), searchText) or 
+                   (description and string.find(string.lower(description), searchText))) then
+            table.insert(foundAchievements, {
+                id = id,
+                type = achievementType,
+                name = name,
+                description = description
+            })
+        end
+    end
+    
+    if #foundAchievements == 0 then
+        return nil, "Ачивки не найдены"
+    end
+    
+    return foundAchievements
+end
+
+function AchievementHelper:SearchAndShowAchievements(searchText, channel)
+    channel = channel or "OFFICER"
+    local achievements, errorMsg = self:SearchAchievements(searchText)
+    
+    if errorMsg then
+        self:SendMessage(errorMsg, channel)
+        return
+    end
+        
+    local maxToShow = math.min(#achievements, self.maxOutputLines)
+    
+    for i = 1, maxToShow do
+        local achievement = achievements[i]
+        self:DisplayAchievement(achievement.id, achievement.type, channel)
+    end
+end
+
+function AchievementHelper:DisplayAchievement(achievementID, achievementType, channel)
+    local handlerName = self.achievementHandlers[achievementType] or "HandleUnknownType"
+    local handler = self[handlerName]
+    
+    if handler then
+        handler(self, achievementID, channel)
+    else
+        self:SendMessage(string.format("Нет обработчика для ачивки ID %d типа %d", 
+              achievementID, achievementType), channel)
+    end
+end
+
+function AchievementHelper:HandleCounterAchievement(id, channel)
+    local _, name, _, completed, _, _, _, description = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    local status = completed and "Выполнено" or "Не выполнено"
+    
+    -- Получаем прогресс
+    local progress = ""
+    local numCriteria = GetAchievementNumCriteria(id)
+    for i = 1, numCriteria do
+        local criteriaString, _, _, quantity = GetAchievementCriteriaInfo(id, i)
+        if criteriaString and quantity then
+            if string.find(criteriaString:lower(), "золот") or string.find(name:lower(), "золот") then
+                progress = " ("..self:FormatMoney(quantity)..")"
+            else
+                progress = " ("..quantity..")"
+            end
+            break
+        end
+    end
+    
+    -- Формируем сообщение с сохранением гиперссылки
+    local message = string.format("%s [%d][%d] - %s%s", 
+        link, id, 0, status, progress)
+    
+    self:SendMessage(message, channel)
+    
+    if description and description ~= "" and description ~= name then
+        self:SendMessage(string.format("Описание: %s", description), channel)
+    end
+end
+
+function AchievementHelper:HandleType5Achievement(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][%d] - обработчик не реализован", link, id, 5), channel)
+end
+
+function AchievementHelper:HandleType15Achievement(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][%d] - обработчик не реализован", link, id, 15), channel)
+end
+
+function AchievementHelper:HandleType20Achievement(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][%d] - обработчик не реализован", link, id, 20), channel)
+end
+
+function AchievementHelper:HandleType25Achievement(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][%d] - обработчик не реализован", link, id, 25), channel)
+end
+
+function AchievementHelper:HandleType30Achievement(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][%d] - обработчик не реализован", link, id, 30), channel)
+end
+
+function AchievementHelper:HandleType50Achievement(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][%d] - обработчик не реализован", link, id, 50), channel)
+end
+
+function AchievementHelper:HandleUnknownType(id, channel)
+    local _, name = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    self:SendMessage(string.format("%s [%d][unknown] - неизвестный тип ачивки", link, id), channel)
+end
+
+function AchievementHelper:SendMessage(msg, channel)
+    -- Экранируем только опасные символы |, но сохраняем гиперссылки
+    local safeMsg = msg:gsub("|([^Hhcr])", "||%1")
+    
+    if channel and channel ~= "PRINT" then
+        SendChatMessage(safeMsg, channel)
+    else
+        print(msg)
+    end
+end
+
+function string.trim(s)
+    return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
