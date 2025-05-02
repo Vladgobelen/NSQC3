@@ -8468,33 +8468,86 @@ function AchievementHelper:DisplayAchievement(achievementID, achievementType, ch
 end
 
 function AchievementHelper:HandleCounterAchievement(id, channel)
+    local _, name, _, completed = GetAchievementInfo(id)
+    local link = GetAchievementLink(id) or name
+    local status = completed and "Выполнено" or "Не выполнено"
+    
+    -- Получаем статистику и преобразуем в число
+    local statValue = tonumber(GetStatistic(id)) or 0
+    
+    -- Проверяем обычные критерии
+    local numCriteria = GetAchievementNumCriteria(id)
+    local progressParts = {}
+    local hasDetailedProgress = false
+    
+    for i = 1, numCriteria do
+        local criteriaString, _, _, quantity, reqQuantity, _, _, _, progressText = GetAchievementCriteriaInfo(id, i)
+        
+        if criteriaString then
+            quantity = quantity or statValue  -- Используем статистику если нет quantity
+            
+            -- Для денежных достижений
+            if string.find(criteriaString:lower(), "золот") or string.find(name:lower(), "золот") then
+                table.insert(progressParts, self:FormatMoney(quantity))
+                break
+            
+            -- Для критериев с текстовым прогрессом
+            elseif progressText and progressText ~= "" and progressText ~= "--" then
+                table.insert(progressParts, string.format("%d (%s)", quantity, progressText))
+                hasDetailedProgress = true
+            
+            -- Для количественных критериев
+            elseif reqQuantity and reqQuantity > 0 then
+                table.insert(progressParts, string.format("%d/%d", quantity, reqQuantity))
+            
+            -- Для простых счетчиков
+            elseif quantity > 0 then
+                table.insert(progressParts, tostring(quantity))
+            end
+        end
+    end
+    
+    -- Если не нашли критериев, но есть статистика
+    if #progressParts == 0 and statValue > 0 then
+        table.insert(progressParts, tostring(statValue))
+    end
+    
+    -- Формируем итоговый прогресс
+    if #progressParts > 0 then
+        status = status.." ("..table.concat(progressParts, ", ")..")"
+    end
+    
+    -- Отправляем сообщение
+    self:SendMessage(string.format("%s [%d][0] - %s", link, id, status), channel)
+end
+
+function AchievementHelper:HandleStandardAchievement(id, channel)
     local _, name, _, completed, _, _, _, description = GetAchievementInfo(id)
     local link = GetAchievementLink(id) or name
     local status = completed and "Выполнено" or "Не выполнено"
     
-    -- Получаем прогресс
-    local progress = ""
+    -- Проверяем критерии для типа 10
     local numCriteria = GetAchievementNumCriteria(id)
+    local progressParts = {}
+    
     for i = 1, numCriteria do
-        local criteriaString, _, _, quantity = GetAchievementCriteriaInfo(id, i)
-        if criteriaString and quantity then
-            if string.find(criteriaString:lower(), "золот") or string.find(name:lower(), "золот") then
-                progress = " ("..self:FormatMoney(quantity)..")"
-            else
-                progress = " ("..quantity..")"
-            end
-            break
+        local _, _, _, quantity, reqQuantity = GetAchievementCriteriaInfo(id, i)
+        if quantity and reqQuantity and reqQuantity > 0 then
+            table.insert(progressParts, string.format("%d/%d", quantity, reqQuantity))
         end
     end
     
-    -- Формируем сообщение с сохранением гиперссылки
-    local message = string.format("%s [%d][%d] - %s%s", 
-        link, id, 0, status, progress)
+    -- Добавляем прогресс если есть
+    if #progressParts > 0 then
+        status = status .. " ("..table.concat(progressParts, ", ")..")"
+    end
     
-    self:SendMessage(message, channel)
+    self:SendMessage(string.format("%s [%d][10] - %s", link, id, status), channel)
     
-    if description and description ~= "" and description ~= name then
-        self:SendMessage(string.format("Описание: %s", description), channel)
+    -- Выводим награду если есть (10-й параметр GetAchievementInfo)
+    local _, _, _, _, _, _, _, _, _, _, rewardText = GetAchievementInfo(id)
+    if rewardText and rewardText ~= "" then
+        self:SendMessage(string.format("%s", rewardText), channel)
     end
 end
 
