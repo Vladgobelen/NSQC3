@@ -709,7 +709,27 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:ns_qxxx"] = {
+        {
+            keyword = {
+                { word = "ns_qxxx", position = 1, source = "prefix" },
+            },
+            func = "ns_qxxx",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
 }
+
+function ns_qxxx(channel, text, sender, prefix)
+    questManagerClient.questWindow:Hide()
+end
 
 function statisticAchievment(channel, text, sender)
     achievementHelper:SearchAndShowAchievements(text:match(WORD_POSITION_MIDDLE), "OFFICER")
