@@ -1901,4 +1901,56 @@ function getUnixTime(_, message, _, sender, HOUR)
     end
 end
 
+function move(saveTable)
+    local frame = GetMouseFocus()
+    if not frame or not frame.GetName then return end
+    
+    local frameName = frame:GetName()
+    saveTable = saveTable or {}
 
+    if not frame.moveToggle then
+        -- Включение перемещения
+        frame:SetMovable(true)
+        frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            local point, _, relPoint, x, y = self:GetPoint()
+            saveTable[frameName] = {point, relPoint, x, y}
+            print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
+        end)
+        
+        frame.moveToggle = true
+    else
+        -- Выключение перемещения
+        frame:SetMovable(false)
+        frame:EnableMouse(false)
+        frame:SetScript("OnDragStart", nil)
+        frame:SetScript("OnDragStop", nil)
+        frame.moveToggle = nil
+    end
+    
+    return saveTable
+end
+
+function RestoreFramePositions(saveTable)
+    if not saveTable then return end
+    
+    for frameName, posData in pairs(saveTable) do
+        local frame = _G[frameName]
+        if frame and frame.ClearAllPoints then
+            frame:ClearAllPoints()
+            frame:SetPoint(posData[1], UIParent, posData[2], posData[3], posData[4])
+        end
+    end
+end
+
+function remove()
+    move(nsDbc['frames'])
+end
+
+function resetF()
+    nsDbc['frames'] = nil
+end

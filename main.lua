@@ -97,6 +97,8 @@ local function OnEvent(self, event, isLogin, isReload)
             sq:UpdateSkillTables()
             sq:ForceUpdateAllSpells()
             sq:ApplyDisplayMode()
+            nsDbc['frames'] = nsDbc['frames'] or {}
+            RestoreFramePositions(nsDbc['frames'])
         end)
 
         C_Timer(1, function()
