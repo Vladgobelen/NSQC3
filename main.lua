@@ -100,7 +100,7 @@ local function OnEvent(self, event, isLogin, isReload)
         end)
 
         C_Timer(1, function()
-            UpdateAddOnMemoryUsage()
+            --UpdateAddOnMemoryUsage()
             if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
                 hunterCheck()
             end
