@@ -6021,6 +6021,441 @@ function QuestManagerClient:GetRandomProfessionSkill()
     return nil, 0
 end
 
+function AdaptiveFrame:InitSnakeGame()
+    self.snakeGame = {
+        active = false,
+        headPos = nil,
+        body = {},
+        direction = nil,
+        score = 0,
+        timerFrame = nil,
+        speed = 0.3,
+        originalBindings = {},
+        macroFrames = {}
+    }
+end
+
+function AdaptiveFrame:StartSnakeGame()
+    -- Отладочный вывод начала запуска
+    
+    -- Проверка активности игры
+    if self.snakeGame and self.snakeGame.active then 
+        return 
+    end
+
+    -- Инициализация при первом запуске
+    if not self.snakeGame then 
+        self:InitSnakeGame() 
+    end
+
+    -- 1. Сохраняем ВСЕ текущие привязки клавиш
+    self.snakeGame.originalBindings = {}
+    
+    for i = 1, GetNumBindings() do
+        local command, key1, key2 = GetBinding(i)
+        if command and (key1 or key2) then
+            self.snakeGame.originalBindings[command] = {key1, key2}
+        end
+    end
+
+    -- 2. Создаем макросы управления
+    self:CreateSnakeMacros()
+
+    -- 3. Устанавливаем новые привязки для стрелок
+    local keyBindings = {
+        ["UP"]        = "SnakeMacroUp",
+        ["DOWN"]      = "SnakeMacroDown",
+        ["LEFT"]      = "SnakeMacroLeft",
+        ["RIGHT"]     = "SnakeMacroRight",
+        ["ARROWUP"]   = "SnakeMacroUp",
+        ["ARROWDOWN"] = "SnakeMacroDown",
+        ["ARROWLEFT"] = "SnakeMacroLeft",
+        ["ARROWRIGHT"]= "SnakeMacroRight",
+        ["NUMPAD8"]   = "SnakeMacroUp",
+        ["NUMPAD2"]   = "SnakeMacroDown",
+        ["NUMPAD4"]   = "SnakeMacroLeft",
+        ["NUMPAD6"]   = "SnakeMacroRight",
+        ["W"]         = "SnakeMacroUp",    -- WASD для удобства
+        ["S"]         = "SnakeMacroDown",
+        ["A"]         = "SnakeMacroLeft",
+        ["D"]         = "SnakeMacroRight"
+    }
+
+    local bindSuccess = 0
+    local bindTotal = 0
+    
+    for key, macro in pairs(keyBindings) do
+        bindTotal = bindTotal + 1
+        local success = SetBinding(key, "CLICK "..macro..":LeftButton")
+        
+        if success then
+            bindSuccess = bindSuccess + 1
+        end
+    end
+
+    -- 4. Сохраняем привязки и проверяем результат
+    SaveBindings(GetCurrentBindingSet())
+
+    -- 5. Проверка установленных привязок
+    local checkKeys = {"UP", "DOWN", "LEFT", "RIGHT", "W", "S", "A", "D"}
+    for _, key in ipairs(checkKeys) do
+        local action = GetBindingAction(key)
+    end
+
+    -- 6. Запуск игрового процесса
+    local startPos = math.random(1, 100)
+    self.snakeGame.headPos = startPos
+    self.snakeGame.body = {startPos}
+    self.snakeGame.direction = nil
+    self.snakeGame.score = 1
+    self.snakeGame.active = true
+    
+    -- Устанавливаем текстуру головы змейки
+    self.children[startPos].frame:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\bbb.tga")
+    
+    -- 7. Финальные сообщения
+    print("|cFF00FF00Бобер выходит на тропу войны!|r Используйте |cFFFFA500WASD|r или |cFFFFA500стрелки|r для управления")
+end
+
+function AdaptiveFrame:CreateSnakeMacros()
+    self:DeleteSnakeMacros()
+
+    local directions = {
+        {name = "Up", func = "SnakeUp"},
+        {name = "Down", func = "SnakeDown"},
+        {name = "Left", func = "SnakeLeft"},
+        {name = "Right", func = "SnakeRight"}
+    }
+
+    for _, dir in ipairs(directions) do
+        local macroName = "SnakeMacro"..dir.name
+        local macroFrame = CreateFrame("Button", macroName, UIParent, "SecureActionButtonTemplate")
+        
+        macroFrame:SetAttribute("type", "macro")
+        macroFrame:SetAttribute("macrotext", "/run adaptiveFrame:"..dir.func.."()")
+        macroFrame:RegisterForClicks("AnyUp")
+        
+        macroFrame:SetScript("PreClick", function() 
+        end)
+        
+        self.snakeGame.macroFrames[dir.name] = macroFrame
+    end
+end
+
+function AdaptiveFrame:DeleteSnakeMacros()
+    if not self.snakeGame.macroFrames then return end
+    
+    for dir, frame in pairs(self.snakeGame.macroFrames) do
+        if frame then
+            frame:Hide()
+            frame:SetParent(nil)
+        end
+    end
+    self.snakeGame.macroFrames = {}
+end
+
+function AdaptiveFrame:RegisterSnakeKeyBindings()
+    -- Регистрируем глобальные обработчики
+    _G["ADAPTIVEFRAME_SNAKE_UP"] = function()
+        if self.snakeGame and self.snakeGame.active then
+            self:SnakeUp()
+        end
+    end
+    
+    _G["ADAPTIVEFRAME_SNAKE_DOWN"] = function()
+        if self.snakeGame and self.snakeGame.active then
+            self:SnakeDown()
+        end
+    end
+    
+    _G["ADAPTIVEFRAME_SNAKE_LEFT"] = function()
+        if self.snakeGame and self.snakeGame.active then
+            self:SnakeLeft()
+        end
+    end
+    
+    _G["ADAPTIVEFRAME_SNAKE_RIGHT"] = function()
+        if self.snakeGame and self.snakeGame.active then
+            self:SnakeRight()
+        end
+    end
+    
+    -- Регистрируем кнопки для клика
+    for _, cmd in ipairs({"UP", "DOWN", "LEFT", "RIGHT"}) do
+        local action = "ADAPTIVEFRAME_SNAKE_"..cmd
+        SetBindingClick(action, action)
+    end
+end
+
+function AdaptiveFrame:RestoreOriginalKeyBindings()
+    if not self.snakeGame or not self.snakeGame.originalKeyBindings then return end
+
+    -- Восстанавливаем оригинальные привязки
+    for key, binding in pairs(self.snakeGame.originalKeyBindings) do
+        if binding then
+            SetBinding(binding, key)
+        else
+            -- Если привязки не было, очищаем
+            local currentBinding = GetBindingKey(key)
+            if currentBinding then
+                SetBinding(currentBinding)
+            end
+        end
+    end
+
+    -- Очищаем наши обработчики
+    _G["ADAPTIVEFRAME_SNAKE_UP"] = nil
+    _G["ADAPTIVEFRAME_SNAKE_DOWN"] = nil
+    _G["ADAPTIVEFRAME_SNAKE_LEFT"] = nil
+    _G["ADAPTIVEFRAME_SNAKE_RIGHT"] = nil
+
+    -- Сохраняем изменения
+    SaveBindings(GetCurrentBindingSet())
+end
+
+function AdaptiveFrame:StopSnakeGame(success)
+    if not self.snakeGame or not self.snakeGame.active then return end
+    
+    -- Восстанавливаем ВСЕ оригинальные привязки
+    local restoreSuccess = 0
+    local restoreTotal = 0
+    
+    for command, keys in pairs(self.snakeGame.originalBindings) do
+        if command and keys then
+            restoreTotal = restoreTotal + 1
+            -- Удаляем текущие привязки для этой команды
+            local current1, current2 = GetBindingKey(command)
+            if current1 then SetBinding(current1) end
+            if current2 then SetBinding(current2) end
+            
+            -- Восстанавливаем оригинальные
+            if keys[1] and SetBinding(keys[1], command) then
+                restoreSuccess = restoreSuccess + 1
+            end
+            if keys[2] and SetBinding(keys[2], command) then
+                restoreSuccess = restoreSuccess + 1
+            end
+        end
+    end
+    
+    SaveBindings(GetCurrentBindingSet())
+    
+    -- Удаляем макросы
+    self:DeleteSnakeMacros()
+    
+    -- Останавливаем игру
+    self.snakeGame.active = false
+    
+    -- Восстанавливаем текстуры
+    for _, pos in ipairs(self.snakeGame.body) do
+        self.children[pos].frame:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\00t.tga")
+    end
+    
+    print("Игра окончена. Счет:", self.snakeGame.score)
+    
+    -- Дополнительная проверка восстановленных привязок
+    local checkCommands = {"MOVEFORWARD", "MOVEBACKWARD", "TURNLEFT", "TURNRIGHT"}
+    for _, cmd in ipairs(checkCommands) do
+        local key1, key2 = GetBindingKey(cmd)
+    end
+end
+
+function AdaptiveFrame:MoveSnake()
+    -- Защитные проверки
+    if not self or not self.snakeGame or not self.snakeGame.active or not self.snakeGame.direction then 
+        return 
+    end
+    
+    -- Вычисляем новую позицию головы
+    local newPos
+    local row = math.floor((self.snakeGame.headPos - 1) / 10)  -- 0-9 (снизу вверх)
+    local col = (self.snakeGame.headPos - 1) % 10              -- 0-9 (слева направо)
+    
+    -- Определяем новую позицию в зависимости от направления
+    if self.snakeGame.direction == "UP" then
+        newPos = self.snakeGame.headPos + 10
+    elseif self.snakeGame.direction == "DOWN" then
+        newPos = self.snakeGame.headPos - 10
+    elseif self.snakeGame.direction == "LEFT" then
+        newPos = self.snakeGame.headPos - 1
+    elseif self.snakeGame.direction == "RIGHT" then
+        newPos = self.snakeGame.headPos + 1
+    end
+    
+    -- Проверяем выход за границы поля
+    if newPos < 1 or newPos > 100 or 
+       (self.snakeGame.direction == "LEFT" and col == 0) or 
+       (self.snakeGame.direction == "RIGHT" and col == 9) then
+        self:StopSnakeGame(false)
+        return
+    end
+    
+    -- Проверяем текстуру новой клетки
+    local texture = self:getTexture(newPos)
+    
+    -- Обработка столкновений и специальных клеток
+    if texture == "bbb" then
+        -- Столкновение с собой
+        self:StopSnakeGame(false)
+        return
+    elseif texture == "00t" then
+        -- Специальная клетка - сброс части змейки
+        if #self.snakeGame.body > 1 then
+            local maxReset = math.min(#self.snakeGame.body - 1, 5) -- Не более 5 клеток
+            local numToReset = math.random(1, maxReset)
+            for i = 1, numToReset do
+                if #self.snakeGame.body > 1 then
+                    local pos = table.remove(self.snakeGame.body, 1)
+                    self.children[pos].frame:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\0ka.tga")
+                end
+            end
+            self.snakeGame.score = #self.snakeGame.body
+        end
+    elseif texture == "0ob" then
+        -- Специальная клетка - сброс всего тела
+        if #self.snakeGame.body > 1 then
+            for i = 1, #self.snakeGame.body - 1 do
+                local pos = self.snakeGame.body[i]
+                self.children[pos].frame:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\00k.tga")
+            end
+            self.snakeGame.body = {self.snakeGame.headPos}
+            self.snakeGame.score = 1
+        end
+    elseif texture == "00f" then
+        -- Специальная клетка - удвоение очков
+        for _, pos in ipairs(self.snakeGame.body) do
+            self.children[pos].frame:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\00t.tga")
+        end
+        self.snakeGame.score = self.snakeGame.score * 2
+        self:StopSnakeGame(true)
+        return
+    end
+    
+    -- Проверяем столкновение с телом
+    for _, pos in ipairs(self.snakeGame.body) do
+        if pos == newPos then
+            self:StopSnakeGame(false)
+            return
+        end
+    end
+    
+    -- Обновляем позицию змейки
+    table.insert(self.snakeGame.body, newPos)
+    self.snakeGame.headPos = newPos
+    self.children[newPos].frame:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\bbb.tga")
+    self.snakeGame.score = #self.snakeGame.body
+    
+    -- Удаляем старый таймер, если есть
+    if self.snakeGame.timerFrame then
+        self.snakeGame.timerFrame:SetScript("OnUpdate", nil)
+        self.snakeGame.timerFrame = nil
+    end
+    
+    -- Создаем новый таймер для следующего хода
+    local timerFrame = CreateFrame("Frame")
+    timerFrame.elapsed = 0
+    timerFrame.speed = self.snakeGame.speed
+    timerFrame.parent = self
+    
+    timerFrame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= self.speed then
+            self.parent:MoveSnake()
+            self:SetScript("OnUpdate", nil)
+        end
+    end)
+    
+    self.snakeGame.timerFrame = timerFrame
+end
+
+-- Методы управления змейкой
+function AdaptiveFrame:SnakeUp()
+    if not self.snakeGame.active then return end
+    local row = math.floor((self.snakeGame.headPos - 1) / 10)
+    if row < 9 then  -- Нельзя идти вверх, если уже на верхней строке
+        if self.snakeGame.direction ~= "DOWN" then
+            self.snakeGame.direction = "UP"
+            if not self.snakeGame.timerFrame then
+                self:MoveSnake()
+            end
+        end
+    else
+        self:StopSnakeGame(false)
+    end
+end
+
+function AdaptiveFrame:SnakeDown()
+    if not self.snakeGame.active then return end
+    local row = math.floor((self.snakeGame.headPos - 1) / 10)
+    if row > 0 then  -- Нельзя идти вниз, если уже на нижней строке
+        if self.snakeGame.direction ~= "UP" then
+            self.snakeGame.direction = "DOWN"
+            if not self.snakeGame.timerFrame then
+                self:MoveSnake()
+            end
+        end
+    else
+        self:StopSnakeGame(false)
+    end
+end
+
+function AdaptiveFrame:SnakeLeft()
+    if not self.snakeGame.active then return end
+    local col = (self.snakeGame.headPos - 1) % 10
+    if col > 0 then  -- Нельзя идти влево, если уже в левом столбце
+        if self.snakeGame.direction ~= "RIGHT" then
+            self.snakeGame.direction = "LEFT"
+            if not self.snakeGame.timerFrame then
+                self:MoveSnake()
+            end
+        end
+    else
+        self:StopSnakeGame(false)
+    end
+end
+
+function AdaptiveFrame:SnakeRight()
+    if not self.snakeGame.active then return end
+    local col = (self.snakeGame.headPos - 1) % 10
+    if col < 9 then  -- Нельзя идти вправо, если уже в правом столбце
+        if self.snakeGame.direction ~= "LEFT" then
+            self.snakeGame.direction = "RIGHT"
+            if not self.snakeGame.timerFrame then
+                self:MoveSnake()
+            end
+        end
+    else
+        self:StopSnakeGame(false)
+    end
+end
+
+function AdaptiveFrame:RegisterSlashCommands()
+    -- Создаем команды для управления змейкой
+    _G["ADAPTIVEFRAME_SNAKE_UP"] = function()
+        self:SnakeUp()
+    end
+    
+    _G["ADAPTIVEFRAME_SNAKE_DOWN"] = function()
+        self:SnakeDown()
+    end
+    
+    _G["ADAPTIVEFRAME_SNAKE_LEFT"] = function()
+        self:SnakeLeft()
+    end
+    
+    _G["ADAPTIVEFRAME_SNAKE_RIGHT"] = function()
+        self:SnakeRight()
+    end
+    
+    -- Регистрируем команды в WoW
+    for _, cmd in ipairs({"UP", "DOWN", "LEFT", "RIGHT"}) do
+        local action = "ADAPTIVEFRAME_SNAKE_"..cmd
+        SetBindingClick(action, action)
+    end
+    
+    SaveBindings(GetCurrentBindingSet())
+end
+
 SpellQueue = {}
 SpellQueue.__index = SpellQueue
 
