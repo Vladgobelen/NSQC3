@@ -672,6 +672,9 @@ local triggersByAddress = {
                     local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
                     return kod2 == GetUnitName("player")
                 end,
+                function(channel, text, sender, prefix)
+                    return gPoint(text)
+                end,
             },
             chatType = {"ADDON"},
             stopOnMatch = true,  -- Прервать обработку после этого триггера
@@ -687,6 +690,9 @@ local triggersByAddress = {
                 function(channel, text, sender, prefix)
                     local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
                     return kod2 == GetUnitName("player")
+                end,
+                function(channel, text, sender, prefix)
+                    return gPoint(text)
                 end,
             },
             chatType = {"ADDON"},

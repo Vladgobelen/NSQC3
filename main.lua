@@ -102,7 +102,6 @@ local function OnEvent(self, event, isLogin, isReload)
         end)
 
         C_Timer(1, function()
-            --UpdateAddOnMemoryUsage()
             if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
                 hunterCheck()
             end
@@ -120,6 +119,10 @@ local function OnEvent(self, event, isLogin, isReload)
                     nsqc3Timer = nil
                 end
             end
+        end, true)
+
+        C_Timer(10, function()
+            UpdateAddOnMemoryUsage()
         end, true)
 
         C_Timer(100, function()
