@@ -1954,3 +1954,49 @@ end
 function resetF()
     nsDbc['frames'] = nil
 end
+
+local myFrame = nil
+
+function setFrameSize(rX)
+    if not myFrame then
+        myFrame = { rY = {} }
+    end
+    table.insert(myFrame.rY, rX)
+end
+
+function setFrameSizeF(rX)
+    if not myFrame then
+        myFrame = { rY = {} }
+    end
+
+    table.insert(myFrame.rY, rX)
+
+    local rZ = table.concat(myFrame.rY)
+    myFrame.rY = {}
+
+    setFramePoints(rZ)
+end
+
+function setFramePoints(rZ)
+    print("Полученная строка:", rZ) -- Отладка
+
+    local chunk, err = loadstring(rZ)
+    if not chunk then
+        print("Ошибка компиляции Lua-кода:", err)
+        return
+    end
+
+    local success, result = pcall(chunk)
+    if not success then
+        print("Ошибка выполнения Lua-кода:", result)
+        return
+    end
+
+    if MyTestClassGlobal then
+        local obj = MyTestClassGlobal:new(42)
+        print(111)
+        obj:printValue() -- должно вывести "Значение: 42"
+    else
+        print("MyTestClassGlobal не загружен!")
+    end
+end

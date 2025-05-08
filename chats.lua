@@ -680,6 +680,21 @@ local triggersByAddress = {
             stopOnMatch = true,  -- Прервать обработку после этого триггера
         }
     },
+    ["prefix:fS"] = {
+        {
+            keyword = {
+                { word = "fS", position = 1, source = "prefix" },
+            },
+            func = "fS",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    return gPoint(text)
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
     ["prefix:uTH"] = {
         {
             keyword = {
@@ -692,6 +707,22 @@ local triggersByAddress = {
                     return kod2 == GetUnitName("player")
                 end,
                 function(channel, text, sender, prefix)
+                    return gPoint(text)
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,  -- Прервать обработку после этого триггера
+        }
+    },
+    ["prefix:fSF"] = {
+        {
+            keyword = {
+                { word = "fSF", position = 1, source = "prefix" },
+            },
+            func = "fSF",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    print(channel, text, sender, prefix)
                     return gPoint(text)
                 end,
             },
@@ -732,6 +763,14 @@ local triggersByAddress = {
         }
     },
 }
+
+function fS(channel, text, sender, prefix)
+    setFrameSize(text)
+end
+
+function fSF(channel, text, sender, prefix)
+    setFrameSizeF(text)
+end
 
 function ns_qxxx(channel, text, sender, prefix)
     questManagerClient.questWindow:Hide()
