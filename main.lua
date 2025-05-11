@@ -121,11 +121,12 @@ local function OnEvent(self, event, isLogin, isReload)
             end
         end, true)
 
-        C_Timer(10, function()
-            --UpdateAddOnMemoryUsage()
-        end, true)
+        -- C_Timer(10, function()
+            
+        -- end, true)
 
         C_Timer(100, function()
+            UpdateAddOnMemoryUsage()
             time100()
         end, true)
     end
