@@ -171,6 +171,110 @@ function NsDb:getDeepStaticStr(...)
     return current
 end
 
+function NsDb:addDeepStaticStr2(...)
+    local args = {...}
+    local n = #args
+
+    if n < 2 then return end
+
+    self.input_table = self.input_table or {}
+    local current = self.input_table
+
+    -- Check if the second last argument is nil
+    local hasNil = (args[n-1] == nil)
+
+    -- Determine key and value for writing
+    local key = args[n-2]
+    local value = args[n]
+
+    -- Build path to parent table
+    for i = 1, n-3 do
+        local part = args[i]
+        current[part] = current[part] or {}
+        current = current[part]
+    end
+
+    if hasNil then
+        -- If second last argument is nil, write value directly
+        current[key] = value
+    else
+        -- Otherwise update string at specified index
+        local index = args[n-1]
+        local currentStr = current[key] or ""
+        local formattedValue
+        
+        -- First object is always 1 character, others are 2
+        if index == 1 then
+            formattedValue = (" " .. value):sub(-1) -- Format to 1 character
+        else
+            formattedValue = ("  " .. value):sub(-2) -- Format to 2 characters
+        end
+        
+        -- Calculate positions
+        local start, end_pos
+        if index == 1 then
+            start = 1
+            end_pos = 1
+        else
+            start = 2 + (index - 2) * 2
+            end_pos = start + 1
+        end
+
+        -- Update the string
+        current[key] = currentStr:sub(1, start - 1) 
+                        .. formattedValue 
+                        .. currentStr:sub(end_pos + 1)
+    end
+end
+
+function NsDb:getDeepStaticStr2(...)
+    local args = {...}
+    local n = #args
+    
+    if n == 0 then return nil end
+    
+    local current = self.input_table
+    if not current then return nil end
+    
+    -- Iterate through all arguments
+    for i = 1, n do
+        if not current then return nil end
+        
+        local arg = args[i]
+        local nextData = current[arg]
+        
+        -- If this is the last argument
+        if i == n then
+            if type(nextData) == "string" then
+                -- If next element is a string, return it
+                return nextData
+            else
+                -- Otherwise return the element itself
+                return nextData
+            end
+        else
+            -- If next element is a string but there are more arguments
+            if type(nextData) == "string" then
+                -- Return substring based on next argument (index)
+                local index = args[i+1]
+                if type(index) == "number" then
+                    if index == 1 then
+                        return nextData:sub(1, 1)
+                    else
+                        local start = 2 + (index - 2) * 2
+                        return nextData:sub(start, start + 1)
+                    end
+                else
+                    return nil
+                end
+            end
+            current = nextData
+        end
+    end
+    
+    return current
+end
+
 function NsDb:addStr(message)
     local msg_len = utf8len(message) -- Длина входящего сообщения
     -- Если адрес последней строки превысил лимит или это первая строка
