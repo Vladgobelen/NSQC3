@@ -1519,181 +1519,6 @@ function GpDb:Show()
     self.window:Show()
     
     -- Автоматически устанавливаем галочку "Только рейд" если мы в рейде
-    self.window.raidOnlyCheckbox:SetChecked(IsInRaid())
-    
-    self:_UpdateFromGuild()
-    self:UpdateWindow()
-end
-
-function GpDb:Hide()
-    self.window:Hide()
-end
-
-function GpDb:_UpdateFromGuild()
-    -- Всегда начинаем с чистого списка
-    self.gp_data = {}
-    local totalWithGP = 0
-    local totalMembers = GetNumGuildMembers()
-    
-    -- Синхронизируем галочку с текущим состоянием рейда
-    local inRaid = IsInRaid()
-    self.window.raidOnlyCheckbox:SetChecked(inRaid)
-    local raidOnlyMode = inRaid and self.window.raidOnlyCheckbox:GetChecked()
-
-    if not IsInGuild() then
-        print("|cFFFF0000ГП:|r Вы не состоите в гильдии")
-        self:UpdateWindow()
-        return
-    end
-
-    -- Обновляем данные гильдии (добавляем задержку для гарантированного обновления)
-    GuildRoster()
-    C_Timer(0.5, function()
-        -- Собираем полный список членов гильдии для быстрой проверки
-        local guildRosterInfo = {}
-        for j = 1, GetNumGuildMembers() do
-            local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(j)
-            if name then
-                -- Парсим офицерскую заметку для получения ID
-                local playerID = nil
-                if officerNote then
-                    local words = {}
-                    for word in officerNote:gmatch("%S+") do
-                        table.insert(words, word)
-                    end
-                    if #words >= 2 then
-                        playerID = words[2] -- Берем ID из второго слова
-                    end
-                end
-                
-                guildRosterInfo[name] = {
-                    publicNote = publicNote,
-                    officerNote = officerNote,
-                    classFileName = classFileName,
-                    playerID = playerID
-                }
-            end
-        end
-
-        -- Режим "Только рейд" и мы в рейде
-        if raidOnlyMode then
-            local numRaidMembers = GetNumGroupMembers()
-            local raidCheckPassed = true
-            local invalidPlayers = {}
-
-            -- Проверяем всех игроков рейда на принадлежность к гильдии
-            for i = 1, numRaidMembers do
-                local raidName, _, _, _, _, classFileName, _, _, _, _, _, _, _, _, _, _, _, isConnected = GetRaidRosterInfo(i)
-                if raidName then
-                    -- Удаляем серверную часть имени для сравнения
-                    local plainName = raidName:match("^(.-)-") or raidName
-                    if not guildRosterInfo[plainName] then
-                        raidCheckPassed = false
-                        table.insert(invalidPlayers, raidName)
-                    end
-                end
-            end
-            
-            -- Если есть чужие игроки - сообщаем и выходим
-            if not raidCheckPassed then
-                print("|cFFFF0000ГП:|r В рейде есть не члены гильдии: "..table.concat(invalidPlayers, ", "))
-                self.window.countText:SetText("Отображается игроков: 0 (в рейде есть не члены гильдии)")
-                self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
-                self:UpdateWindow()
-                return
-            end
-
-            -- Заполняем данные ВСЕХ игроков рейда (даже с нулевым ГП)
-            for i = 1, numRaidMembers do
-                local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
-                if raidName then
-                    local plainName = raidName:match("^(.-)-") or raidName
-                    local guildInfo = guildRosterInfo[plainName]
-                    if guildInfo then
-                        local gp = 0
-                        local publicNote = guildInfo.publicNote or ""
-                        
-                        -- Парсим ГП из officerNote
-                        if guildInfo.officerNote then
-                            local words = {}
-                            for word in guildInfo.officerNote:gmatch("%S+") do
-                                table.insert(words, word)
-                            end
-                            if #words >= 3 then
-                                gp = tonumber(words[3]) or 0
-                            end
-                        end
-
-                        if gp > 0 then
-                            totalWithGP = totalWithGP + 1
-                        end
-
-                        local displayName = raidName -- Используем полное имя с сервером
-                        if publicNote and publicNote ~= "" then
-                            displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
-                        end
-
-                        table.insert(self.gp_data, {
-                            nick = displayName,
-                            original_nick = raidName, -- Сохраняем полное имя с сервером
-                            gp = gp,
-                            classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
-                            classFileName = classFileName,
-                            playerID = guildInfo.playerID -- Добавляем ID игрока
-                        })
-                    end
-                end
-            end
-        else
-            -- Обычный режим - показываем только игроков с ГП
-            for i = 1, GetNumGuildMembers() do
-                local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
-                
-                if name and officerNote and officerNote ~= "" then
-                    local words = {}
-                    for word in officerNote:gmatch("%S+") do
-                        table.insert(words, word)
-                    end
-                    
-                    if #words >= 3 then
-                        local gp = tonumber(words[3]) or 0
-                        local playerID = words[2] -- Берем ID из второго слова
-                        
-                        if gp ~= 0 then
-                            totalWithGP = totalWithGP + 1
-                            local displayName = name
-                            if publicNote and publicNote ~= "" then
-                                displayName = name .. " |cFFFFFF00(" .. publicNote .. ")|r"
-                            end
-                            
-                            table.insert(self.gp_data, {
-                                nick = displayName,
-                                original_nick = name,
-                                gp = gp,
-                                classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
-                                classFileName = classFileName,
-                                playerID = playerID -- Добавляем ID игрока
-                            })
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Обновляем UI
-        self.window.countText:SetText(string.format("Отображается игроков: %d", #self.gp_data))
-        self.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, GetNumGuildMembers()))
-        
-        self:ClearSelection()
-        self:SortData()
-        self:UpdateWindow()
-    end)
-end
-
-function GpDb:Show()
-    self.window:Show()
-    
-    -- Автоматически включаем режим "Только рейд" если мы в рейде
     if IsInRaid() then
         self.window.raidOnlyCheckbox:SetChecked(true)
     else
@@ -2718,6 +2543,54 @@ function AdaptiveFrame:new(parent)
     end)
     self.toggleSideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    -- Кнопка открытия интерфейса нуклеотидов
+    self.nucleotideButton = CreateFrame("Button", nil, self.frame)
+    self.nucleotideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.nucleotideButton:SetPoint("TOPRIGHT", self.toggleSideButton, "BOTTOMRIGHT", 0, -5)
+    self.nucleotideButton:SetNormalTexture("Interface\\ICONS\\inv_misc_gem_diamond_02")
+    self.nucleotideButton:SetPushedTexture("Interface\\ICONS\\inv_misc_gem_diamond_02")
+    self.nucleotideButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+
+    local function UpdateNucleotideButtonState()
+        local btn = self.nucleotideButton
+        local nucBtn = _G["NucleotideMainButton"]
+        if nucBtn and nucBtn:IsShown() then
+            btn:GetNormalTexture():SetDesaturated(true)
+            btn:SetAlpha(0.5)
+            btn.isNucActive = true
+        else
+            btn:GetNormalTexture():SetDesaturated(false)
+            btn:SetAlpha(1)
+            btn.isNucActive = false
+        end
+    end
+
+    self.nucleotideButton:SetScript("OnClick", function()
+        local nucBtn = _G["NucleotideMainButton"]
+        if not nucBtn then
+            SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
+            UpdateNucleotideButtonState()
+            return
+        end
+        if not self.nucleotideButton.isNucActive then
+            SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
+        else
+            SendAddonMessage("ns_dna_x " .. GetUnitName("player"), "", "GUILD")
+        end
+        UpdateNucleotideButtonState()
+    end)
+
+    self.nucleotideButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.nucleotideButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Открыть/скрыть интерфейс нуклеотидов")
+        GameTooltip:Show()
+    end)
+    self.nucleotideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Обновлять состояние при создании
+    C_Timer.After(0.5, UpdateNucleotideButtonState)
+    self.UpdateNucleotideButtonState = UpdateNucleotideButtonState
+
     -- Ручка изменения размера
     self.resizeHandle = CreateFrame("Button", nil, self.frame)
     self.resizeHandle:SetSize(16, 16)
@@ -2746,7 +2619,7 @@ function AdaptiveFrame:new(parent)
 
     self.craftButton = CreateFrame("Button", nil, self.frame)
     self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
-    self.craftButton:SetPoint("TOPRIGHT", self.toggleSideButton, "BOTTOMRIGHT", 0, -5)
+    self.craftButton:SetPoint("TOPRIGHT", self.nucleotideButton, "BOTTOMRIGHT", 0, -5)
     
     -- Текстуры состояний
     self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
