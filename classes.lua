@@ -2566,15 +2566,17 @@ function AdaptiveFrame:new(parent)
     end
 
     self.nucleotideButton:SetScript("OnClick", function()
-        local nucBtn = _G["NucleotideMainButton"]
-        if not nucBtn then
+        if not NucleotideMainButton then
             SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
             UpdateNucleotideButtonState()
+            print(1111)
             return
         end
-        if not self.nucleotideButton.isNucActive then
+        if not NucleotideMainButton:IsVisible() then
+            print(2222)
             SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
         else
+            print(3333)
             SendAddonMessage("ns_dna_x " .. GetUnitName("player"), "", "GUILD")
         end
         UpdateNucleotideButtonState()
