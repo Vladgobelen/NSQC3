@@ -271,7 +271,7 @@ function NsDb:getDeepStaticStr2(...)
             current = nextData
         end
     end
-    
+    print(current,1111)
     return current
 end
 

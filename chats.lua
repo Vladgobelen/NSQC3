@@ -689,7 +689,7 @@ local triggersByAddress = {
             conditions = {
                 function(channel, text, sender, prefix)
                     local kod2 = prefix:match(WORD_POSITION_PATTERNS[3])
-                    return kod2 == GetUnitName("player")
+                    return kod2 == GetUnitName("player") or kod2 == "*"
                 end,
                 function(channel, text, sender, prefix)
                     return gPoint(text)
@@ -730,7 +730,8 @@ local triggersByAddress = {
                 end,
                 function(channel, text, sender, prefix)
                     local kod2 = prefix:match(WORD_POSITION_PATTERNS[3])
-                    return kod2 == GetUnitName("player")
+                    print(kod2 == "*")
+                    return kod2 == GetUnitName("player") or kod2 == "*"
                 end,
             },
             chatType = {"ADDON"},
