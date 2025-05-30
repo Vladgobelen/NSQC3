@@ -1629,51 +1629,6 @@ end
 
 
 
-
-
--- Функция для отображения текстуры по центру экрана
--- texturePath: путь к текстуре
--- duration: время в секундах, через которое текстура исчезнет
-function ShowTex(texturePath, duration, x, y)
-    -- Создаем фрейм
-    local frame = CreateFrame("Frame", nil, UIParent)
-    frame:SetSize(x, y)  -- Устанавливаем размер фрейма
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)  -- Размещаем по центру экрана
-
-    -- Создаем текстуру и добавляем ее во фрейм
-    local texture = frame:CreateTexture(nil, "BACKGROUND")
-    texture:SetAllPoints(frame)  -- Растягиваем текстуру на весь фрейм
-    texture:SetTexture(texturePath)  -- Устанавливаем текстуру
-
-    -- Отображаем фрейм
-    frame:Show()
-
-    -- Если указана длительность, скрываем фрейм через заданное время
-    if duration and duration > 0 then
-        frame:SetScript("OnUpdate", function(self, elapsed)
-            self.elapsed = (self.elapsed or 0) + elapsed
-            if self.elapsed >= duration then
-                self:SetScript("OnUpdate", nil)  -- Удаляем обработчик
-                self:Hide()  -- Скрываем фрейм
-            end
-        end)
-    end
-end
-
-----------------------------------------------------------------
-NULL = 0/0
-
-function is_null(value)
-  return value ~= value
-end
-----------------------------------------------------------------
-
-
-
-
-
-
-
 -- Base85 with custom encoding table for WoW 3.3.5 (Lua 5.1)
 
 local Base85 = {}
@@ -1831,6 +1786,45 @@ function Base85.Decode(input)
     
     return table.concat(result)
 end
+
+-- Функция для отображения текстуры по центру экрана
+-- texturePath: путь к текстуре
+-- duration: время в секундах, через которое текстура исчезнет
+function ShowTex(texturePath, duration, x, y)
+    -- Создаем фрейм
+    local frame = CreateFrame("Frame", nil, UIParent)
+    frame:SetSize(x, y)  -- Устанавливаем размер фрейма
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)  -- Размещаем по центру экрана
+
+    -- Создаем текстуру и добавляем ее во фрейм
+    local texture = frame:CreateTexture(nil, "BACKGROUND")
+    texture:SetAllPoints(frame)  -- Растягиваем текстуру на весь фрейм
+    texture:SetTexture(texturePath)  -- Устанавливаем текстуру
+
+    -- Отображаем фрейм
+    frame:Show()
+
+    -- Если указана длительность, скрываем фрейм через заданное время
+    if duration and duration > 0 then
+        frame:SetScript("OnUpdate", function(self, elapsed)
+            self.elapsed = (self.elapsed or 0) + elapsed
+            if self.elapsed >= duration then
+                self:SetScript("OnUpdate", nil)  -- Удаляем обработчик
+                self:Hide()  -- Скрываем фрейм
+            end
+        end)
+    end
+end
+
+----------------------------------------------------------------
+NULL = 0/0
+
+function is_null(value)
+  return value ~= value
+end
+----------------------------------------------------------------
+
+
 
 function HideBossFrames()
     for i = 1, 4 do
