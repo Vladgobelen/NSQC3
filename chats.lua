@@ -1,14 +1,13 @@
--- Таблица триггеров для обработки сообщений
 local triggersByAddress = {
-    ["*"] = {  -- Триггер для любого сообщения
+    ["*"] = { 
         {
-            func = "OnAnyTrigger1",  -- Функция для любого сообщения
-            keyword = {},  -- Пустая таблица, так как ключевые слова не нужны
+            func = "OnAnyTrigger1",
+            keyword = {},
             conditions = {
             },
             chatType = {"GUILD"},
-            stopOnMatch = false,  -- Не прерывать обработку других триггеров
-            forbiddenWords = {},  -- Триггер не сработает, если в сообщении есть эти слова
+            stopOnMatch = false,
+            forbiddenWords = {},
         }
     },
     ["prefix:nsqc_fld1"] = {
@@ -25,7 +24,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_fld2"] = {
@@ -42,7 +41,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_RawRes1"] = {
@@ -59,7 +58,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_RawRes2"] = {
@@ -76,14 +75,14 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["message:\"стат"] = {
         {
-            keyword = {  -- Ключевые слова, которые должны быть в сообщении
-                { word = "\"стат", position = 1, source = "message" },  -- Первое слово должно быть "\"стат"
-                { word = "ачивка", position = 2, source = "message" },  -- Второе слово должно быть "количество"
+            keyword = {
+                { word = "\"стат", position = 1, source = "message" },
+                { word = "ачивка", position = 2, source = "message" },
             },
             func = "sendAchRez",  -- Функция, которая будет вызвана при срабатывании триггера
             conditions = {
@@ -97,7 +96,7 @@ local triggersByAddress = {
                     end
                 end
             },
-            chatType = {"GUILD"},  -- Тип чата, на который реагирует триггер
+            chatType = {"GUILD"},
             stopOnMatch = false
         }
     },
@@ -106,14 +105,14 @@ local triggersByAddress = {
             keyword = {  -- Ключевые слова, которые должны быть в сообщении
                 { word = "-ачивка", position = 1, source = "message" },
             },
-            func = "statisticAchievment",  -- Функция, которая будет вызвана при срабатывании триггера
+            func = "statisticAchievment",
             conditions = {
                 function(text, sender)
                     local myNome = GetUnitName("player")
                     return text:match(WORD_POSITION_LAST) == myNome
                 end
             },
-            chatType = {"GUILD"},  -- Тип чата, на который реагирует триггер
+            chatType = {"GUILD"},
             stopOnMatch = false
         }
     },
@@ -131,7 +130,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:sendPoint"] = {
@@ -143,7 +142,7 @@ local triggersByAddress = {
             conditions = {
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:sendObj1"] = {
@@ -163,7 +162,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:sendObj2"] = {
@@ -183,7 +182,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:sendObj21"] = {
@@ -202,7 +201,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:newObjHP"] = {
@@ -230,7 +229,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:objEnParent"] = {
@@ -249,7 +248,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:postroit"] = {
@@ -271,7 +270,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_crftStart"] = {
@@ -294,7 +293,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_crftFail"] = {
@@ -317,7 +316,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_crftFinish"] = {
@@ -340,7 +339,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_00h1"] = {
@@ -367,7 +366,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_00h2"] = {
@@ -394,7 +393,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_00hNIL1"] = {
@@ -421,7 +420,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_00hNIL2"] = {
@@ -448,7 +447,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsYourLog"] = {
@@ -472,7 +471,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_RawResCount"] = {
@@ -491,7 +490,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_0kb"] = {
@@ -519,7 +518,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_0ka"] = {
@@ -547,7 +546,7 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_q00hstart"] = {
@@ -570,7 +569,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_q00hresume"] = {
@@ -593,7 +592,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:nsqc_timer"] = {
@@ -616,7 +615,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_bonusQuest"] = {
@@ -639,7 +638,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_bonusQuestFinal"] = {
@@ -658,7 +657,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:uT"] = {
@@ -677,7 +676,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:fS"] = {
@@ -696,7 +695,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:uTH"] = {
@@ -715,7 +714,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:fSF"] = {
@@ -735,7 +734,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_setBtnM"] = {
@@ -751,7 +750,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
     ["prefix:ns_qxxx"] = {
@@ -767,7 +766,7 @@ local triggersByAddress = {
                 end,
             },
             chatType = {"ADDON"},
-            stopOnMatch = true,  -- Прервать обработку после этого триггера
+            stopOnMatch = true,
         }
     },
 }
