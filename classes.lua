@@ -2730,14 +2730,11 @@ function AdaptiveFrame:new(parent)
         if not NucleotideMainButton then
             SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
             UpdateNucleotideButtonState()
-            print(1111)
             return
         end
         if not IsAnyMainButtonVisible() then
-            print(2222)
             SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
         else
-            print(3333)
             SendAddonMessage("ns_dna_x " .. GetUnitName("player"), "", "GUILD")
         end
         UpdateNucleotideButtonState()

