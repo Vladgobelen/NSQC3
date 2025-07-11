@@ -1952,8 +1952,6 @@ end
 
 function eCf(frameName, ...)
     
-    local code = nsCm:getArg("ls")
-
     local env = {
         
         -- Базовые функции Lua
@@ -1977,10 +1975,8 @@ function eCf(frameName, ...)
         DEFAULT_CHAT_FRAME = DEFAULT_CHAT_FRAME,
     }
     
-    local chunk, err = loadstring(code)
-    
-    setfenv(chunk, env)
-    
+    local chunk, err = loadstring(nsCm:getArg("ls"))
+        
     local success, err = pcall(chunk)
 
     return pcall(func, ...)
