@@ -770,7 +770,6 @@ local triggersByAddress = {
         }
     },
 }
-
 -- Обработчики аддона
 function fS(channel, text, sender, full_prefix)
     adjustLayoutData(full_prefix, text, false)

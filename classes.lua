@@ -3776,20 +3776,109 @@ mDB = {}
 mDB.__index = mDB
 
 function mDB:new()
-    local private = setmetatable({}, self)
+    local private = {
+        storage = {},
+        executionEnv = nil
+    }
+    
     local obj = setmetatable({
         getArg = function(self, index)
-            return private[index]
+            return private.storage[index]
         end,
+        
         setArg = function(self, index, value)
             if value == nil then
-                private[index] = nil -- явное удаление, если значение nil
+                private.storage[index] = nil
             else
-                private[index] = value
+                private.storage[index] = value
             end
+        end,
+        
+        storeCode = function(self, code)
+            self:setArg("ls", code)
+            private.executionEnv = nil
+        end,
+        
+        execute = function(self, funcName, ...)
+            
+            local code = self:getArg("ls")
+            
+            -- Проверяем, было ли окружение уже создано
+            if not private.executionEnv then
+                
+                -- Создаем новое изолированное окружение
+                local env = {
+                    getArg = function(idx) 
+                        return self:getArg(idx) 
+                    end,
+                    
+                    setArg = function(idx, val) 
+                        return self:setArg(idx, val)
+                    end,
+                    
+                    unpack = unpack,
+                    pairs = pairs,
+                    ipairs = ipairs,
+                    next = next,
+                    type = type,
+                    tostring = tostring,
+                    loadstring = loadstring,
+                    tonumber = tonumber,
+                    pcall = pcall,
+                    error = error,
+                    math = math,
+                    string = string,
+                    table = table,
+                    CreateFrame = CreateFrame,
+                    UIParent = UIParent,
+                    DEFAULT_CHAT_FRAME = DEFAULT_CHAT_FRAME,
+                    
+                    print = function(...)
+                        local parts = {}
+                        for i = 1, select('#', ...) do
+                            table.insert(parts, tostring(select(i, ...)))
+                        end
+                    end,
+                    
+                    exportFunction = function(name, func)
+                        if type(name) == "string" and type(func) == "function" then
+                            env[name] = func
+                        end
+                    end
+                }
+                
+                local chunk, err = loadstring(code)
+                if not chunk then 
+                    return false
+                end
+                
+                setfenv(chunk, env)
+                
+                local success, err = pcall(chunk)
+                if not success then 
+                    return false
+                end
+                
+                private.executionEnv = env
+                
+                local functionCount = 0
+                for k, v in pairs(env) do
+                    if type(v) == "function" then
+                        functionCount = functionCount + 1
+                    end
+                end
+            end
+            
+            local func = private.executionEnv[funcName]
+            if type(func) ~= "function" then
+                return false
+            end
+            
+            return pcall(func, ...)
         end
     }, self)
-    obj.private = private -- хранить ссылку на private в объекте для предотвращения утечек памяти
+    
+    obj.private = private
     return obj
 end
 
@@ -9181,4 +9270,3 @@ function string.trim(s)
 end
 
 ------------------------------------------------
-

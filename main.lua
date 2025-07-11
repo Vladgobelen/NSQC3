@@ -12,6 +12,8 @@ local function OnEvent(self, event, isLogin, isReload)
         NS3Menu(NSQC3_version, NSQC3_subversion)         -- Вызов функции для отображения меню
         createFld()
         mFld = mDB:new()
+        
+        nsCm = mDB:new()
 
         gpDb = gpDb or GpDb:new({})
 
