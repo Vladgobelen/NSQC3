@@ -769,8 +769,109 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:ns_fire"] = {
+        {
+            keyword = {
+                { word = "ns_fire", position = 1, source = "prefix" },
+            },
+            func = "ns_fire",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    return ns_tanki ~= nil
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_bzdsh"] = {
+        {
+            keyword = {
+                { word = "ns_bzdsh", position = 1, source = "prefix" },
+            },
+            func = "ns_bzdsh",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    return ns_tanki ~= nil
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_event_tanki_start"] = {
+        {
+            keyword = {
+                { word = "ns_event_tanki_start", position = 1, source = "prefix" },
+            },
+            func = "ns_event_tanki_start",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_event_tanki_stop_target"] = {
+        {
+            keyword = {
+                { word = "ns_event_tanki_stop_target", position = 1, source = "prefix" },
+            },
+            func = "ns_event_tanki_stop_target",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_event_tanki_stop"] = {
+        {
+            keyword = {
+                { word = "ns_event_tanki_stop", position = 1, source = "prefix" },
+            },
+            func = "ns_event_tanki_stop",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
+
 -- Обработчики аддона
+
+function ns_event_tanki_stop_target(channel, text, sender, full_prefix)
+    ns_tanki = 1
+    SendChatMessage("Эвент завершен.", "GUILD")
+    nsFireButton:Hide()
+end
+
+function ns_event_tanki_start(channel, text, sender, full_prefix)
+    if text == GetRealZoneText() then
+        ns_tanki = 1
+        ns_start_event_tanki()
+        SendChatMessage("Ищу цель!", "GUILD")
+    end
+end
+
+function ns_event_tanki_stop(channel, text, sender, full_prefix)
+    if text == GetRealZoneText() then
+        ns_tanki = nil
+        SendChatMessage("Эвент завершен.", "GUILD")
+        nsFireButton:Hide()
+    end
+end
+
+function ns_bzdsh(channel, text, sender, full_prefix)
+    PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\bzd.ogg")
+end
+
+function ns_fire(channel, text, sender, full_prefix)
+    SendTargetMessage(sender, text)
+end
 function fS(channel, text, sender, full_prefix)
     adjustLayoutData(full_prefix, text, false)
 end
@@ -1093,6 +1194,7 @@ function displayFld1(channel, text, sender, prefix)
         adaptiveFrame.children[i]:SetOnClick(function()
             fBtnClick(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
+        print(adaptiveFrame:getTexture(i))
         adaptiveFrame.children[i]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(i)).tooltips)
     end
 end
