@@ -2182,7 +2182,7 @@ function GpDb:_CreateRaidSelectionWindow()
             if self.gp_data[index] then
                 local nick = self.gp_data[index].original_nick
                 local playerID = self.gp_data[index].playerID or "UNKNOWN" -- Используем сохраненный ID
-                SendAddonMessage("nsGP" .. " " .. gpValue, nick, "guild")
+                SendAddonMessage("nsGP1" .. " " .. gpValue, nick, "guild")
                 logStr = logStr .. " " .. playerID
                 
                 -- Добавляем запись в лог

@@ -839,9 +839,65 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:ns_event_nfs_start"] = {
+        {
+            keyword = {
+                { word = "ns_event_nfs_start", position = 1, source = "prefix" },
+            },
+            func = "ns_event_nfs_start",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_event_nfs_stop_target"] = {
+        {
+            keyword = {
+                { word = "ns_event_nfs_stop_target", position = 1, source = "prefix" },
+            },
+            func = "ns_event_nfs_stop_target",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_event_nfs_stop"] = {
+        {
+            keyword = {
+                { word = "ns_event_nfs_stop", position = 1, source = "prefix" },
+            },
+            func = "ns_event_nfs_stop",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
 
 -- Обработчики аддона
+
+function ns_event_nfs_stop_target(channel, text, sender, full_prefix)
+    nsRace:Stop()
+end
+
+function ns_event_nfs_start(channel, text, sender, full_prefix)
+    if text == GetRealZoneText() then
+        nsRace:Start()
+    end
+end
+
+function ns_event_nfs_stop(channel, text, sender, full_prefix)
+    if text == GetRealZoneText() then
+        nsRace:Stop()        
+    end
+end
 
 function ns_event_tanki_stop_target(channel, text, sender, full_prefix)
     ns_tanki = 1
