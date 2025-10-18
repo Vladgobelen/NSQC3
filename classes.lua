@@ -2659,7 +2659,6 @@ function AdaptiveFrame:new(parent)
     self.initialAspectRatio = self.width / self.height
     self.buttonsPerRow = 5
     self.skipSizeCheck = true
-    
     -- Создаем основной фрейм
     self.frame = CreateFrame("Frame", "AdaptiveFrame_"..math.random(10000), self.parent)
     self.frame:SetSize(self.width, self.height)
@@ -2672,24 +2671,20 @@ function AdaptiveFrame:new(parent)
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    
     FRAME_ALPHA = ns_dbc:getKey("настройки", "FRAME_ALPHA") or FRAME_ALPHA
     BUTTON_ALPHA = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or BUTTON_ALPHA
     self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
-
     -- Текстовое поле
     self.textField = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     self.textField:SetPoint("TOP", self.frame, "TOP", 0, -5)
     self.textField:SetText("")
     self.textField:SetTextColor(1, 1, 1, 1)
-
     -- Настройки перемещения и изменения размера
     self.frame:SetMovable(true)
     self.frame:SetResizable(true)
     self.frame:EnableMouse(true)
     self.frame:RegisterForDrag("LeftButton", "RightButton")
-    
     -- Обработчики событий мыши
     self.frame:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" then
@@ -2698,7 +2693,6 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
-    
     local startX = 0
     local isDragging = false
     self.frame:SetScript("OnMouseUp", function(_, button)
@@ -2709,7 +2703,6 @@ function AdaptiveFrame:new(parent)
             self:StopMovingOrSizing()
         end
     end)
-    
     self.frame:SetScript("OnDragStart", function(_, button)
         if button == "RightButton" then
             startX = GetCursorPosition()
@@ -2739,7 +2732,6 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
-    
     self.frame:SetScript("OnDragStop", function(_, button)
         if button == "RightButton" then
             isDragging = false
@@ -2748,7 +2740,6 @@ function AdaptiveFrame:new(parent)
             self:StopMovingOrSizing()
         end
     end)
-
     -- Кнопка закрытия
     self.closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
     self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -2765,17 +2756,14 @@ function AdaptiveFrame:new(parent)
             end
         end
     end)
-
     -- Кнопка управления боковой панелью
     self.toggleSideButton = CreateFrame("Button", nil, self.frame)
     self.toggleSideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
     self.toggleSideButton:SetPoint("TOPRIGHT", self.closeButton, "BOTTOMRIGHT", 5, -5)
-    
     self.toggleSideButton:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
     self.toggleSideButton:GetNormalTexture():SetDesaturated(true)
     self.toggleSideButton:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
     self.toggleSideButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    
     self.toggleSideButton:SetScript("OnClick", function()
         if not self.sideFrame then
             self:CreateSideFrame()
@@ -2792,15 +2780,12 @@ function AdaptiveFrame:new(parent)
             self.toggleSideButton:GetPushedTexture():SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down")
         end
     end)
-    
-    -- Подсказка для кнопки
     self.toggleSideButton:SetScript("OnEnter", function()
         GameTooltip:SetOwner(self.toggleSideButton, "ANCHOR_RIGHT")
         GameTooltip:SetText("Показать/скрыть инвентарь")
         GameTooltip:Show()
     end)
     self.toggleSideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
     -- Кнопка открытия интерфейса нуклеотидов
     self.nucleotideButton = CreateFrame("Button", nil, self.frame)
     self.nucleotideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -2808,7 +2793,6 @@ function AdaptiveFrame:new(parent)
     self.nucleotideButton:SetNormalTexture("Interface\\ICONS\\inv_misc_gem_diamond_02")
     self.nucleotideButton:SetPushedTexture("Interface\\ICONS\\inv_misc_gem_diamond_02")
     self.nucleotideButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-
     local function UpdateNucleotideButtonState()
         local btn = self.nucleotideButton
         local nucBtn = _G["NucleotideMainButton"]
@@ -2822,7 +2806,6 @@ function AdaptiveFrame:new(parent)
             btn.isNucActive = false
         end
     end
-
     self.nucleotideButton:SetScript("OnClick", function()
         if not NucleotideMainButton then
             SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
@@ -2836,18 +2819,89 @@ function AdaptiveFrame:new(parent)
         end
         UpdateNucleotideButtonState()
     end)
-
     self.nucleotideButton:SetScript("OnEnter", function()
         GameTooltip:SetOwner(self.nucleotideButton, "ANCHOR_RIGHT")
         GameTooltip:SetText("Открыть/скрыть интерфейс нуклеотидов")
         GameTooltip:Show()
     end)
     self.nucleotideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Обновлять состояние при создании
     C_Timer.After(0.5, UpdateNucleotideButtonState)
     self.UpdateNucleotideButtonState = UpdateNucleotideButtonState
+    -- === КНОПКА: переключение видимости маркера игрока ===
+    self.togglePlayerMarkerButton = CreateFrame("Button", nil, self.frame)
+    self.togglePlayerMarkerButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.togglePlayerMarkerButton:SetPoint("TOPRIGHT", self.nucleotideButton, "BOTTOMRIGHT", 0, -5)
+    self.togglePlayerMarkerButton:SetNormalTexture("Interface\\ICONS\\Ability_Mage_Invisibility")
+    self.togglePlayerMarkerButton:SetPushedTexture("Interface\\ICONS\\Ability_Mage_Invisibility")
+    self.togglePlayerMarkerButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    self.drawPlayerMarker = true  -- ✅ флаг: разрешено ли отображать маркер игрока
 
+    local function UpdatePlayerMarkerButtonState()
+        local btn = self.togglePlayerMarkerButton
+        if self.drawPlayerMarker then
+            btn:GetNormalTexture():SetDesaturated(false)
+            btn:SetAlpha(1)
+            GameTooltip:SetText("Скрыть маркер игрока")
+        else
+            btn:GetNormalTexture():SetDesaturated(true)
+            btn:SetAlpha(0.5)
+            GameTooltip:SetText("Показать маркер игрока")
+        end
+    end
+
+    self.togglePlayerMarkerButton:SetScript("OnClick", function()
+        self.drawPlayerMarker = not self.drawPlayerMarker
+        if self.playerMarker then
+            if self.drawPlayerMarker then
+                self.playerMarker:Show()
+            else
+                self.playerMarker:Hide()
+                self.playerMarker = nil  -- удаляем, чтобы не мешался
+            end
+        end
+        UpdatePlayerMarkerButtonState()
+    end)
+
+    self.togglePlayerMarkerButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.togglePlayerMarkerButton, "ANCHOR_RIGHT")
+        UpdatePlayerMarkerButtonState()
+        GameTooltip:Show()
+    end)
+
+    self.togglePlayerMarkerButton:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    UpdatePlayerMarkerButtonState()
+    -- Кнопка крафта
+    self.craftButton = CreateFrame("Button", nil, self.frame)
+    self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
+    self.craftButton:SetPoint("TOPRIGHT", self.togglePlayerMarkerButton, "BOTTOMRIGHT", 0, -5)
+    self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+    self.craftButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
+    self.craftButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    self.craftButton.icon = self.craftButton:CreateTexture(nil, "OVERLAY")
+    self.craftButton.icon:SetTexture("Interface\\ICONS\\Trade_BlackSmithing")
+    self.craftButton.icon:SetAllPoints()
+    self.craftSettings = {
+        active = false,
+        visibleCells = {},
+        enabledLocations = CRAFT_ENABLED_LOCATIONS
+    }
+    self.craftButton:SetScript("OnClick", function()
+        self.craftSettings.active = not self.craftSettings.active
+        self:UpdateCraftButtonState()
+        ns_dbc:modKey("настройки", "CRAFT_ACTIVE", self.craftSettings.active)
+    end)
+    self.craftButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.craftButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Режим крафта")
+        GameTooltip:AddLine("ЛКМ - активация/деактивация", 1,1,1)
+        GameTooltip:Show()
+    end)
+    self.craftButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.craftSettings.active = ns_dbc:getKey("настройки", "CRAFT_ACTIVE") or false
+    self:UpdateCraftButtonState()
     -- Ручка изменения размера
     self.resizeHandle = CreateFrame("Button", nil, self.frame)
     self.resizeHandle:SetSize(16, 16)
@@ -2862,7 +2916,6 @@ function AdaptiveFrame:new(parent)
         ns_dbc:modKey("настройки", "mfldRX", x)
         self:AdjustSizeAndPosition()
     end)
-
     -- Обработчик изменения размера
     self.frame:SetScript("OnSizeChanged", function(_, width, height)
         if self.skipSizeCheck then
@@ -2873,51 +2926,18 @@ function AdaptiveFrame:new(parent)
         self.frame:SetSize(width, height)
         self:AdjustSizeAndPosition()
     end)
-
-    self.craftButton = CreateFrame("Button", nil, self.frame)
-    self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
-    self.craftButton:SetPoint("TOPRIGHT", self.nucleotideButton, "BOTTOMRIGHT", 0, -5)
-    
-    -- Текстуры состояний
-    self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
-    self.craftButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
-    self.craftButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    
-    -- Иконка крафта
-    self.craftButton.icon = self.craftButton:CreateTexture(nil, "OVERLAY")
-    self.craftButton.icon:SetTexture("Interface\\ICONS\\Trade_BlackSmithing")
-    self.craftButton.icon:SetAllPoints()
-    
-    -- Инициализация состояния
-    self.craftSettings = {
-        active = false,
-        visibleCells = {},
-        enabledLocations = CRAFT_ENABLED_LOCATIONS  -- Сохраняем таблицу локаций
-    }
-    -- Обработчик клика
-    self.craftButton:SetScript("OnClick", function()
-        self.craftSettings.active = not self.craftSettings.active
-        self:UpdateCraftButtonState()
-        ns_dbc:modKey("настройки", "CRAFT_ACTIVE", self.craftSettings.active)
-    end)
-    
-    self.craftButton:SetScript("OnEnter", function()
-        GameTooltip:SetOwner(self.craftButton, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Режим крафта")
-        GameTooltip:AddLine("ЛКМ - активация/деактивация", 1,1,1)
-        GameTooltip:Show()
-    end)
-    self.craftButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    -- Загрузка сохраненного состояния
-    self.craftSettings.active = ns_dbc:getKey("настройки", "CRAFT_ACTIVE") or false
-    self:UpdateCraftButtonState()
-
     -- Инициализация списка дочерних элементов
     self.children = {}
-    
     return self
 end
+
+----------------------------------------
+----------------------------------------
+----------------------------------------
+
+---------------------------------------
+---------------------------------------
+---------------------------------------
 
 function AdaptiveFrame:UpdateCraftButtonState()
     -- Проверяем необходимые объекты
@@ -3057,15 +3077,34 @@ function AdaptiveFrame:StopMovingOrSizing()
     self:AdjustSizeAndPosition()
 end
 
+-- Универсальная функция ожидания метода
+local function WaitForMethodAndCall(obj, methodName, callback)
+    if obj[methodName] and type(obj[methodName]) == "function" then
+        -- Метод появился — вызываем callback
+        callback()
+    else
+        -- Метода ещё нет — ждём 5 секунд и проверяем снова
+        C_Timer.After(5, function()
+            WaitForMethodAndCall(obj, methodName, callback)
+        end)
+    end
+end
 -- Метод для скрытия фрейма
 function AdaptiveFrame:Hide()
     self.frame:Hide()
+
+    -- Ждём, пока появится StopPlayerPositionTracking, и вызываем его
+    WaitForMethodAndCall(self, "StopPlayerPositionTracking", function()
+        self:StopPlayerPositionTracking()
+    end)
 end
 
 -- Метод для отображения фрейма
 function AdaptiveFrame:Show()
     self.frame:Show()
     self:AdjustSizeAndPosition()
+    -- Запускаем отслеживание позиции игрока при показе фрейма
+    self:StartPlayerPositionTracking()
 end
 
 -- Метод для получения размеров фрейма
