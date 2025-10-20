@@ -825,14 +825,12 @@ function GpDb:_CreateLogWindow()
     self.logWindow:SetPoint("TOPLEFT", self.window, "TOPRIGHT", 5, 0)
     self.logWindow:SetMovable(false)
     self.logWindow:Hide()
-
     -- Фон окна
     self.logWindow.background = self.logWindow:CreateTexture(nil, "BACKGROUND")
     self.logWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.logWindow.background:SetVertexColor(0.1, 0.1, 0.1)
     self.logWindow.background:SetAlpha(0.9)
     self.logWindow.background:SetAllPoints(true)
-
     -- Граница окна
     self.logWindow.borderFrame = CreateFrame("Frame", nil, self.logWindow)
     self.logWindow.borderFrame:SetPoint("TOPLEFT", -3, 3)
@@ -842,20 +840,17 @@ function GpDb:_CreateLogWindow()
         edgeSize = 16,
         insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
-
     -- Кнопка закрытия
     self.logWindow.closeButton = CreateFrame("Button", nil, self.logWindow, "UIPanelCloseButton")
     self.logWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
     self.logWindow.closeButton:SetScript("OnClick", function() 
         self.logWindow:Hide() 
     end)
-
     -- Фильтры
     self.logWindow.filters = CreateFrame("Frame", nil, self.logWindow)
     self.logWindow.filters:SetPoint("TOPLEFT", 10, -5)
     self.logWindow.filters:SetPoint("RIGHT", -10, 0)
     self.logWindow.filters:SetHeight(30)
-
     -- Поле "Количество"
     self.logWindow.countFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.countFilter:SetSize(60, 20)
@@ -867,19 +862,17 @@ function GpDb:_CreateLogWindow()
         self.logWindow.countFilter:ClearFocus() 
         self:UpdateLogDisplay()
     end)
-
-    -- Поле "Время"
+    -- Поле "День" (вместо "Время")
     self.logWindow.timeFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.timeFilter:SetSize(70, 20)
     self.logWindow.timeFilter:SetPoint("LEFT", self.logWindow.countFilter, "RIGHT", 5, 0)
     self.logWindow.timeFilter:SetAutoFocus(false)
-    self.logWindow.timeFilter:SetText("Время")
+    self.logWindow.timeFilter:SetText("День")
     self.logWindow.timeFilter:SetScript("OnEscapePressed", function() self.logWindow.timeFilter:ClearFocus() end)
     self.logWindow.timeFilter:SetScript("OnEnterPressed", function() 
         self.logWindow.timeFilter:ClearFocus() 
         self:UpdateLogDisplay()
     end)
-
     -- Поле "РЛ"
     self.logWindow.rlFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.rlFilter:SetSize(70, 20)
@@ -891,7 +884,6 @@ function GpDb:_CreateLogWindow()
         self.logWindow.rlFilter:ClearFocus() 
         self:UpdateLogDisplay()
     end)
-
     -- Поле "Рейд"
     self.logWindow.raidFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.raidFilter:SetSize(100, 20)
@@ -903,7 +895,6 @@ function GpDb:_CreateLogWindow()
         self.logWindow.raidFilter:ClearFocus() 
         self:UpdateLogDisplay()
     end)
-
     -- Поле "Ник"
     self.logWindow.nameFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.nameFilter:SetSize(100, 20)
@@ -915,7 +906,6 @@ function GpDb:_CreateLogWindow()
         self.logWindow.nameFilter:ClearFocus() 
         self:UpdateLogDisplay()
     end)
-
     -- Кнопка "Показать"
     self.logWindow.showButton = CreateFrame("Button", nil, self.logWindow.filters, "UIPanelButtonTemplate")
     self.logWindow.showButton:SetSize(80, 22)
@@ -923,47 +913,71 @@ function GpDb:_CreateLogWindow()
     self.logWindow.showButton:SetText("Показать")
     self.logWindow.showButton:SetScript("OnClick", function()
         local function processFilterText(text, placeholder)
-            if text == placeholder then
-                return ""
+            if text == placeholder or text == "" then
+                return "_"
             end
             if text:find("%s") then
                 text = text:gsub("%s+", "_")
             end
             return text
         end
+
         local count = processFilterText(self.logWindow.countFilter:GetText(), "Кол-во")
-        local time = processFilterText(self.logWindow.timeFilter:GetText(), "Время")
+        local time = processFilterText(self.logWindow.timeFilter:GetText(), "День")
         local rl = processFilterText(self.logWindow.rlFilter:GetText(), "РЛ")
         local raid = processFilterText(self.logWindow.raidFilter:GetText(), "Рейд")
-        local name = processFilterText(self.logWindow.nameFilter:GetText(), "Ник")
-        print("|cFF00FF00[Клиент] Запрос логов:|r", count, time, rl, raid, name)
-        self:ClearLog()
-        SendAddonMessage("NSShowMeLogs", count.. " " ..time.. " " ..rl.. " " ..raid.. " " ..name, "GUILD")
-    end)
+        
+        -- === Преобразуем имя → код через officerNote ===
+        local nameInput = self.logWindow.nameFilter:GetText()
+        local name = "_"
+        if nameInput ~= "" and nameInput ~= "Ник" then
+            local foundCode = nil
+            -- Ищем игрока по имени в гильдии
+            for i = 1, GetNumGuildMembers() do
+                local guildName, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(i)
+                if guildName and officerNote then
+                    -- Убираем серверную часть из имени (если есть)
+                    local plainName = guildName:match("^(.-)-") or guildName
+                    if plainName == nameInput then
+                        -- Парсим officerNote: ожидаем формат "что-то КОД ..."
+                        local words = {}
+                        for w in officerNote:gmatch("%S+") do
+                            table.insert(words, w)
+                        end
+                        if #words >= 2 then
+                            foundCode = words[2]
+                            break
+                        end
+                    end
+                end
+            end
+            name = foundCode or nameInput  -- если не нашли — отправляем как есть (на случай ручного ввода кода)
+        end
 
+        local request = count .. " " .. time .. " " .. rl .. " " .. raid .. " " .. name
+        print("|cFF00FF00[Клиент] Запрос логов:|r", request)
+        self:ClearLog()
+        SendAddonMessage("NSShowMeLogs", request, "GUILD")
+    end)
     -- Область с прокруткой для логов
     self.logWindow.scrollFrame = CreateFrame("ScrollFrame", "GpDbLogScrollFrame", self.logWindow, "UIPanelScrollFrameTemplate")
     self.logWindow.scrollFrame:SetPoint("TOPLEFT", 0, -35)
     self.logWindow.scrollFrame:SetPoint("BOTTOMRIGHT", 0, 10)
-
     self.logWindow.scrollChild = CreateFrame("Frame")
     self.logWindow.scrollChild:SetSize(580, 1000)
     self.logWindow.scrollFrame:SetScrollChild(self.logWindow.scrollChild)
-
     -- Создаем строки для отображения логов
     self.logRows = {}
     for i = 1, 2000 do
         local row = CreateFrame("Frame", "GpDbLogRow"..i, self.logWindow.scrollChild)
-        row:SetSize(580, 40) -- Увеличиваем высоту для переноса строк
+        row:SetSize(580, 40)
         row:SetPoint("TOPLEFT", 0, -((i-1)*40))
-
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         row.text:SetAllPoints(true)
         row.text:SetJustifyH("LEFT")
         row.text:SetJustifyV("TOP")
-        row.text:SetWordWrap(true) -- Включаем перенос слов
+        row.text:SetWordWrap(true)
         row.text:SetText("")
-
         self.logRows[i] = row
     end
 end
@@ -974,7 +988,7 @@ function GpDb:ClearLog()
     
     -- Очищаем фильтры
     self.logWindow.countFilter:SetText("Кол-во")
-    self.logWindow.timeFilter:SetText("Время")
+    self.logWindow.timeFilter:SetText("День")
     self.logWindow.rlFilter:SetText("РЛ")
     self.logWindow.raidFilter:SetText("Рейд")
     self.logWindow.nameFilter:SetText("Ник")
@@ -1307,30 +1321,25 @@ function GpDb:ToggleLogWindow()
     if not self.logWindow then
         self:_CreateLogWindow()
     end
-
     if self.logWindow:IsShown() then
         self.logWindow:Hide()
     else
         self.logWindow:Show()
-
-        -- Собираем оригинальные ники выделенных игроков
-        local selectedNicks = {}
+        local selectedCodes = {}
         for index in pairs(self.selected_indices) do
-            if self.gp_data[index] and self.gp_data[index].original_nick then
-                table.insert(selectedNicks, self.gp_data[index].original_nick)
+            if self.gp_data[index] and self.gp_data[index].playerID then
+                table.insert(selectedCodes, self.gp_data[index].playerID)
             end
         end
-
-        if #selectedNicks > 0 then
-            local nickFilter = table.concat(selectedNicks, "_")
-            print("|cFF00FF00[Клиент] Запрос логов по игрокам:|r", nickFilter)
+        if #selectedCodes > 0 then
+            local codeFilter = table.concat(selectedCodes, "_")
+            print("|cFF00FF00[Клиент] Запрос логов по кодам игроков:|r", codeFilter)
             self:ClearLog()
-            SendAddonMessage("NSShowMeLogs", "0 0 РЛ Рейд " .. nickFilter, "GUILD")
+            -- Отправляем ПУСТЫЕ значения для первых 4 полей, коды — в 5-м
+            SendAddonMessage("NSShowMeLogs", "    " .. codeFilter, "GUILD")
         else
             self:UpdateLogDisplay()
         end
-
-        -- Корректируем размер окна логов
         if self.raidWindow and self.raidWindow:IsShown() then
             self.logWindow:SetHeight(self.window:GetHeight() / 2)
         else
