@@ -879,9 +879,30 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:NSQC3_ver"] = {
+        {
+            keyword = {
+                { word = "NSQC3_ver", position = 1, source = "prefix" },
+            },
+            func = "NSQC3_ver",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
 
 -- Обработчики аддона
+
+-- Функция отправки версии аддона в гильдию
+-- Использует глобальные переменные NSQC3_version и NSQC3_subversion
+function NSQC3_ver()
+    local playerName = UnitName("player")
+    local versionStr = string.format("%d.%d", NSQC3_version or 0, NSQC3_subversion or 0)
+    local message = playerName .. ": " .. versionStr
+    SendAddonMessage("NSQC3_myVer", message, "GUILD")
+end
 
 function ns_event_nfs_stop_target(channel, text, sender, full_prefix)
     nsRace:Stop()
