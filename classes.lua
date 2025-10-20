@@ -1713,16 +1713,20 @@ function GpDb:_UpdateFromGuild()
         self:UpdateWindow()
         return
     end
+
     -- Обновляем данные гильдии
     GuildRoster()
+
     -- Сохраняем self в локальную переменную для замыкания
     local db = self
+
     -- Для 3.3.5 используем простой таймер без возможности отмены
     local timerFrame = CreateFrame("Frame")
     timerFrame:SetScript("OnUpdate", function(selfFrame, elapsed)
         selfFrame.elapsed = (selfFrame.elapsed or 0) + elapsed
         if selfFrame.elapsed >= 0.01 then
             selfFrame:SetScript("OnUpdate", nil)
+
             -- Собираем полный список членов гильдии для быстрой проверки
             local guildRosterInfo = {}
             for j = 1, GetNumGuildMembers() do
@@ -1745,10 +1749,12 @@ function GpDb:_UpdateFromGuild()
                         publicNote = publicNote,
                         officerNote = officerNote,
                         classFileName = classFileName,
-                        playerID = playerID
+                        playerID = playerID,
+                        online = select(9, GetGuildRosterInfo(j))
                     }
                 end
             end
+
             -- Режим "Только рейд" и мы в рейде
             if raidOnlyMode then
                 local numRaidMembers = GetNumGroupMembers()
@@ -1817,10 +1823,11 @@ function GpDb:_UpdateFromGuild()
                     local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
                     local online = select(9, GetGuildRosterInfo(i))
                     if name then
-                        -- Фильтр по онлайну/офлайну
-                        if (showOfflineOnly and online) or (not showOfflineOnly and not online) then
-                            -- Пропускаем
+                        -- === ИСПРАВЛЕННАЯ ЛОГИКА ФИЛЬТРАЦИИ ===
+                        if not showOfflineOnly and not online then
+                            -- Пропускаем офлайн, если "Off" выключена
                         else
+                            -- Отображаем: всех, если "Off" включена; только онлайн — если выключена
                             local plainName = name:match("^(.-)-") or name
                             local gp = 0
                             local playerID = nil
@@ -1887,6 +1894,7 @@ function GpDb:_UpdateFromGuild()
                     end
                 end
             end
+
             -- Применяем фильтр
             if db.filterText and db.filterText ~= "" then
                 local filteredData = {}
@@ -1899,6 +1907,7 @@ function GpDb:_UpdateFromGuild()
                 end
                 db.gp_data = filteredData
             end
+
             -- Обновляем UI
             db.window.countText:SetText(string.format("Отображается игроков: %d", #db.gp_data))
             db.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, GetNumGuildMembers()))
