@@ -722,6 +722,101 @@ function GpDb:new(input_table)
     return new_object
 end
 
+function GpDb:AddRawLogEntry(rawLogString)
+    if not self.logWindow then
+        self:_CreateLogWindow()
+    end
+
+    -- Парсим: "1760908142 Шеф Тест 5 1Ic"
+    local words = {}
+    for word in rawLogString:gmatch("%S+") do
+        table.insert(words, word)
+    end
+
+    if #words < 4 then return end
+
+    local unixTime = tonumber(words[1])
+    local rl = words[2]
+    local raid = words[3]
+    local gpValue = tonumber(words[4]) or 0
+
+    -- Цели — всё, что после 4-го слова
+    local targets = {}
+    for i = 5, #words do
+        table.insert(targets, words[i])
+    end
+    local targetsStr = table.concat(targets, " ")
+
+    -- Форматируем время из unixtime
+    local formattedTime = "|cFFA0A0A0" .. date("%d %H:%M:%S", unixTime) .. "|r"
+
+    -- Получаем цвет класса для РЛ
+    local function GetClassColor(name)
+        if not name or type(name) ~= "string" or name == "" then 
+            return "|cFFFFFFFF" 
+        end
+        for i = 1, GetNumGuildMembers() do
+            local guildName, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
+            if guildName and guildName == name then
+                local color = RAID_CLASS_COLORS[classFileName]
+                if color then
+                    return string.format("|cFF%02x%02x%02x", color.r*255, color.g*255, color.b*255)
+                end
+                break
+            end
+        end
+        return "|cFFFFFFFF"
+    end
+
+    local formattedRl = GetClassColor(rl) .. (rl or "Неизвестно") .. "|r"
+    local gpColor = gpValue >= 0 and "|cFF00FF00" or "|cFFFF0000"
+    local formattedGp = gpColor .. tostring(gpValue) .. "|r"
+    local formattedRaid = "|cFFFFFF00" .. (raid or "Неизвестно") .. "|r"
+
+    -- Декодируем цели (если есть NSQS_dict)
+    local formattedTargets = {}
+    for _, code in ipairs(targets) do
+        local playerName = code
+        if NSQS_dict then
+            for name, info in pairs(NSQS_dict) do
+                if info[2] == code then
+                    playerName = name
+                    break
+                end
+            end
+        end
+        table.insert(formattedTargets, GetClassColor(playerName) .. playerName .. "|r")
+    end
+    local formattedTargetsText = table.concat(formattedTargets, " ")
+
+    local logText = string.format("%s | %s | %s | %s | %s",
+        formattedTime,
+        formattedRl,
+        formattedGp,
+        formattedRaid,
+        formattedTargetsText)
+
+    table.insert(self.logData, {
+        text = logText,
+        raw = {
+            time = unixTime,
+            rl = rl,
+            gp = gpValue,
+            raid = raid,
+            targets = targetsStr
+        }
+    })
+
+    if #self.logData > 2000 then
+        table.remove(self.logData, 1)
+    end
+
+    if self.logWindow and self.logWindow:IsShown() then
+        self:UpdateLogDisplay()
+        self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())
+    end
+end
+
 function GpDb:_CreateLogWindow()
     -- Основное окно логов
     self.logWindow = CreateFrame("Frame", "GpDbLogWindow", self.window)
@@ -827,25 +922,22 @@ function GpDb:_CreateLogWindow()
     self.logWindow.showButton:SetPoint("LEFT", self.logWindow.nameFilter, "RIGHT", 5, 0)
     self.logWindow.showButton:SetText("Показать")
     self.logWindow.showButton:SetScript("OnClick", function()
-        
         local function processFilterText(text)
-            -- Проверяем, содержит ли текст пробелы (несколько слов)
             if text:find("%s") then
-                -- Заменяем все последовательности пробелов на один символ '_'
                 text = text:gsub("%s+", "_")
             end
             return text
         end
-
         local count = processFilterText(self.logWindow.countFilter:GetText())
         local time = processFilterText(self.logWindow.timeFilter:GetText())
         local rl = processFilterText(self.logWindow.rlFilter:GetText())
         local raid = processFilterText(self.logWindow.raidFilter:GetText())
         local name = processFilterText(self.logWindow.nameFilter:GetText())
-
-        gpDb_old:ClearLog()
         
-        SendAddonMessage("NSShowMeLogs", count.. " " ..time.. " " ..rl.. " " ..raid.. " " ..name, "guild")
+        print("|cFF00FF00[Клиент] Запрос логов:|r", count, time, rl, raid, name)
+        
+        self:ClearLog()
+        SendAddonMessage("NSShowMeLogs", count.. " " ..time.. " " ..rl.. " " ..raid.. " " ..name, "GUILD")
     end)
 
     -- Область с прокруткой для логов
@@ -859,7 +951,7 @@ function GpDb:_CreateLogWindow()
 
     -- Создаем строки для отображения логов
     self.logRows = {}
-    for i = 1, 50 do
+    for i = 1, 2000 do
         local row = CreateFrame("Frame", "GpDbLogRow"..i, self.logWindow.scrollChild)
         row:SetSize(580, 40) -- Увеличиваем высоту для переноса строк
         row:SetPoint("TOPLEFT", 0, -((i-1)*40))
@@ -1214,9 +1306,25 @@ function GpDb:ToggleLogWindow()
         self.logWindow:Hide()
     else
         self.logWindow:Show()
-        self:UpdateLogDisplay()
-        
-        -- Если открыто окно рейда - корректируем размер
+
+        -- Собираем оригинальные ники выделенных игроков
+        local selectedNicks = {}
+        for index in pairs(self.selected_indices) do
+            if self.gp_data[index] and self.gp_data[index].original_nick then
+                table.insert(selectedNicks, self.gp_data[index].original_nick)
+            end
+        end
+
+        if #selectedNicks > 0 then
+            local nickFilter = table.concat(selectedNicks, "_")
+            print("|cFF00FF00[Клиент] Запрос логов по игрокам:|r", nickFilter)
+            self:ClearLog()
+            SendAddonMessage("NSShowMeLogs", "0 0 РЛ Рейд " .. nickFilter, "GUILD")
+        else
+            self:UpdateLogDisplay()
+        end
+
+        -- Корректируем размер окна логов
         if self.raidWindow and self.raidWindow:IsShown() then
             self.logWindow:SetHeight(self.window:GetHeight() / 2)
         else
@@ -1334,18 +1442,16 @@ function GpDb:GetSelectedEntries()
     return selected
 end
 
-function GpDb:AddLogEntry(timeStr, gpValue, rl, raid, targets)
+function GpDb:AddLogEntry(timeStr, gpValue, rl, raid, targets, isDecoded)
     -- Проверяем наличие окна логов
     if not self.logWindow then
         self:_CreateLogWindow()
     end
 
-    -- Функция для получения цвета класса игрока
     local function GetClassColor(name)
         if not name or type(name) ~= "string" or name == "" then 
             return "|cFFFFFFFF" 
         end
-        
         for i = 1, GetNumGuildMembers() do
             local guildName, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(i)
             if guildName and guildName == name then
@@ -1356,58 +1462,50 @@ function GpDb:AddLogEntry(timeStr, gpValue, rl, raid, targets)
                 break
             end
         end
-        
         return "|cFFFFFFFF"
     end
-    
-    -- Получаем числовое значение ГП
+
     local gpNumValue = tonumber(gpValue) or 0
-    
-    -- Форматируем компоненты
     local formattedTime = "|cFFA0A0A0" .. (timeStr or "??:??") .. "|r"
     local formattedRl = GetClassColor(rl) .. (rl or "Неизвестно") .. "|r"
     local gpColor = gpNumValue >= 0 and "|cFF00FF00" or "|cFFFF0000"
     local formattedGp = gpColor .. tostring(gpNumValue) .. "|r"
     local formattedRaid = "|cFFFFFF00" .. (raid or "Неизвестно") .. "|r"
-    
-    -- Функция для поиска имени игрока по коду
-    local function GetPlayerNameByCode(code)
-        if not code or type(code) ~= "string" then return code end
-        
-        for i = 1, GetNumGuildMembers() do
-            local name, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(i)
-            if name and officerNote then
-                local words = {}
-                for word in officerNote:gmatch("%S+") do
-                    table.insert(words, word)
-                end
-                if #words >= 2 and words[2] == code then
-                    return name
-                end
-            end
-        end
-        return code -- Возвращаем код, если не нашли игрока
-    end
-    
-    -- Форматируем цели (заменяем коды на имена)
+
+    -- Форматируем цели
     local formattedTargets = {}
     if type(targets) == "string" then
-        for code in targets:gmatch("%S+") do
-            local playerName = GetPlayerNameByCode(code)
+        for word in targets:gmatch("%S+") do
+            local playerName = word
+            -- Декодируем ТОЛЬКО если это не серверная запись (isDecoded == nil или false)
+            if not isDecoded then
+                -- Пытаемся найти имя по коду в officerNote
+                for i = 1, GetNumGuildMembers() do
+                    local name, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(i)
+                    if name and officerNote then
+                        local words = {}
+                        for w in officerNote:gmatch("%S+") do
+                            table.insert(words, w)
+                        end
+                        if #words >= 2 and words[2] == word then
+                            playerName = name
+                            break
+                        end
+                    end
+                end
+            end
             table.insert(formattedTargets, GetClassColor(playerName) .. playerName .. "|r")
         end
     end
     local formattedTargetsText = table.concat(formattedTargets, " ")
 
-    -- Собираем строку лога (время | РЛ | ГП | подземелье | игроки)
     local logText = string.format("%s | %s | %s | %s | %s", 
         formattedTime, 
         formattedRl,
         formattedGp,
         formattedRaid, 
         formattedTargetsText)
-    
-    -- Добавляем новую запись
+
     table.insert(self.logData, {
         text = logText,
         raw = {
@@ -1418,13 +1516,11 @@ function GpDb:AddLogEntry(timeStr, gpValue, rl, raid, targets)
             targets = targets
         }
     })
-    
-    -- Ограничиваем количество записей
-    if #self.logData > 200 then
+
+    if #self.logData > 2000 then
         table.remove(self.logData, 1)
     end
-    
-    -- Обновляем отображение
+
     if self.logWindow and self.logWindow:IsShown() then
         self:UpdateLogDisplay()
         self.logWindow.scrollFrame:SetVerticalScroll(self.logWindow.scrollFrame:GetVerticalScrollRange())

@@ -950,10 +950,12 @@ end
 
 function uT(channel, text, sender, prefix)
     getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, false)
+    print('111')
 end
 
 function uTH(channel, text, sender, prefix)
     getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, true)
+    print('222')
 end
 
 function ns_bonusQuestFinal(channel, text, sender, prefix)
@@ -1117,27 +1119,22 @@ function nsYourLog(channel, text, sender, prefix)
         return
     end
     
-    -- Преобразуем timestamp в "ЧЧ:ММ"
-    local time = date("%H:%M", timestamp)
-    
-    -- Преобразуем raid_id в читаемое название (убираем цифры в начале, если есть)
-    local raid = raid_id:gsub("^%d+_", "")
+    -- Преобразуем timestamp в "ДД ЧЧ:ММ:СС"
+    local timeStr = date("%d %H:%M:%S", tonumber(timestamp))
     
     -- Обрабатываем targets
     local decodedTargets = {}
     for word in targets:gmatch("%S+") do
-        -- Проверяем, есть ли этот ID в таблице соответствия
         if gpDb and gpDb.nsUnitID_tbl and gpDb.nsUnitID_tbl[word] then
             table.insert(decodedTargets, gpDb.nsUnitID_tbl[word])
         else
             table.insert(decodedTargets, word)
         end
     end
-    
-    -- Собираем обратно в строку
     local finalTargets = table.concat(decodedTargets, " ")
     
-    gpDb:AddLogEntry(time, gp, rl, raid, finalTargets)
+    -- Вызываем AddLogEntry с правильным порядком аргументов
+    gpDb:AddLogEntry(timeStr, gp, rl, raid_id, finalTargets)
 end
 
 function postroit_c(channel, text, sender, prefix)
