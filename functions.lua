@@ -2100,7 +2100,26 @@ function hunterCheck()
     end
 end
 
+function GetVisibleGuildNames()
+    local names = {}
+    if not GuildFrame or not GuildFrame:IsVisible() then
+        return names
+    end
 
+    for i = 1, 13 do
+        local button = _G["GuildFrame"]
+        button.Name:SetText("djkfdjskfhdskfh")
+        if button and button:IsShown() and button.Name then
+            local name = button.Name:GetText()
+
+            if nameses and name ~= "" then
+                table.insert(namese, name)
+            end
+        end
+    end
+
+    return names
+end
 
 
 
