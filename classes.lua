@@ -2322,7 +2322,6 @@ end
 
 function GpDb:_UpdatePlayerInfo()
     if not self.raidWindow or not self.raidWindow:IsShown() then return end
-
     local selected = self:GetSelectedEntries()
     if #selected ~= 1 then
         if self.raidWindow.playerInfoContainer then
@@ -2330,17 +2329,17 @@ function GpDb:_UpdatePlayerInfo()
         end
         return
     end
-
     local nick = selected[1].original_nick
     local found = false
     local playerData = nil
-
+    local rosterIndex = nil
     for i = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, level, classFileName, zone, publicNote, officerNote, online = GetGuildRosterInfo(i)
         if name then
             local plainName = name:match("^(.-)-") or name
             if plainName == nick then
                 found = true
+                rosterIndex = i
                 playerData = {
                     name = name,
                     rankName = rankName,
@@ -2356,65 +2355,57 @@ function GpDb:_UpdatePlayerInfo()
             end
         end
     end
-
     if not found then
         if self.raidWindow.playerInfoContainer then
             self.raidWindow.playerInfoContainer:Hide()
         end
         return
     end
-
     -- Создаём контейнер и элементы ОДИН РАЗ
     if not self.raidWindow.playerInfoContainer then
         self.raidWindow.playerInfoContainer = CreateFrame("Frame", nil, self.raidWindow)
         self.raidWindow.playerInfoContainer:SetPoint("TOPRIGHT", -10, -30)
-        self.raidWindow.playerInfoContainer:SetSize(230, 200)
-
+        self.raidWindow.playerInfoContainer:SetSize(230, 220)
         -- Класс
         self.raidWindow.classText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.classText:SetPoint("TOPLEFT", 0, -5)
         self.raidWindow.classText:SetWidth(230)
-
         -- Уровень
         self.raidWindow.levelText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.levelText:SetPoint("TOPLEFT", 0, -25)
         self.raidWindow.levelText:SetWidth(230)
-
+        -- Офлайн (новая строка)
+        self.raidWindow.offlineText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        self.raidWindow.offlineText:SetPoint("TOPLEFT", 0, -45)
+        self.raidWindow.offlineText:SetWidth(230)
         -- Звание с кнопками
         self.raidWindow.rankFrame = CreateFrame("Frame", nil, self.raidWindow.playerInfoContainer)
         self.raidWindow.rankFrame:SetSize(230, 20)
-        self.raidWindow.rankFrame:SetPoint("TOPLEFT", 0, -45)
-
+        self.raidWindow.rankFrame:SetPoint("TOPLEFT", 0, -65)
         self.raidWindow.minusBtn = CreateFrame("Button", nil, self.raidWindow.rankFrame, "UIPanelButtonTemplate")
         self.raidWindow.minusBtn:SetSize(20, 20)
         self.raidWindow.minusBtn:SetPoint("LEFT", 0, 0)
         self.raidWindow.minusBtn:SetText("-")
-
         self.raidWindow.rankText = self.raidWindow.rankFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.rankText:SetPoint("LEFT", self.raidWindow.minusBtn, "RIGHT", 5, 0)
         self.raidWindow.rankText:SetPoint("RIGHT", -25, 0)
-
         self.raidWindow.plusBtn = CreateFrame("Button", nil, self.raidWindow.rankFrame, "UIPanelButtonTemplate")
         self.raidWindow.plusBtn:SetSize(20, 20)
         self.raidWindow.plusBtn:SetPoint("RIGHT", 0, 0)
         self.raidWindow.plusBtn:SetText("+")
-
         -- Публичная заметка
         self.raidWindow.publicBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.publicBtn:SetSize(230, 20)
-        self.raidWindow.publicBtn:SetPoint("TOPLEFT", 0, -70)
-
+        self.raidWindow.publicBtn:SetPoint("TOPLEFT", 0, -90)
         -- Офицерская заметка
         self.raidWindow.officerBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.officerBtn:SetSize(230, 20)
-        self.raidWindow.officerBtn:SetPoint("TOPLEFT", 0, -95)
+        self.raidWindow.officerBtn:SetPoint("TOPLEFT", 0, -115)
     else
         self.raidWindow.playerInfoContainer:Show()
     end
-
     -- === ОБНОВЛЕНИЕ ТЕКСТОВ И ОБРАБОТЧИКОВ ===
     local db = self
-
     -- Класс
     local className = "Класс: ?"
     if playerData.classFileName then
@@ -2427,13 +2418,29 @@ function GpDb:_UpdatePlayerInfo()
         end
     end
     self.raidWindow.classText:SetText(className)
-
     -- Уровень
     self.raidWindow.levelText:SetText("Уровень: " .. (playerData.level or "?"))
-
+    -- Офлайн
+    local offlineStr = "Офлайн: "
+    if playerData.online then
+        offlineStr = offlineStr .. "в сети"
+    else
+        local years, months, days, hours = GetGuildRosterLastOnline(rosterIndex)
+        if years ~= nil then
+            if years > 0 then
+                offlineStr = string.format("Офлайн: %dг %dм %dд %dч", years, months, days, hours)
+            elseif months > 0 then
+                offlineStr = string.format("Офлайн: %dм %dд %dч", months, days, hours)
+            else
+                offlineStr = string.format("Офлайн: %dд %dч", days, hours)
+            end
+        else
+            offlineStr = offlineStr .. "—"
+        end
+    end
+    self.raidWindow.offlineText:SetText(offlineStr)
     -- Звание
     self.raidWindow.rankText:SetText("Звание: " .. (playerData.rankName or "?"))
-
     -- Кнопки повышения/понижения — обновляем обработчики (чтобы playerData был актуальным)
     self.raidWindow.minusBtn:SetScript("OnClick", function()
         if not db:_CheckOfficerRank() then
@@ -2443,7 +2450,6 @@ function GpDb:_UpdatePlayerInfo()
         GuildDemote(playerData.name)
         C_Timer.After(0.5, function() db:_UpdatePlayerInfo() end)
     end)
-
     self.raidWindow.plusBtn:SetScript("OnClick", function()
         if not db:_CheckOfficerRank() then
             print("|cFFFF0000ГП:|r Только офицеры могут менять звания")
@@ -2452,7 +2458,6 @@ function GpDb:_UpdatePlayerInfo()
         GuildPromote(playerData.name)
         C_Timer.After(0.5, function() db:_UpdatePlayerInfo() end)
     end)
-
     -- Публичная заметка
     self.raidWindow.publicBtn:SetText("Публ.: " .. (playerData.publicNote ~= "" and playerData.publicNote or "—"))
     self.raidWindow.publicBtn:SetScript("OnClick", function()
@@ -2487,7 +2492,6 @@ function GpDb:_UpdatePlayerInfo()
         }
         StaticPopup_Show("GP_EDIT_PUBLIC_NOTE")
     end)
-
     -- Офицерская заметка
     self.raidWindow.officerBtn:SetText("Оф.: " .. (playerData.officerNote ~= "" and playerData.officerNote or "—"))
     self.raidWindow.officerBtn:SetScript("OnClick", function()
