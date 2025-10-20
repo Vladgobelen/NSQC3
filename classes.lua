@@ -922,20 +922,21 @@ function GpDb:_CreateLogWindow()
     self.logWindow.showButton:SetPoint("LEFT", self.logWindow.nameFilter, "RIGHT", 5, 0)
     self.logWindow.showButton:SetText("Показать")
     self.logWindow.showButton:SetScript("OnClick", function()
-        local function processFilterText(text)
+        local function processFilterText(text, placeholder)
+            if text == placeholder then
+                return ""
+            end
             if text:find("%s") then
                 text = text:gsub("%s+", "_")
             end
             return text
         end
-        local count = processFilterText(self.logWindow.countFilter:GetText())
-        local time = processFilterText(self.logWindow.timeFilter:GetText())
-        local rl = processFilterText(self.logWindow.rlFilter:GetText())
-        local raid = processFilterText(self.logWindow.raidFilter:GetText())
-        local name = processFilterText(self.logWindow.nameFilter:GetText())
-        
+        local count = processFilterText(self.logWindow.countFilter:GetText(), "Кол-во")
+        local time = processFilterText(self.logWindow.timeFilter:GetText(), "Время")
+        local rl = processFilterText(self.logWindow.rlFilter:GetText(), "РЛ")
+        local raid = processFilterText(self.logWindow.raidFilter:GetText(), "Рейд")
+        local name = processFilterText(self.logWindow.nameFilter:GetText(), "Ник")
         print("|cFF00FF00[Клиент] Запрос логов:|r", count, time, rl, raid, name)
-        
         self:ClearLog()
         SendAddonMessage("NSShowMeLogs", count.. " " ..time.. " " ..rl.. " " ..raid.. " " ..name, "GUILD")
     end)
