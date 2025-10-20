@@ -1335,8 +1335,22 @@ function GpDb:ToggleLogWindow()
             local codeFilter = table.concat(selectedCodes, "_")
             print("|cFF00FF00[Клиент] Запрос логов по кодам игроков:|r", codeFilter)
             self:ClearLog()
-            -- Отправляем ПУСТЫЕ значения для первых 4 полей, коды — в 5-м
-            SendAddonMessage("NSShowMeLogs", "    " .. codeFilter, "GUILD")
+            -- Используем processFilterText для формирования корректного запроса
+            local function processFilterText(text, placeholder)
+                if text == placeholder or text == "" then
+                    return "_"
+                end
+                if text:find("%s") then
+                    text = text:gsub("%s+", "_")
+                end
+                return text
+            end
+            local request = processFilterText("", "Кол-во") .. " " ..
+                            processFilterText("", "День") .. " " ..
+                            processFilterText("", "РЛ") .. " " ..
+                            processFilterText("", "Рейд") .. " " ..
+                            codeFilter
+            SendAddonMessage("NSShowMeLogs", request, "GUILD")
         else
             self:UpdateLogDisplay()
         end

@@ -5,7 +5,7 @@
 -- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
-        NSQC3_version = 2; NSQC3_subversion = 4
+        NSQC3_version = 2; NSQC3_subversion = 5
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
         ns_dbc = ns_dbc or NsDb:new(nsDbc)
