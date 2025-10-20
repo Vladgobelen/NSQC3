@@ -2121,7 +2121,9 @@ function GetVisibleGuildNames()
     return names
 end
 
-
+function IsInRaid()
+    return GetNumRaidMembers() > 0
+end
 
 
 
