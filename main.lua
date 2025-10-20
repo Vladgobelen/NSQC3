@@ -104,23 +104,23 @@ local function OnEvent(self, event, isLogin, isReload)
         end)
 
         C_Timer(1, function()
-            if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
-                hunterCheck()
-            end
-            if nsqc3Timer then
-                if adaptiveFrame:isVisible() then
-                    for i = 1, 100 do
-                        if adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3) == "stl" then
-                            adaptiveFrame.children[i]:SetTextT(nsqc3Timer)
-                        end
-                    end
-                end
-                if nsqc3Timer >=1 then
-                    nsqc3Timer = nsqc3Timer - 1
-                else
-                    nsqc3Timer = nil
-                end
-            end
+            -- if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
+            --     hunterCheck()
+            -- end
+            -- if nsqc3Timer then
+            --     if adaptiveFrame:isVisible() then
+            --         for i = 1, 100 do
+            --             if adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3) == "stl" then
+            --                 adaptiveFrame.children[i]:SetTextT(nsqc3Timer)
+            --             end
+            --         end
+            --     end
+            --     if nsqc3Timer >=1 then
+            --         nsqc3Timer = nsqc3Timer - 1
+            --     else
+            --         nsqc3Timer = nil
+            --     end
+            -- end
         end, true)
 
         -- C_Timer(10, function()
