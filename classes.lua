@@ -7161,6 +7161,7 @@ local BUFF_PRIORITY_POSITION = -100
 
 local MODE_COMBAT_ONLY = 1
 local MODE_ALWAYS_VISIBLE = 2
+local MODE_ALWAYS_HIDDEN = 3
 
 
 function SpellQueue:UpdateDebuffState(spellName)
@@ -7414,8 +7415,15 @@ function SpellQueue:ApplyDisplayMode()
     if self.displayMode == MODE_ALWAYS_VISIBLE then
         self.frame:SetAlpha(INACTIVE_ALPHA)
         self.frame:Show()
-    else
+    elseif self.displayMode == MODE_ALWAYS_HIDDEN then
         self.frame:Hide()
+    else -- MODE_COMBAT_ONLY
+        if self.inCombat then
+            self.frame:SetAlpha(self.alpha)
+            self.frame:Show()
+        else
+            self.frame:Hide()
+        end
     end
 end
 
@@ -7640,10 +7648,22 @@ function SpellQueue:HasWeaponEnchant()
 end
 
 function SpellQueue:ToggleDisplayMode()
-    self.displayMode = (self.displayMode == MODE_COMBAT_ONLY) and MODE_ALWAYS_VISIBLE or MODE_COMBAT_ONLY
+    if self.displayMode == MODE_COMBAT_ONLY then
+        self.displayMode = MODE_ALWAYS_VISIBLE
+    elseif self.displayMode == MODE_ALWAYS_VISIBLE then
+        self.displayMode = MODE_ALWAYS_HIDDEN
+    else
+        self.displayMode = MODE_COMBAT_ONLY
+    end
     ns_dbc:modKey("настройки", "Skill Queue mode", self.displayMode)
     self:ApplyDisplayMode()
-    print("SpellQueue: Режим "..(self.displayMode == MODE_ALWAYS_VISIBLE and "'Всегда видимый'" or "'Только в бою'"))
+
+    local modeText = {
+        [MODE_COMBAT_ONLY] = "'Только в бою'",
+        [MODE_ALWAYS_VISIBLE] = "'Всегда видимый'",
+        [MODE_ALWAYS_HIDDEN] = "'Всегда скрыт'"
+    }
+    print("SpellQueue: Режим " .. (modeText[self.displayMode] or "'неизвестен'"))
 end
 
 function SpellQueue:RegisterAllEvents()
@@ -7705,26 +7725,18 @@ function SpellQueue:CheckAllDebuffs()
     end
 end
 
-function SpellQueue:LeaveCombat()
-    self.inCombat = false
-    if self.displayMode == MODE_COMBAT_ONLY then
-        self.frame:SetAlpha(INACTIVE_ALPHA)
-        self.frame:Hide()
-    else
-        -- В режиме всегда видимой продолжаем обновление
-        self.frame:SetAlpha(self.alpha)
-        self.frame:Show()
-    end
-end
-
 function SpellQueue:EnterCombat()
     self.inCombat = true
-    self.frame:SetAlpha(self.alpha)
-    self.frame:Show()
+    self:ApplyDisplayMode()
     for spellName, _ in pairs(self.spells) do
         self:UpdateSpellPosition(spellName)
     end
     self:UpdateSpellsPriority()
+end
+
+function SpellQueue:LeaveCombat()
+    self.inCombat = false
+    self:ApplyDisplayMode()
 end
 
 function SpellQueue:SetIconsTable(tblIcons)
@@ -8526,12 +8538,10 @@ function SpellQueue:ForceUpdateAllSpells()
     -- Принудительно обновляем размеры фрейма
     self.frame:SetWidth(self.width)
     self.frame:SetHeight(self.height)
-    
     -- Обновляем все видимые элементы
     self:UpdateComboPoints()
     self:UpdatePoisonStacks()
     self:UpdateResourceBars()
-    
     -- Основная логика обновления заклинаний
     for spellName, spell in pairs(self.spells) do
         -- Проверка на ресурсы
@@ -8543,7 +8553,6 @@ function SpellQueue:ForceUpdateAllSpells()
                 do break end
             end
         end
-        
         -- Проверка на комбо-поинты
         if spell.data.combo and spell.data.combo > 0 then
             if not self:HasEnoughComboPoints(spell.data.combo) then
@@ -8553,17 +8562,14 @@ function SpellQueue:ForceUpdateAllSpells()
                 do break end
             end
         end
-        
         -- Обновляем кулдаун
         local remaining, fullDuration = self:GetSpellCooldown(spellName)
         spell.active = remaining and remaining > 0
         spell.isReady = not spell.active
-        
         -- Обновляем баффы
         if spell.data.buf == 1 then
             spell.hasBuff = self:HasBuff(spellName)
         end
-        
         -- Обновляем дебаффы
         if spell.data.debuf then
             self:UpdateDebuffState(spellName)
@@ -8572,14 +8578,12 @@ function SpellQueue:ForceUpdateAllSpells()
         else
             spell.icon:SetAlpha(COOLDOWN_ALPHA)
         end
-        
         -- Перерисовываем позицию
         self:UpdateSpellPosition(spellName)
     end
-    
     -- Финализируем обновления
     self:UpdateSpellsPriority()
-    self.frame:Show() -- Гарантируем видимость
+    self:ApplyDisplayMode()  -- <<< ИСПРАВЛЕНО: вместо Show()
 end
 
 function SpellQueue:SetAppearanceSettings(options)
