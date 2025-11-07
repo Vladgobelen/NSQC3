@@ -8,6 +8,7 @@ local function OnEvent(self, event, isLogin, isReload)
         NSQC3_version = 2; NSQC3_subversion = 5
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
+        ---
         ns_dbc = ns_dbc or NsDb:new(nsDbc)
         NS3Menu(NSQC3_version, NSQC3_subversion)         -- Вызов функции для отображения меню
         createFld()
@@ -23,6 +24,10 @@ local function OnEvent(self, event, isLogin, isReload)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
         C_Timer(2, function()
+           ---
+           GuildRecruiter.instance = GuildRecruiter.new()
+           nsDbc["набор в гильдию"] = nsDbc["набор в гильдию"] or {}
+           ---
             achievementHelper = AchievementHelper:new()
             questWhatchPanel()
             nsDbc.proks = nsDbc.proks or {}

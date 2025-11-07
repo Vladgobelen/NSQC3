@@ -2130,3 +2130,136 @@ end
 
 
 
+local frame = CreateFrame("Frame", "RandomRouteTexture", WorldMapFrame)
+frame:SetAllPoints(WorldMapFrame)
+
+local texture = frame:CreateTexture(nil, "OVERLAY")
+texture:SetTexture("Interface\\AddOns\\NSQC3\\libs\\121212.tga")
+texture:SetWidth(32)
+texture:SetHeight(32)
+texture:SetBlendMode("ADD")
+
+-- Функция для получения безопасных координат с учетом размера текстуры
+local function GetSafeCoordinates(x, y)
+    local mapWidth = WorldMapFrame:GetWidth()
+    local mapHeight = WorldMapFrame:GetHeight()
+    
+    -- Рассчитываем минимальные и максимальные координаты с учетом размера текстуры
+    local minX = texture:GetWidth() / 2 / mapWidth
+    local maxX = 1 - minX
+    local minY = texture:GetHeight() / 2 / mapHeight
+    local maxY = 1 - minY
+    
+    -- Ограничиваем координаты безопасными значениями
+    local safeX = math.max(minX, math.min(maxX, x))
+    local safeY = math.max(minY, math.min(maxY, y))
+    
+    return safeX, safeY
+end
+
+-- Генерация случайных точек в безопасной зоне
+local function GenerateRandomPath(segments)
+    local points = {}
+    for i = 1, segments do
+        local x, y = GetSafeCoordinates(math.random(), math.random())
+        points[i] = {
+            x = x,
+            y = y
+        }
+    end
+    table.sort(points, function(a, b) 
+        return (a.x + a.y) < (b.x + b.y)
+    end)
+    return points
+end
+
+-- Безопасные стартовая и конечная точки
+local startX, startY = GetSafeCoordinates(0, 0)
+local endX, endY = GetSafeCoordinates(1, 1)
+
+-- Анимация движения
+local function StartAnimation()
+    local path = GenerateRandomPath(5)
+    local duration = 20
+    local startTime = GetTime()
+    
+    local function OnUpdate()
+        local elapsed = GetTime() - startTime
+        local progress = elapsed / duration
+        
+        if progress > 1 then
+            -- Финальная позиция (безопасная)
+            texture:SetPoint("CENTER", WorldMapFrame, "TOPLEFT", 
+                endX * WorldMapFrame:GetWidth(), 
+                -endY * WorldMapFrame:GetHeight())
+            frame:SetScript("OnUpdate", nil)
+            return
+        end
+        
+        -- Интерполяция между точками пути
+        local totalSegments = #path + 1
+        local segmentProgress = progress * totalSegments
+        local currentSegment = math.floor(segmentProgress)
+        local segmentFraction = segmentProgress - currentSegment
+        
+        local x1, y1, x2, y2
+        
+        if currentSegment == 0 then
+            x1, y1 = startX, startY
+            x2, y2 = path[1].x, path[1].y
+        elseif currentSegment >= #path then
+            x1, y1 = path[#path].x, path[#path].y
+            x2, y2 = endX, endY
+        else
+            x1, y1 = path[currentSegment].x, path[currentSegment].y
+            x2, y2 = path[currentSegment + 1].x, path[currentSegment + 1].y
+        end
+        
+        local currentX = x1 + (x2 - x1) * segmentFraction
+        local currentY = y1 + (y2 - y1) * segmentFraction
+        
+        -- Обеспечиваем безопасные координаты на каждом кадре
+        local safeX, safeY = GetSafeCoordinates(currentX, currentY)
+        
+        texture:SetPoint("CENTER", WorldMapFrame, "TOPLEFT", 
+            safeX * WorldMapFrame:GetWidth(), 
+            -safeY * WorldMapFrame:GetHeight())
+    end
+    
+    -- Начальная позиция (безопасная)
+    texture:SetPoint("CENTER", WorldMapFrame, "TOPLEFT", 
+        startX * WorldMapFrame:GetWidth(), 
+        -startY * WorldMapFrame:GetHeight())
+    
+    frame:SetScript("OnUpdate", OnUpdate)
+end
+
+-- Запуск анимации при открытии карты
+WorldMapFrame:HookScript("OnShow", StartAnimation)
+
+-- Остановка анимации при закрытии карты
+WorldMapFrame:HookScript("OnHide", function()
+    frame:SetScript("OnUpdate", nil)
+end)
+
+
+
+function GetGuildRosterInfoTable()
+    local guildInfo = {}
+    local numGuildMembers = GetNumGuildMembers()
+
+    for i = 1, numGuildMembers do
+        local name, rank, rankIndex, level, class, zone, note, officerNote, online, status, classFileName = GetGuildRosterInfo(i)
+        if name then
+            table.insert(guildInfo, {
+                name = name,
+                level = level,
+                class = class,
+                publicNote = note or "",
+                officerNote = officerNote or ""
+            })
+        end
+    end
+
+    return guildInfo
+end
