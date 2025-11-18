@@ -2263,3 +2263,160 @@ function GetGuildRosterInfoTable()
 
     return guildInfo
 end
+
+----------------------------------------------------------------------------
+NSQC3 = {}
+NSQC3.waypoints = {}
+NSQC3.overlay = {}
+NSQC3.calib = {}  -- { screenTopLeft, mapTopLeft, mapBottomRight }
+NSQC3.mode = "idle" -- "idle", "calibrating", "tracking"
+
+-- Восстанавливаем обработчик при каждом обновлении карты
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("WORLD_MAP_UPDATE")
+frame:SetScript("OnEvent", function()
+    if WorldMapFrame:IsVisible() then
+        NSQC3:AttachClickHandler()
+    end
+end)
+
+function NSQC3:AttachClickHandler()
+    if not WorldMapButton or not WorldMapButton:IsVisible() then return end
+
+    WorldMapButton:SetScript("OnMouseUp", function(_, button)
+        if button ~= "LeftButton" then return end
+
+        local cursorX, cursorY = GetCursorPosition()
+        local uiScale = UIParent:GetEffectiveScale()
+        cursorX = cursorX / uiScale
+        cursorY = cursorY / uiScale
+
+        if NSQC3.mode == "idle" then
+            NSQC3.calib = {}
+            NSQC3.waypoints = {}
+            NSQC3.mode = "calibrating"
+            table.insert(NSQC3.calib, {x = cursorX, y = cursorY})
+            print("NSQC3: Клик 1/3 — отметьте ЛЕВЫЙ ВЕРХНИЙ УГОЛ ЭКРАНА ИГРЫ (где начинается UI)")
+            NSQC3:ClearOverlay()
+        elseif NSQC3.mode == "calibrating" then
+            table.insert(NSQC3.calib, {x = cursorX, y = cursorY})
+            if #NSQC3.calib == 2 then
+                print("NSQC3: Клик 2/3 — отметьте ЛЕВЫЙ ВЕРХНИЙ УГОЛ КАРТЫ")
+            elseif #NSQC3.calib == 3 then
+                NSQC3.mode = "tracking"
+                print("NSQC3: Калибровка завершена. Следующие клики — точки маршрута.")
+            end
+        elseif NSQC3.mode == "tracking" then
+            -- Преобразуем в (0..1) относительно карты
+            local screenTL = NSQC3.calib[1]  -- левый верх экрана
+            local mapTL   = NSQC3.calib[2]  -- левый верх карты
+            local mapBR   = NSQC3.calib[3]  -- правый низ карты
+
+            -- Смещение относительно левого верха карты
+            local dx = cursorX - mapTL.x
+            local dy = cursorY - mapTL.y
+
+            -- Размеры карты в пикселях
+            local mapWidth  = mapBR.x - mapTL.x
+            local mapHeight = mapBR.y - mapTL.y
+
+            if mapWidth == 0 or mapHeight == 0 then return end
+
+            local normX = dx / mapWidth
+            local normY = dy / mapHeight
+
+            table.insert(NSQC3.waypoints, {x = normX, y = normY})
+            print("NSQC3: Added waypoint", #NSQC3.waypoints, string.format("(%.3f, %.3f)", normX, normY))
+        end
+    end)
+end
+
+function NSQC3:ClearOverlay()
+    if not NSQC3.overlay then NSQC3.overlay = {} end
+    for i, tex in pairs(NSQC3.overlay) do
+        if tex and tex:IsObjectType("Texture") then
+            tex:Hide()
+        end
+    end
+    wipe(NSQC3.overlay)
+end
+
+function NSQC3:DrawWaypoints(from, to)
+    if NSQC3.mode ~= "tracking" then
+        print("NSQC3: Сначала завершите калибровку (3 клика)!")
+        return
+    end
+
+    NSQC3:ClearOverlay()
+    from = from or 1
+    to = to or #NSQC3.waypoints
+    from = math.max(1, from)
+    to = math.min(#NSQC3.waypoints, to)
+
+    local mapTL = NSQC3.calib[2]
+    local mapBR = NSQC3.calib[3]
+    if not mapTL or not mapBR then return end
+
+    local mapWidth  = mapBR.x - mapTL.x
+    local mapHeight = mapBR.y - mapTL.y
+
+    for i = from, to do
+        local wp = NSQC3.waypoints[i]
+        -- Восстанавливаем абсолютную позицию на экране
+        local screenX = mapTL.x + wp.x * mapWidth
+        local screenY = mapTL.y + wp.y * mapHeight
+
+        -- Позиционируем относительно WorldMapButton
+        local left = WorldMapButton:GetLeft()
+        local top = WorldMapButton:GetTop()
+        local relX = screenX - left
+        local relY = top - screenY  -- Y растёт вниз
+
+        local tex = WorldMapButton:CreateTexture(nil, "OVERLAY")
+        tex:SetTexture("Interface\\AddOns\\NSQC3\\libs\\121212.tga")
+        tex:SetWidth(6)
+        tex:SetHeight(6)
+        tex:SetPoint("CENTER", WorldMapButton, "TOPLEFT", relX, -relY)
+        tex:Show()
+        NSQC3.overlay[i] = tex
+    end
+end
+
+-- Команды
+SLASH_NSQC31 = "/nsqc3"
+SlashCmdList["NSQC3"] = function(msg)
+    local args = {}
+    for word in msg:gmatch("%S+") do table.insert(args, word) end
+    local cmd = (args[1] or ""):lower()
+
+    if cmd == "draw" then
+        NSQC3:DrawWaypoints(tonumber(args[2]), tonumber(args[3]))
+    elseif cmd == "clear" then
+        NSQC3:ClearOverlay()
+    elseif cmd == "count" or cmd == "" then
+        print("NSQC3 waypoints:", #NSQC3.waypoints)
+        print("Mode:", NSQC3.mode)
+        if NSQC3.mode == "calibrating" then
+            print("Калибровка:", #NSQC3.calib, "/ 3")
+        end
+    elseif cmd == "list" then
+        for i, wp in ipairs(NSQC3.waypoints) do
+            print(i, string.format("(%.3f, %.3f)", wp.x, wp.y))
+        end
+    elseif cmd == "reset" then
+        NSQC3.waypoints = {}
+        NSQC3.calib = {}
+        NSQC3.mode = "idle"
+        NSQC3:ClearOverlay()
+        print("NSQC3: Сброшено. Откройте карту и начните с КЛИКА 1 (левый верх экрана).")
+    else
+        print("/nsqc3 [count|draw|clear|list|reset]")
+        print("Калибровка:")
+        print("1. Клик: левый верх экрана (где начинается UI)")
+        print("2. Клик: левый верх карты")
+        print("3. Клик: правый низ карты")
+        print("4+. Клики: точки маршрута")
+    end
+end
+
+NSQC3.overlay = {}

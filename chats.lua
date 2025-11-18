@@ -1268,7 +1268,6 @@ function displayFld1(channel, text, sender, prefix)
         adaptiveFrame.children[i]:SetOnClick(function()
             fBtnClick(i, adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3))
         end)
-        print(adaptiveFrame:getTexture(i))
         adaptiveFrame.children[i]:SetMultiLineTooltip(mFldObj:getKey(adaptiveFrame:getTexture(i)).tooltips)
     end
 end

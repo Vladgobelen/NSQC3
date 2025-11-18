@@ -8108,7 +8108,7 @@ end
 
 function SpellQueue:GetSpellCooldown(spellName)
     local start, duration, enabled = GetSpellCooldown(spellName)
-    if start == 0 or duration == 0 then
+    if not start or not duration or start == 0 or duration == 0 then
         return 0, 0
     end
     local now = GetTime()
