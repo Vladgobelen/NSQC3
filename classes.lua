@@ -8109,9 +8109,22 @@ end
 function SpellQueue:GetSpellCooldown(spellName)
     local start, duration, enabled = GetSpellCooldown(spellName)
     if not start or not duration or start == 0 or duration == 0 then
+        if DEBUG then
+            print("SQ_DEBUG: GetSpellCooldown returned invalid values for spell:", tostring(spellName))
+            print("  start =", tostring(start), type(start))
+            print("  duration =", tostring(duration), type(duration))
+            print("  enabled =", tostring(enabled), type(enabled))
+        end
         return 0, 0
     end
     local now = GetTime()
+    if type(start) ~= "number" or type(duration) ~= "number" then
+        print("SQ_ERROR: Unexpected non-numeric values from GetSpellCooldown for spell:", tostring(spellName))
+        print("  start =", tostring(start), type(start))
+        print("  duration =", tostring(duration), type(duration))
+        print("  enabled =", tostring(enabled), type(enabled))
+        return 0, 0
+    end
     local remaining = (start + duration) - now
     return remaining > 0 and remaining or 0, duration
 end
