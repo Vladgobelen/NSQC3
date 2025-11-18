@@ -7742,7 +7742,7 @@ end
 function SpellQueue:SetIconsTable(tblIcons)
     -- Отладочный вывод входящей таблицы
     if type(tblIcons) ~= "table" then
-        print("ERROR: tblIcons is not a table!")
+        --print("ERROR: tblIcons is not a table!")
         return
     end
     
@@ -8525,7 +8525,7 @@ function SpellQueue:UpdateSkillTables()
                     combined[k].resource = nil
                 end
             else
-                print(string.format("  Skipped (duplicate): %s", k))
+                --print(string.format("  Skipped (duplicate): %s", k))
             end
         end
     end
@@ -9824,15 +9824,6 @@ function GuildRecruiter.new()
         self.settings.races[race] = (saved.settings and saved.settings.races and saved.settings.races[race]) == true
     end
 
-    -- Логирование загруженных настроек
-    print("=== ЗАГРУЗКА НАСТРОЕК ===")
-    print("Фракции: Альянс = " .. tostring(self.settings.factions.Alliance) .. ", Орда = " .. tostring(self.settings.factions.Horde))
-    print("Расы:")
-    for _, race in ipairs(ALL_RACES) do
-        print("  " .. race .. " = " .. tostring(self.settings.races[race]))
-    end
-    print("========================")
-
     self.originalFriendsFramePoint = nil
     self.isUIBuilt = false
     self.results = {}
@@ -10409,14 +10400,6 @@ function GuildRecruiter:OnEvent(event, ...)
 end
 
 function GuildRecruiter:SaveSettings()
-    -- Логирование перед сохранением
-    print("=== СОХРАНЕНИЕ НАСТРОЕК ===")
-    print("Фракции: Альянс = " .. tostring(self.settings.factions.Alliance) .. ", Орда = " .. tostring(self.settings.factions.Horde))
-    print("Расы:")
-    for _, race in ipairs(ALL_RACES) do
-        print("  " .. race .. " = " .. tostring(self.settings.races[race]))
-    end
-    print("========================")
     
     nsDbc["набор в гильдию"] = {
         exceptions = self.exceptions,
@@ -10437,13 +10420,4 @@ function GuildRecruiter:SaveSettings()
     
     -- Проверка сохранения
     local saved = nsDbc["набор в гильдию"]
-    if saved and saved.settings then
-        print("=== ПРОВЕРКА СОХРАНЕНИЯ ===")
-        print("Фракции в сохраненных: Альянс = " .. tostring(saved.settings.factions.Alliance) .. ", Орда = " .. tostring(saved.settings.factions.Horde))
-        print("Расы в сохраненных:")
-        for _, race in ipairs(ALL_RACES) do
-            print("  " .. race .. " = " .. tostring(saved.settings.races[race]))
-        end
-        print("==========================")
-    end
 end
