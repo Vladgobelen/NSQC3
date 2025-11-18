@@ -8109,11 +8109,6 @@ end
 function SpellQueue:GetSpellCooldown(spellName)
     local start, duration, enabled = GetSpellCooldown(spellName)
     if not start or not duration or start == 0 or duration == 0 then
-        -- Принудительный вывод при ошибке (без условия DEBUG)
-        print("|cffff0000[SQ ERROR]|r GetSpellCooldown failed for spell:", tostring(spellName))
-        print("  start:", tostring(start), "(" .. type(start) .. ")")
-        print("  duration:", tostring(duration), "(" .. type(duration) .. ")")
-        print("  enabled:", tostring(enabled), "(" .. type(enabled) .. ")")
         return 0, 0
     end
     local now = GetTime()
