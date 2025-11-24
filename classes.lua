@@ -711,14 +711,13 @@ function GpDb:new(input_table)
         last_selected_index = nil,
         logData = {},
         filterText = "",
-        updateTimer = nil  -- Добавляем поле для управления таймером
+        showOnlyNotes = false,
+        updateTimer = nil
     }
     setmetatable(new_object, self)
-    
     new_object:_CreateWindow()
     new_object:_CreateRaidSelectionWindow()
     new_object:_CreateLogWindow()
-    
     return new_object
 end
 
@@ -1090,12 +1089,19 @@ function GpDb:_CreateWindow()
         self:_UpdateFromGuild()
         self:UpdateWindow()
     end)
-    -- 5.1 Поле фильтрации по нику
-    self.window.filterLabel = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.window.filterLabel:SetPoint("TOPLEFT", self.window.raidOnlyCheckbox, "BOTTOMLEFT", 0, -10)
-    self.window.filterLabel:SetText("Фильтр:")
+    -- 5.1 Чекбокс "Заметки"
+    self.window.notesCheckbox = CreateFrame("CheckButton", nil, self.window, "UICheckButtonTemplate")
+    self.window.notesCheckbox:SetPoint("TOPLEFT", self.window.raidOnlyCheckbox, "BOTTOMLEFT", 0, -10)
+    self.window.notesCheckbox:SetSize(24, 24)
+    self.window.notesCheckbox.text = self.window.notesCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.window.notesCheckbox.text:SetPoint("LEFT", self.window.notesCheckbox, "RIGHT", 5, 0)
+    self.window.notesCheckbox.text:SetText("Заметки")
+    self.window.notesCheckbox:SetScript("OnClick", function()
+        self.showOnlyNotes = self.window.notesCheckbox:GetChecked()
+    end)
+    -- 5.2 Поле фильтрации по нику (без надписи "Фильтр:")
     self.window.filterEditBox = CreateFrame("EditBox", nil, self.window, "InputBoxTemplate")
-    self.window.filterEditBox:SetPoint("TOPLEFT", self.window.filterLabel, "BOTTOMLEFT", 0, -5)
+    self.window.filterEditBox:SetPoint("TOPLEFT", self.window.notesCheckbox.text, "BOTTOMLEFT", 0, -5)
     self.window.filterEditBox:SetPoint("RIGHT", self.window.closeButton, "LEFT", -40, 0)
     self.window.filterEditBox:SetHeight(20)
     self.window.filterEditBox:SetAutoFocus(false)
@@ -1111,7 +1117,7 @@ function GpDb:_CreateWindow()
     self.window.filterEditBox:SetScript("OnEnterPressed", function() 
         self.window.filterEditBox:ClearFocus() 
     end)
-    -- 5.2 Кнопка очистки фильтра
+    -- 5.3 Кнопка очистки фильтра
     self.window.filterClearButton = CreateFrame("Button", nil, self.window, "UIPanelButtonTemplate")
     self.window.filterClearButton:SetSize(80, 22)
     self.window.filterClearButton:SetPoint("TOPRIGHT", self.window.filterEditBox, "BOTTOMRIGHT", 60, 20)
@@ -1335,7 +1341,6 @@ function GpDb:ToggleLogWindow()
             local codeFilter = table.concat(selectedCodes, "_")
             print("|cFF00FF00[Клиент] Запрос логов по кодам игроков:|r", codeFilter)
             self:ClearLog()
-            -- Используем processFilterText для формирования корректного запроса
             local function processFilterText(text, placeholder)
                 if text == placeholder or text == "" then
                     return "_"
@@ -1352,7 +1357,21 @@ function GpDb:ToggleLogWindow()
                             codeFilter
             SendAddonMessage("NSShowMeLogs", request, "GUILD")
         else
-            self:UpdateLogDisplay()
+            -- Применяем фильтр "Заметки", если он включён
+            if self.window.notesCheckbox and self.window.notesCheckbox:GetChecked() then
+                local filteredLogData = {}
+                for _, entry in ipairs(self.logData) do
+                    if entry.raw and entry.raw.raid and entry.raw.raid:find(">>", 1, true) then
+                        table.insert(filteredLogData, entry)
+                    end
+                end
+                local originalLogData = self.logData
+                self.logData = filteredLogData
+                self:UpdateLogDisplay()
+                self.logData = originalLogData
+            else
+                self:UpdateLogDisplay()
+            end
         end
         if self.raidWindow and self.raidWindow:IsShown() then
             self.logWindow:SetHeight(self.window:GetHeight() / 2)

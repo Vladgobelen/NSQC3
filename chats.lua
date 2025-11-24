@@ -1139,7 +1139,12 @@ function nsYourLog(channel, text, sender, prefix)
         print("Не удалось распарсить строку:", text)
         return
     end
-    
+
+    -- === ФИЛЬТРАЦИЯ ПО ЧЕКБОКСУ "Заметки" ===
+    if gpDb and gpDb.showOnlyNotes and not (raid_id:find(">>", 1, true)) then
+        return  -- Игнорируем запись
+    end
+
     -- Преобразуем timestamp в "ДД ЧЧ:ММ:СС"
     local timeStr = date("%d %H:%M:%S", tonumber(timestamp))
     
