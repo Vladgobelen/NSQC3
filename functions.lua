@@ -2511,9 +2511,29 @@ monitor:SetScript("OnUpdate", function(self, elapsed)
 end)
 -- === END CLIENT ===
 
--- === NSQC3: DELETE VIA CREATE EVENT FRAME ONLY ===
-if _G.NSQC3_CALENDAR_DEL_HOOKED then return end
-_G.NSQC3_CALENDAR_DEL_HOOKED = true
+-- === NSQC3: CALENDAR CONTEXT MENU WITH TWO BUTTONS ===
+if _G.NSQC3_CALENDAR_MENU_HOOKED then return end
+_G.NSQC3_CALENDAR_MENU_HOOKED = true
+
+-- Вспомогательная функция: отправка чанками
+local function SendAddonMessageChunked(prefix, payload, channel)
+    if not payload or payload == "" then return end
+    local MAX_CHUNK_SIZE = 200
+    local chunks = {}
+    local i = 1
+    while i <= #payload do
+        table.insert(chunks, payload:sub(i, i + MAX_CHUNK_SIZE - 1))
+        i = i + MAX_CHUNK_SIZE
+    end
+
+    local total = #chunks
+    for idx = 1, total do
+        local msg = string.format("%d/%d|%s", idx, total, chunks[idx])
+        if #msg <= 254 then
+            SendAddonMessage(prefix, msg, channel)
+        end
+    end
+end
 
 local function TryHookContextMenu()
     if not _G.CalendarContextMenu then
@@ -2521,62 +2541,104 @@ local function TryHookContextMenu()
         return
     end
 
-    if _G.CalendarContextMenu.ns_hooked_del then return end
+    if _G.CalendarContextMenu.ns_hooked then return end
 
     local orig_OnShow = _G.CalendarContextMenu:GetScript("OnShow")
     _G.CalendarContextMenu:SetScript("OnShow", function(self)
         if orig_OnShow then orig_OnShow(self) end
 
         C_Timer.After(0.02, function()
-            -- НЕ смотрим на eventButton! Просто показываем кнопку всегда в меню события
-            local btn = _G["CalendarContextMenuButton7"]
-            if not btn then return end
+            -- === КНОПКА 1: Удалить с сервера (через CreateEventFrame) ===
+            local btnDel = _G["CalendarContextMenuButton7"]
+            if btnDel then
+                btnDel:SetText("Удалить с сервера")
+                btnDel:Show()
 
-            btn:SetText("Удалить с сервера")
-            btn:Show()
+                if not btnDel.ns_hooked_del then
+                    btnDel:SetScript("OnClick", function()
+                        local createFrame = _G.CalendarCreateEventFrame
+                        if not (createFrame and createFrame:IsVisible()) then
+                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Окно редактирования не открыто.|r")
+                            HideUIPanel(_G.CalendarContextMenu)
+                            return
+                        end
 
-            if not btn.ns_hooked_del then
-                btn:SetScript("OnClick", function()
-                    -- === Берём ВСЁ только из CreateEventFrame ===
-                    local createFrame = _G.CalendarCreateEventFrame
-                    if not (createFrame and createFrame:IsVisible()) then
-                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Окно редактирования не открыто.|r")
+                        local title = (_G.CalendarCreateEventTitleEdit and _G.CalendarCreateEventTitleEdit:GetText()) or ""
+                        if title == "" then
+                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Название пусто.|r")
+                            HideUIPanel(_G.CalendarContextMenu)
+                            return
+                        end
+
+                        local calFrame = _G.CalendarFrame
+                        local year, month, day = calFrame.selectedYear, calFrame.selectedMonth, calFrame.selectedDay
+                        if not (year and month and day) then
+                            local t = date("*t")
+                            year, month, day = t.year, t.month, t.day
+                        end
+                        local dateStr = string.format("%04d-%02d-%02d", year, month, day)
+
+                        SendAddonMessage("ns_calendar_del", dateStr .. "|" .. title, "GUILD")
+                        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[NSQC3] Удалено: " .. dateStr .. " | " .. title .. "|r")
                         HideUIPanel(_G.CalendarContextMenu)
-                        return
-                    end
-
-                    local titleEdit = _G.CalendarCreateEventTitleEdit
-                    local title = titleEdit and titleEdit:GetText() or ""
-                    if title == "" then
-                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Название события пусто.|r")
-                        HideUIPanel(_G.CalendarContextMenu)
-                        return
-                    end
-
-                    -- Получаем дату из CalendarFrame (как в твоей функции создания)
-                    local calFrame = _G.CalendarFrame
-                    local year, month, day
-                    if calFrame and calFrame.selectedYear then
-                        year, month, day = calFrame.selectedYear, calFrame.selectedMonth, calFrame.selectedDay
-                    else
-                        local t = date("*t")
-                        year, month, day = t.year, t.month, t.day
-                    end
-                    local dateStr = string.format("%04d-%02d-%02d", year, month, day)
-
-                    -- Отправка
-                    SendAddonMessage("ns_calendar_del", dateStr .. "|" .. title, "GUILD")
-                    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[NSQC3] Удалено: " .. dateStr .. " | " .. title .. "|r")
-                    HideUIPanel(_G.CalendarContextMenu)
-                end)
-                btn.ns_hooked_del = true
+                    end)
+                    btnDel.ns_hooked_del = true
+                end
             end
 
-            self:SetHeight(132)
+            -- === КНОПКА 2: Добавить чужое (через eventIndex из контекста меню) ===
+            local btnAlien = _G["CalendarContextMenuButton8"]
+            local eventButton = self.eventButton
+            if btnAlien and eventButton and eventButton.eventIndex then
+                btnAlien:SetText("Добавить чужое")
+                btnAlien:Show()
+
+                if not btnAlien.ns_hooked_alien then
+                    btnAlien:SetScript("OnClick", function()
+                        local eventIndex = eventButton.eventIndex
+                        local eventInfo = { CalendarGetEventInfo(eventIndex) }
+                        if #eventInfo < 11 then
+                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Недостаточно данных события.|r")
+                            HideUIPanel(_G.CalendarContextMenu)
+                            return
+                        end
+
+                        local title = eventInfo[1] or ""
+                        local desc = eventInfo[2] or ""
+                        local creator = eventInfo[3] or ""
+                        local month = eventInfo[9]
+                        local day = eventInfo[10]
+                        local year = eventInfo[11]
+                        local hour = eventInfo[12] or 0
+                        local min = eventInfo[13] or 0
+
+                        if title == "" or not (year and month and day) then
+                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Некорректные данные события.|r")
+                            HideUIPanel(_G.CalendarContextMenu)
+                            return
+                        end
+
+                        local dateStr = string.format("%04d-%02d-%02d", year, month, day)
+                        local timeStr = string.format("%02d%02d", hour, min)
+                        local payload = dateStr .. "|" .. timeStr .. "|" .. title .. "|" .. desc .. "|" .. creator
+
+                        SendAddonMessageChunked("ns_alien_event", payload, "GUILD")
+                        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[NSQC3] Отправлено чужое событие: " .. title .. "|r")
+                        HideUIPanel(_G.CalendarContextMenu)
+                    end)
+                    btnAlien.ns_hooked_alien = true
+                end
+            else
+                if btnAlien then
+                    btnAlien:Hide()
+                end
+            end
+
+            self:SetHeight(158)
         end)
     end)
 
-    _G.CalendarContextMenu.ns_hooked_del = true
+    _G.CalendarContextMenu.ns_hooked = true
 end
 
 TryHookContextMenu()
