@@ -2511,5 +2511,73 @@ monitor:SetScript("OnUpdate", function(self, elapsed)
 end)
 -- === END CLIENT ===
 
+-- === NSQC3: DELETE VIA CREATE EVENT FRAME ONLY ===
+if _G.NSQC3_CALENDAR_DEL_HOOKED then return end
+_G.NSQC3_CALENDAR_DEL_HOOKED = true
 
+local function TryHookContextMenu()
+    if not _G.CalendarContextMenu then
+        C_Timer.After(0.1, TryHookContextMenu)
+        return
+    end
 
+    if _G.CalendarContextMenu.ns_hooked_del then return end
+
+    local orig_OnShow = _G.CalendarContextMenu:GetScript("OnShow")
+    _G.CalendarContextMenu:SetScript("OnShow", function(self)
+        if orig_OnShow then orig_OnShow(self) end
+
+        C_Timer.After(0.02, function()
+            -- НЕ смотрим на eventButton! Просто показываем кнопку всегда в меню события
+            local btn = _G["CalendarContextMenuButton7"]
+            if not btn then return end
+
+            btn:SetText("Удалить с сервера")
+            btn:Show()
+
+            if not btn.ns_hooked_del then
+                btn:SetScript("OnClick", function()
+                    -- === Берём ВСЁ только из CreateEventFrame ===
+                    local createFrame = _G.CalendarCreateEventFrame
+                    if not (createFrame and createFrame:IsVisible()) then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Окно редактирования не открыто.|r")
+                        HideUIPanel(_G.CalendarContextMenu)
+                        return
+                    end
+
+                    local titleEdit = _G.CalendarCreateEventTitleEdit
+                    local title = titleEdit and titleEdit:GetText() or ""
+                    if title == "" then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[NSQC3] Название события пусто.|r")
+                        HideUIPanel(_G.CalendarContextMenu)
+                        return
+                    end
+
+                    -- Получаем дату из CalendarFrame (как в твоей функции создания)
+                    local calFrame = _G.CalendarFrame
+                    local year, month, day
+                    if calFrame and calFrame.selectedYear then
+                        year, month, day = calFrame.selectedYear, calFrame.selectedMonth, calFrame.selectedDay
+                    else
+                        local t = date("*t")
+                        year, month, day = t.year, t.month, t.day
+                    end
+                    local dateStr = string.format("%04d-%02d-%02d", year, month, day)
+
+                    -- Отправка
+                    SendAddonMessage("ns_calendar_del", dateStr .. "|" .. title, "GUILD")
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[NSQC3] Удалено: " .. dateStr .. " | " .. title .. "|r")
+                    HideUIPanel(_G.CalendarContextMenu)
+                end)
+                btn.ns_hooked_del = true
+            end
+
+            self:SetHeight(132)
+        end)
+    end)
+
+    _G.CalendarContextMenu.ns_hooked_del = true
+end
+
+TryHookContextMenu()
+-- === END ===
