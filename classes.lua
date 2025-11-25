@@ -712,7 +712,9 @@ function GpDb:new(input_table)
         logData = {},
         filterText = "",
         showOnlyNotes = false,
-        updateTimer = nil
+        updateTimer = nil,
+        lastCheckedPlayer = nil,
+        confirmed_rl_nicks = {}
     }
     setmetatable(new_object, self)
     new_object:_CreateWindow()
@@ -2374,6 +2376,7 @@ end
 
 function GpDb:_UpdatePlayerInfo()
     if not self.raidWindow or not self.raidWindow:IsShown() then return end
+
     local selected = self:GetSelectedEntries()
     if #selected ~= 1 then
         if self.raidWindow.playerInfoContainer then
@@ -2381,6 +2384,7 @@ function GpDb:_UpdatePlayerInfo()
         end
         return
     end
+
     local nick = selected[1].original_nick
     local found = false
     local playerData = nil
@@ -2407,57 +2411,96 @@ function GpDb:_UpdatePlayerInfo()
             end
         end
     end
+
     if not found then
         if self.raidWindow.playerInfoContainer then
             self.raidWindow.playerInfoContainer:Hide()
         end
         return
     end
-    -- Создаём контейнер и элементы ОДИН РАЗ
+
+    -- === ОТПРАВКА ЗАПРОСА НА ПРОВЕРКУ ПРАВ РЛ ===
+    if self.lastCheckedPlayer ~= nick then
+        self.lastCheckedPlayer = nick
+        SendAddonMessage("ns_get_rl", UnitName("player"), "GUILD")
+    end
+
+    -- === СОЗДАНИЕ КОНТЕЙНЕРА И ЭЛЕМЕНТОВ ОДИН РАЗ ===
     if not self.raidWindow.playerInfoContainer then
         self.raidWindow.playerInfoContainer = CreateFrame("Frame", nil, self.raidWindow)
         self.raidWindow.playerInfoContainer:SetPoint("TOPRIGHT", -10, -30)
         self.raidWindow.playerInfoContainer:SetSize(230, 220)
+
+        -- === ЧЕКБОКС СЛЕВА ОТ КНОПКИ ЗАКРЫТИЯ ===
+        self.raidWindow.playerInfoCheckbox = CreateFrame("CheckButton", nil, self.raidWindow.playerInfoContainer, "UICheckButtonTemplate")
+        self.raidWindow.playerInfoCheckbox:SetSize(24, 24)
+        self.raidWindow.playerInfoCheckbox:SetPoint("TOPRIGHT", self.raidWindow.closeButton, "TOPLEFT", -2, 0)
+        self.raidWindow.playerInfoCheckbox:Disable() -- Единоразово неактивен
+
+        self.raidWindow.playerInfoCheckbox:SetScript("OnClick", function()
+            if self.raidWindow.playerInfoCheckbox:GetChecked() then
+                SendAddonMessage("ns_its_rl", nick, "GUILD")
+            end
+        end)
+
+        -- === ПРОВЕРКА: если я уже подтверждён как РЛ, активируем чекбокс сразу ===
+        local myName = UnitName("player")
+        if self.confirmed_rl_nicks and self.confirmed_rl_nicks[myName] then
+            self.raidWindow.playerInfoCheckbox:Enable()
+        end
+
         -- Класс
         self.raidWindow.classText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.classText:SetPoint("TOPLEFT", 0, -5)
         self.raidWindow.classText:SetWidth(230)
+
         -- Уровень
         self.raidWindow.levelText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.levelText:SetPoint("TOPLEFT", 0, -25)
         self.raidWindow.levelText:SetWidth(230)
-        -- Офлайн (новая строка)
+
+        -- Офлайн
         self.raidWindow.offlineText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.offlineText:SetPoint("TOPLEFT", 0, -45)
         self.raidWindow.offlineText:SetWidth(230)
+
         -- Звание с кнопками
         self.raidWindow.rankFrame = CreateFrame("Frame", nil, self.raidWindow.playerInfoContainer)
         self.raidWindow.rankFrame:SetSize(230, 20)
         self.raidWindow.rankFrame:SetPoint("TOPLEFT", 0, -65)
+
         self.raidWindow.minusBtn = CreateFrame("Button", nil, self.raidWindow.rankFrame, "UIPanelButtonTemplate")
         self.raidWindow.minusBtn:SetSize(20, 20)
         self.raidWindow.minusBtn:SetPoint("LEFT", 0, 0)
         self.raidWindow.minusBtn:SetText("-")
+
         self.raidWindow.rankText = self.raidWindow.rankFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.rankText:SetPoint("LEFT", self.raidWindow.minusBtn, "RIGHT", 5, 0)
         self.raidWindow.rankText:SetPoint("RIGHT", -25, 0)
+
         self.raidWindow.plusBtn = CreateFrame("Button", nil, self.raidWindow.rankFrame, "UIPanelButtonTemplate")
         self.raidWindow.plusBtn:SetSize(20, 20)
         self.raidWindow.plusBtn:SetPoint("RIGHT", 0, 0)
         self.raidWindow.plusBtn:SetText("+")
+
         -- Публичная заметка
         self.raidWindow.publicBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.publicBtn:SetSize(230, 20)
         self.raidWindow.publicBtn:SetPoint("TOPLEFT", 0, -90)
+
         -- Офицерская заметка
         self.raidWindow.officerBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.officerBtn:SetSize(230, 20)
         self.raidWindow.officerBtn:SetPoint("TOPLEFT", 0, -115)
     else
+        -- Контейнер уже существует — просто показываем его
         self.raidWindow.playerInfoContainer:Show()
+        -- ⚠️ НЕ СБРАСЫВАЕМ чекбокс! Состояние управляется извне.
     end
-    -- === ОБНОВЛЕНИЕ ТЕКСТОВ И ОБРАБОТЧИКОВ ===
+
+    -- === ОБНОВЛЕНИЕ ДАННЫХ ИГРОКА ===
     local db = self
+
     -- Класс
     local className = "Класс: ?"
     if playerData.classFileName then
@@ -2470,8 +2513,10 @@ function GpDb:_UpdatePlayerInfo()
         end
     end
     self.raidWindow.classText:SetText(className)
+
     -- Уровень
     self.raidWindow.levelText:SetText("Уровень: " .. (playerData.level or "?"))
+
     -- Офлайн
     local offlineStr = "Офлайн: "
     if playerData.online then
@@ -2491,9 +2536,11 @@ function GpDb:_UpdatePlayerInfo()
         end
     end
     self.raidWindow.offlineText:SetText(offlineStr)
+
     -- Звание
     self.raidWindow.rankText:SetText("Звание: " .. (playerData.rankName or "?"))
-    -- Кнопки повышения/понижения — обновляем обработчики (чтобы playerData был актуальным)
+
+    -- Кнопки повышения/понижения
     self.raidWindow.minusBtn:SetScript("OnClick", function()
         if not db:_CheckOfficerRank() then
             print("|cFFFF0000ГП:|r Только офицеры могут менять звания")
@@ -2502,6 +2549,7 @@ function GpDb:_UpdatePlayerInfo()
         GuildDemote(playerData.name)
         C_Timer.After(0.5, function() db:_UpdatePlayerInfo() end)
     end)
+
     self.raidWindow.plusBtn:SetScript("OnClick", function()
         if not db:_CheckOfficerRank() then
             print("|cFFFF0000ГП:|r Только офицеры могут менять звания")
@@ -2510,6 +2558,7 @@ function GpDb:_UpdatePlayerInfo()
         GuildPromote(playerData.name)
         C_Timer.After(0.5, function() db:_UpdatePlayerInfo() end)
     end)
+
     -- Публичная заметка
     self.raidWindow.publicBtn:SetText("Публ.: " .. (playerData.publicNote ~= "" and playerData.publicNote or "—"))
     self.raidWindow.publicBtn:SetScript("OnClick", function()
@@ -2544,6 +2593,7 @@ function GpDb:_UpdatePlayerInfo()
         }
         StaticPopup_Show("GP_EDIT_PUBLIC_NOTE")
     end)
+
     -- Офицерская заметка
     self.raidWindow.officerBtn:SetText("Оф.: " .. (playerData.officerNote ~= "" and playerData.officerNote or "—"))
     self.raidWindow.officerBtn:SetScript("OnClick", function()

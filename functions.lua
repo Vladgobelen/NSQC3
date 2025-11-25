@@ -2420,3 +2420,96 @@ end
 -- end
 
 -- NSQC3.overlay = {}
+
+
+-- === NSQC3 CALENDAR CLIENT (RELEASE) ===
+local function CreateCustomButton()
+    if _G.CustomCalendarCreateButton then return end
+
+    local origButton = _G.CalendarCreateEventCreateButton
+    if not origButton then return end
+
+    local calEventFrame = _G.CalendarCreateEventFrame
+    if not calEventFrame or not calEventFrame:IsVisible() then return end
+
+    local btn = CreateFrame("Button", "CustomCalendarCreateButton", calEventFrame, "UIPanelButtonTemplate")
+    btn:SetPoint("CENTER", origButton, "CENTER")
+    btn:SetSize(origButton:GetWidth(), origButton:GetHeight())
+    btn:SetText(origButton:GetText() or "Создать")
+
+    origButton:Hide()
+
+    btn:SetScript("OnClick", function(self, mouseButton)
+        local title = (_G.CalendarCreateEventTitleEdit and _G.CalendarCreateEventTitleEdit:GetText()) or ""
+        local desc = (_G.CalendarCreateEventDescriptionEdit and _G.CalendarCreateEventDescriptionEdit:GetText()) or ""
+        local hour = (_G.CalendarCreateEventHourDropDown and _G.CalendarCreateEventHourDropDown.selectedValue) or 0
+        local min = (_G.CalendarCreateEventMinuteDropDown and _G.CalendarCreateEventMinuteDropDown.selectedValue) or 0
+
+        local calFrame = _G.CalendarFrame
+        local selYear = calFrame and calFrame.selectedYear
+        local selMonth = calFrame and calFrame.selectedMonth
+        local selDay = calFrame and calFrame.selectedDay
+        if not (selYear and selMonth and selDay) then
+            local t = date("*t")
+            selYear, selMonth, selDay = t.year, t.month, t.day
+        end
+        local eventDateStr = string.format("%04d-%02d-%02d", selYear, selMonth, selDay)
+        local timeStr = string.format("%02d%02d", hour, min)
+
+        if title == "" then return end
+
+        local payload = eventDateStr .. "|" .. timeStr .. "|" .. title .. "|" .. desc
+
+        -- Безопасный размер чанка (254 - запас на заголовок "i/total|")
+        local MAX_CHUNK_SIZE = 200
+        local chunks = {}
+        local i = 1
+        while i <= #payload do
+            table.insert(chunks, payload:sub(i, i + MAX_CHUNK_SIZE - 1))
+            i = i + MAX_CHUNK_SIZE
+        end
+
+        local total = #chunks
+        for idx = 1, total do
+            local msg = string.format("%d/%d|%s", idx, total, chunks[idx])
+            if #msg <= 254 then
+                SendAddonMessage("ns_calendar", msg, "GUILD")
+            end
+        end
+
+        -- Оригинальное создание события
+        local origOnClick = origButton:GetScript("OnClick")
+        if origOnClick then
+            origOnClick(origButton, mouseButton)
+        elseif _G.CalendarCreateEventButton_Click then
+            _G.CalendarCreateEventButton_Click()
+        end
+    end)
+end
+
+-- Хук на появление формы создания
+local monitor = CreateFrame("Frame")
+monitor:SetScript("OnUpdate", function(self, elapsed)
+    self.t = (self.t or 0) + elapsed
+    if self.t > 0.3 then
+        local f = _G.CalendarCreateEventFrame
+        if f and not f.ns_hooked then
+            f.ns_hooked = true
+            f:HookScript("OnShow", function()
+                local d = CreateFrame("Frame")
+                d:SetScript("OnUpdate", function(_, dt)
+                    d.t = (d.t or 0) + dt
+                    if d.t > 0.05 then
+                        CreateCustomButton()
+                        d:SetScript("OnUpdate", nil)
+                    end
+                end)
+            end)
+        end
+        self.t = 0
+    end
+end)
+-- === END CLIENT ===
+
+
+

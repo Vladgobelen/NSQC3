@@ -891,9 +891,31 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:ns_set_rl"] = {
+        {
+            keyword = {
+                { word = "ns_set_rl", position = 1, source = "prefix" },
+            },
+            func = "ns_set_rl",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
 
 -- Обработчики аддона
+
+function ns_set_rl(channel, text, sender, full_prefix)
+    if not gpDb then return end
+
+    -- Активируем чекбокс, если он существует
+    if gpDb.raidWindow and gpDb.raidWindow.playerInfoCheckbox then
+        gpDb.raidWindow.playerInfoCheckbox:Enable()
+        -- Не сбрасываем галочку — оставляем как есть
+    end
+end
 
 -- Функция отправки версии аддона в гильдию
 -- Использует глобальные переменные NSQC3_version и NSQC3_subversion
@@ -1317,16 +1339,11 @@ function nsqc_RawRes2(channel, text, sender, prefix)
 end
 
 function OnAnyTrigger1(channel, text, sender, prefix)
-    local myNome = GetUnitName("player")
-    if myNome == sender then
-        sendAch("Копирайтер", 1, 1)
+    local myName = UnitName("player")
+    if myName == sender then
+        -- sendAch("Копирайтер", 1, 1)
     end
-    -- local msg = mysplit(text)
-    -- if string.find(string.lower(text), "привет") then
-    --     infoFrame1 = infoFrame1 or UniversalInfoFrame:new(5, testQ['uniFrame'])
-    --     infoFrame1:AddText("Клиент", 'GetAddOnMemoryUsage("NSQS")', true)
-    --     print(sender .. " написал: " .. text)
-    -- end
+
 end
 
 function OnTestTrigger(channel, text, sender, prefix)
