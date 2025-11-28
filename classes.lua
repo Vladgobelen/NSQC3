@@ -2416,12 +2416,11 @@ function GpDb:_UpdatePlayerInfo()
         self.raidWindow.playerInfoContainer = CreateFrame("Frame", nil, self.raidWindow)
         self.raidWindow.playerInfoContainer:SetPoint("TOPRIGHT", -10, -30)
         self.raidWindow.playerInfoContainer:SetSize(230, 240) -- +20px под новую кнопку
-
-        -- === ЧЕКБОКС СЛЕВА ОТ КНОПКИ ЗАКРЫТИЯ ===
+        -- === ЧЕКБОКС ПОД КНОПКОЙ ЗАКРЫТИЯ ===
         local checkboxName = "GpDbPlayerInfoCheckbox"
-        local checkbox = CreateFrame("CheckButton", checkboxName, self.raidWindow.playerInfoContainer, "ChatConfigCheckButtonTemplate")
+        local checkbox = CreateFrame("CheckButton", checkboxName, self.raidWindow, "ChatConfigCheckButtonTemplate")
         checkbox:SetSize(24, 24)
-        checkbox:SetPoint("TOPRIGHT", self.raidWindow.closeButton, "TOPLEFT", -2, 0)
+        checkbox:SetPoint("TOPRIGHT", self.raidWindow.closeButton, "BOTTOMRIGHT", 0, -5)
         checkbox:Disable()
         checkbox.targetNick = nick
         checkbox:SetScript("OnClick", function(self_cb)
@@ -2438,7 +2437,6 @@ function GpDb:_UpdatePlayerInfo()
         if self.confirmed_rl_nicks and self.confirmed_rl_nicks[myName] then
             self.raidWindow.playerInfoCheckbox:Enable()
         end
-
         -- === ЭЛЕМЕНТЫ ИНТЕРФЕЙСА ===
         self.raidWindow.classText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.classText:SetPoint("TOPLEFT", 0, -5)
@@ -2449,7 +2447,6 @@ function GpDb:_UpdatePlayerInfo()
         self.raidWindow.offlineText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.offlineText:SetPoint("TOPLEFT", 0, -45)
         self.raidWindow.offlineText:SetWidth(230)
-
         self.raidWindow.rankFrame = CreateFrame("Frame", nil, self.raidWindow.playerInfoContainer)
         self.raidWindow.rankFrame:SetSize(230, 20)
         self.raidWindow.rankFrame:SetPoint("TOPLEFT", 0, -65)
@@ -2464,14 +2461,12 @@ function GpDb:_UpdatePlayerInfo()
         self.raidWindow.plusBtn:SetSize(20, 20)
         self.raidWindow.plusBtn:SetPoint("RIGHT", 0, 0)
         self.raidWindow.plusBtn:SetText("+")
-
         self.raidWindow.publicBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.publicBtn:SetSize(230, 20)
         self.raidWindow.publicBtn:SetPoint("TOPLEFT", 0, -90)
         self.raidWindow.officerBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.officerBtn:SetSize(230, 20)
         self.raidWindow.officerBtn:SetPoint("TOPLEFT", 0, -115)
-
         -- === КНОПКА "ЗАМЕТКИ РЛОВ" ===
         self.raidWindow.rlNotesBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.rlNotesBtn:SetSize(230, 20)
@@ -2484,7 +2479,6 @@ function GpDb:_UpdatePlayerInfo()
             self.raidWindow.playerInfoCheckbox.targetNick = nick
         end
     end
-
     -- === ОБНОВЛЕНИЕ ДАННЫХ ИГРОКА ===
     local db = self
     local className = "Класс: ?"
@@ -2600,7 +2594,6 @@ function GpDb:_UpdatePlayerInfo()
         }
         StaticPopup_Show("GP_EDIT_OFFICER_NOTE")
     end)
-
    -- === ОБНОВЛЕНИЕ ONCLICK ДЛЯ КНОПКИ "ЗАМЕТКИ РЛОВ" ===
     self.raidWindow.rlNotesBtn:SetScript("OnClick", function()
         local selectedEntries = self:GetSelectedEntries()
@@ -2616,7 +2609,6 @@ function GpDb:_UpdatePlayerInfo()
             print("|cFFFF0000[DEBUG]|r ОШИБКА: выделено не 1 игрок (выделено:", #selectedEntries, ")")
         end
     end)
-
     -- Показываем кнопку, только если чекбокс активен (мы — РЛ)
     if self.raidWindow.playerInfoCheckbox:IsEnabled() then
         self.raidWindow.rlNotesBtn:Show()
