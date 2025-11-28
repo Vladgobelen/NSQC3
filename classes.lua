@@ -1701,16 +1701,6 @@ function GpDb:GetNumSelected()
     return count
 end
 
-function GpDb:Show()
-    self.window:Show()
-    
-    -- Автоматически устанавливаем галочку "Только рейд" если мы в рейде
-    self.window.raidOnlyCheckbox:SetChecked(IsInRaid())
-    
-    self:_UpdateFromGuild()
-    self:UpdateWindow()
-end
-
 function GpDb:Hide()
     self.window:Hide()
 end
@@ -1965,10 +1955,10 @@ function GpDb:Show()
     
     -- Принудительно обновляем данные гильдии перед показом
     GuildRoster()
-    C_Timer(0.01, function()
-        self:_UpdateFromGuild()
-        self:UpdateWindow()
-    end)
+    -- C_Timer(0.01, function()
+    --     self:_UpdateFromGuild()
+    --     self:UpdateWindow()
+    -- end)
 end
 
 function GpDb:AddGpEntry(nick, gp, playerID)
