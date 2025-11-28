@@ -911,7 +911,7 @@ local triggersByAddress = {
             func = "ns_set_rl_notes",
             conditions = {
                 function(channel, text, sender, prefix)
-                    local kod2 = text:match(WORD_POSITION_PATTERNS[1])
+                    local kod2 = channel:match(WORD_POSITION_PATTERNS[1])
                     return kod2 == GetUnitName("player")
                 end,
             },
@@ -926,8 +926,8 @@ local triggersByAddress = {
             },
             func = "ns_set_rl_notes_f",
             conditions = {
-                function(channel, text, sender, prefix)
-                    local kod2 = text:match(WORD_POSITION_PATTERNS[1])
+                 function(channel, text, sender, prefix)
+                    local kod2 = channel:match(WORD_POSITION_PATTERNS[1])
                     return kod2 == GetUnitName("player")
                 end,
             },
@@ -943,36 +943,42 @@ local triggersByAddress = {
 _rlNotesReassembly = {}
 
 function ns_set_rl_notes(channel, text, sender, full_prefix)
-    local recipient, target, rest = text:match("^([^%s]+)%s+([^%s]+)%s*(.*)$")
-    if not (recipient and target) then
+    local initiator, target, rest = text:match("^([^%s]+)%s+([^%s]+)%s*(.*)$")
+    if not (initiator and target) then
         print("|cFFFF0000[NSRL ERROR]|r Неверный формат чанка:", text)
         return
     end
 
-    -- Собираем буфер по ЦЕЛИ (target), потому что именно она нужна в редакторе
     if not _rlNotesReassembly[target] then
-        _rlNotesReassembly[target] = { parts = {} }
+        _rlNotesReassembly[target] = { parts = {}, initiator = initiator }
+    else
+        if _rlNotesReassembly[target].initiator ~= initiator then
+            print("|cFFFF0000[NSRL ERROR]|r Конфликт инициатора для", target)
+            return
+        end
     end
+
     table.insert(_rlNotesReassembly[target].parts, rest)
 end
 
--- Обработка финального чанка
 function ns_set_rl_notes_f(channel, text, sender, full_prefix)
-    local recipient, target, _ = text:match("^([^%s]+)%s+([^%s]+)%s*(.*)$")
+    local initiator, target = text:match("^([^%s]+)%s+([^%s]+)")
     if not target then
-        print("|cFFFF0000[NSRL ERROR]|r Неверный формат финального чанка:", text)
+        print("|cFFFF0000[NSRL ERROR]|r Неверный финальный чанк:", text)
         return
     end
 
     local state = _rlNotesReassembly[target]
     if not state then return end
 
-    local fullNote = table.concat(state.parts, "")
-    _rlNotesReassembly[target] = nil
-
-    if gpDb and type(gpDb.ShowRlNotesEditor) == "function" then
-        gpDb:ShowRlNotesEditor(target, fullNote)  -- правильно: target = "Высшая"
+    -- Открываем ТОЛЬКО если мы — инициатор запроса
+    if UnitName("player") == state.initiator then
+        if gpDb and type(gpDb.ShowRlNotesEditor) == "function" then
+            gpDb:ShowRlNotesEditor(target, table.concat(state.parts, ""))
+        end
     end
+
+    _rlNotesReassembly[target] = nil
 end
 
 

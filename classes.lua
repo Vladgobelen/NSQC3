@@ -1955,10 +1955,10 @@ function GpDb:Show()
     
     -- Принудительно обновляем данные гильдии перед показом
     GuildRoster()
-    -- C_Timer(0.01, function()
-    --     self:_UpdateFromGuild()
-    --     self:UpdateWindow()
-    -- end)
+    C_Timer(0.01, function()
+        self:_UpdateFromGuild()
+        self:UpdateWindow()
+    end)
 end
 
 function GpDb:AddGpEntry(nick, gp, playerID)
