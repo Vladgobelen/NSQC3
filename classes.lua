@@ -714,7 +714,7 @@ function GpDb:new(input_table)
         showOnlyNotes = false,
         updateTimer = nil,
         lastCheckedPlayer = nil,
-        confirmed_rl_nicks = {}
+        confirmed_rl_nicks = {},
     }
     setmetatable(new_object, self)
     new_object:_CreateWindow()
@@ -2376,7 +2376,6 @@ end
 
 function GpDb:_UpdatePlayerInfo()
     if not self.raidWindow or not self.raidWindow:IsShown() then return end
-
     local selected = self:GetSelectedEntries()
     if #selected ~= 1 then
         if self.raidWindow.playerInfoContainer then
@@ -2384,7 +2383,6 @@ function GpDb:_UpdatePlayerInfo()
         end
         return
     end
-
     local nick = selected[1].original_nick
     local found = false
     local playerData = nil
@@ -2411,97 +2409,94 @@ function GpDb:_UpdatePlayerInfo()
             end
         end
     end
-
     if not found then
         if self.raidWindow.playerInfoContainer then
             self.raidWindow.playerInfoContainer:Hide()
         end
         return
     end
-
     -- === ОТПРАВКА ЗАПРОСА НА ПРОВЕРКУ ПРАВ РЛ ===
     if self.lastCheckedPlayer ~= nick then
         self.lastCheckedPlayer = nick
-        SendAddonMessage("ns_get_rl", UnitName("player"), "GUILD")
+        local myName = UnitName("player")
+        SendAddonMessage("ns_get_rl", myName .. " " .. nick, "GUILD")
     end
-
     -- === СОЗДАНИЕ КОНТЕЙНЕРА И ЭЛЕМЕНТОВ ОДИН РАЗ ===
     if not self.raidWindow.playerInfoContainer then
         self.raidWindow.playerInfoContainer = CreateFrame("Frame", nil, self.raidWindow)
         self.raidWindow.playerInfoContainer:SetPoint("TOPRIGHT", -10, -30)
-        self.raidWindow.playerInfoContainer:SetSize(230, 220)
+        self.raidWindow.playerInfoContainer:SetSize(230, 240) -- +20px под новую кнопку
 
         -- === ЧЕКБОКС СЛЕВА ОТ КНОПКИ ЗАКРЫТИЯ ===
-        self.raidWindow.playerInfoCheckbox = CreateFrame("CheckButton", nil, self.raidWindow.playerInfoContainer, "UICheckButtonTemplate")
-        self.raidWindow.playerInfoCheckbox:SetSize(24, 24)
-        self.raidWindow.playerInfoCheckbox:SetPoint("TOPRIGHT", self.raidWindow.closeButton, "TOPLEFT", -2, 0)
-        self.raidWindow.playerInfoCheckbox:Disable() -- Единоразово неактивен
-
-        self.raidWindow.playerInfoCheckbox:SetScript("OnClick", function()
-            if self.raidWindow.playerInfoCheckbox:GetChecked() then
-                SendAddonMessage("ns_its_rl", nick, "GUILD")
-            end
+        local checkboxName = "GpDbPlayerInfoCheckbox"
+        local checkbox = CreateFrame("CheckButton", checkboxName, self.raidWindow.playerInfoContainer, "ChatConfigCheckButtonTemplate")
+        checkbox:SetSize(24, 24)
+        checkbox:SetPoint("TOPRIGHT", self.raidWindow.closeButton, "TOPLEFT", -2, 0)
+        checkbox:Disable()
+        checkbox.targetNick = nick
+        checkbox:SetScript("OnClick", function(self_cb)
+            local isChecked = self_cb:GetChecked()
+            local boolStr = isChecked and "1" or "nil"
+            SendAddonMessage("ns_its_rl", self_cb.targetNick .. " " .. boolStr, "GUILD")
         end)
-
-        -- === ПРОВЕРКА: если я уже подтверждён как РЛ, активируем чекбокс сразу ===
+        self.raidWindow.playerInfoCheckbox = checkbox
+        local textRegion = _G[checkboxName .. "Text"]
+        if textRegion then
+            textRegion:SetText("")
+        end
         local myName = UnitName("player")
         if self.confirmed_rl_nicks and self.confirmed_rl_nicks[myName] then
             self.raidWindow.playerInfoCheckbox:Enable()
         end
 
-        -- Класс
+        -- === ЭЛЕМЕНТЫ ИНТЕРФЕЙСА ===
         self.raidWindow.classText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.classText:SetPoint("TOPLEFT", 0, -5)
         self.raidWindow.classText:SetWidth(230)
-
-        -- Уровень
         self.raidWindow.levelText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.levelText:SetPoint("TOPLEFT", 0, -25)
         self.raidWindow.levelText:SetWidth(230)
-
-        -- Офлайн
         self.raidWindow.offlineText = self.raidWindow.playerInfoContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.offlineText:SetPoint("TOPLEFT", 0, -45)
         self.raidWindow.offlineText:SetWidth(230)
 
-        -- Звание с кнопками
         self.raidWindow.rankFrame = CreateFrame("Frame", nil, self.raidWindow.playerInfoContainer)
         self.raidWindow.rankFrame:SetSize(230, 20)
         self.raidWindow.rankFrame:SetPoint("TOPLEFT", 0, -65)
-
         self.raidWindow.minusBtn = CreateFrame("Button", nil, self.raidWindow.rankFrame, "UIPanelButtonTemplate")
         self.raidWindow.minusBtn:SetSize(20, 20)
         self.raidWindow.minusBtn:SetPoint("LEFT", 0, 0)
         self.raidWindow.minusBtn:SetText("-")
-
         self.raidWindow.rankText = self.raidWindow.rankFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.raidWindow.rankText:SetPoint("LEFT", self.raidWindow.minusBtn, "RIGHT", 5, 0)
         self.raidWindow.rankText:SetPoint("RIGHT", -25, 0)
-
         self.raidWindow.plusBtn = CreateFrame("Button", nil, self.raidWindow.rankFrame, "UIPanelButtonTemplate")
         self.raidWindow.plusBtn:SetSize(20, 20)
         self.raidWindow.plusBtn:SetPoint("RIGHT", 0, 0)
         self.raidWindow.plusBtn:SetText("+")
 
-        -- Публичная заметка
         self.raidWindow.publicBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.publicBtn:SetSize(230, 20)
         self.raidWindow.publicBtn:SetPoint("TOPLEFT", 0, -90)
-
-        -- Офицерская заметка
         self.raidWindow.officerBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
         self.raidWindow.officerBtn:SetSize(230, 20)
         self.raidWindow.officerBtn:SetPoint("TOPLEFT", 0, -115)
+
+        -- === КНОПКА "ЗАМЕТКИ РЛОВ" ===
+        self.raidWindow.rlNotesBtn = CreateFrame("Button", nil, self.raidWindow.playerInfoContainer, "UIPanelButtonTemplate")
+        self.raidWindow.rlNotesBtn:SetSize(230, 20)
+        self.raidWindow.rlNotesBtn:SetPoint("TOPLEFT", 0, -140)
+        self.raidWindow.rlNotesBtn:SetText("Заметки РЛов")
+        -- OnClick будет обновляться каждый раз ниже
     else
-        -- Контейнер уже существует — просто показываем его
         self.raidWindow.playerInfoContainer:Show()
-        -- ⚠️ НЕ СБРАСЫВАЕМ чекбокс! Состояние управляется извне.
+        if self.raidWindow.playerInfoCheckbox then
+            self.raidWindow.playerInfoCheckbox.targetNick = nick
+        end
     end
 
     -- === ОБНОВЛЕНИЕ ДАННЫХ ИГРОКА ===
     local db = self
-
-    -- Класс
     local className = "Класс: ?"
     if playerData.classFileName then
         local color = RAID_CLASS_COLORS[playerData.classFileName]
@@ -2513,11 +2508,7 @@ function GpDb:_UpdatePlayerInfo()
         end
     end
     self.raidWindow.classText:SetText(className)
-
-    -- Уровень
     self.raidWindow.levelText:SetText("Уровень: " .. (playerData.level or "?"))
-
-    -- Офлайн
     local offlineStr = "Офлайн: "
     if playerData.online then
         offlineStr = offlineStr .. "в сети"
@@ -2536,11 +2527,7 @@ function GpDb:_UpdatePlayerInfo()
         end
     end
     self.raidWindow.offlineText:SetText(offlineStr)
-
-    -- Звание
     self.raidWindow.rankText:SetText("Звание: " .. (playerData.rankName or "?"))
-
-    -- Кнопки повышения/понижения
     self.raidWindow.minusBtn:SetScript("OnClick", function()
         if not db:_CheckOfficerRank() then
             print("|cFFFF0000ГП:|r Только офицеры могут менять звания")
@@ -2549,7 +2536,6 @@ function GpDb:_UpdatePlayerInfo()
         GuildDemote(playerData.name)
         C_Timer.After(0.5, function() db:_UpdatePlayerInfo() end)
     end)
-
     self.raidWindow.plusBtn:SetScript("OnClick", function()
         if not db:_CheckOfficerRank() then
             print("|cFFFF0000ГП:|r Только офицеры могут менять звания")
@@ -2558,8 +2544,6 @@ function GpDb:_UpdatePlayerInfo()
         GuildPromote(playerData.name)
         C_Timer.After(0.5, function() db:_UpdatePlayerInfo() end)
     end)
-
-    -- Публичная заметка
     self.raidWindow.publicBtn:SetText("Публ.: " .. (playerData.publicNote ~= "" and playerData.publicNote or "—"))
     self.raidWindow.publicBtn:SetScript("OnClick", function()
         StaticPopupDialogs["GP_EDIT_PUBLIC_NOTE"] = {
@@ -2593,8 +2577,6 @@ function GpDb:_UpdatePlayerInfo()
         }
         StaticPopup_Show("GP_EDIT_PUBLIC_NOTE")
     end)
-
-    -- Офицерская заметка
     self.raidWindow.officerBtn:SetText("Оф.: " .. (playerData.officerNote ~= "" and playerData.officerNote or "—"))
     self.raidWindow.officerBtn:SetScript("OnClick", function()
         StaticPopupDialogs["GP_EDIT_OFFICER_NOTE"] = {
@@ -2628,6 +2610,29 @@ function GpDb:_UpdatePlayerInfo()
         }
         StaticPopup_Show("GP_EDIT_OFFICER_NOTE")
     end)
+
+   -- === ОБНОВЛЕНИЕ ONCLICK ДЛЯ КНОПКИ "ЗАМЕТКИ РЛОВ" ===
+    self.raidWindow.rlNotesBtn:SetScript("OnClick", function()
+        local selectedEntries = self:GetSelectedEntries()
+        if #selectedEntries == 1 then
+            local targetNick = selectedEntries[1].original_nick
+            -- Скрываем контейнер
+            if self.raidWindow.playerInfoContainer then
+                self.raidWindow.playerInfoContainer:Hide()
+            end
+            -- Отправляем
+            SendAddonMessage("ns_get_rl_notes", targetNick, "GUILD")
+        else
+            print("|cFFFF0000[DEBUG]|r ОШИБКА: выделено не 1 игрок (выделено:", #selectedEntries, ")")
+        end
+    end)
+
+    -- Показываем кнопку, только если чекбокс активен (мы — РЛ)
+    if self.raidWindow.playerInfoCheckbox:IsEnabled() then
+        self.raidWindow.rlNotesBtn:Show()
+    else
+        self.raidWindow.rlNotesBtn:Hide()
+    end
 end
 
 function GpDb:_UpdateSelectedPlayersText()
@@ -2770,6 +2775,167 @@ function GpDb:ToggleRaidWindow()
             UIDropDownMenu_Initialize(self.raidWindow.dropdown, nil)
         end
     end
+end
+
+function GpDb:ShowRlNotesEditor(targetNick, noteText)
+    -- === 1. Эмулируем нажатие на крестик raidWindow, если он открыт ===
+    if self.raidWindow and self.raidWindow:IsShown() and self.raidWindow.closeButton then
+        local script = self.raidWindow.closeButton:GetScript("OnClick")
+        if script then
+            script(self.raidWindow.closeButton)
+        end
+    end
+    -- === 2. Открываем редактор заметок ===
+    if not self.rlNotesEditor then
+        self:_CreateRlNotesEditor()
+    end
+    self.rlNotesEditor.targetNick = targetNick
+    self.rlNotesEditor.editBox:SetText(noteText or "")
+    self.rlNotesEditor.title:SetText("Заметки РЛов: " .. targetNick)
+    self.rlNotesEditor:Show()
+    self.rlNotesEditor.editBox:SetFocus()
+end
+
+function GpDb:_CreateRlNotesEditor()
+    self.rlNotesEditor = CreateFrame("Frame", "GpDbRlNotesEditor", UIParent)
+    self.rlNotesEditor:SetSize(400, 300)
+    self.rlNotesEditor:SetPoint("CENTER", UIParent, "CENTER")
+    self.rlNotesEditor:SetFrameStrata("FULLSCREEN_DIALOG")
+    self.rlNotesEditor:EnableMouse(true)
+    self.rlNotesEditor:SetMovable(true)
+    self.rlNotesEditor:RegisterForDrag("LeftButton")
+    self.rlNotesEditor:SetScript("OnDragStart", self.rlNotesEditor.StartMoving)
+    self.rlNotesEditor:SetScript("OnDragStop", self.rlNotesEditor.StopMovingOrSizing)
+
+    local bg = self.rlNotesEditor:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    bg:SetVertexColor(0.1, 0.1, 0.1, 0.9)
+    bg:SetAllPoints()
+
+    self.rlNotesEditor.border = CreateFrame("Frame", nil, self.rlNotesEditor)
+    self.rlNotesEditor.border:SetPoint("TOPLEFT", -3, 3)
+    self.rlNotesEditor.border:SetPoint("BOTTOMRIGHT", 3, -3)
+    self.rlNotesEditor.border:SetBackdrop({
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+
+    self.rlNotesEditor.title = self.rlNotesEditor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.rlNotesEditor.title:SetPoint("TOP", 0, -10)
+    self.rlNotesEditor.title:SetText("Заметки РЛов")
+
+    -- Кнопка закрытия
+    self.rlNotesEditor.closeBtn = CreateFrame("Button", nil, self.rlNotesEditor, "UIPanelCloseButton")
+    self.rlNotesEditor.closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    self.rlNotesEditor.closeBtn:SetScript("OnClick", function()
+        if self.rlNotesEditor.targetNick then
+            _rlNotesReassembly[self.rlNotesEditor.targetNick] = nil
+        end
+        self.rlNotesEditor:Hide()
+    end)
+
+    -- Кнопка "Сохранить"
+    self.rlNotesEditor.saveBtn = CreateFrame("Button", nil, self.rlNotesEditor, "UIPanelButtonTemplate")
+    self.rlNotesEditor.saveBtn:SetSize(80, 22)
+    self.rlNotesEditor.saveBtn:SetPoint("RIGHT", self.rlNotesEditor.closeBtn, "LEFT", -5, 0)
+    self.rlNotesEditor.saveBtn:SetText("Сохранить")
+    self.rlNotesEditor.saveBtn:SetScript("OnClick", function()
+        if not self.rlNotesEditor.targetNick then
+            print("|cFFFF0000[NSRL DEBUG]|r Ошибка: нет targetNick при сохранении")
+            self.rlNotesEditor:Hide()
+            return
+        end
+        local noteText = self.rlNotesEditor.editBox:GetText()
+        local targetNick = self.rlNotesEditor.targetNick
+        local prefix = "ns_RL_notes"
+        local MAX_BODY_BYTES = 240
+        local header = targetNick .. " "
+        local headerByteLen = #header
+        if headerByteLen >= MAX_BODY_BYTES then
+            print("|cFFFF0000[NSRL DEBUG]|r Ошибка: ник слишком длинный (байт:", headerByteLen, "):", targetNick)
+            self.rlNotesEditor:Hide()
+            return
+        end
+        local maxNoteBytes = MAX_BODY_BYTES - headerByteLen
+        local maxChars = math.floor(maxNoteBytes / 2)
+        if maxChars < 1 then maxChars = 1 end
+        local noteLen = utf8myLen(noteText) or 0
+        local chunks = {}
+        local startPos = 1
+        while startPos <= noteLen do
+            local endPos = startPos + maxChars - 1
+            if endPos > noteLen then
+                endPos = noteLen
+            end
+            local chunk = utf8mySub(noteText, startPos, endPos)
+            if not chunk or chunk == "" then
+                startPos = startPos + 1
+            else
+                table.insert(chunks, header .. chunk)
+                startPos = endPos + 1
+            end
+            if startPos > 100000 then break end
+        end
+        if #chunks == 0 then
+            table.insert(chunks, header)
+        end
+        local i = 1
+        local function sendNext()
+            if i > #chunks then
+                _rlNotesReassembly[targetNick] = nil
+                self.rlNotesEditor:Hide()
+                return
+            end
+            SendAddonMessage(prefix, chunks[i], "GUILD")
+            i = i + 1
+            C_Timer.After(0.15, sendNext)
+        end
+        sendNext()
+    end)
+
+    -- === СКРОЛЛИРУЕМЫЙ КОНТЕЙНЕР ДЛЯ ТЕКСТА ===
+    local scrollFrame = CreateFrame("ScrollFrame", "GpDbRlNotesScrollFrame", self.rlNotesEditor, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOP", 0, -40)
+    scrollFrame:SetPoint("BOTTOM", 0, 40)
+    scrollFrame:SetPoint("LEFT", 10, 0)
+    scrollFrame:SetPoint("RIGHT", -30, 0) -- оставляем место под скроллбар
+
+    local scrollChild = CreateFrame("Frame")
+    scrollChild:SetWidth(360)
+    scrollChild:SetHeight(1000) -- начальная высота, будет расти
+    scrollFrame:SetScrollChild(scrollChild)
+
+    -- EditBox внутри скролла
+    self.rlNotesEditor.editBox = CreateFrame("EditBox", nil, scrollChild, "InputBoxTemplate")
+    self.rlNotesEditor.editBox:SetSize(360, 220)
+    self.rlNotesEditor.editBox:SetPoint("TOPLEFT")
+    self.rlNotesEditor.editBox:SetMultiLine(true)
+    self.rlNotesEditor.editBox:SetMaxLetters(1000)
+    self.rlNotesEditor.editBox:SetAutoFocus(false)
+    self.rlNotesEditor.editBox:SetScript("OnTextChanged", function(_, userInput)
+        if userInput then
+            -- Автоподбор высоты содержимого (примерный)
+            local text = self.rlNotesEditor.editBox:GetText()
+            local lines = 1
+            for _ in text:gmatch("\n") do lines = lines + 1 end
+            local height = math.max(220, lines * 20)
+            scrollChild:SetHeight(height)
+            scrollFrame:UpdateScrollChildRect()
+        end
+    end)
+    self.rlNotesEditor.editBox:SetScript("OnEscapePressed", function()
+        if self.rlNotesEditor.targetNick then
+            _rlNotesReassembly[self.rlNotesEditor.targetNick] = nil
+        end
+        self.rlNotesEditor:Hide()
+    end)
+
+    -- Фон только внутри EditBox
+    local editBg = self.rlNotesEditor.editBox:CreateTexture(nil, "BACKGROUND")
+    editBg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    editBg:SetVertexColor(0.2, 0.2, 0.2, 0.8)
+    editBg:SetAllPoints()
 end
 
 -- Определяем класс create_table

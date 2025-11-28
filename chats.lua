@@ -903,17 +903,114 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:ns_set_rl_notes"] = {
+        {
+            keyword = {
+                { word = "ns_set_rl_notes", position = 1, source = "prefix" },
+            },
+            func = "ns_set_rl_notes",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = text:match(WORD_POSITION_PATTERNS[1])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_set_rl_notes_f"] = {
+        {
+            keyword = {
+                { word = "ns_set_rl_notes_f", position = 1, source = "prefix" },
+            },
+            func = "ns_set_rl_notes_f",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    local kod2 = text:match(WORD_POSITION_PATTERNS[1])
+                    return kod2 == GetUnitName("player")
+                end,
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
 
 -- Обработчики аддона
 
-function ns_set_rl(channel, text, sender, full_prefix)
-    if not gpDb then return end
+-- Глобальный буфер для сборки заметок
+_rlNotesReassembly = {}
 
-    -- Активируем чекбокс, если он существует
-    if gpDb.raidWindow and gpDb.raidWindow.playerInfoCheckbox then
-        gpDb.raidWindow.playerInfoCheckbox:Enable()
-        -- Не сбрасываем галочку — оставляем как есть
+function ns_set_rl_notes(channel, text, sender, full_prefix)
+    local recipient, target, rest = text:match("^([^%s]+)%s+([^%s]+)%s*(.*)$")
+    if not (recipient and target) then
+        print("|cFFFF0000[NSRL ERROR]|r Неверный формат чанка:", text)
+        return
+    end
+
+    -- Собираем буфер по ЦЕЛИ (target), потому что именно она нужна в редакторе
+    if not _rlNotesReassembly[target] then
+        _rlNotesReassembly[target] = { parts = {} }
+    end
+    table.insert(_rlNotesReassembly[target].parts, rest)
+end
+
+-- Обработка финального чанка
+function ns_set_rl_notes_f(channel, text, sender, full_prefix)
+    local recipient, target, _ = text:match("^([^%s]+)%s+([^%s]+)%s*(.*)$")
+    if not target then
+        print("|cFFFF0000[NSRL ERROR]|r Неверный формат финального чанка:", text)
+        return
+    end
+
+    local state = _rlNotesReassembly[target]
+    if not state then return end
+
+    local fullNote = table.concat(state.parts, "")
+    _rlNotesReassembly[target] = nil
+
+    if gpDb and type(gpDb.ShowRlNotesEditor) == "function" then
+        gpDb:ShowRlNotesEditor(target, fullNote)  -- правильно: target = "Высшая"
+    end
+end
+
+
+function ns_set_rl(channel, text, sender, full_prefix)
+    if not gpDb or not gpDb.raidWindow or not gpDb.raidWindow.playerInfoCheckbox then
+        return
+    end
+
+    local words = {}
+    for word in text:gmatch("%S+") do
+        table.insert(words, word)
+    end
+
+    if #words < 2 then return end
+
+    local myNick = UnitName("player")
+    local requester = words[1]
+    local targetIsRl = words[2]
+
+    if requester ~= myNick then
+        return
+    end
+
+    -- Активируем чекбокс
+    gpDb.raidWindow.playerInfoCheckbox:Enable()
+
+    -- Устанавливаем состояние
+    local shouldBeChecked = (targetIsRl == "1")
+    gpDb.raidWindow.playerInfoCheckbox:SetChecked(shouldBeChecked)
+
+    -- Обновляем визуальную галочку (для WoW 3.3.5)
+    local checkTex = gpDb.raidWindow.playerInfoCheckbox:GetCheckedTexture()
+    if checkTex then
+        if shouldBeChecked then
+            checkTex:Show()
+        else
+            checkTex:Hide()
+        end
     end
 end
 
