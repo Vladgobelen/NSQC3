@@ -2806,12 +2806,10 @@ function GpDb:_CreateRlNotesEditor()
     self.rlNotesEditor:RegisterForDrag("LeftButton")
     self.rlNotesEditor:SetScript("OnDragStart", self.rlNotesEditor.StartMoving)
     self.rlNotesEditor:SetScript("OnDragStop", self.rlNotesEditor.StopMovingOrSizing)
-
     local bg = self.rlNotesEditor:CreateTexture(nil, "BACKGROUND")
     bg:SetTexture("Interface\\Buttons\\WHITE8X8")
     bg:SetVertexColor(0.1, 0.1, 0.1, 0.9)
     bg:SetAllPoints()
-
     self.rlNotesEditor.border = CreateFrame("Frame", nil, self.rlNotesEditor)
     self.rlNotesEditor.border:SetPoint("TOPLEFT", -3, 3)
     self.rlNotesEditor.border:SetPoint("BOTTOMRIGHT", 3, -3)
@@ -2820,11 +2818,9 @@ function GpDb:_CreateRlNotesEditor()
         edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-
     self.rlNotesEditor.title = self.rlNotesEditor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.rlNotesEditor.title:SetPoint("TOP", 0, -10)
     self.rlNotesEditor.title:SetText("Заметки РЛов")
-
     -- Кнопка закрытия
     self.rlNotesEditor.closeBtn = CreateFrame("Button", nil, self.rlNotesEditor, "UIPanelCloseButton")
     self.rlNotesEditor.closeBtn:SetPoint("TOPRIGHT", -5, -5)
@@ -2834,12 +2830,11 @@ function GpDb:_CreateRlNotesEditor()
         end
         self.rlNotesEditor:Hide()
     end)
-
-    -- Кнопка "Сохранить"
+    -- Кнопка "Сохранить" (S)
     self.rlNotesEditor.saveBtn = CreateFrame("Button", nil, self.rlNotesEditor, "UIPanelButtonTemplate")
-    self.rlNotesEditor.saveBtn:SetSize(80, 22)
-    self.rlNotesEditor.saveBtn:SetPoint("RIGHT", self.rlNotesEditor.closeBtn, "LEFT", -5, 0)
-    self.rlNotesEditor.saveBtn:SetText("Сохранить")
+    self.rlNotesEditor.saveBtn:SetSize(24, 24)
+    self.rlNotesEditor.saveBtn:SetPoint("TOPLEFT", 8, -8)
+    self.rlNotesEditor.saveBtn:SetText("S")
     self.rlNotesEditor.saveBtn:SetScript("OnClick", function()
         if not self.rlNotesEditor.targetNick then
             print("|cFFFF0000[NSRL DEBUG]|r Ошибка: нет targetNick при сохранении")
@@ -2893,19 +2888,47 @@ function GpDb:_CreateRlNotesEditor()
         end
         sendNext()
     end)
-
-    -- === СКРОЛЛИРУЕМЫЙ КОНТЕЙНЕР ДЛЯ ТЕКСТА ===
+    -- Тултип для "Сохранить"
+    self.rlNotesEditor.saveBtn:SetScript("OnEnter", function(self_btn)
+        GameTooltip:SetOwner(self_btn, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Сохранить")
+        GameTooltip:Show()
+    end)
+    self.rlNotesEditor.saveBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    -- Кнопка "Получить историю правок" (F)
+    self.rlNotesEditor.fullBtn = CreateFrame("Button", nil, self.rlNotesEditor, "UIPanelButtonTemplate")
+    self.rlNotesEditor.fullBtn:SetSize(24, 24)
+    self.rlNotesEditor.fullBtn:SetPoint("LEFT", self.rlNotesEditor.saveBtn, "RIGHT", 2, 0)
+    self.rlNotesEditor.fullBtn:SetText("F")
+    self.rlNotesEditor.fullBtn:SetScript("OnClick", function()
+        if not self.rlNotesEditor.targetNick then
+            print("|cFFFF0000[NSRL DEBUG]|r Ошибка: нет targetNick при запросе истории")
+            return
+        end
+        local targetNick = self.rlNotesEditor.targetNick
+        SendAddonMessage("ns_RL_notes_full", targetNick, "GUILD")
+    end)
+    -- Тултип для "Получить историю правок"
+    self.rlNotesEditor.fullBtn:SetScript("OnEnter", function(self_btn)
+        GameTooltip:SetOwner(self_btn, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Получить историю правок")
+        GameTooltip:Show()
+    end)
+    self.rlNotesEditor.fullBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    -- Скроллируемый контейнер для текста
     local scrollFrame = CreateFrame("ScrollFrame", "GpDbRlNotesScrollFrame", self.rlNotesEditor, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOP", 0, -40)
     scrollFrame:SetPoint("BOTTOM", 0, 40)
     scrollFrame:SetPoint("LEFT", 10, 0)
-    scrollFrame:SetPoint("RIGHT", -30, 0) -- оставляем место под скроллбар
-
+    scrollFrame:SetPoint("RIGHT", -30, 0)
     local scrollChild = CreateFrame("Frame")
     scrollChild:SetWidth(360)
-    scrollChild:SetHeight(1000) -- начальная высота, будет расти
+    scrollChild:SetHeight(1000)
     scrollFrame:SetScrollChild(scrollChild)
-
     -- EditBox внутри скролла
     self.rlNotesEditor.editBox = CreateFrame("EditBox", nil, scrollChild, "InputBoxTemplate")
     self.rlNotesEditor.editBox:SetSize(360, 220)
@@ -2915,7 +2938,6 @@ function GpDb:_CreateRlNotesEditor()
     self.rlNotesEditor.editBox:SetAutoFocus(false)
     self.rlNotesEditor.editBox:SetScript("OnTextChanged", function(_, userInput)
         if userInput then
-            -- Автоподбор высоты содержимого (примерный)
             local text = self.rlNotesEditor.editBox:GetText()
             local lines = 1
             for _ in text:gmatch("\n") do lines = lines + 1 end
@@ -2930,7 +2952,6 @@ function GpDb:_CreateRlNotesEditor()
         end
         self.rlNotesEditor:Hide()
     end)
-
     -- Фон только внутри EditBox
     local editBg = self.rlNotesEditor.editBox:CreateTexture(nil, "BACKGROUND")
     editBg:SetTexture("Interface\\Buttons\\WHITE8X8")
