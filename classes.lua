@@ -1955,7 +1955,7 @@ function GpDb:Show()
     
     -- Принудительно обновляем данные гильдии перед показом
     GuildRoster()
-    C_Timer(0.01, function()
+    C_Timer(0.05, function()
         self:_UpdateFromGuild()
         self:UpdateWindow()
     end)
