@@ -5,7 +5,7 @@
 -- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
-        NSQC3_version = 2; NSQC3_subversion = 15
+        NSQC3_version = 2; NSQC3_subversion = 16
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
         ---
@@ -110,7 +110,7 @@ local function OnEvent(self, event, isLogin, isReload)
 
         C_Timer(1, function()
             if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
-                hunterCheck()
+               hunterCheck()
             end
             if nsqc3Timer then
                 if adaptiveFrame:isVisible() then

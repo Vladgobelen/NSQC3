@@ -1454,4 +1454,4 @@ function OnTestTrigger(channel, text, sender, prefix)
 end
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
-local chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON"})
+chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON",})

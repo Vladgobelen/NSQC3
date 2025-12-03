@@ -1162,25 +1162,16 @@ do
     local existing_C_Timer = _G.C_Timer
 
     -- Создаём базовую таблицу C_Timer
-    local C_Timer = {
-        _activeTimers = {}  -- для отладки (опционально)
-    }
+    local C_Timer = {}
 
     -- Вспомогательная функция для безопасной отмены таймера
     local function cancelTimer(timerFrame)
         if not timerFrame or timerFrame.isCancelled then return end
         timerFrame.isCancelled = true
         timerFrame:SetScript("OnUpdate", nil)
-        -- Удаляем из активных (если отслеживаем)
-        for i, t in ipairs(C_Timer._activeTimers) do
-            if t == timerFrame then
-                table.remove(C_Timer._activeTimers, i)
-                break
-            end
-        end
     end
 
-    -- Реализация C_Timer.After — однократный вызов через duration
+    -- C_Timer.After — однократный вызов через duration
     function C_Timer.After(duration, callback)
         if type(callback) ~= "function" then return end
         if type(duration) ~= "number" or duration < 0 then duration = 0 end
@@ -1189,7 +1180,6 @@ do
         timerFrame.elapsed = 0
         timerFrame.isCancelled = false
 
-        -- Метод отмены
         function timerFrame:Cancel()
             cancelTimer(self)
         end
@@ -1205,41 +1195,44 @@ do
             end
         end)
 
-        table.insert(C_Timer._activeTimers, timerFrame)
         return timerFrame
     end
 
-    -- Реализация C_Timer.NewTicker — повторяющийся таймер
+    -- C_Timer.NewTicker — повторяющийся таймер
     function C_Timer.NewTicker(duration, callback, iterations)
         if type(callback) ~= "function" then return end
         if type(duration) ~= "number" or duration < 0 then duration = 0 end
 
-        local ticker = {
-            _remaining = iterations or math.huge,
-            Cancel = function(self)
-                self._remaining = 0
-            end
-        }
+        local tickerFrame = CreateFrame("Frame")
+        tickerFrame.elapsed = 0
+        tickerFrame.count = 0
+        tickerFrame.maxCount = iterations or math.huge
+        tickerFrame.isCancelled = false
 
-        local function tick()
-            if ticker._remaining <= 0 then return end
-            if type(callback) == "function" then
-                callback()
-            end
-            ticker._remaining = ticker._remaining - 1
-            if ticker._remaining > 0 then
-                C_Timer.After(duration, tick)
-            end
+        function tickerFrame:Cancel()
+            cancelTimer(self)
         end
 
-        C_Timer.After(duration, tick)
-        return ticker
+        tickerFrame:SetScript("OnUpdate", function(self, elapsed)
+            if self.isCancelled then return end
+            self.elapsed = self.elapsed + elapsed
+            if self.elapsed >= duration then
+                self.elapsed = self.elapsed - duration
+                self.count = self.count + 1
+                if type(callback) == "function" then
+                    callback()
+                end
+                if self.count >= self.maxCount then
+                    cancelTimer(self)
+                end
+            end
+        end)
+
+        return tickerFrame
     end
 
     -- Совместимость: C_Timer.NewTimer (если используется)
-    function C_Timer.NewTimer(duration, callback)
-        return C_Timer.After(duration, callback)
-    end
+    C_Timer.NewTimer = C_Timer.After
 
     -- Метаметод __call — чтобы можно было вызывать C_Timer как функцию
     setmetatable(C_Timer, {
@@ -1252,10 +1245,10 @@ do
         end
     })
 
-    -- Восстанавливаем/устанавливаем глобальный C_Timer
+    -- Устанавливаем глобальный C_Timer
     _G.C_Timer = C_Timer
 
-    -- Эмуляция GetServerTime, если отсутствует (для полной совместимости)
+    -- Эмуляция GetServerTime, если отсутствует
     if not _G.GetServerTime then
         _G.GetServerTime = function()
             return time()
