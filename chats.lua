@@ -935,9 +935,54 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:ns_sendRLlist"] = {
+        {
+            keyword = {
+                { word = "ns_sendRLlist", position = 1, source = "prefix" },
+            },
+            func = "ns_sendRLlist",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_sendRLlist_f"] = {
+        {
+            keyword = {
+                { word = "ns_sendRLlist_f", position = 1, source = "prefix" },
+            },
+            func = "ns_sendRLlist_f",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
 
 -- Обработчики аддона
+
+function ns_sendRLlist(channel, text, sender, full_prefix)
+    if not gpDb._rl_tooltip_list then
+        gpDb._rl_tooltip_list = {}
+    end
+    table.insert(gpDb._rl_tooltip_list, text)
+end
+
+function ns_sendRLlist_f(channel, text, sender, full_prefix)
+    if gpDb._rl_tooltip_list then
+        if text ~= "" then
+            table.insert(gpDb._rl_tooltip_list, text)
+        end
+        gpDb.rl_tooltip_nicks = gpDb._rl_tooltip_list
+    else
+        gpDb.rl_tooltip_nicks = (text ~= "") and {text} or {}
+    end
+    gpDb._rl_tooltip_list = nil
+    -- Принудительно скрываем текущий тултип, чтобы обновился при следующем наведении
+    GameTooltip:Hide()
+end
 
 -- Глобальный буфер для сборки заметок
 _rlNotesReassembly = {}

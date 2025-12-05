@@ -1147,31 +1147,49 @@ end
 
 -- ============================================================================
 -- C_Timer Emulation — FULLY BACKWARDS COMPATIBLE for WoW 3.3.5
--- Supports:
---   C_Timer.After(duration, callback)
---   C_Timer.NewTicker(duration, callback, iterations)
---   C_Timer(duration, callback, isLooping) → via __call
---   timer:Cancel() on all returned timer objects
--- Fixes:
---   "attempt to index global 'C_Timer' (a function value)"
---   "attempt to call global 'C_Timer' (a table value)"
--- Place this at the VERY TOP of your addon (main.lua)
+-- + SAFE FULL CLEANUP via C_Timer._PurgeAllTimers()
 -- ============================================================================
 
 do
     local existing_C_Timer = _G.C_Timer
 
-    -- Создаём базовую таблицу C_Timer
     local C_Timer = {}
+    local activeTimers = {}  -- только для целей массовой отмены; не используется в логике
 
-    -- Вспомогательная функция для безопасной отмены таймера
+    local function registerTimer(timerFrame)
+        if not timerFrame then return end
+        table.insert(activeTimers, timerFrame)
+        -- Слабая ссылка не нужна — мы сами управляем жизнью
+    end
+
+    local function unregisterTimer(timerFrame)
+        if not timerFrame then return end
+        for i = #activeTimers, 1, -1 do
+            if activeTimers[i] == timerFrame then
+                table.remove(activeTimers, i)
+            end
+        end
+    end
+
     local function cancelTimer(timerFrame)
         if not timerFrame or timerFrame.isCancelled then return end
         timerFrame.isCancelled = true
         timerFrame:SetScript("OnUpdate", nil)
+        unregisterTimer(timerFrame)
     end
 
-    -- C_Timer.After — однократный вызов через duration
+    -- ПОЛНАЯ БЕЗОПАСНАЯ ОЧИСТКА ВСЕХ ТАЙМЕРОВ
+    function C_Timer._PurgeAllTimers()
+        for i = #activeTimers, 1, -1 do
+            local t = activeTimers[i]
+            if t and not t.isCancelled then
+                t.isCancelled = true
+                t:SetScript("OnUpdate", nil)
+            end
+        end
+        wipe(activeTimers)
+    end
+
     function C_Timer.After(duration, callback)
         if type(callback) ~= "function" then return end
         if type(duration) ~= "number" or duration < 0 then duration = 0 end
@@ -1195,10 +1213,10 @@ do
             end
         end)
 
+        registerTimer(timerFrame)
         return timerFrame
     end
 
-    -- C_Timer.NewTicker — повторяющийся таймер
     function C_Timer.NewTicker(duration, callback, iterations)
         if type(callback) ~= "function" then return end
         if type(duration) ~= "number" or duration < 0 then duration = 0 end
@@ -1228,13 +1246,12 @@ do
             end
         end)
 
+        registerTimer(tickerFrame)
         return tickerFrame
     end
 
-    -- Совместимость: C_Timer.NewTimer (если используется)
     C_Timer.NewTimer = C_Timer.After
 
-    -- Метаметод __call — чтобы можно было вызывать C_Timer как функцию
     setmetatable(C_Timer, {
         __call = function(_, duration, callback, isLooping)
             if isLooping then
@@ -1245,10 +1262,8 @@ do
         end
     })
 
-    -- Устанавливаем глобальный C_Timer
     _G.C_Timer = C_Timer
 
-    -- Эмуляция GetServerTime, если отсутствует
     if not _G.GetServerTime then
         _G.GetServerTime = function()
             return time()
@@ -2634,3 +2649,4 @@ end
 
 TryHookContextMenu()
 -- === END ===
+
