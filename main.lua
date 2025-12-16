@@ -23,7 +23,8 @@ local function OnEvent(self, event, isLogin, isReload)
         mFldObj = mFldObj or NsDb:new(ns_tooltips, nil, nil, nil, 100000)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
-        C_Timer(2, function()
+        C_Timer.After(2, function()
+
            ---
            GuildRecruiter.instance = GuildRecruiter.new()
            nsDbc["набор в гильдию"] = nsDbc["набор в гильдию"] or {}
@@ -108,9 +109,9 @@ local function OnEvent(self, event, isLogin, isReload)
             RestoreFramePositions(nsDbc['frames'])
         end)
 
-        C_Timer(1, function()
+        C_Timer.NewTicker(1, function()
             if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
-               hunterCheck()
+                hunterCheck()
             end
             if nsqc3Timer then
                 if adaptiveFrame:isVisible() then
@@ -120,22 +121,22 @@ local function OnEvent(self, event, isLogin, isReload)
                         end
                     end
                 end
-                if nsqc3Timer >=1 then
+                if nsqc3Timer >= 1 then
                     nsqc3Timer = nsqc3Timer - 1
                 else
                     nsqc3Timer = nil
                 end
             end
-        end, true)
+        end)
 
         -- C_Timer(10, function()
             
         -- end, true)
 
-        C_Timer(100, function()
+        C_Timer.NewTicker(100, function()
             UpdateAddOnMemoryUsage()
             time100()
-        end, true)
+        end)
     end
     if arg1 == "Blizzard_AchievementUI" then
         setFrameAchiv()

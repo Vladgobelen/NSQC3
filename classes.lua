@@ -1989,7 +1989,7 @@ function GpDb:Show()
     
     -- Принудительно обновляем данные гильдии перед показом
     GuildRoster()
-    C_Timer(0.1, function()
+    C_Timer.After(0.1, function()
         self:_UpdateFromGuild()
         self:UpdateWindow()
     end)
@@ -2444,6 +2444,7 @@ function GpDb:_UpdatePlayerInfo()
         self.lastCheckedPlayer = nick
         local myName = UnitName("player")
         SendAddonMessage("ns_get_rl", myName .. " " .. nick, "GUILD")
+        print(myName,nick,555)
     end
     -- === СОЗДАНИЕ КОНТЕЙНЕРА И ЭЛЕМЕНТОВ ОДИН РАЗ ===
     if not self.raidWindow.playerInfoContainer then
@@ -3742,7 +3743,7 @@ function AdaptiveFrame:Show()
     self.frame:Show()
     self:AdjustSizeAndPosition()
     -- Запускаем отслеживание позиции игрока при показе фрейма
-    self:StartPlayerPositionTracking()
+    --self:StartPlayerPositionTracking()
 end
 
 -- Метод для получения размеров фрейма

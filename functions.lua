@@ -815,7 +815,7 @@ function NS3Menu(ver, subver)
             sq:SetClickThrough(checked) -- Если чекбокс включен (true), панель пропускает клики насквозь
         end
     })
-    C_Timer(2, function()
+    C_Timer.After(2, function()
         SendAddonMessage("menu_chk " .. GetUnitName("player"), "", "GUILD")
     end)
 end
@@ -1150,124 +1150,161 @@ end
 -- + SAFE FULL CLEANUP via C_Timer._PurgeAllTimers()
 -- ============================================================================
 
-do
-    local existing_C_Timer = _G.C_Timer
-
-    local C_Timer = {}
-    local activeTimers = {}  -- только для целей массовой отмены; не используется в логике
-
-    local function registerTimer(timerFrame)
-        if not timerFrame then return end
-        table.insert(activeTimers, timerFrame)
-        -- Слабая ссылка не нужна — мы сами управляем жизнью
-    end
-
-    local function unregisterTimer(timerFrame)
-        if not timerFrame then return end
-        for i = #activeTimers, 1, -1 do
-            if activeTimers[i] == timerFrame then
-                table.remove(activeTimers, i)
-            end
-        end
-    end
-
-    local function cancelTimer(timerFrame)
-        if not timerFrame or timerFrame.isCancelled then return end
-        timerFrame.isCancelled = true
-        timerFrame:SetScript("OnUpdate", nil)
-        unregisterTimer(timerFrame)
-    end
-
-    -- ПОЛНАЯ БЕЗОПАСНАЯ ОЧИСТКА ВСЕХ ТАЙМЕРОВ
-    function C_Timer._PurgeAllTimers()
-        for i = #activeTimers, 1, -1 do
-            local t = activeTimers[i]
-            if t and not t.isCancelled then
-                t.isCancelled = true
-                t:SetScript("OnUpdate", nil)
-            end
-        end
-        wipe(activeTimers)
-    end
-
-    function C_Timer.After(duration, callback)
-        if type(callback) ~= "function" then return end
-        if type(duration) ~= "number" or duration < 0 then duration = 0 end
-
-        local timerFrame = CreateFrame("Frame")
-        timerFrame.elapsed = 0
-        timerFrame.isCancelled = false
-
-        function timerFrame:Cancel()
-            cancelTimer(self)
-        end
-
-        timerFrame:SetScript("OnUpdate", function(self, elapsed)
-            if self.isCancelled then return end
-            self.elapsed = self.elapsed + elapsed
-            if self.elapsed >= duration then
-                if not self.isCancelled and type(callback) == "function" then
-                    callback()
+-- Эмуляция C_Timer для WoW 3.3.5
+if not C_Timer then
+    C_Timer = {}
+    
+    -- Внутренние переменные для управления таймерами
+    local timers = {}
+    local timerFrame = CreateFrame("Frame") 
+    local timerCount = 0
+    
+    -- Главный обработчик OnUpdate для всех таймеров
+    timerFrame:SetScript("OnUpdate", function(self, elapsed)
+        local currentTime = GetTime()
+        local timersToRemove = {}
+        
+        -- Проверяем все активные таймеры
+        for id, timer in pairs(timers) do
+            timer.elapsed = timer.elapsed + elapsed
+            
+            -- Если время вышло для однократного таймера
+            if not timer.repeating and timer.elapsed >= timer.delay then
+                if timer.callback then
+                    pcall(timer.callback)
                 end
-                cancelTimer(self)
+                timersToRemove[id] = true
             end
-        end)
-
-        registerTimer(timerFrame)
-        return timerFrame
-    end
-
-    function C_Timer.NewTicker(duration, callback, iterations)
-        if type(callback) ~= "function" then return end
-        if type(duration) ~= "number" or duration < 0 then duration = 0 end
-
-        local tickerFrame = CreateFrame("Frame")
-        tickerFrame.elapsed = 0
-        tickerFrame.count = 0
-        tickerFrame.maxCount = iterations or math.huge
-        tickerFrame.isCancelled = false
-
-        function tickerFrame:Cancel()
-            cancelTimer(self)
-        end
-
-        tickerFrame:SetScript("OnUpdate", function(self, elapsed)
-            if self.isCancelled then return end
-            self.elapsed = self.elapsed + elapsed
-            if self.elapsed >= duration then
-                self.elapsed = self.elapsed - duration
-                self.count = self.count + 1
-                if type(callback) == "function" then
-                    callback()
+            
+            -- Если время вышло для повторяющегося таймера
+            if timer.repeating and timer.elapsed >= timer.delay then
+                if timer.callback then
+                    pcall(timer.callback)
                 end
-                if self.count >= self.maxCount then
-                    cancelTimer(self)
+                timer.elapsed = timer.elapsed - timer.delay
+            end
+        end
+        
+        -- Удаляем завершенные таймеры
+        for id in pairs(timersToRemove) do
+            timers[id] = nil
+        end
+        
+        -- Скрываем фрейм если нет активных таймеров
+        if next(timers) == nil then
+            self:Hide()
+        end
+    end)
+    
+    -- Скрываем фрейм по умолчанию
+    timerFrame:Hide()
+    
+    -- Эмуляция C_Timer.After(delay, callback)
+    function C_Timer.After(delay, callback)
+        if type(delay) ~= "number" or delay <= 0 then
+            error("C_Timer.After: delay must be a positive number", 2)
+        end
+        
+        if type(callback) ~= "function" then
+            error("C_Timer.After: callback must be a function", 2)
+        end
+        
+        timerCount = timerCount + 1
+        local timerId = timerCount
+        
+        timers[timerId] = {
+            delay = delay,
+            elapsed = 0,
+            callback = callback,
+            repeating = false
+        }
+        
+        -- Показываем фрейм для обработки таймеров
+        timerFrame:Show()
+    end
+    
+    -- Эмуляция C_Timer.NewTimer(delay, callback)
+    function C_Timer.NewTimer(delay, callback)
+        if type(delay) ~= "number" or delay <= 0 then
+            error("C_Timer.NewTimer: delay must be a positive number", 2)
+        end
+        
+        if type(callback) ~= "function" then
+            error("C_Timer.NewTimer: callback must be a function", 2)
+        end
+        
+        timerCount = timerCount + 1
+        local timerId = timerCount
+        
+        local timer = {
+            delay = delay,
+            elapsed = 0,
+            callback = callback,
+            repeating = false
+        }
+        
+        timers[timerId] = timer
+        
+        -- Показываем фрейм для обработки таймеров
+        timerFrame:Show()
+        
+        -- Создаем объект таймера с методом Cancel
+        local timerObject = {
+            id = timerId,
+            Cancel = function(self)
+                if timers[self.id] then
+                    timers[self.id] = nil
+                    -- Скрываем фрейм если нет активных таймеров
+                    if next(timers) == nil then
+                        timerFrame:Hide()
+                    end
                 end
             end
-        end)
-
-        registerTimer(tickerFrame)
-        return tickerFrame
+        }
+        
+        return timerObject
     end
-
-    C_Timer.NewTimer = C_Timer.After
-
-    setmetatable(C_Timer, {
-        __call = function(_, duration, callback, isLooping)
-            if isLooping then
-                return C_Timer.NewTicker(duration, callback)
-            else
-                return C_Timer.After(duration, callback)
+    
+    -- Эмуляция C_Timer.NewTicker(interval, callback)
+    function C_Timer.NewTicker(interval, callback)
+        if type(interval) ~= "number" or interval <= 0 then
+            error("C_Timer.NewTicker: interval must be a positive number", 2)
+        end
+        
+        if type(callback) ~= "function" then
+            error("C_Timer.NewTicker: callback must be a function", 2)
+        end
+        
+        timerCount = timerCount + 1
+        local timerId = timerCount
+        
+        local timer = {
+            delay = interval,
+            elapsed = 0,
+            callback = callback,
+            repeating = true
+        }
+        
+        timers[timerId] = timer
+        
+        -- Показываем фрейм для обработки таймеров
+        timerFrame:Show()
+        
+        -- Создаем объект тикера с методом Cancel
+        local tickerObject = {
+            id = timerId,
+            Cancel = function(self)
+                if timers[self.id] then
+                    timers[self.id] = nil
+                    -- Скрываем фрейм если нет активных таймеров
+                    if next(timers) == nil then
+                        timerFrame:Hide()
+                    end
+                end
             end
-        end
-    })
-
-    _G.C_Timer = C_Timer
-
-    if not _G.GetServerTime then
-        _G.GetServerTime = function()
-            return time()
-        end
+        }
+        
+        return tickerObject
     end
 end
 
@@ -1301,7 +1338,7 @@ function fBtnClick(id, obj)
         SendAddonMessage(actionPrefix .. mFldName .. " " .. id, obj, "guild")
     end
 
-    C_Timer(0.3, function()
+    C_Timer.After(0.3, function()
         set = true
     end)
 end
@@ -2047,7 +2084,7 @@ function adjustLayoutData(headerParams, geometryPayload, isLayoutComplete)
     end
     if isLayoutComplete then
         miniMapButton:Show()
-        C_Timer(1, function()
+        C_Timer.After(1, function()
             eCf()
         end)
     end
