@@ -8291,7 +8291,7 @@ function SpellQueue:SpellUsed(spellName)
     
     -- Добавляем проверку на рыцаря смерти и запуск таймера
     --if self.playerClass == "DEATHKNIGHT" then
-        C_Timer(0.1, function()
+        C_Timer.After(0.1, function()
             self:ForceUpdateAllSpells()
         end)
     --end

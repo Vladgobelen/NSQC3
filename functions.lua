@@ -1146,7 +1146,7 @@ function setFrameAchiv()
 end
 
 -- ============================================================================
--- C_Timer Emulation — FULLY BACKWARDS COMPATIBLE for WoW 3.3.5
+-- collectgarbage("collect") Emulation — FULLY BACKWARDS COMPATIBLE for WoW 3.3.5
 -- + SAFE FULL CLEANUP via C_Timer._PurgeAllTimers()
 -- ============================================================================
 
@@ -2554,7 +2554,7 @@ monitor:SetScript("OnUpdate", function(self, elapsed)
 end)
 -- === END CLIENT ===
 
--- === NSQC3: CALENDAR CONTEXT MENU WITH TWO BUTTONS ===
+-- === NSQC3: CALENDAR CONTEXT MENU WITH TWO BUTTONS (WoW 3.3.5 compatible) ===
 if _G.NSQC3_CALENDAR_MENU_HOOKED then return end
 _G.NSQC3_CALENDAR_MENU_HOOKED = true
 
@@ -2578,9 +2578,49 @@ local function SendAddonMessageChunked(prefix, payload, channel)
     end
 end
 
+-- Создаём служебный фрейм для таймеров
+local NSQC3_TimerFrame = CreateFrame("Frame")
+NSQC3_TimerFrame.timers = {}
+
+function NSQC3_TimerFrame:StartTimer(delay, callback)
+    local timer = {
+        startTime = GetTime(),
+        delay = delay,
+        callback = callback,
+        active = true
+    }
+    table.insert(self.timers, timer)
+    self:Show()
+end
+
+function NSQC3_TimerFrame:OnUpdate(elapsed)
+    local now = GetTime()
+    local i = #self.timers
+    while i >= 1 do
+        local t = self.timers[i]
+        if t.active and now - t.startTime >= t.delay then
+            t.active = false
+            t.callback()
+            table.remove(self.timers, i)
+        end
+        i = i - 1
+    end
+    if #self.timers == 0 then
+        self:Hide()
+    end
+end
+
+NSQC3_TimerFrame:SetScript("OnUpdate", NSQC3_TimerFrame.OnUpdate)
+NSQC3_TimerFrame:Hide()
+
+-- Замена C_Timer.After
+local function NSQC3_After(delay, callback)
+    NSQC3_TimerFrame:StartTimer(delay, callback)
+end
+
 local function TryHookContextMenu()
     if not _G.CalendarContextMenu then
-        C_Timer.After(0.1, TryHookContextMenu)
+        NSQC3_After(0.1, TryHookContextMenu)
         return
     end
 
@@ -2590,7 +2630,7 @@ local function TryHookContextMenu()
     _G.CalendarContextMenu:SetScript("OnShow", function(self)
         if orig_OnShow then orig_OnShow(self) end
 
-        C_Timer.After(0.02, function()
+        NSQC3_After(0.02, function()
             -- === КНОПКА 1: Удалить с сервера (через CreateEventFrame) ===
             local btnDel = _G["CalendarContextMenuButton7"]
             if btnDel then
