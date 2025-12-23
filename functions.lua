@@ -2122,7 +2122,6 @@ end
 
 function hunterCheck()
     local _, classUnit = UnitClass("player")
-    if testQ["метка охотника"] then
         if classUnit == "HUNTER" then
             for slot = 1, 24, 1 do
                 local debuffName = UnitDebuff("target", slot);
@@ -2140,7 +2139,6 @@ function hunterCheck()
                 end;
             end;
         end
-    end
 end
 
 function GetVisibleGuildNames()

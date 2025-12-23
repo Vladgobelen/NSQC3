@@ -5,7 +5,7 @@
 -- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
-        NSQC3_version = 3; NSQC3_subversion = 1
+        NSQC3_version = 3; NSQC3_subversion = 2
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
         ---
@@ -23,111 +23,130 @@ local function OnEvent(self, event, isLogin, isReload)
         mFldObj = mFldObj or NsDb:new(ns_tooltips, nil, nil, nil, 100000)
         set_miniButton()    -- Вызов функции для настройки мини-кнопки
         
-        C_Timer.After(2, function()
+        local timerFrame = CreateFrame("Frame")
+local timer = 0
+timerFrame:SetScript("OnUpdate", function(self, elapsed)
+    timer = timer + elapsed
+    if timer >= 2 then
+        GuildRecruiter.instance = GuildRecruiter.new()
+        nsDbc["набор в гильдию"] = nsDbc["набор в гильдию"] or {}
+        achievementHelper = AchievementHelper:new()
+        questWhatchPanel()
+        nsDbc.proks = nsDbc.proks or {}
+        ProkIconManager:Initialize(nsDbc.proks)
+        if UnitLevel("player") >= 10 then
+            if AchievementMicroButton:IsEnabled() == 1 then
+                AchievementMicroButton:Click()
+                AchievementFrameCloseButton:Click()
+            end
+        end
+        getPoint()
+        --questManagerClient = QuestManagerClient:new()
+        nsDbc.skills3 = nsDbc.skills3 or {}
+        sq = SpellQueue:Create("MySpellQueue", 600, 350, "CENTER")
+        sq:SetIconsTable()
+        local appearanceSettings = {
+            width = 200,
+            height = 32,
+            scale = 1,
+            alpha = 0.9,
+            inactiveAlpha = 0.4,
+            iconSpacing = 0,
+            glowSizeOffset = 10,
+            highlightSizeOffset = 15,
+            glowAlpha = 0.3,
+            healthColor = {1, 0, 0},
+            healthBarHeight = 3,
+            healthBarOffset = 3,
+            resourceColor = {0, 0.8, 1},
+            resourceBarHeight = 3,
+            resourceBarOffset = 0,
+            targetHealthColor = {1, 0, 0},
+            targetHealthHeight = 3,
+            targetHealthBarOffset = -3,
+            targetResourceColor = {0.5, 0, 1},
+            targetResourceHeight = 3,
+            targetResourceBarOffset = 0,
+            iconSize = 32,
+            comboSize = 18,
+            poisonSize = 16,
+            timeLinePosition = 15,
+            comboSize = 6,
+            comboSpacing = 0,
+            comboOffset = {x = 0, y = 24},
+            poisonSize = 6,
+            poisonSpacing = 0,
+            poisonOffset = {x = 0, y = 24},
+            healthBarHeight = 3,
+            healthBarOffset = 6,
+            resourceBarHeight = 3,
+            resourceBarOffset = 0,
+            targetHealthBarHeight = 3,
+            targetHealthBarOffset = -6,
+            targetResourceBarHeight = 3,
+            targetResourceBarOffset = 0,
+            clickThrough = 0
+        }
+        if not ns_dbc:getKey("настройки", "Skill Queue") then
+            ns_dbc:modKey("настройки", "Skill Queue", appearanceSettings)
+        end
+        sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
+        sq:UpdateSkillTables()
+        sq:ForceUpdateAllSpells()
+        sq:ApplyDisplayMode()
+        nsDbc['frames'] = nsDbc['frames'] or {}
+        RestoreFramePositions(nsDbc['frames'])
+        -- Clear the timer
+        self:SetScript("OnUpdate", nil)
+        self:Hide()
+    end
+end)
+timerFrame:Show()
+        local nsqc3TimerFrame = CreateFrame("Frame")
+nsqc3TimerFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.total = (self.total or 0) + elapsed
+    if self.total >= 1 then
+        self.total = self.total - 1  -- поддерживаем точность при небольших задержках
 
-           ---
-           GuildRecruiter.instance = GuildRecruiter.new()
-           nsDbc["набор в гильдию"] = nsDbc["набор в гильдию"] or {}
-           ---
-            achievementHelper = AchievementHelper:new()
-            questWhatchPanel()
-            nsDbc.proks = nsDbc.proks or {}
-            ProkIconManager:Initialize(nsDbc.proks)
-            if UnitLevel("player") >= 10 then
-                if AchievementMicroButton:IsEnabled() == 1 then
-                    AchievementMicroButton:Click()
-                    AchievementFrameCloseButton:Click()
-                end
-            end
-            getPoint()
-            questManagerClient = QuestManagerClient:new()
-            nsDbc.skills3 = nsDbc.skills3 or {}
-            sq = SpellQueue:Create("MySpellQueue", 600, 350, "CENTER")
-            sq:SetIconsTable()
-            local appearanceSettings = {
-                -- Основные параметры
-                width = 200,              -- Ширина всей панели
-                height = 32,              -- Высота панели
-                scale = 1,                -- Масштаб интерфейса
-                alpha = 0.9,              -- Прозрачность в бою
-                inactiveAlpha = 0.4,      -- Прозрачность вне боя
-                iconSpacing = 0,          -- расстояние между иконками
-                glowSizeOffset = 10,      -- На сколько больше иконки будет glow
-                highlightSizeOffset = 15, -- На сколько больше иконки будет highlight
-                glowAlpha = 0.3,          -- Прозрачность glow
-                
-                -- Игрок
-                healthColor = {1, 0, 0},                 -- Цвет здоровья игрока (RGB)
-                healthBarHeight = 3,                     -- Высота полосы здоровья
-                healthBarOffset = 3,                     -- Смещение от верха панели
-                
-                resourceColor = {0, 0.8, 1},             -- Цвет ресурса (мана/ярость и т.д.)
-                resourceBarHeight = 3,                   -- Высота полосы ресурса
-                resourceBarOffset = 0,                   -- Смещение от полосы здоровья
-                
-                -- Цель
-                targetHealthColor = {1, 0, 0},         -- Цвет здоровья цели
-                targetHealthHeight = 3,                  -- Высота полосы здоровья цели
-                targetHealthBarOffset = -3,              -- Смещение от низа панели (отрицательное - вверх)
-                
-                targetResourceColor = {0.5, 0, 1},       -- Цвет ресурса цели
-                targetResourceHeight = 3,                -- Высота полосы ресурса цели
-                targetResourceBarOffset = 0,             -- Смещение от полосы здоровья цели
-                
-                -- Другие элементы
-                iconSize = 32,              -- Размер иконок способностей
-                comboSize = 18,             -- Размер комбо-поинтов
-                poisonSize = 16,            -- Размер стаков ядов
-                timeLinePosition = 15,      -- Позиция временной линии
-                -- Комбо-поинты
-                comboSize = 6,               -- Размер квадрата
-                comboSpacing = 0,            -- Расстояние между квадратами
-                comboOffset = {x = 0, y = 24}, -- Смещение от панели
-                
-                -- Яды
-                poisonSize = 6,              -- Размер квадрата
-                poisonSpacing = 0,           -- Расстояние между квадратами
-                poisonOffset = {x = 0, y = 24}, -- Смещение от панели
-                healthBarHeight = 3,          -- высота полоски хп игрока
-                healthBarOffset = 6,          -- расстояние полоски хп до панели
-                resourceBarHeight = 3,
-                resourceBarOffset = 0,
-                targetHealthBarHeight = 3,
-                targetHealthBarOffset = -6,
-                targetResourceBarHeight = 3,
-                targetResourceBarOffset = 0,
-                clickThrough = 0
-            }
-            if not ns_dbc:getKey("настройки", "Skill Queue") then
-                ns_dbc:modKey("настройки", "Skill Queue", appearanceSettings)
-            end
-            sq:SetAppearanceSettings(ns_dbc:getKey("настройки", "Skill Queue"))
-            sq:UpdateSkillTables()
-            sq:ForceUpdateAllSpells()
-            sq:ApplyDisplayMode()
-            nsDbc['frames'] = nsDbc['frames'] or {}
-            RestoreFramePositions(nsDbc['frames'])
-        end)
+        -- Основная логика, которая должна выполняться каждую секунду
+        if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
+            hunterCheck()
+        end
 
-        C_Timer.NewTicker(1, function()
-            if ns_dbc:getKey("настройки", "hunterTarget") == 1 then
-                hunterCheck()
-            end
-            if nsqc3Timer then
-                if adaptiveFrame:isVisible() then
-                    for i = 1, 100 do
-                        if adaptiveFrame.children[i].frame:GetNormalTexture():GetTexture():sub(-3) == "stl" then
-                            adaptiveFrame.children[i]:SetTextT(nsqc3Timer)
+        if nsqc3Timer then
+            if adaptiveFrame and adaptiveFrame:IsVisible() then
+                for i = 1, 100 do
+                    local child = adaptiveFrame.children[i]
+                    if child and child.frame and child.frame:GetNormalTexture() then
+                        local tex = child.frame:GetNormalTexture():GetTexture()
+                        if tex and tex:sub(-3) == "stl" then
+                            child:SetTextT(nsqc3Timer)
                         end
                     end
                 end
-                if nsqc3Timer >= 1 then
-                    nsqc3Timer = nsqc3Timer - 1
-                else
-                    nsqc3Timer = nil
-                end
             end
-        end)
+
+            if nsqc3Timer >= 1 then
+                nsqc3Timer = nsqc3Timer - 1
+            else
+                nsqc3Timer = nil
+            end
+        end
+
+        -- Если таймер закончился и нет других причин продолжать — скрываем
+        if not nsqc3Timer and ns_dbc:getKey("настройки", "hunterTarget") ~= 1 then
+            self:Hide()
+        end
+    end
+end)
+
+-- Функция для запуска таймера (вызывай её, когда нужно начать отсчёт)
+function StartNsqc3Timer()
+    if not nsqc3TimerFrame:IsShown() then
+        nsqc3TimerFrame.total = 0
+        nsqc3TimerFrame:Show()
+    end
+end
 
         -- C_Timer(10, function()
             
