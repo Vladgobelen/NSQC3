@@ -8363,12 +8363,14 @@ function SpellQueue:SpellUsed(spellName)
     self:CheckAllDebuffs()
     self:UpdateSpellPosition(spellName)
     self:UpdateSpellsPriority()
-    -- Добавляем проверку на рыцаря смерти и запуск таймера
-    --if self.playerClass == "DEATHKNIGHT" then
+    -- Запускаем принудительное обновление ТОЛЬКО для Death Knight и с проверкой
+    if self.playerClass == "DEATHKNIGHT" then
         self:CreateTimer(0.1, function()
-            self:ForceUpdateAllSpells()
+            if self.frame:IsShown() then
+                self:ForceUpdateAllSpells()
+            end
         end)
-    --end
+    end
 end
 
 function SpellQueue:UpdateSpellPosition(spellName)
@@ -8937,46 +8939,54 @@ function SpellQueue:ForceUpdateAllSpells()
     self:UpdateResourceBars()
     -- Основная логика обновления заклинаний
     for spellName, spell in pairs(self.spells) do
+        local skipSpell = false
+        
         -- Проверка на ресурсы
         if spell.data.resource then
             if not self:HasEnoughResource(spellName) then
                 spell.icon:Hide()
                 spell.glow:Hide()
                 spell.cooldownText:Hide()
-                do break end
+                skipSpell = true
             end
         end
-        -- Проверка на комбо-поинты
-        if spell.data.combo and spell.data.combo > 0 then
+        
+        -- Проверка на комбо-поинты (только если не пропускаем)
+        if not skipSpell and spell.data.combo and spell.data.combo > 0 then
             if not self:HasEnoughComboPoints(spell.data.combo) then
                 spell.icon:Hide()
                 spell.glow:Hide()
                 spell.cooldownText:Hide()
-                do break end
+                skipSpell = true
             end
         end
-        -- Обновляем кулдаун
-        local remaining, fullDuration = self:GetSpellCooldown(spellName)
-        spell.active = remaining and remaining > 0
-        spell.isReady = not spell.active
-        -- Обновляем баффы
-        if spell.data.buf == 1 then
-            spell.hasBuff = self:HasBuff(spellName)
-        end
-        -- Обновляем дебаффы
-        if spell.data.debuf then
-            self:UpdateDebuffState(spellName)
-        elseif spell.isReady then
-            spell.icon:SetAlpha(READY_ALPHA)
+        
+        if skipSpell then
+            -- Пропускаем остальную обработку для этого скилла
         else
-            spell.icon:SetAlpha(COOLDOWN_ALPHA)
+            -- Обновляем кулдаун
+            local remaining, fullDuration = self:GetSpellCooldown(spellName)
+            spell.active = remaining and remaining > 0
+            spell.isReady = not spell.active
+            -- Обновляем баффы
+            if spell.data.buf == 1 then
+                spell.hasBuff = self:HasBuff(spellName)
+            end
+            -- Обновляем дебаффы
+            if spell.data.debuf then
+                self:UpdateDebuffState(spellName)
+            elseif spell.isReady then
+                spell.icon:SetAlpha(READY_ALPHA)
+            else
+                spell.icon:SetAlpha(COOLDOWN_ALPHA)
+            end
+            -- Перерисовываем позицию
+            self:UpdateSpellPosition(spellName)
         end
-        -- Перерисовываем позицию
-        self:UpdateSpellPosition(spellName)
     end
     -- Финализируем обновления
     self:UpdateSpellsPriority()
-    self:ApplyDisplayMode()  -- <<< ИСПРАВЛЕНО: вместо Show()
+    -- УБРАНО: self:ApplyDisplayMode() - это вызывало мигание
 end
 
 function SpellQueue:SetAppearanceSettings(options)
