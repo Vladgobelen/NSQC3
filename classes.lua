@@ -1256,6 +1256,11 @@ function GpDb:_SetupTable()
             if not self.gp_data or not self.gp_data[dataIndex] then return end
             -- Получаем текущее время
             local currentTime = GetTime()
+
+            ------------------ проверка наличия заметок ------------------
+            SendAddonMessage("NSShowMeZametki", self.gp_data[dataIndex].original_nick, "GUILD")
+            ------------------ проверка наличия заметок ------------------
+
             -- Проверяем двойной клик (только ЛКМ и только если в рейде)
             if button == "LeftButton" and IsInRaid() and (currentTime - row.lastClickTime) < 0.5 then
                 -- Двойной клик - выделяем все элементы
@@ -2444,7 +2449,6 @@ function GpDb:_UpdatePlayerInfo()
         self.lastCheckedPlayer = nick
         local myName = UnitName("player")
         SendAddonMessage("ns_get_rl", myName .. " " .. nick, "GUILD")
-        print(myName,nick,555)
     end
     -- === СОЗДАНИЕ КОНТЕЙНЕРА И ЭЛЕМЕНТОВ ОДИН РАЗ ===
     if not self.raidWindow.playerInfoContainer then
@@ -7380,10 +7384,6 @@ SpellQueue.__index = SpellQueue
 local COMBO_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga" 
 local POISON_TEXTURE = "IInterface\\AddOns\\NSQC3\\libs\\00t.tga"
 
-local DEBUG = false -- включить отладку
-local function debug(msg)
-    if DEBUG then print("SQ_DEBUG:", msg) end
-end
 
 local FEATURE_HP = 1
 local FEATURE_RESOURCE = 2
@@ -7426,7 +7426,19 @@ local RESOURCE_NAMES = {
     [14] = "Комбо-поинты"
 }
 
+-- Индексы ресурсов (для проверок)
 local RESOURCE_TYPES = {
+    MANA = 0,
+    RAGE = 1,
+    FOCUS = 2,
+    ENERGY = 3,
+    RUNIC_POWER = 6,
+    RUNES = 5,
+    COMBO_POINTS = 14
+}
+
+-- Соответствие классов и их основного ресурса (переименовано, чтобы не конфликтовало)
+local CLASS_RESOURCE_TYPES = {
     DEATHKNIGHT = 6,  -- Сила рун
     DRUID = 0,        -- Мана/Энергия (в зависимости от формы)
     HUNTER = 2,       -- Фокус
@@ -7455,6 +7467,72 @@ local MODE_COMBAT_ONLY = 1
 local MODE_ALWAYS_VISIBLE = 2
 local MODE_ALWAYS_HIDDEN = 3
 
+function SpellQueue:FindIconBySpellQueueName(spellName)
+    if not ProkIconManager or not ProkIconManager.icons then return nil end
+    for _, iconData in pairs(ProkIconManager.icons) do
+        if iconData.spellqueue_name == spellName and iconData.triggerType == "custom" then
+            return iconData
+        end
+    end
+    return nil
+end
+
+function SpellQueue:ShowProkTexture(spellName, iconData)
+    if not self.prokTextures then
+        self.prokTextures = {}
+    end
+    
+    -- Если фрейм уже существует, используем его
+    if not self.prokTextures[spellName] then
+        local frame = CreateFrame("Frame", nil, UIParent)
+        frame:SetFrameStrata("HIGH")
+        frame.texture = frame:CreateTexture(nil, "BACKGROUND")
+        frame.texture:SetAllPoints()
+        self.prokTextures[spellName] = frame
+    end
+    
+    local frame = self.prokTextures[spellName]
+    local profile = ProkIconManager.settings[iconData.profil or 1] or ProkIconManager.settings[1]
+    
+    -- Определяем размеры
+    local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+    local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+    local x, y = profile.x or 0, profile.y or 0
+    
+    
+    -- Настраиваем фрейм
+    frame:SetSize(width, height)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
+    
+    -- Обрабатываем путь к текстуре
+    local texturePath = iconData.icon
+    if not strfind(texturePath:lower(), "^interface\\") then
+        if not strfind(texturePath:lower(), "%.tga$") and not strfind(texturePath:lower(), "%.blp$") then
+            texturePath = texturePath .. ".tga"
+        end
+        texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath
+    end
+    
+    
+    -- Безопасная загрузка текстуры
+    local success = pcall(function()
+        frame.texture:SetTexture(texturePath)
+    end)
+    
+    if not success then
+        print(string.format("ERROR: Failed to load texture for %s: %s", spellName, texturePath))
+        frame.texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    end
+    
+    frame:Show()
+end
+
+function SpellQueue:HideProkTexture(spellName)
+    if self.prokTextures and self.prokTextures[spellName] then
+        self.prokTextures[spellName]:Hide()
+    end
+end
 
 function SpellQueue:UpdateDebuffState(spellName)
     local spell = self.spells[spellName]
@@ -7568,7 +7646,6 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     )
     self.timers = {}  -- Инициализация таблицы таймеров
     self.frame:SetClampedToScreen(true)
-    debug(string.format("Initial features: %d", self.features))
 
     -- Настройка размеров и позиционирования
     frame:SetWidth(self.width)
@@ -7678,6 +7755,10 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
 
             -- ОБНОВЛЯЕМ ПОЗИЦИИ ГОТОВЫХ СКИЛЛОВ ОДИН РАЗ ЗА КАДР
             self:UpdateSpellsPriority()
+
+            -- === ИСПРАВЛЕНИЕ 2: Обновляем слои для откатывающихся скиллов ===
+            -- Сортируем так, чтобы самый быстрый откат был выше остальных
+            self:UpdateCooldownLayers()
 
             -- Обновление UI-элементов
             self:UpdateResourceBars()
@@ -7819,26 +7900,20 @@ end
 
 function SpellQueue:GetPlayerResourceType()
     local _, class = UnitClass("player")
-    debug(string.format("Class: %s", class))
     
     if class == "DRUID" then
         local form = GetShapeshiftForm()
-        debug(string.format("Druid form: %d", form))
         -- 1: Медведь, 3: Кошка, 4: Лунный облик
         if form == 1 then
-            debug("Bear form - Rage")
             return 1 -- RAGE
         elseif form == 3 then
-            debug("Cat form - Energy")
             return 3 -- ENERGY
         else
-            debug("Other form - Mana")
             return 0 -- MANA
         end
     end
     
     local resource = RESOURCE_TYPES[class] or 0
-    debug(string.format("Resource type: %d (%s)", resource, RESOURCE_NAMES[resource] or "unknown"))
     return resource
 end
 
@@ -7856,7 +7931,6 @@ function SpellQueue:UpdateResourceBars()
     if bit.band(self.features, FEATURE_HP) ~= 0 then
         local maxHP = UnitHealthMax("player")
         local hp = maxHP > 0 and (UnitHealth("player") / maxHP) or 0
-        debug(string.format("Player HP: %.1f%%", hp*100))
         self.healthBar:SetWidth(self.width * hp)
         self.healthBar:Show()
     else
@@ -7867,11 +7941,9 @@ function SpellQueue:UpdateResourceBars()
         local resourceType = self:GetPlayerResourceType()
         local current = UnitPower("player", resourceType)
         local max = UnitPowerMax("player", resourceType)
-        debug(string.format("Player resource: %d/%d (type %d)", current, max, resourceType))
         
         local colorName = self.resourceTypeNames[resourceType] or "UNKNOWN"
         local color = FEATURE_COLORS[colorName] or {1,1,1} -- дефолтный белый если нет цвета
-        debug(string.format("Resource color: %s", colorName))
         
         self.resourceBar:SetWidth(max > 0 and (current/max)*self.width or 0)
         self.resourceBar:SetVertexColor(unpack(color))
@@ -7886,7 +7958,6 @@ function SpellQueue:UpdateResourceBars()
             -- Здоровье цели
             local maxHP = UnitHealthMax("target")
             local hp = maxHP > 0 and (UnitHealth("target") / maxHP) or 0
-            debug(string.format("Target HP: %.1f%%", hp*100))
             self.targetHealthBar:SetWidth(self.width * hp)
             self.targetHealthBar:Show()
             
@@ -8165,7 +8236,8 @@ function SpellQueue:SetIconsTable(tblIcons)
                     type = spellData.resource.type,
                     amount = spellData.resource.amount
                 } or nil,
-                prok = spellData.prok  -- <<< КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+                prok = spellData.prok,
+                texture = spellData.texture
             }
             self.spells[spellName] = {
                 data = newData,
@@ -8354,16 +8426,58 @@ end
 
 function SpellQueue:SpellUsed(spellName)
     local spell = self.spells[spellName]
-    if not spell then return end
+    if not spell then
+        return
+    end
+    
     -- Принудительное обновление кулдауна
-    local remaining = self:GetSpellCooldown(spellName)
+    local remaining, fullDuration = self:GetSpellCooldown(spellName)
     spell.active = remaining and remaining > 0
     spell.isReady = not spell.active
+    
     -- Проверяем все скиллы с дебафами сразу после использования скилла
     self:CheckAllDebuffs()
+    
+    -- === ОБРАБОТКА СКИЛЛОВ С ПАРАМЕТРОМ "texture" ===
+    if spell.data.texture then
+        if ProkIconManager then
+            local iconData = nil
+            -- Ищем iconData так же, как в UpdateSpellPosition
+            if ProkIconManager.icons and ProkIconManager.icons[spellName] then
+                iconData = ProkIconManager.icons[spellName]
+            end
+            if not iconData and nsDbc and nsDbc.proks and nsDbc.proks[spellName] then
+                iconData = nsDbc.proks[spellName]
+            end
+            if not iconData and nsDbc and nsDbc.proks then
+                for name, data in pairs(nsDbc.proks) do
+                    if data.spellqueue_name == spellName then
+                        iconData = data
+                        break
+                    end
+                end
+            end
+            
+            if iconData and iconData.triggerType == "custom" then
+                -- Скрываем текстуру при использовании скилла
+                self:HideProkTexture(spellName)
+                spell.textureVisible = false
+                
+                -- Добавляем таймер для повторной проверки через небольшую задержку
+                self:CreateTimer(0.1, function()
+                    self:UpdateSpellPosition(spellName)
+                end)
+            end
+        end
+    end
+    
+    -- Обновляем позицию скилла
     self:UpdateSpellPosition(spellName)
+    
+    -- Обновляем приоритеты скиллов
     self:UpdateSpellsPriority()
-    -- Запускаем принудительное обновление ТОЛЬКО для Death Knight и с проверкой
+    
+    -- Запускаем принудительное обновление для Death Knight
     if self.playerClass == "DEATHKNIGHT" then
         self:CreateTimer(0.1, function()
             if self.frame:IsShown() then
@@ -8376,7 +8490,82 @@ end
 function SpellQueue:UpdateSpellPosition(spellName)
     local spell = self.spells[spellName]
     if not spell then return end
-
+    
+    -- === Проверка "Текстура" ===
+    if spell.data.texture then
+        -- Если есть параметр texture, то не отображаем на панели
+        spell.icon:Hide()
+        spell.glow:Hide()
+        spell.cooldownText:Hide()
+        
+        -- Кэшируем предыдущее состояние
+        local wasVisible = spell.textureVisible or false
+        spell.textureVisible = false
+        
+        -- === Поиск иконки в правильных таблицах ===
+        local iconData = nil
+        -- 1. Сначала ищем в ProkIconManager.icons (если доступно)
+        if ProkIconManager and ProkIconManager.icons and ProkIconManager.icons[spellName] then
+            iconData = ProkIconManager.icons[spellName]
+        end
+        -- 2. Если не найдено, ищем в nsDbc.proks
+        if not iconData and nsDbc and nsDbc.proks and nsDbc.proks[spellName] then
+            iconData = nsDbc.proks[spellName]
+        end
+        -- 3. Если все еще не найдено, ищем по spellqueue_name в nsDbc.proks
+        if not iconData and nsDbc and nsDbc.proks then
+            for name, data in pairs(nsDbc.proks) do
+                if data.spellqueue_name == spellName then
+                    iconData = data
+                    break
+                end
+            end
+        end
+        
+        -- === Проверка доступности скилла ===
+        local isUsable = IsUsableSpell(spellName)
+        
+        -- === Отображение текстуры (ИСПРАВЛЕННЫЙ БЛОК) ===
+        if iconData then
+            if iconData.triggerType == "custom" and isUsable then
+                -- Если есть прок - проверяем условие (например, HP цели)
+                if spell.data.prok then
+                    if UnitExists("target") and UnitCanAttack("player", "target") then
+                        local maxHP = UnitHealthMax("target")
+                        if maxHP > 0 then
+                            local hpPercent = (UnitHealth("target") / maxHP) * 100
+                            if hpPercent <= spell.data.prok then
+                                spell.textureVisible = true
+                            end
+                        end
+                    end
+                else
+                    -- Если нет прока - всегда показываем текстуру (если скилл доступен)
+                    spell.textureVisible = true
+                end
+            elseif iconData.triggerType == "buff" then
+                -- === ИСПРАВЛЕНИЕ: Поддержка триггера "buff" ===
+                -- Проверяем наличие баффа на игроке. iconData.name содержит название баффа.
+                if self:HasBuff(iconData.name) then
+                    spell.textureVisible = true
+                else
+                    spell.textureVisible = false
+                end
+            end
+        end
+        
+        -- Показываем/скрываем текстуру только при изменении состояния
+        if spell.textureVisible ~= wasVisible then
+            if spell.textureVisible then
+                self:ShowProkTexture(spellName, iconData)
+            else
+                self:HideProkTexture(spellName)
+            end
+        end
+        
+        return
+    end
+    
     -- === Проверка "Прок" ===
     if spell.data.prok then
         if not UnitExists("target") or not UnitCanAttack("player", "target") then
@@ -8400,7 +8589,7 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-
+    
     -- === Комбо-поинты ===
     if spell.data.combo and spell.data.combo > 0 then
         if not self:HasEnoughComboPoints(spell.data.combo) then
@@ -8410,7 +8599,7 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-
+    
     -- === Ресурсы ===
     if spell.data.resource then
         if not self:HasEnoughResource(spellName) then
@@ -8420,7 +8609,7 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-
+    
     -- === Бафф ===
     if spell.data.buf == 1 then
         spell.hasBuff = self:HasBuff(spellName)
@@ -8431,12 +8620,30 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-
+    
     -- === Кулдаун ===
     local remaining, fullDuration = self:GetSpellCooldown(spellName)
+    -- === Фильтр ГКД ===
+    if fullDuration and fullDuration > 0 and fullDuration < 2.0 then
+        remaining = 0
+        fullDuration = 0
+    end
     spell.active = remaining and remaining > 0
     spell.isReady = not spell.active
-
+    spell.remaining = remaining
+    
+    -- === ПРОВЕРКА ДОСТУПНОСТИ ===
+    if spell.isReady then
+        local isUsable = IsUsableSpell(spellName)
+        if not isUsable then
+            spell.isReady = false
+            spell.icon:Hide()
+            spell.glow:Hide()
+            spell.cooldownText:Hide()
+            return
+        end
+    end
+    
     -- === Отображение текста отката ===
     if remaining and remaining > 0 then
         if remaining > 3 then
@@ -8448,7 +8655,7 @@ function SpellQueue:UpdateSpellPosition(spellName)
     else
         spell.cooldownText:Hide()
     end
-
+    
     -- === Прозрачность ===
     if not spell.data.debuf or not spell.hasDebuff then
         if spell.isReady then
@@ -8459,8 +8666,8 @@ function SpellQueue:UpdateSpellPosition(spellName)
             spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
         end
     end
-
-    -- === Позиционирование ТОЛЬКО для скиллов в откате ===
+    
+    -- === Позиционирование ===
     if not spell.isReady then
         local startPos = (spell.data.pos or 0) * (self.height - 10)
         local maxPosition = self.width - (self.height - 10)
@@ -8481,10 +8688,40 @@ function SpellQueue:UpdateSpellPosition(spellName)
         spell.icon:ClearAllPoints()
         spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
     end
-
+    
     -- Всегда показываем, если дошли до этого места
     spell.icon:Show()
     spell.glow:Show()
+end
+
+function SpellQueue:UpdateCooldownLayers()
+    local activeSpells = {}
+    
+    -- Собираем все активные (на откате) скиллы
+    for spellName, spell in pairs(self.spells) do
+        if spell.active and spell.icon:IsShown() then
+            table.insert(activeSpells, spell)
+        end
+    end
+    
+    -- Сортируем по оставшемуся времени отката (от меньшего к большему)
+    -- Самый быстрый откат будет в начале списка (индекс 1)
+    table.sort(activeSpells, function(a, b)
+        return (a.remaining or 999) < (b.remaining or 999)
+    end)
+    
+    -- Устанавливаем слои отрисовки. 
+    -- SetDrawLayer(strata, subLevel). Чем выше subLevel, тем выше слой.
+    -- Мы хотим, чтобы скилл с индексом 1 (самый быстрый) был самым верхним.
+    local count = #activeSpells
+    for i, spell in ipairs(activeSpells) do
+        -- Вычисляем уровень: первому элементу (быстрому) даем макс уровень, последнему - минимальный
+        local subLevel = count - i + 1
+        
+        spell.icon:SetDrawLayer("OVERLAY", subLevel)
+        spell.glow:SetDrawLayer("ARTWORK", subLevel)
+        spell.cooldownText:SetDrawLayer("OVERLAY", subLevel)
+    end
 end
 
 function SpellQueue:GetSpellCooldown(spellName)
@@ -8511,14 +8748,27 @@ function SpellQueue:UpdateSpellsPriority()
     local spacing = 5
     local maxPosition = self.width - iconSize
     local groups = {}
-
+    
     -- Собираем готовые скиллы, которые ДОЛЖНЫ быть видны
     for name, spell in pairs(self.spells) do
         if spell.isReady then
             local skip = false
-
+            
+            -- === ПРОВЕРКА ТЕКСТУРЫ ===
+            if spell.data.texture then
+                -- Если есть параметр texture, то не отображаем на панели
+                spell.icon:Hide()
+                spell.glow:Hide()
+                skip = true
+            end
+            
+            -- === ПРОВЕРКА ДОСТУПНОСТИ ===
+            if not IsUsableSpell(name) then
+                skip = true
+            end
+            
             -- Прок
-            if spell.data.prok then
+            if not skip and spell.data.prok then
                 if not UnitExists("target") or not UnitCanAttack("player", "target") then
                     skip = true
                 else
@@ -8533,21 +8783,21 @@ function SpellQueue:UpdateSpellsPriority()
                     end
                 end
             end
-
+            
             -- Комбо
             if not skip and spell.data.combo and spell.data.combo > 0 then
                 if not self:HasEnoughComboPoints(spell.data.combo) then
                     skip = true
                 end
             end
-
+            
             -- Бафф
             if not skip and spell.data.buf == 1 then
                 if self:HasBuff(name) then
                     skip = true
                 end
             end
-
+            
             if not skip then
                 local pos = spell.data.pos or 0
                 if not groups[pos] then groups[pos] = {} end
@@ -8561,7 +8811,7 @@ function SpellQueue:UpdateSpellsPriority()
             -- Не готовые скиллы обрабатываются в UpdateSpellPosition — здесь их не трогаем
         end
     end
-
+    
     -- Перемещаем и показываем ТОЛЬКО нужные скиллы
     for pos, spells in pairs(groups) do
         table.sort(spells, function(a, b) return a.data.name < b.data.name end)
@@ -8580,7 +8830,7 @@ function SpellQueue:CreateConfigWindow()
     local configFrame = CreateFrame("Frame", "SpellQueueConfig", UIParent)
     configFrame.parent = self
     configFrame.spellQueue = self
-    configFrame:SetSize(350, 500)  -- увеличено, чтобы поместилось новое поле
+    configFrame:SetSize(350, 550)
     configFrame:SetPoint("CENTER")
     configFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -8600,7 +8850,7 @@ function SpellQueue:CreateConfigWindow()
     title:SetPoint("TOP", 0, -15)
     title:SetText("Настройки SpellQueue")
 
-    -- Кнопка закрытия в правом верхнем углу
+    -- Кнопка закрытия
     local closeButton = CreateFrame("Button", nil, configFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
     closeButton:SetScript("OnClick", function() configFrame:Hide() end)
@@ -8609,6 +8859,7 @@ function SpellQueue:CreateConfigWindow()
     local nameLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameLabel:SetPoint("TOPLEFT", 15, -45)
     nameLabel:SetText("Название скилла:")
+
     local editBox = CreateFrame("EditBox", "SpellQueueEditBox", configFrame, "InputBoxTemplate")
     editBox:SetSize(180, 20)
     editBox:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -5)
@@ -8623,9 +8874,9 @@ function SpellQueue:CreateConfigWindow()
         local spellName = editBox:GetText()
         if not spellName or spellName == "" then return end
         local name = GetSpellInfo(spellName)
-        if not name then 
+        if not name then
             message("Скилл не найден!")
-            return 
+            return
         end
         if _G.nsDbc.skills3[PLAYER_KEY] and _G.nsDbc.skills3[PLAYER_KEY][name] then
             _G.nsDbc.skills3[PLAYER_KEY][name] = nil
@@ -8641,35 +8892,40 @@ function SpellQueue:CreateConfigWindow()
     local posLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     posLabel:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -15)
     posLabel:SetText("Позиция:")
+
     local posDropdown = CreateFrame("Frame", "SpellQueuePosDropdown", configFrame, "UIDropDownMenuTemplate")
     posDropdown:SetPoint("TOPLEFT", posLabel, "BOTTOMLEFT", -15, -5)
     UIDropDownMenu_SetWidth(posDropdown, 100)
+
     local function PosDropDown_Initialize()
         local info = UIDropDownMenu_CreateInfo()
         for i = 0, 10 do
             info.text = i
             info.value = i
-            info.func = function() 
-                UIDropDownMenu_SetSelectedValue(posDropdown, i) 
+            info.func = function()
+                UIDropDownMenu_SetSelectedValue(posDropdown, i)
             end
             UIDropDownMenu_AddButton(info)
         end
     end
+
     UIDropDownMenu_Initialize(posDropdown, PosDropDown_Initialize)
     UIDropDownMenu_SetSelectedValue(posDropdown, 0)
 
-    -- Чекбокс баффа с полем ввода
+    -- Чекбокс баффа
     local buffCheckButton = CreateFrame("CheckButton", "SpellQueueBuffCheckButton", configFrame, "UICheckButtonTemplate")
     buffCheckButton:SetSize(24, 24)
     buffCheckButton:SetPoint("TOPLEFT", posDropdown, "BOTTOMLEFT", 15, -10)
     buffCheckButton.text = buffCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     buffCheckButton.text:SetText("Бафф")
     buffCheckButton.text:SetPoint("LEFT", buffCheckButton, "RIGHT", 5, 0)
+
     local buffNameEditBox = CreateFrame("EditBox", "SpellQueueBuffNameEditBox", configFrame, "InputBoxTemplate")
     buffNameEditBox:SetSize(150, 20)
     buffNameEditBox:SetPoint("LEFT", buffCheckButton.text, "RIGHT", 10, 0)
     buffNameEditBox:SetAutoFocus(false)
     buffNameEditBox:Hide()
+
     buffCheckButton:SetScript("OnClick", function(self)
         if self:GetChecked() then
             buffNameEditBox:Show()
@@ -8679,18 +8935,20 @@ function SpellQueue:CreateConfigWindow()
         end
     end)
 
-    -- Чекбокс дебаффа с полем ввода
+    -- Чекбокс дебаффа
     local debuffCheckButton = CreateFrame("CheckButton", "SpellQueueDebuffCheckButton", configFrame, "UICheckButtonTemplate")
     debuffCheckButton:SetSize(24, 24)
     debuffCheckButton:SetPoint("TOPLEFT", buffCheckButton, "BOTTOMLEFT", 0, -10)
     debuffCheckButton.text = debuffCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     debuffCheckButton.text:SetText("Дебафф")
     debuffCheckButton.text:SetPoint("LEFT", debuffCheckButton, "RIGHT", 5, 0)
+
     local debuffNameEditBox = CreateFrame("EditBox", "SpellQueueDebuffNameEditBox", configFrame, "InputBoxTemplate")
     debuffNameEditBox:SetSize(150, 20)
     debuffNameEditBox:SetPoint("LEFT", debuffCheckButton.text, "RIGHT", 10, 0)
     debuffNameEditBox:SetAutoFocus(false)
     debuffNameEditBox:Hide()
+
     debuffCheckButton:SetScript("OnClick", function(self)
         if self:GetChecked() then
             debuffNameEditBox:Show()
@@ -8707,24 +8965,27 @@ function SpellQueue:CreateConfigWindow()
     comboCheckButton.text = comboCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     comboCheckButton.text:SetText("Комбо-поинты:")
     comboCheckButton.text:SetPoint("LEFT", comboCheckButton, "RIGHT", 5, 0)
-    -- Выпадающий список комбо-поинтов (скрыт по умолчанию)
+
     local comboDropdown = CreateFrame("Frame", "SpellQueueComboDropdown", configFrame, "UIDropDownMenuTemplate")
     comboDropdown:SetPoint("LEFT", comboCheckButton.text, "RIGHT", 10, 0)
     comboDropdown:SetAlpha(0)
     UIDropDownMenu_SetWidth(comboDropdown, 50)
+
     local function ComboDropDown_Initialize()
         local info = UIDropDownMenu_CreateInfo()
         for i = 1, 5 do
             info.text = i
             info.value = i
-            info.func = function() 
-                UIDropDownMenu_SetSelectedValue(comboDropdown, i) 
+            info.func = function()
+                UIDropDownMenu_SetSelectedValue(comboDropdown, i)
             end
             UIDropDownMenu_AddButton(info)
         end
     end
+
     UIDropDownMenu_Initialize(comboDropdown, ComboDropDown_Initialize)
     UIDropDownMenu_SetSelectedValue(comboDropdown, 1)
+
     comboCheckButton:SetScript("OnClick", function(self)
         if self:GetChecked() then
             comboDropdown:SetAlpha(1)
@@ -8740,11 +9001,12 @@ function SpellQueue:CreateConfigWindow()
     resourceCheckButton.text = resourceCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     resourceCheckButton.text:SetText("Ресурс:")
     resourceCheckButton.text:SetPoint("LEFT", resourceCheckButton, "RIGHT", 5, 0)
-    -- Выпадающий список ресурсов (скрыт по умолчанию)
+
     local resourceDropdown = CreateFrame("Frame", "SpellQueueResourceDropdown", configFrame, "UIDropDownMenuTemplate")
     resourceDropdown:SetPoint("LEFT", resourceCheckButton.text, "RIGHT", 10, 0)
     resourceDropdown:SetAlpha(0)
     UIDropDownMenu_SetWidth(resourceDropdown, 120)
+
     local function ResourceDropDown_Initialize()
         local info = UIDropDownMenu_CreateInfo()
         local resources = {
@@ -8758,21 +9020,23 @@ function SpellQueue:CreateConfigWindow()
         for _, resource in ipairs(resources) do
             info.text = resource.text
             info.value = resource.value
-            info.func = function() 
-                UIDropDownMenu_SetSelectedValue(resourceDropdown, resource.value) 
+            info.func = function()
+                UIDropDownMenu_SetSelectedValue(resourceDropdown, resource.value)
             end
             UIDropDownMenu_AddButton(info)
         end
     end
+
     UIDropDownMenu_Initialize(resourceDropdown, ResourceDropDown_Initialize)
     UIDropDownMenu_SetSelectedValue(resourceDropdown, 0)
-    -- Поле ввода количества ресурса (скрыто по умолчанию)
+
     local resourceAmountEditBox = CreateFrame("EditBox", "SpellQueueResourceAmountEditBox", configFrame, "InputBoxTemplate")
     resourceAmountEditBox:SetSize(50, 20)
     resourceAmountEditBox:SetPoint("LEFT", resourceDropdown, "RIGHT", 15, 0)
     resourceAmountEditBox:SetAutoFocus(false)
     resourceAmountEditBox:Hide()
     resourceAmountEditBox:SetText("0")
+
     resourceCheckButton:SetScript("OnClick", function(self)
         if self:GetChecked() then
             resourceDropdown:SetAlpha(1)
@@ -8784,20 +9048,21 @@ function SpellQueue:CreateConfigWindow()
         end
     end)
 
-    -- НОВЫЙ ЧЕКБОКС: Прок
+    -- Чекбокс Прок
     local prokCheckButton = CreateFrame("CheckButton", "SpellQueueProkCheckButton", configFrame, "UICheckButtonTemplate")
     prokCheckButton:SetSize(24, 24)
     prokCheckButton:SetPoint("TOPLEFT", resourceCheckButton, "BOTTOMLEFT", 0, -10)
     prokCheckButton.text = prokCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     prokCheckButton.text:SetText("Прок")
     prokCheckButton.text:SetPoint("LEFT", prokCheckButton, "RIGHT", 5, 0)
-    -- Текстовое поле для процента HP (справа от надписи)
+
     local prokHPEditBox = CreateFrame("EditBox", "SpellQueueProkHPEditBox", configFrame, "InputBoxTemplate")
     prokHPEditBox:SetSize(50, 20)
     prokHPEditBox:SetPoint("LEFT", prokCheckButton.text, "RIGHT", 10, 0)
     prokHPEditBox:SetAutoFocus(false)
     prokHPEditBox:Hide()
-    prokHPEditBox:SetText("50")  -- значение по умолчанию
+    prokHPEditBox:SetText("50")
+
     prokCheckButton:SetScript("OnClick", function(self)
         if self:GetChecked() then
             prokHPEditBox:Show()
@@ -8807,24 +9072,33 @@ function SpellQueue:CreateConfigWindow()
         end
     end)
 
+    -- Чекбокс Текстура (НОВЫЙ)
+    local textureCheckButton = CreateFrame("CheckButton", "SpellQueueTextureCheckButton", configFrame, "UICheckButtonTemplate")
+    textureCheckButton:SetSize(24, 24)
+    textureCheckButton:SetPoint("TOPLEFT", prokCheckButton, "BOTTOMLEFT", 0, -10)
+    textureCheckButton.text = textureCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    textureCheckButton.text:SetText("Текстура")
+    textureCheckButton.text:SetPoint("LEFT", textureCheckButton, "RIGHT", 5, 0)
+
     -- Кнопка добавления
     local addButton = CreateFrame("Button", "SpellQueueAddButton", configFrame, "UIPanelButtonTemplate")
     addButton:SetSize(120, 25)
-    addButton:SetPoint("BOTTOM", 0, 70)  -- сдвинута вниз из-за нового поля
+    addButton:SetPoint("BOTTOM", 0, 70)
     addButton:SetText("Добавить")
     addButton:SetScript("OnClick", function()
         local spellName = editBox:GetText()
         if not spellName or spellName == "" then return end
         local name, _, icon = GetSpellInfo(spellName)
-        if not name then 
+        if not name then
             message("Скилл не найден!")
-            return 
+            return
         end
+
         local comboValue = 0
         if comboCheckButton:GetChecked() then
             comboValue = UIDropDownMenu_GetSelectedValue(comboDropdown)
         end
-        -- Определяем параметр ресурса
+
         local resourceValue = nil
         if resourceCheckButton:GetChecked() then
             local amount = tonumber(resourceAmountEditBox:GetText()) or 0
@@ -8833,19 +9107,19 @@ function SpellQueue:CreateConfigWindow()
                 amount = amount
             }
         end
-        -- Определяем параметр баффа
+
         local buffParam = nil
         if buffCheckButton:GetChecked() then
             local buffName = buffNameEditBox:GetText()
             buffParam = buffName ~= "" and buffName or 1
         end
-        -- Определяем параметр дебаффа
+
         local debuffParam = nil
         if debuffCheckButton:GetChecked() then
             local debuffName = debuffNameEditBox:GetText()
             debuffParam = debuffName ~= "" and debuffName or 1
         end
-        -- НОВОЕ: параметр "Прок"
+
         local prokParam = nil
         if prokCheckButton:GetChecked() then
             local hpPercent = tonumber(prokHPEditBox:GetText()) or 50
@@ -8854,19 +9128,29 @@ function SpellQueue:CreateConfigWindow()
             prokParam = hpPercent
         end
 
+        -- НОВЫЙ параметр: Текстура
+        local textureParam = textureCheckButton:GetChecked()
+
+        if not _G.nsDbc.skills3[PLAYER_KEY] then
+            _G.nsDbc.skills3[PLAYER_KEY] = {}
+        end
+
         _G.nsDbc.skills3[PLAYER_KEY][name] = {
             pos = UIDropDownMenu_GetSelectedValue(posDropdown),
             buf = buffParam,
             debuf = debuffParam,
             combo = comboValue,
             resource = resourceValue,
-            prok = prokParam,  -- сохраняем процент HP
+            prok = prokParam,
+            texture = textureParam,  -- сохраняем параметр текстуры
             icon = icon
         }
+
         _G.SpellQueueInstance:UpdateSkillTables()
         if _G.SpellQueueInstance.inCombat then
             _G.SpellQueueInstance:UpdateAllSpells()
         end
+
         -- Сбрасываем поля формы
         editBox:SetText("")
         buffCheckButton:SetChecked(false)
@@ -8884,6 +9168,7 @@ function SpellQueue:CreateConfigWindow()
         prokCheckButton:SetChecked(false)
         prokHPEditBox:SetText("50")
         prokHPEditBox:Hide()
+        textureCheckButton:SetChecked(false)
         message("Скилл "..name.." добавлен!")
     end)
 
@@ -9381,82 +9666,114 @@ ProkIconManager = {
     }
 }
 
-function ProkIconManager:Initialize(externalIconsTable)
-    self.externalIconsTable = externalIconsTable or {}
-    
-    -- Копируем проки из внешней таблицы во внутреннюю
-    for name, iconData in pairs(self.externalIconsTable) do
-        self.icons[name] = iconData
-        
-        local profile = self.settings[iconData.profil or 1]
-        local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
-        local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
-        
-        -- Формируем полный путь к текстуре
-        local texturePath = iconData.icon
-        if not strfind(texturePath:lower(), "^interface\\") then
-            texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
-        end
-        
-        if not self.frames[name] then
-            self.frames[name] = CreateFrame("Frame", nil, UIParent)
-            self.frames[name].texture = self.frames[name]:CreateTexture(nil, "BACKGROUND")
-            self.frames[name].texture:SetAllPoints()
-            self.frames[name]:SetFrameStrata("HIGH")
-        end
-        
-        self.frames[name]:SetSize(width, height)
-        self.frames[name]:ClearAllPoints()
-        self.frames[name]:SetPoint("CENTER", UIParent, "CENTER", profile.x, profile.y)
-        self.frames[name].texture:SetTexture(texturePath)
-        self.frames[name]:Show() -- Показываем сразу, HandleSpellEvent потом скроет если нужно
+function ProkIconManager:Initialize(iconsTable)
+    if not iconsTable then 
+        return 
     end
     
-    -- Инициализация фрейма событий
+    self.externalIconsTable = iconsTable
+    
+    -- Копируем проки из внешней таблицы во внутреннюю
+    for name, iconData in pairs(iconsTable) do
+        self.icons[name] = iconData
+        
+        -- Регистрация кастомных триггеров
+        if iconData.triggerType == "custom" and iconData.spellqueue_name and _G.SpellQueueInstance then
+            -- Инициализируем таблицу триггеров
+            if not _G.SpellQueueInstance.customTriggers then
+                _G.SpellQueueInstance.customTriggers = {}
+            end
+            
+            if not _G.SpellQueueInstance.customTriggers[iconData.spellqueue_name] then
+                _G.SpellQueueInstance.customTriggers[iconData.spellqueue_name] = {}
+            end
+            
+            -- Регистрируем обработчики
+            _G.SpellQueueInstance:RegisterTrigger(
+                iconData.spellqueue_name,
+                function(sName, sData)
+                    self:HandleCustomTrigger(sName, sData, "onActivate", iconData)
+                end,
+                "onActivate"
+            )
+            
+            _G.SpellQueueInstance:RegisterTrigger(
+                iconData.spellqueue_name,
+                function(sName, sData)
+                    self:HandleCustomTrigger(sName, sData, "onDeactivate", iconData)
+                end,
+                "onDeactivate"
+            )
+        end
+    end
+
+    -- Восстанавливаем регистрацию событий для обычных баффов
     self.eventFrame = self.eventFrame or CreateFrame("Frame")
     self.eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self.eventFrame:RegisterEvent("UNIT_AURA")
     
     self.eventFrame:SetScript("OnEvent", function(_, event, ...)
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-            local _, subEvent, _, _, _, _, _, destGUID, _, _, _, spellID, spellName = ...
+            -- Правильное получение данных CLEU - аргументы передаются напрямую
+            local timestamp, subEvent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, 
+                  destGUID, destName, destFlags, destRaidFlags, spellID, spellName = ...
+            
             local isPlayer = (destGUID == UnitGUID("player"))
+            if not isPlayer then 
+                return 
+            end
             
-            if not isPlayer then return end
-            
-            if subEvent == "SPELL_AURA_APPLIED" or subEvent == "SPELL_CAST_SUCCESS" or 
+            if subEvent == "SPELL_AURA_APPLIED" or subEvent == "SPELL_CAST_SUCCESS" or
                subEvent == "SPELL_AURA_REMOVED" or subEvent == "SPELL_AURA_REFRESH" then
                 
                 for name, icon in pairs(self.icons) do
-                    if spellName == icon.name or spellName == icon.skill then
-                        self:HandleSpellEvent(subEvent, icon, spellName)
+                    -- Пропускаем кастомные триггеры
+                    if icon.triggerType ~= "custom" then
+                        -- Проверяем по обоим полям - name и skill
+                        if spellName == icon.name or (icon.skill and icon.skill ~= "" and spellName == icon.skill) then
+                            self:HandleSpellEvent(subEvent, icon, spellName)
+                        end
                     end
                 end
             end
-            
         elseif event == "UNIT_AURA" and ... == "player" then
-            for _, icon in pairs(self.icons) do
-                self:HandleSpellEvent("UNIT_AURA", icon)
+            for name, icon in pairs(self.icons) do
+                -- Пропускаем кастомные триггеры
+                if icon.triggerType ~= "custom" then
+                    self:HandleSpellEvent("UNIT_AURA", icon)
+                end
             end
         end
     end)
-    
+
     -- Принудительно проверяем баффы после загрузки
-    for _, icon in pairs(self.icons) do
-        self:HandleSpellEvent("UNIT_AURA", icon)
+    for name, icon in pairs(self.icons) do
+        if icon.triggerType ~= "custom" then
+            self:HandleSpellEvent("UNIT_AURA", icon)
+        end
     end
 end
 
 function ProkIconManager:HandleSpellEvent(event, iconData, spellName)
-    -- Удаляем проверку по таймеру и переводим полностью на обработку событий
-    if event == "SPELL_AURA_APPLIED" or event == "SPELL_CAST_SUCCESS" or 
+    if not iconData then 
+        return 
+    end
+    
+    -- Пропускаем кастомные триггеры
+    if iconData.triggerType == "custom" then 
+        return 
+    end
+
+    if event == "SPELL_AURA_APPLIED" or event == "SPELL_CAST_SUCCESS" or
        event == "SPELL_AURA_REFRESH" or event == "UNIT_AURA" then
         
         -- Проверяем наличие баффа в реальном времени
         local shouldShow = false
+        local buffToCheckName = iconData.skill and iconData.skill ~= "" and iconData.skill or iconData.name
+        
         for i = 1, 40 do
             local name, _, _, count = UnitBuff("player", i)
-            if name and (name == iconData.name or name == iconData.skill) then
+            if name and (name == iconData.name or name == buffToCheckName) then
                 if (iconData.stack or 0) <= (count or 1) then
                     shouldShow = true
                     break
@@ -9469,13 +9786,139 @@ function ProkIconManager:HandleSpellEvent(event, iconData, spellName)
             local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
             local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
             
-            self:ShowIcon(iconData.name, width, height, profile.x, profile.y, iconData.icon)
+            -- Формируем полный путь к текстуре
+            local texturePath = iconData.icon
+            if not strfind(texturePath:lower(), "^interface\\") then
+                texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
+            end
+            
+            self:ShowIcon(iconData.name, width, height, profile.x, profile.y, texturePath)
         else
             self:HideIcon(iconData.name)
         end
-        
     elseif event == "SPELL_AURA_REMOVED" then
         -- Мгновенно скрываем иконку при спадении баффа
+        -- Проверяем по обоим возможным названиям
+        if spellName == iconData.name or (iconData.skill and spellName == iconData.skill) then
+            self:HideIcon(iconData.name)
+        end
+    end
+end
+
+function ProkIconManager:CheckInitialStates()
+    -- Проверяем начальное состояние для всех иконок
+    for name, iconData in pairs(self.icons) do
+        -- Определяем тип триггера (по умолчанию "buff" если не указан)
+        local triggerType = iconData.triggerType or "buff"
+        if triggerType == "custom" and _G.SpellQueueInstance then
+            -- Для кастомных триггеров проверяем через SpellQueue
+            local spell = _G.SpellQueueInstance.spells[iconData.spellqueue_name]
+            if spell then
+                local isActive = _G.SpellQueueInstance:IsSpellActive(spell)
+                if isActive then
+                    self:HandleCustomTrigger(iconData.spellqueue_name, spell, "onActivate", iconData)
+                else
+                    self:HandleCustomTrigger(iconData.spellqueue_name, spell, "onDeactivate", iconData)
+                end
+            end
+        else
+            -- Для баффов проверяем текущее состояние
+            local shouldShow = false
+            -- Используем skill если он не пустой, иначе name
+            local buffToCheck = (iconData.skill and iconData.skill ~= "") and iconData.skill or iconData.name
+            for i = 1, 40 do
+                local buffName, _, _, count = UnitBuff("player", i)
+                if buffName and buffName == buffToCheck then
+                    if (iconData.stack or 0) <= (count or 1) then
+                        shouldShow = true
+                        break
+                    end
+                end
+            end
+            if shouldShow then
+                self:ShowIconNow(iconData)
+            else
+                self:HideIcon(iconData.name)
+            end
+        end
+    end
+end
+
+function ProkIconManager:ShowIconNow(iconData)
+    if not iconData or not iconData.name then return end
+    
+    local profile = self.settings[iconData.profil or 1]
+    local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+    local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+    
+    -- === ИСПРАВЛЕНО: Корректная обработка пути к текстуре без GetFileIDFromPath ===
+    local texturePath = iconData.icon or ""
+    if texturePath == "" then
+        texturePath = "Interface\\Icons\\INV_Misc_QuestionMark"
+    elseif not strfind(texturePath:lower(), "^interface\\") then
+        texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
+    end
+    
+    if not self.frames[iconData.name] then
+        self.frames[iconData.name] = CreateFrame("Frame", nil, UIParent)
+        self.frames[iconData.name].texture = self.frames[iconData.name]:CreateTexture(nil, "BACKGROUND")
+        self.frames[iconData.name].texture:SetAllPoints()
+        self.frames[iconData.name]:SetFrameStrata("HIGH")
+    end
+    
+    -- Безопасная загрузка текстуры
+    local textureLoaded = pcall(function()
+        self.frames[iconData.name].texture:SetTexture(texturePath)
+    end)
+    
+    if not textureLoaded then
+        debug(string.format("Не удалось загрузить текстуру для %s: %s", iconData.name, texturePath))
+        self.frames[iconData.name].texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    end
+    
+    self.frames[iconData.name]:SetSize(width, height)
+    self.frames[iconData.name]:ClearAllPoints()
+    self.frames[iconData.name]:SetPoint("CENTER", UIParent, "CENTER", profile.x, profile.y)
+    self.frames[iconData.name]:Show()
+end
+
+function ProkIconManager:HandleSpellEvent(event, iconData, spellName)
+    if not iconData then return end
+    
+    -- Определяем тип триггера (по умолчанию "buff" если не указан)
+    local triggerType = iconData.triggerType or "buff"
+    if triggerType == "custom" then return end
+    
+    -- Определяем название баффа для проверки
+    local buffToCheck = (iconData.skill and iconData.skill ~= "") and iconData.skill or iconData.name
+    
+    if event == "SPELL_AURA_APPLIED" or event == "SPELL_CAST_SUCCESS" or
+       event == "SPELL_AURA_REFRESH" or event == "UNIT_AURA" then
+        
+        local shouldShow = false
+        for i = 1, 40 do
+            local name, _, _, count = UnitBuff("player", i)
+            if name and name == buffToCheck then
+                if (iconData.stack or 0) <= (count or 1) then
+                    shouldShow = true
+                    break
+                end
+            end
+        end
+        
+        if shouldShow then
+            local profile = self.settings[iconData.profil or 1]
+            local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+            local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+            local texturePath = iconData.icon
+            if not strfind(texturePath:lower(), "^interface\\") then
+                texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
+            end
+            self:ShowIcon(iconData.name, width, height, profile.x, profile.y, texturePath)
+        else
+            self:HideIcon(iconData.name)
+        end
+    elseif event == "SPELL_AURA_REMOVED" and spellName == buffToCheck then
         self:HideIcon(iconData.name)
     end
 end
@@ -9507,7 +9950,7 @@ end
 
 function ProkIconManager:CreateConfigUI()
     self.configFrame = CreateFrame("Frame", "ProkIconConfig", UIParent)
-    self.configFrame:SetSize(400, 242) -- Увеличил высоту для нормального отображения
+    self.configFrame:SetSize(400, 320) -- Увеличена высота для новых элементов
     self.configFrame:SetPoint("CENTER")
     self.configFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -9524,12 +9967,13 @@ function ProkIconManager:CreateConfigUI()
     -- Кнопка закрытия
     local closeBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    closeBtn:SetScript("OnClick", function() self.configFrame:Hide() end)
     
     -- Заголовок
     local title = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("TOP", 0, -18)
     title:SetText("Управление проками")
-
+    
     self:CreateConfigUIElements()
     self.configFrame:Hide()
 end
@@ -9537,7 +9981,7 @@ end
 function ProkIconManager:CreateConfigUIElements()
     local yPos = 50
     local fieldHeight = 30
-    
+
     -- Поле названия с кнопкой удаления
     self:CreateInputField("Название", "name", yPos)
     local delBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
@@ -9545,13 +9989,57 @@ function ProkIconManager:CreateConfigUIElements()
     delBtn:SetPoint("LEFT", self.input_name, "RIGHT", 5, 0)
     delBtn:SetText("X")
     delBtn:SetScript("OnClick", function()
-        if self.icons[self.input_name:GetText()] then
-            self.icons[self.input_name:GetText()] = nil
+        local inputText = self.input_name:GetText()
+        if inputText == "" then return end
+
+        -- 1. Удаление из self.icons (локальная таблица)
+        if self.icons[inputText] then
+            self.icons[inputText] = nil
             if self.externalIconsTable then
-                self.externalIconsTable[self.input_name:GetText()] = nil
+                self.externalIconsTable[inputText] = nil
             end
             self:ResetForm()
-            print("Иконка удалена:", self.input_name:GetText())
+            print("Иконка удалена:", inputText)
+            return
+        end
+
+        -- 2. Удаление из nsDbc.proks по имени
+        if _G.nsDbc and _G.nsDbc.proks and _G.nsDbc.proks[inputText] then
+            _G.nsDbc.proks[inputText] = nil
+            if self.icons then
+                self.icons[inputText] = nil
+            end
+            if self.externalIconsTable then
+                self.externalIconsTable[inputText] = nil
+            end
+            self:ResetForm()
+            print("Иконка удалена из nsDbc.proks:", inputText)
+            return
+        end
+
+        -- 3. Поиск по spellqueue_name в nsDbc.proks
+        local foundKey = nil
+        if _G.nsDbc and _G.nsDbc.proks then
+            for key, iconData in pairs(_G.nsDbc.proks) do
+                if iconData.spellqueue_name == inputText then
+                    foundKey = key
+                    break
+                end
+            end
+        end
+
+        if foundKey then
+            _G.nsDbc.proks[foundKey] = nil
+            if self.icons then
+                self.icons[foundKey] = nil
+            end
+            if self.externalIconsTable then
+                self.externalIconsTable[foundKey] = nil
+            end
+            self:ResetForm()
+            print("Иконка удалена по spellqueue_name из nsDbc.proks:", inputText)
+        else
+            print("Иконка не найдена:", inputText)
         end
     end)
 
@@ -9564,7 +10052,6 @@ function ProkIconManager:CreateConfigUIElements()
     local profileLabel = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     profileLabel:SetPoint("TOPLEFT", 20, -yPos + 5)
     profileLabel:SetText("Профиль:")
-    
     self.profileDropdown = CreateFrame("Frame", "ProkProfileDropdown", self.configFrame, "UIDropDownMenuTemplate")
     self.profileDropdown:SetPoint("TOPLEFT", 120, -yPos)
     UIDropDownMenu_SetWidth(self.profileDropdown, 180)
@@ -9573,7 +10060,7 @@ function ProkIconManager:CreateConfigUIElements()
             local info = UIDropDownMenu_CreateInfo()
             info.text = p.name ~= "" and p.name or "Профиль "..i
             info.value = i
-            info.func = function() 
+            info.func = function()
                 UIDropDownMenu_SetSelectedValue(self.profileDropdown, i)
                 if self.selectedIcon then
                     self:ShowTexturePreview(self.selectedIcon)
@@ -9584,12 +10071,11 @@ function ProkIconManager:CreateConfigUIElements()
     end)
     UIDropDownMenu_SetSelectedValue(self.profileDropdown, 1)
 
-    -- Выбор текстуры с вложенным меню
+    -- Выбор текстуры
     yPos = yPos + fieldHeight
     local texLabel = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     texLabel:SetPoint("TOPLEFT", 20, -yPos + 5)
     texLabel:SetText("Текстура:")
-    
     self.texDropdown = CreateFrame("Frame", "ProkTexDropdown", self.configFrame, "UIDropDownMenuTemplate")
     self.texDropdown:SetPoint("TOPLEFT", 120, -yPos)
     UIDropDownMenu_SetWidth(self.texDropdown, 180)
@@ -9607,11 +10093,11 @@ function ProkIconManager:CreateConfigUIElements()
             for _, tex in ipairs(self.textureList[category]) do
                 local info = UIDropDownMenu_CreateInfo()
                 info.text = tex.name
-                info.func = function() 
+                info.func = function()
                     self.selectedIcon = tex.path
                     UIDropDownMenu_SetText(self.texDropdown, tex.name)
                     self:ShowTexturePreview(tex.path)
-                    CloseDropDownMenus() -- Закрытие всех уровней меню
+                    CloseDropDownMenus()
                 end
                 UIDropDownMenu_AddButton(info, level)
             end
@@ -9624,16 +10110,55 @@ function ProkIconManager:CreateConfigUIElements()
     self:CreateInputField("Стаки", "stack", yPos, true)
     self.input_stack:SetText("0")
 
-    -- Кнопка добавления
+    -- Новое поле: Название скилла из SpellQueue
+    yPos = yPos + fieldHeight + 10
+    self:CreateInputField("Скилл SpellQueue", "spellqueue_name", yPos)
+
+    -- Чекбоксы типа триггера
+    yPos = yPos + fieldHeight
+    local triggerLabel = self.configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    triggerLabel:SetPoint("TOPLEFT", 20, -yPos + 5)
+    triggerLabel:SetText("Тип триггера:")
+
+    -- Сохраняем чекбоксы как поля объекта для прямого доступа
+    self.triggerTypeBuff = CreateFrame("CheckButton", "ProkTriggerBuff", self.configFrame, "UICheckButtonTemplate")
+    self.triggerTypeBuff:SetSize(24, 24)
+    self.triggerTypeBuff:SetPoint("TOPLEFT", 120, -yPos)
+    self.triggerTypeBuff.text = self.triggerTypeBuff:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.triggerTypeBuff.text:SetText("Бафф")
+    self.triggerTypeBuff.text:SetPoint("LEFT", self.triggerTypeBuff, "RIGHT", 5, 0)
+    self.triggerTypeBuff:SetChecked(true)
+
+    self.triggerTypeCustom = CreateFrame("CheckButton", "ProkTriggerCustom", self.configFrame, "UICheckButtonTemplate")
+    self.triggerTypeCustom:SetSize(24, 24)
+    self.triggerTypeCustom:SetPoint("LEFT", self.triggerTypeBuff.text, "RIGHT", 20, 0)
+    self.triggerTypeCustom.text = self.triggerTypeCustom:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.triggerTypeCustom.text:SetText("Кастомный")
+    self.triggerTypeCustom.text:SetPoint("LEFT", self.triggerTypeCustom, "RIGHT", 5, 0)
+
+    -- Синхронизация чекбоксов через прямые ссылки на объект
+    self.triggerTypeBuff:SetScript("OnClick", function()
+        if self.triggerTypeBuff:GetChecked() then
+            self.triggerTypeCustom:SetChecked(false)
+        end
+    end)
+    self.triggerTypeCustom:SetScript("OnClick", function()
+        if self.triggerTypeCustom:GetChecked() then
+            self.triggerTypeBuff:SetChecked(false)
+        end
+    end)
+
+    -- Кнопка добавления (сдвинута вниз)
+    yPos = yPos + fieldHeight + 10
     local addBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
     addBtn:SetSize(120, 24)
-    addBtn:SetPoint("BOTTOM", 0, 20)
+    addBtn:SetPoint("TOP", 0, -yPos)
     addBtn:SetText("Добавить")
-    addBtn:SetScript("OnClick", function() 
-        self:AddNewIcon() 
-        CloseDropDownMenus() -- Закрытие меню при добавлении
+    addBtn:SetScript("OnClick", function()
+        self:AddNewIcon()
+        CloseDropDownMenus()
         self:ForceHideAllIcons()
-    end)    
+    end)
 end
 
 function ProkIconManager:CreateInputField(label, fieldName, yOffset, isNumeric)
@@ -9765,44 +10290,139 @@ function ProkIconManager:AddNewIcon()
         print("Ошибка: не указано название")
         return
     end
-    
     if not self.selectedIcon then
         print("Ошибка: не выбрана текстура")
+        return
+    end
+    
+    -- Определяем тип триггера
+    local triggerType = "buff"
+    if self.triggerTypeCustom and self.triggerTypeCustom:GetChecked() then
+        triggerType = "custom"
+    end
+    
+    local spellQueueName = self.input_spellqueue_name:GetText()
+    if triggerType == "custom" and (not spellQueueName or spellQueueName == "") then
+        print("Ошибка: для кастомного триггера необходимо указать название скилла из SpellQueue")
         return
     end
     
     local iconData = {
         name = name,
         skill = self.input_skill:GetText() or "",
+        spellqueue_name = spellQueueName,
         icon = self.selectedIcon,
         stack = tonumber(self.input_stack:GetText()) or 0,
-        profil = UIDropDownMenu_GetSelectedValue(self.profileDropdown) or 1
+        profil = UIDropDownMenu_GetSelectedValue(self.profileDropdown) or 1,
+        triggerType = triggerType
     }
+    
+    -- Инициализируем таблицы если их нет
+    if not self.icons then
+        self.icons = {}
+    end
+    
+    if not self.externalIconsTable then
+        self.externalIconsTable = {}
+    end
     
     -- Добавляем в обе таблицы
     self.icons[name] = iconData
-    if self.externalIconsTable then
-        self.externalIconsTable[name] = iconData
+    self.externalIconsTable[name] = iconData
+    
+    -- Регистрация кастомных триггеров
+    if triggerType == "custom" and _G.SpellQueueInstance then
+        -- Создаем обработчик для активации
+        local activateHandler = function(spellName, spellData)
+            self:HandleCustomTrigger(spellName, spellData, "onActivate", iconData)
+        end
+        
+        -- Создаем обработчик для деактивации
+        local deactivateHandler = function(spellName, spellData)
+            self:HandleCustomTrigger(spellName, spellData, "onDeactivate", iconData)
+        end
+        
+        -- Инициализируем таблицу триггеров
+        if not _G.SpellQueueInstance.customTriggers then
+            _G.SpellQueueInstance.customTriggers = {}
+        end
+        
+        if not _G.SpellQueueInstance.customTriggers[spellQueueName] then
+            _G.SpellQueueInstance.customTriggers[spellQueueName] = {}
+        end
+        
+        -- Сохраняем обработчики
+        table.insert(_G.SpellQueueInstance.customTriggers[spellQueueName], {
+            onActivate = activateHandler,
+            onDeactivate = deactivateHandler,
+            iconData = iconData
+        })
     end
     
-    print(string.format("Добавлена иконка: %s (стаки: %d, профиль: %s)", 
-          name, iconData.stack, self.settings[iconData.profil].name))
-    
-    -- Показываем иконку
+    -- Показываем иконку для превью
     local profile = self.settings[iconData.profil]
     local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
     local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
-    
     local texturePath = iconData.icon
     if not strfind(texturePath:lower(), "^interface\\") then
         texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath:gsub("%.tga$", "") .. ".tga"
     end
-    
     self:ShowIcon(name, width, height, profile.x, profile.y, texturePath)
+    
     self:ResetForm()
-
     if self.previewFrame then
         self.previewFrame:Hide()
+    end
+end
+
+function ProkIconManager:HandleCustomTrigger(spellName, spellData, eventType, iconData)
+    if not spellName or not iconData or not iconData.icon then
+        return
+    end
+    if eventType == "onActivate" then
+        local profile = self.settings[iconData.profil or 1] or self.settings[1]
+        local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
+        local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
+        local x, y = profile.x or 0, profile.y or 0
+        if not self.frames then
+            self.frames = {}
+        end
+        if not self.frames[spellName] then
+            self.frames[spellName] = CreateFrame("Frame", nil, UIParent)
+            self.frames[spellName]:SetFrameStrata("HIGH")
+            self.frames[spellName].texture = self.frames[spellName]:CreateTexture(nil, "BACKGROUND")
+            self.frames[spellName].texture:SetAllPoints()
+        end
+        local frame = self.frames[spellName]
+        frame:SetSize(width, height)
+        frame:ClearAllPoints()
+        frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
+        -- Обрабатываем путь к текстуре
+        local texturePath = iconData.icon
+        if not strfind(texturePath:lower(), "^interface\\") then
+            -- Проверяем расширение
+            if not strfind(texturePath:lower(), "%.tga$") and not strfind(texturePath:lower(), "%.blp$") then
+                texturePath = texturePath .. ".tga"
+            end
+            texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath
+        end
+        -- Безопасная загрузка текстуры
+        local success = pcall(function()
+            frame.texture:SetTexture(texturePath)
+        end)
+        if not success then
+            frame.texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            -- Попробуем альтернативный путь
+            local altPath = "Interface\\AddOns\\NSQC\\textures\\" .. iconData.icon:gsub("%.tga$", "") .. ".tga"
+            pcall(function()
+                frame.texture:SetTexture(altPath)
+            end)
+        end
+        frame:Show()
+    elseif eventType == "onDeactivate" then
+        if self.frames and self.frames[spellName] then
+            self.frames[spellName]:Hide()
+        end
     end
 end
 
@@ -9810,8 +10430,16 @@ function ProkIconManager:ResetForm()
     self.input_name:SetText("")
     self.input_skill:SetText("")
     self.input_stack:SetText("")
+    self.input_spellqueue_name:SetText("") -- Сброс нового поля
     self.selectedIcon = nil
     UIDropDownMenu_SetSelectedValue(self.profileDropdown, 1)
+    -- Сброс чекбоксов через прямые ссылки
+    if self.triggerTypeBuff then
+        self.triggerTypeBuff:SetChecked(true)
+    end
+    if self.triggerTypeCustom then
+        self.triggerTypeCustom:SetChecked(false)
+    end
 end
 
 function ProkIconManager:ForceHideAllIcons()
@@ -10089,6 +10717,98 @@ local ALL_RACES = {}
 for _, r in ipairs(RACES_ALLIANCE) do table.insert(ALL_RACES, r) end
 for _, r in ipairs(RACES_HORDE) do table.insert(ALL_RACES, r) end
 
+    function GuildRecruiter:ManualSave()
+        nsDbc["набор в гильдию"] = {
+            exceptions = self.exceptions,
+            settings = {
+                minLevel = self.settings.minLevel,
+                maxLevel = self.settings.maxLevel,
+                step = self.settings.step,
+                autoAccept = self.settings.autoAccept,
+                autoHideAfterSearch = self.settings.autoHideAfterSearch,
+                factions = {
+                    Alliance = self.settings.factions.Alliance,
+                    Horde = self.settings.factions.Horde
+                },
+                classes = self.settings.classes,
+                races = self.settings.races
+            }
+        }
+        print("Настройки сохранены (С).")
+    end
+
+    function GuildRecruiter:ManualLoad()
+        local saved = nsDbc["набор в гильдию"]
+        if not saved or not saved.settings then
+            print("Нет сохраненных настроек для загрузки.")
+            return
+        end
+
+        -- Загрузка данных в переменные
+        if saved.settings.minLevel then self.settings.minLevel = saved.settings.minLevel end
+        if saved.settings.maxLevel then self.settings.maxLevel = saved.settings.maxLevel end
+        if saved.settings.step then self.settings.step = saved.settings.step end
+        if type(saved.settings.autoAccept) == "boolean" then self.settings.autoAccept = saved.settings.autoAccept end
+        if type(saved.settings.autoHideAfterSearch) == "boolean" then self.settings.autoHideAfterSearch = saved.settings.autoHideAfterSearch end
+        
+        if saved.settings.factions then
+            if saved.settings.factions.Alliance ~= nil then self.settings.factions.Alliance = saved.settings.factions.Alliance end
+            if saved.settings.factions.Horde ~= nil then self.settings.factions.Horde = saved.settings.factions.Horde end
+        end
+
+        if saved.settings.classes then
+            for cls, val in pairs(saved.settings.classes) do
+                if self.settings.classes[cls] ~= nil then
+                    self.settings.classes[cls] = val
+                end
+            end
+        end
+
+        if saved.settings.races then
+            for race, val in pairs(saved.settings.races) do
+                if self.settings.races[race] ~= nil then
+                    self.settings.races[race] = val
+                end
+            end
+        end
+
+        if saved.exceptions then
+            self.exceptions = saved.exceptions
+        end
+
+        -- Обновление интерфейса
+        if self.ui then
+            if self.ui.minLevelBtn then self.ui.minLevelBtn:SetText(self.settings.minLevel) end
+            if self.ui.maxLevelBtn then self.ui.maxLevelBtn:SetText(self.settings.maxLevel) end
+            if self.ui.stepDD then UIDropDownMenu_SetText(self.ui.stepDD, "Шаг: " .. tostring(self.settings.step)) end
+            
+            if self.ui.autoCB then self.ui.autoCB:SetChecked(self.settings.autoAccept) end
+            if self.ui.autoHideCB then self.ui.autoHideCB:SetChecked(self.settings.autoHideAfterSearch) end
+
+            if self.ui.factionChecks then
+                self.ui.factionChecks.Alliance:SetChecked(self.settings.factions.Alliance)
+                self.ui.factionChecks.Horde:SetChecked(self.settings.factions.Horde)
+            end
+
+            if self.ui.classChecks then
+                for cls, cb in pairs(self.ui.classChecks) do
+                    if self.settings.classes[cls] ~= nil then
+                        cb:SetChecked(self.settings.classes[cls])
+                    end
+                end
+            end
+
+            if self.ui.raceChecks then
+                for race, cb in pairs(self.ui.raceChecks) do
+                    if self.settings.races[race] ~= nil then
+                        cb:SetChecked(self.settings.races[race])
+                    end
+                end
+            end
+        end
+        print("Настройки загружены (З).")
+    end
+
 -- Безопасный LevelPicker без UIPanelScrollBarTemplate
 local function CreateLevelPicker(parent, current, callback)
     local frame = CreateFrame("Frame", nil, parent)
@@ -10179,7 +10899,6 @@ GuildRecruiter.autoHideButton = nil
 
 function GuildRecruiter.new()
     local self = setmetatable({}, GuildRecruiter)
-
     self.frame = CreateFrame("Frame", "GuildRecruiterFrame", UIParent)
     self.frame:SetSize(320, 520)
     self.frame:Hide()
@@ -10194,16 +10913,13 @@ function GuildRecruiter.new()
     self.loadingText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.loadingText:SetText("ЗАГРУЗКА...")
     self.loadingText:SetPoint("CENTER")
-
     if WhoFrame then
         self.frame:SetParent(WhoFrame)
         self.frame:SetPoint("TOPLEFT", WhoFrame, "TOPRIGHT", 10, 0)
     end
-
     -- === ГАРАНТИРОВАННАЯ ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ===
     local saved = nsDbc["набор в гильдию"] or {}
     self.exceptions = type(saved.exceptions) == "table" and saved.exceptions or {}
-
     -- Инициализация фракций
     local factions = saved.settings and saved.settings.factions or {}
     self.settings = {
@@ -10219,14 +10935,12 @@ function GuildRecruiter.new()
         classes = {},
         races = {}
     }
-
     for _, cls in ipairs(CLASSES) do
         self.settings.classes[cls] = (saved.settings and saved.settings.classes and saved.settings.classes[cls]) == true
     end
     for _, race in ipairs(ALL_RACES) do
         self.settings.races[race] = (saved.settings and saved.settings.races and saved.settings.races[race]) == true
     end
-
     self.originalFriendsFramePoint = nil
     self.isUIBuilt = false
     self.results = {}
@@ -10234,6 +10948,9 @@ function GuildRecruiter.new()
     self.autoInviteLoop = false
     self.isSearching = false
     self.lastInvited = nil
+    self.searchTimer = nil
+    self.autoInviteTimer = nil
+    self.cooldownTimer = nil
     self:SafeHookWhoFrame()
     return self
 end
@@ -10273,27 +10990,47 @@ end
 function GuildRecruiter:BuildUI()
     if self.isUIBuilt then return end
     self.isUIBuilt = true
+    
+    -- Очистка старых исключений (логика оставлена без изменений)
     local now = time()
     for name, inviteTime in pairs(self.exceptions) do
         if type(inviteTime) == "number" and now - inviteTime > 7 * 24 * 60 * 60 then
             self.exceptions[name] = nil
         end
     end
-    self:SaveSettings()
+    
     if self.loadingText then
         self.loadingText:Hide()
         self.loadingText = nil
     end
+    
     local y = -10
+    
+    -- === НОВЫЕ КНОПКИ: Сохранить (С) и Загрузить (З) ===
+    local saveBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
+    saveBtn:SetSize(32, 32)
+    saveBtn:SetPoint("TOPLEFT", 5, -5)
+    saveBtn:SetText("С")
+    saveBtn:SetScript("OnClick", function() self:ManualSave() end)
+
+    local loadBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
+    loadBtn:SetSize(32, 32)
+    loadBtn:SetPoint("TOPLEFT", saveBtn, "BOTTOMLEFT", 37, 32)
+    loadBtn:SetText("З")
+    loadBtn:SetScript("OnClick", function() self:ManualLoad() end)
+
     local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetText("Набор в гильдию")
-    title:SetPoint("TOP", 0, -10)
+    -- Сдвигаем заголовок правее, чтобы кнопки его не перекрывали
+    title:SetPoint("TOP", 25, -10)
+
+    -- Автоскрытие (без авто-сохранения)
     local autoHideCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
     autoHideCB:SetPoint("TOPRIGHT", -10, -10)
     autoHideCB:SetChecked(self.settings.autoHideAfterSearch)
     autoHideCB:SetScript("OnClick", function()
         self.settings.autoHideAfterSearch = autoHideCB:GetChecked()
-        self:SaveSettings()
+        -- Убрано: self:SaveSettings()
         self:ApplyAutoHideSetting()
     end)
     autoHideCB:SetScript("OnEnter", function()
@@ -10302,27 +11039,33 @@ function GuildRecruiter:BuildUI()
         GameTooltip:Show()
     end)
     autoHideCB:SetScript("OnLeave", GameTooltip_Hide)
+
     y = y - 35
+    -- Кнопки выбора уровней (без авто-сохранения в callback)
     local minLevelBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     minLevelBtn:SetSize(40, 20)
     minLevelBtn:SetPoint("TOPLEFT", 20, y)
     minLevelBtn:SetText(self.settings.minLevel)
+    
     local maxLevelBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     maxLevelBtn:SetSize(40, 20)
     maxLevelBtn:SetPoint("LEFT", minLevelBtn, "RIGHT", 10, 0)
     maxLevelBtn:SetText(self.settings.maxLevel)
+    
     local minPicker = CreateLevelPicker(self.frame, self.settings.minLevel, function(lvl)
         self.settings.minLevel = lvl
         minLevelBtn:SetText(lvl)
-        self:SaveSettings()
+        -- Убрано: self:SaveSettings()
     end)
     local maxPicker = CreateLevelPicker(self.frame, self.settings.maxLevel, function(lvl)
         self.settings.maxLevel = lvl
         maxLevelBtn:SetText(lvl)
-        self:SaveSettings()
+        -- Убрано: self:SaveSettings()
     end)
+    
     minLevelBtn:SetScript("OnClick", function() minPicker:Show() end)
     maxLevelBtn:SetScript("OnClick", function() maxPicker:Show() end)
+    
     local stepDD = CreateFrame("Frame", "GuildRecruiterStepDropdown", self.frame, "UIDropDownMenuTemplate")
     stepDD:SetPoint("TOPRIGHT", -20, y)
     UIDropDownMenu_SetWidth(stepDD, 80)
@@ -10333,14 +11076,16 @@ function GuildRecruiter:BuildUI()
             info.func = function()
                 UIDropDownMenu_SetText(stepDD, "Шаг: " .. tostring(v))
                 self.settings.step = v
-                self:SaveSettings()
+                -- Убрано: self:SaveSettings()
             end
             UIDropDownMenu_AddButton(info)
         end
     end)
     UIDropDownMenu_SetText(stepDD, "Шаг: " .. tostring(self.settings.step))
+    
     y = y - 35
-    -- === Фракции: синхронизация с расами при клике ===
+    
+    -- === ФРАКЦИИ ===
     local factionChecks = {}
     for i, f in ipairs({"Alliance", "Horde"}) do
         local cb = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
@@ -10348,7 +11093,6 @@ function GuildRecruiter:BuildUI()
         cb:SetChecked(self.settings.factions[f])
         cb:SetScript("OnClick", function()
             local isChecked = cb:GetChecked()
-            print("Клик по фракции " .. f .. ": " .. tostring(isChecked))
             self.settings.factions[f] = isChecked
             local raceList = (f == "Alliance") and RACES_ALLIANCE or RACES_HORDE
             for _, race in ipairs(raceList) do
@@ -10357,14 +11101,33 @@ function GuildRecruiter:BuildUI()
                     self.ui.raceChecks[race]:SetChecked(isChecked)
                 end
             end
-            self:SaveSettings()
+            -- Убрано: self:SaveSettings()
         end)
         local lbl = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetText(f); lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
         factionChecks[f] = cb
     end
+
+    -- === ГАЛОЧКА "ВСЕ КЛАССЫ" ===
+    local allClassesCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
+    allClassesCB:SetPoint("TOPLEFT", 220, y) -- Справа от фракций
+    allClassesCB:SetScript("OnClick", function()
+        local isChecked = allClassesCB:GetChecked()
+        for _, cls in ipairs(CLASSES) do
+            self.settings.classes[cls] = isChecked
+            if self.ui and self.ui.classChecks and self.ui.classChecks[cls] then
+                self.ui.classChecks[cls]:SetChecked(isChecked)
+            end
+        end
+        -- Убрано: self:SaveSettings()
+    end)
+    local lblAll = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lblAll:SetText("Все классы")
+    lblAll:SetPoint("LEFT", allClassesCB, "RIGHT", 5, 0)
+
     y = y - 30
-    -- Классы
+    
+    -- Классы (добавлен classChecks в self.ui для работы ManualLoad и "Все классы")
     local classChecks = {}
     for i, cls in ipairs(CLASSES) do
         local col = (i-1) % 2
@@ -10377,14 +11140,15 @@ function GuildRecruiter:BuildUI()
         cb:SetScript("OnClick", function()
             local isChecked = cb:GetChecked()
             self.settings.classes[cls] = isChecked
-            self:SaveSettings()
+            -- Убрано: self:SaveSettings()
         end)
         local lbl = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetText(cls); lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
         classChecks[cls] = cb
     end
+    
     y = y - 110
-    -- === Расы: немедленное сохранение при клике ===
+    -- Расы (без авто-сохранения)
     local raceChecks = {}
     for i, race in ipairs(ALL_RACES) do
         local col = (i-1) % 2
@@ -10396,17 +11160,17 @@ function GuildRecruiter:BuildUI()
         cb:SetChecked(self.settings.races[race])
         cb:SetScript("OnClick", function()
             local isChecked = cb:GetChecked()
-            print("Клик по расе " .. race .. ": " .. tostring(isChecked))
             self.settings.races[race] = isChecked
-            self:SaveSettings()
+            -- Убрано: self:SaveSettings()
         end)
         local lbl = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetText(race); lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
         raceChecks[race] = cb
     end
+    
     y = y - 110
 
-    -- === ЗАМЕНА: ScrollFrame как в CreateLevelPicker (без UIPanelScrollFrameTemplate) ===
+    -- ScrollFrame и Slider (Логика прокрутки без изменений)
     local scrollFrame = CreateFrame("ScrollFrame", "GuildRecruiterScrollFrame", self.frame)
     scrollFrame:SetPoint("TOPLEFT", 15, y)
     scrollFrame:SetPoint("BOTTOMRIGHT", -28, 60)
@@ -10419,7 +11183,6 @@ function GuildRecruiter:BuildUI()
     scrollFrame:SetScrollChild(playerList)
     scrollFrame:UpdateScrollChildRect()
 
-    -- Слайдер прокрутки
     local slider = CreateFrame("Slider", "GuildRecruiterScrollSlider", self.frame)
     slider:SetOrientation("VERTICAL")
     slider:SetPoint("TOPRIGHT", -8, y)
@@ -10447,7 +11210,6 @@ function GuildRecruiter:BuildUI()
         scrollFrame:SetVerticalScroll(value)
     end)
 
-    -- === КОЛЕСО НА САМОМ FRAME, как в LevelPicker ===
     self.frame:EnableMouseWheel(true)
     self.frame:SetScript("OnMouseWheel", function(self, delta)
         local sf = GuildRecruiter.instance.ui.scroll
@@ -10461,12 +11223,13 @@ function GuildRecruiter:BuildUI()
         GuildRecruiter.instance.ui.slider:SetValue(newOffset)
     end)
 
+    -- Нижние кнопки (без авто-сохранения)
     local autoCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
     autoCB:SetPoint("BOTTOMLEFT", 20, 30)
     autoCB:SetChecked(self.settings.autoAccept)
     autoCB:SetScript("OnClick", function()
         self.settings.autoAccept = autoCB:GetChecked()
-        self:SaveSettings()
+        -- Убрано: self:SaveSettings()
         if self.settings.autoAccept and #self.results > 0 then
             self:StartAutoInvite()
         end
@@ -10477,6 +11240,7 @@ function GuildRecruiter:BuildUI()
         GameTooltip:Show()
     end)
     autoCB:SetScript("OnLeave", GameTooltip_Hide)
+    
     local searchBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     searchBtn:SetSize(80, 22)
     searchBtn:SetPoint("BOTTOMRIGHT", -20, 30)
@@ -10486,11 +11250,13 @@ function GuildRecruiter:BuildUI()
             self:StopSearch()
             searchBtn:SetText("Найти")
         else
-            self:SaveSettings()
+            -- Убрано: self:SaveSettings()
             self:StartSearch()
             searchBtn:SetText("Стоп")
         end
     end)
+    
+    -- Сохраняем ссылки на UI
     self.ui = {
         minLevelBtn = minLevelBtn,
         maxLevelBtn = maxLevelBtn,
@@ -10504,9 +11270,11 @@ function GuildRecruiter:BuildUI()
         autoHideCB = autoHideCB,
         searchBtn = searchBtn,
         raceChecks = raceChecks,
-        factionChecks = factionChecks
+        factionChecks = factionChecks,
+        classChecks = classChecks -- Добавлено для ManualLoad
     }
-    self:LoadSettings()
+    
+    -- Убрано: self:LoadSettings()
     self:ApplyAutoHideSetting()
 end
 
@@ -10611,6 +11379,13 @@ function GuildRecruiter:StopSearch()
     if self.ui and self.ui.searchBtn then
         self.ui.searchBtn:SetText("Найти")
     end
+    
+    -- Очищаем таймер поиска
+    if self.searchTimer then
+        self.searchTimer:SetScript("OnUpdate", nil)
+        self.searchTimer:Hide()
+        self.searchTimer = nil
+    end
 end
 
 function GuildRecruiter:SendNextWhoQuery()
@@ -10627,8 +11402,15 @@ function GuildRecruiter:SendNextWhoQuery()
         if self.settings.autoHideAfterSearch then
             self.frame:Hide()
         end
+        -- Очищаем таймер поиска
+        if self.searchTimer then
+            self.searchTimer:SetScript("OnUpdate", nil)
+            self.searchTimer:Hide()
+            self.searchTimer = nil
+        end
         return
     end
+
     local maxL = math.min(self.currentLevel + self.settings.step - 1, self.settings.maxLevel)
     local query = self.currentLevel .. "-" .. maxL
     local wasVisible = WhoFrame and WhoFrame:IsShown()
@@ -10637,11 +11419,25 @@ function GuildRecruiter:SendNextWhoQuery()
         WhoFrame:Hide()
     end
     self.currentLevel = maxL + 1
-    C_Timer.After(6, function()
-        if self.isSearching then
-            self:SendNextWhoQuery()
-        end
-    end)
+
+    -- Гарантированно запускаем таймер
+    if not self.searchTimer then
+        self.searchTimer = CreateFrame("Frame")
+        self.searchTimer.guildRecruiter = self
+        self.searchTimer:SetScript("OnUpdate", function(frame, deltaTime)
+            frame.elapsed = (frame.elapsed or 0) + deltaTime
+            if frame.elapsed >= 6 then
+                local gr = frame.guildRecruiter
+                if gr and gr.isSearching then
+                    gr:SendNextWhoQuery()
+                end
+                frame.elapsed = 0
+            end
+        end)
+    else
+        self.searchTimer.elapsed = 0
+    end
+    self.searchTimer:Show()
 end
 
 function GuildRecruiter:ProcessWhoResults()
@@ -10703,12 +11499,12 @@ function GuildRecruiter:UpdatePlayerList()
                     GuildInvite(p.name)
                     GuildRecruiter.instance.exceptions[p.name] = time()
                     GuildRecruiter.instance:RemoveFromList(p.name)
-                    GuildRecruiter.instance:SaveSettings()
+                    -- Убрано: GuildRecruiter.instance:SaveSettings()
                     GuildRecruiter.instance:SetCooldown()
                 elseif button == "RightButton" then
                     GuildRecruiter.instance.exceptions[p.name] = time()
                     GuildRecruiter.instance:RemoveFromList(p.name)
-                    GuildRecruiter.instance:SaveSettings()
+                    -- Убрано: GuildRecruiter.instance:SaveSettings()
                 end
             end)
         end
@@ -10748,19 +11544,40 @@ function GuildRecruiter:InviteAndExclude(name)
     GuildInvite(name)
     self.exceptions[name] = time()
     self:RemoveFromList(name)
-    self:SaveSettings()
+    -- Убрано: self:SaveSettings()
     self:SetCooldown()
 end
 
 function GuildRecruiter:ExcludeOnly(name)
     self.exceptions[name] = time()
     self:RemoveFromList(name)
-    self:SaveSettings()
+    -- Убрано: self:SaveSettings()
 end
 
 function GuildRecruiter:SetCooldown()
     self.cooldown = true
-    C_Timer.After(6, function() self.cooldown = false end)
+    
+    -- Создаем или переиспользуем таймер cooldown
+    if not self.cooldownTimer then
+        self.cooldownTimer = CreateFrame("Frame")
+        self.cooldownTimer.elapsed = 0
+        self.cooldownTimer.guildRecruiter = self
+        self.cooldownTimer:SetScript("OnUpdate", function(self, deltaTime)
+            self.elapsed = self.elapsed + deltaTime
+            if self.elapsed >= 6 then
+                if self.guildRecruiter then
+                    self.guildRecruiter.cooldown = false
+                end
+                self.elapsed = 0
+                self:SetScript("OnUpdate", nil)
+                self:Hide()
+                self.guildRecruiter.cooldownTimer = nil
+            end
+        end)
+    else
+        self.cooldownTimer.elapsed = 0 -- Сбрасываем таймер
+    end
+    self.cooldownTimer:Show()
 end
 
 function GuildRecruiter:RemoveFromList(name)
@@ -10776,20 +11593,57 @@ end
 function GuildRecruiter:StartAutoInvite()
     if self.autoInviteLoop or #self.results == 0 then return end
     self.autoInviteLoop = true
+    
+    -- Очищаем существующий таймер
+    if self.autoInviteTimer then
+        self.autoInviteTimer:SetScript("OnUpdate", nil)
+        self.autoInviteTimer:Hide()
+        self.autoInviteTimer = nil
+    end
+    
     self:ProcessAutoInvite()
 end
 
 function GuildRecruiter:ProcessAutoInvite()
     if not self.settings.autoAccept or #self.results == 0 then
         self.autoInviteLoop = false
+        if self.autoInviteTimer then
+            self.autoInviteTimer:SetScript("OnUpdate", nil)
+            self.autoInviteTimer:Hide()
+            self.autoInviteTimer = nil
+        end
         return
     end
+
     local p = table.remove(self.results, 1)
     if p then
         self:InviteAndExclude(p.name)
-        C_Timer.After(6, function() self:ProcessAutoInvite() end)
+
+        -- Гарантированно запускаем таймер
+        if not self.autoInviteTimer then
+            self.autoInviteTimer = CreateFrame("Frame")
+            self.autoInviteTimer.guildRecruiter = self
+            self.autoInviteTimer:SetScript("OnUpdate", function(frame, deltaTime)
+                frame.elapsed = (frame.elapsed or 0) + deltaTime
+                if frame.elapsed >= 6 then
+                    local gr = frame.guildRecruiter
+                    if gr and gr.autoInviteLoop then
+                        gr:ProcessAutoInvite()
+                    end
+                    frame.elapsed = 0
+                end
+            end)
+        else
+            self.autoInviteTimer.elapsed = 0
+        end
+        self.autoInviteTimer:Show()
     else
         self.autoInviteLoop = false
+        if self.autoInviteTimer then
+            self.autoInviteTimer:SetScript("OnUpdate", nil)
+            self.autoInviteTimer:Hide()
+            self.autoInviteTimer = nil
+        end
     end
 end
 
