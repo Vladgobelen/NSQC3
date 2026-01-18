@@ -7834,7 +7834,7 @@ function SpellQueue:CreateResourceBars()
     self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, 10)
     self.healthBar:SetVertexColor(1, 0, 0)
     self.healthBar:Hide()
-
+    
     -- Полоса ресурса игрока
     self.resourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.resourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -7842,7 +7842,7 @@ function SpellQueue:CreateResourceBars()
     self.resourceBar:SetWidth(self.width)
     self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, -1)
     self.resourceBar:Hide()
-
+    
     -- Полоса здоровья цели
     self.targetHealthBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.targetHealthBar:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -7851,7 +7851,7 @@ function SpellQueue:CreateResourceBars()
     self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, -10)
     self.targetHealthBar:SetVertexColor(1, 0, 0)
     self.targetHealthBar:Hide()
-
+    
     -- Полоса ресурса цели
     self.targetResourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.targetResourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -7900,30 +7900,41 @@ end
 
 function SpellQueue:GetPlayerResourceType()
     local _, class = UnitClass("player")
-    
     if class == "DRUID" then
         local form = GetShapeshiftForm()
-        -- 1: Медведь, 3: Кошка, 4: Лунный облик
-        if form == 1 then
-            return 1 -- RAGE
-        elseif form == 3 then
-            return 3 -- ENERGY
+        if form == 1 then       -- Медведь
+            return 1            -- RAGE
+        elseif form == 3 then   -- Кошка
+            return 3            -- ENERGY
         else
-            return 0 -- MANA
+            return 0            -- MANA
         end
     end
     
-    local resource = RESOURCE_TYPES[class] or 0
-    return resource
+    local classResourceMap = {
+        ["DEATHKNIGHT"] = 6,    -- RUNIC_POWER
+        ["DRUID"] = 0,          -- MANA (основной)
+        ["HUNTER"] = 2,         -- FOCUS
+        ["MAGE"] = 0,           -- MANA
+        ["PALADIN"] = 0,        -- MANA
+        ["PRIEST"] = 0,         -- MANA
+        ["ROGUE"] = 3,          -- ENERGY
+        ["SHAMAN"] = 0,         -- MANA
+        ["WARLOCK"] = 0,        -- MANA
+        ["WARRIOR"] = 1         -- RAGE
+    }
+    
+    return classResourceMap[class] or 0
 end
 
 
 function SpellQueue:GetTargetResourceType()
-    if UnitIsPlayer("target") then
-        local _, class = UnitClass("target")
-        return RESOURCE_TYPES[class] or 0
+    if not UnitExists("target") then 
+        return 0 
     end
-    return 0 -- Для NPC используем ману по умолчанию
+    
+    local powerType = UnitPowerType("target")
+    return powerType
 end
 
 function SpellQueue:UpdateResourceBars()
@@ -7936,49 +7947,86 @@ function SpellQueue:UpdateResourceBars()
     else
         self.healthBar:Hide()
     end
-
+    
     if bit.band(self.features, FEATURE_RESOURCE) ~= 0 then
         local resourceType = self:GetPlayerResourceType()
         local current = UnitPower("player", resourceType)
         local max = UnitPowerMax("player", resourceType)
         
-        local colorName = self.resourceTypeNames[resourceType] or "UNKNOWN"
-        local color = FEATURE_COLORS[colorName] or {1,1,1} -- дефолтный белый если нет цвета
-        
-        self.resourceBar:SetWidth(max > 0 and (current/max)*self.width or 0)
-        self.resourceBar:SetVertexColor(unpack(color))
-        self.resourceBar:Show()
+        if max > 0 then
+            local color = self:GetResourceColor(resourceType)
+            self.resourceBar:SetWidth((current / max) * self.width)
+            self.resourceBar:SetVertexColor(unpack(color))
+            self.resourceBar:Show()
+        else
+            self.resourceBar:Hide()
+        end
     else
         self.resourceBar:Hide()
     end
-
-    -- Для цели
-    if UnitExists("target") then
-        if bit.band(self.features, FEATURE_TARGET) ~= 0 then
-            -- Здоровье цели
-            local maxHP = UnitHealthMax("target")
-            local hp = maxHP > 0 and (UnitHealth("target") / maxHP) or 0
-            self.targetHealthBar:SetWidth(self.width * hp)
-            self.targetHealthBar:Show()
-            
-            -- Ресурс цели
-            local resourceType = self:GetTargetResourceType()
-            local current = UnitPower("target", resourceType)
-            local max = UnitPowerMax("target", resourceType)
-            
-            local colorName = self.resourceTypeNames[resourceType] or "UNKNOWN"
-            local color = FEATURE_COLORS[colorName] or {1,1,1}
-            self.targetResourceBar:SetWidth(max > 0 and (current/max)*self.width or 0)
+    
+    -- Для цели - без проверки UnitCanAttack
+    if UnitExists("target") and bit.band(self.features, FEATURE_TARGET) ~= 0 then
+        -- Здоровье цели
+        local maxHP = UnitHealthMax("target")
+        local hp = maxHP > 0 and (UnitHealth("target") / maxHP) or 0
+        self.targetHealthBar:SetWidth(self.width * hp)
+        self.targetHealthBar:Show()
+        
+        -- Ресурс цели
+        local powerType = UnitPowerType("target")
+        local current = UnitPower("target", powerType)
+        local max = UnitPowerMax("target", powerType)
+        
+        if max > 0 then
+            local color = self:GetResourceColor(powerType)
+            self.targetResourceBar:SetWidth((current / max) * self.width)
             self.targetResourceBar:SetVertexColor(unpack(color))
             self.targetResourceBar:Show()
         else
-            self.targetHealthBar:Hide()
-            self.targetResourceBar:Hide()
+            -- Проверяем альтернативные типы ресурсов
+            local foundResource = false
+            for altType = 0, 12 do
+                current = UnitPower("target", altType)
+                max = UnitPowerMax("target", altType)
+                
+                if max > 0 and current > 0 then
+                    color = self:GetResourceColor(altType)
+                    self.targetResourceBar:SetWidth((current / max) * self.width)
+                    self.targetResourceBar:SetVertexColor(unpack(color))
+                    self.targetResourceBar:Show()
+                    foundResource = true
+                    break
+                end
+            end
+            
+            if not foundResource then
+                self.targetResourceBar:Hide()
+            end
         end
     else
         self.targetHealthBar:Hide()
         self.targetResourceBar:Hide()
     end
+end
+
+function SpellQueue:GetResourceColor(resourceType)
+    local colors = {
+        [0] = {0.0, 0.82, 1.0},   -- MANA
+        [1] = {1.0, 0.0, 0.0},    -- RAGE
+        [2] = {1.0, 0.5, 0.0},    -- FOCUS
+        [3] = {1.0, 1.0, 0.0},    -- ENERGY
+        [5] = {0.4, 0.4, 1.0},    -- RUNES
+        [6] = {0.0, 0.82, 1.0},   -- RUNIC_POWER
+        [7] = {0.5, 0.5, 0.5},    -- FUEL
+        [8] = {1.0, 0.5, 0.0},    -- COMBO_POINTS
+        [9] = {0.8, 0.2, 0.8},    -- SOUL_SHARDS
+        [10] = {0.6, 0.4, 0.2},   -- HOLY_POWER
+        [11] = {0.2, 0.8, 0.2},   -- ALTERNATE
+        [12] = {0.8, 0.8, 0.2}    -- MAELSTROM
+    }
+    
+    return colors[resourceType] or {1, 1, 1} -- белый по умолчанию
 end
 
 function SpellQueue:UpdateComboPoints()
