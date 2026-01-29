@@ -8538,18 +8538,15 @@ end
 function SpellQueue:UpdateSpellPosition(spellName)
     local spell = self.spells[spellName]
     if not spell then return end
-    
     -- === Проверка "Текстура" ===
     if spell.data.texture then
         -- Если есть параметр texture, то не отображаем на панели
         spell.icon:Hide()
         spell.glow:Hide()
         spell.cooldownText:Hide()
-        
         -- Кэшируем предыдущее состояние
         local wasVisible = spell.textureVisible or false
         spell.textureVisible = false
-        
         -- === Поиск иконки в правильных таблицах ===
         local iconData = nil
         -- 1. Сначала ищем в ProkIconManager.icons (если доступно)
@@ -8569,11 +8566,9 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 end
             end
         end
-        
         -- === Проверка доступности скилла ===
         local isUsable = IsUsableSpell(spellName)
-        
-        -- === Отображение текстуры (ИСПРАВЛЕННЫЙ БЛОК) ===
+        -- === Отображение текстуры ===
         if iconData then
             if iconData.triggerType == "custom" and isUsable then
                 -- Если есть прок - проверяем условие (например, HP цели)
@@ -8592,8 +8587,7 @@ function SpellQueue:UpdateSpellPosition(spellName)
                     spell.textureVisible = true
                 end
             elseif iconData.triggerType == "buff" then
-                -- === ИСПРАВЛЕНИЕ: Поддержка триггера "buff" ===
-                -- Проверяем наличие баффа на игроке. iconData.name содержит название баффа.
+                -- Проверяем наличие баффа на игроке
                 if self:HasBuff(iconData.name) then
                     spell.textureVisible = true
                 else
@@ -8601,7 +8595,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 end
             end
         end
-        
         -- Показываем/скрываем текстуру только при изменении состояния
         if spell.textureVisible ~= wasVisible then
             if spell.textureVisible then
@@ -8610,10 +8603,8 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 self:HideProkTexture(spellName)
             end
         end
-        
-        return
+        return  -- ← КРИТИЧЕСКИ ВАЖНЫЙ return для выхода из функции
     end
-    
     -- === Проверка "Прок" ===
     if spell.data.prok then
         if not UnitExists("target") or not UnitCanAttack("player", "target") then
@@ -8637,7 +8628,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-    
     -- === Комбо-поинты ===
     if spell.data.combo and spell.data.combo > 0 then
         if not self:HasEnoughComboPoints(spell.data.combo) then
@@ -8647,7 +8637,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-    
     -- === Ресурсы ===
     if spell.data.resource then
         if not self:HasEnoughResource(spellName) then
@@ -8657,7 +8646,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-    
     -- === Бафф ===
     if spell.data.buf == 1 then
         spell.hasBuff = self:HasBuff(spellName)
@@ -8668,7 +8656,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-    
     -- === Кулдаун ===
     local remaining, fullDuration = self:GetSpellCooldown(spellName)
     -- === Фильтр ГКД ===
@@ -8679,7 +8666,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
     spell.active = remaining and remaining > 0
     spell.isReady = not spell.active
     spell.remaining = remaining
-    
     -- === ПРОВЕРКА ДОСТУПНОСТИ ===
     if spell.isReady then
         local isUsable = IsUsableSpell(spellName)
@@ -8691,7 +8677,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
-    
     -- === Отображение текста отката ===
     if remaining and remaining > 0 then
         if remaining > 3 then
@@ -8703,7 +8688,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
     else
         spell.cooldownText:Hide()
     end
-    
     -- === Прозрачность ===
     if not spell.data.debuf or not spell.hasDebuff then
         if spell.isReady then
@@ -8714,7 +8698,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
         end
     end
-    
     -- === Позиционирование ===
     if not spell.isReady then
         local startPos = (spell.data.pos or 0) * (self.height - 10)
@@ -8736,7 +8719,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
         spell.icon:ClearAllPoints()
         spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
     end
-    
     -- Всегда показываем, если дошли до этого места
     spell.icon:Show()
     spell.glow:Show()
