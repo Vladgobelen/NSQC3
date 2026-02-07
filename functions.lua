@@ -2983,3 +2983,292 @@ f:SetScript("OnUpdate", function(self, dt)
 end)
 
 f:Show()
+
+-- === НАСТРОЙКИ ВРЕМЕНИ (МСК) ===
+NSQC3_RESTART_NOTIFY_START = NSQC3_RESTART_NOTIFY_START or 295  -- 4:55
+NSQC3_RESTART_TIME        = NSQC3_RESTART_TIME        or 305  -- 5:05
+
+-- === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+local function GetMoscowTimeFromTimestamp(timestamp)
+    local secondsInDay = timestamp % 86400
+    local mskSeconds = (secondsInDay + 3 * 3600) % 86400
+    local hour = math.floor(mskSeconds / 3600)
+    local min = math.floor((mskSeconds % 3600) / 60)
+    local sec = math.floor(mskSeconds % 60)
+    return hour, min, sec
+end
+
+local function CreateRestartWarning()
+    local frame = CreateFrame("Frame", nil, UIParent)
+    frame:SetPoint("CENTER", UIParent, "CENTER")
+    frame:SetSize(400, 100)
+    frame:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    frame:SetBackdropColor(0.8, 0, 0, 0.9)
+    
+    local text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    text:SetPoint("CENTER", frame, "CENTER")
+    text:SetTextColor(1, 1, 0, 1)
+    frame.text = text
+    frame:Hide()
+    return frame
+end
+
+-- === ПЕРЕМЕННЫЕ СОСТОЯНИЯ ===
+ns_HP = ns_HP or 20
+ns_soundEnabled = true
+ns_restartWarning = nil
+ns_nextServerCheck = 0
+ns_restartDisabledUntil = 0  -- ОТДЕЛЬНЫЙ флаг только для рестарта
+
+-- === ОСНОВНОЙ ФРЕЙМ ===
+local f = CreateFrame("Frame")
+f.elapsed = 0
+f.checkInterval = 0.5
+f.restartSoundElapsed = 0
+f.alertFrame = nil
+
+-- === КНОПКА HP ===
+local hpButton = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
+hpButton:SetSize(32, 32)
+hpButton:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+hpButton:EnableMouse(true)
+hpButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+hpButton:RegisterForDrag("LeftButton")
+hpButton:SetMovable(true)
+hpButton:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 }
+})
+hpButton:SetBackdropColor(0, 0, 0, 0.8)
+
+local buttonText = hpButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+buttonText:SetText("HP")
+buttonText:SetPoint("CENTER", hpButton, "CENTER")
+
+hpButton:SetScript("OnDragStart", function(self)
+    self:StartMoving()
+end)
+
+hpButton:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+end)
+
+-- === ТУЛТИП ===
+hpButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("NSQC3 — Система оповещений", 1, 0.8, 0)
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    
+    -- Функционал HP
+    local hpStatus = ns_soundEnabled and ("вкл, порог: " .. (ns_HP or 20) .. "%") or "отключён"
+    GameTooltip:AddLine("• Отслеживание HP игрока", 1, 1, 1)
+    GameTooltip:AddLine("  — статус: " .. hpStatus, 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("  — ЛКМ: изменить порог (0 = выкл)", 0.7, 0.7, 0.7)
+    
+    -- Функционал рестарта
+    local restartHour = math.floor(NSQC3_RESTART_TIME / 60)
+    local restartMin = NSQC3_RESTART_TIME % 60
+    GameTooltip:AddLine("• Авто-оповещение о рестарте", 1, 1, 1)
+    GameTooltip:AddLine(string.format("  — рестарт в %02d:%02d МСК", restartHour, restartMin), 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("  — оповещение за 10 мин до рестарта", 0.7, 0.7, 0.7)
+    
+    -- Время до рестарта
+    local serverTimestamp = GetServerTime()
+    local mskHour, mskMin = GetMoscowTimeFromTimestamp(serverTimestamp)
+    local totalMinutesNow = mskHour * 60 + mskMin
+    local totalMinutesRestart = NSQC3_RESTART_TIME
+    
+    local minutesToRestart
+    if totalMinutesRestart >= totalMinutesNow then
+        minutesToRestart = totalMinutesRestart - totalMinutesNow
+    else
+        minutesToRestart = (24 * 60) - totalMinutesNow + totalMinutesRestart
+    end
+    
+    local hoursLeft = math.floor(minutesToRestart / 60)
+    local minsLeft = minutesToRestart % 60
+    
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    if hoursLeft > 0 then
+        GameTooltip:AddLine(string.format("До рестарта: %d ч %d мин", hoursLeft, minsLeft), 0.2, 1, 0.2)
+    else
+        GameTooltip:AddLine(string.format("До рестарта: %d мин", minsLeft), 0.2, 1, 0.2)
+    end
+    
+    -- Управление
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    GameTooltip:AddLine("• ПКМ: отключить уведомление о рестарте на 1 мин", 1, 1, 1)
+    
+    GameTooltip:Show()
+end)
+
+hpButton:SetScript("OnLeave", function(self)
+    GameTooltip:Hide()
+end)
+
+-- === ПОЛЕ ВВОДА ===
+local editBox = CreateFrame("EditBox", nil, hpButton)
+editBox:SetSize(60, 20)
+editBox:SetPoint("LEFT", hpButton, "RIGHT", 5, 0)
+editBox:Hide()
+editBox:SetAutoFocus(false)
+editBox:SetBackdrop({
+    bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 12,
+    insets = { left = 2, right = 2, top = 2, bottom = 2 }
+})
+editBox:SetBackdropColor(0, 0, 0, 0.8)
+editBox:SetTextColor(1, 1, 1, 1)
+editBox:SetFont(STANDARD_TEXT_FONT, 12)
+
+editBox:SetScript("OnEnterPressed", function(self)
+    local text = self:GetText()
+    local num = tonumber(text)
+    if num then
+        if num == 0 then
+            ns_soundEnabled = false
+        else
+            ns_soundEnabled = true
+            if num > 0 and num <= 100 then
+                ns_HP = num
+            else
+                ns_HP = 20
+            end
+        end
+    else
+        ns_HP = 20
+    end
+    self:Hide()
+end)
+
+editBox:SetScript("OnEscapePressed", function(self)
+    self:Hide()
+end)
+
+-- === ОБРАБОТКА КЛИКОВ ===
+hpButton:SetScript("OnClick", function(self, button)
+    if button == "LeftButton" then
+        editBox:SetText(ns_HP or 20)
+        editBox:Show()
+        editBox:SetFocus()
+    elseif button == "RightButton" then
+        -- Отключаем ТОЛЬКО уведомление о рестарте на 1 минуту
+        ns_restartDisabledUntil = GetTime() + 60
+        if ns_restartWarning then
+            ns_restartWarning:Hide()
+            ns_restartWarning = nil
+        end
+        f.restartSoundElapsed = 0
+    end
+end)
+
+-- === ОСНОВНОЙ ЦИКЛ ===
+f:SetScript("OnUpdate", function(self, dt)
+    local currentTime = GetTime()
+    
+    -- Проверка времени сервера раз в минуту
+    if currentTime >= ns_nextServerCheck then
+        ns_nextServerCheck = currentTime + 60
+        
+        local serverTimestamp = GetServerTime()
+        local mskHour, mskMin, mskSec = GetMoscowTimeFromTimestamp(serverTimestamp)
+        local totalMinutes = mskHour * 60 + mskMin
+        
+        -- Проверяем, не отключено ли уведомление о рестарте
+        if currentTime >= ns_restartDisabledUntil then
+            if totalMinutes >= NSQC3_RESTART_NOTIFY_START and totalMinutes < NSQC3_RESTART_TIME then
+                if not ns_restartWarning then
+                    ns_restartWarning = CreateRestartWarning()
+                end
+                
+                local minutesLeft = NSQC3_RESTART_TIME - totalMinutes - 1
+                if minutesLeft < 0 then minutesLeft = 0 end
+                local secondsLeft = 59 - mskSec
+                
+                ns_restartWarning.text:SetText(string.format("РЕСТАРТ СЕРВЕРА ЧЕРЕЗ %d:%02d", minutesLeft, secondsLeft))
+                ns_restartWarning:Show()
+            else
+                if ns_restartWarning then
+                    ns_restartWarning:Hide()
+                    ns_restartWarning = nil
+                end
+            end
+        else
+            -- Временно отключено ПКМ — ничего не показываем
+            if ns_restartWarning then
+                ns_restartWarning:Hide()
+                ns_restartWarning = nil
+            end
+        end
+    end
+    
+    -- Обработка активного предупреждения о рестарте
+    if ns_restartWarning then
+        local serverTimestamp = GetServerTime()
+        local mskHour, mskMin, mskSec = GetMoscowTimeFromTimestamp(serverTimestamp)
+        local totalMinutes = mskHour * 60 + mskMin
+        
+        if currentTime >= ns_restartDisabledUntil and
+           totalMinutes >= NSQC3_RESTART_NOTIFY_START and
+           totalMinutes < NSQC3_RESTART_TIME then
+            self.restartSoundElapsed = self.restartSoundElapsed + dt
+            if self.restartSoundElapsed >= 1.0 then
+                self.restartSoundElapsed = 0
+                PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\fail.ogg")
+                
+                local minutesLeft = NSQC3_RESTART_TIME - totalMinutes - 1
+                if minutesLeft < 0 then minutesLeft = 0 end
+                local secondsLeft = 59 - mskSec
+                ns_restartWarning.text:SetText(string.format("РЕСТАРТ СЕРВЕРА ЧЕРЕЗ %d:%02d", minutesLeft, secondsLeft))
+            end
+        else
+            ns_restartWarning:Hide()
+            ns_restartWarning = nil
+        end
+    end
+    
+    -- === HP-ОПОВЕЩЕНИЕ (работает ВСЕГДА, если не выключено через 0) ===
+    self.elapsed = self.elapsed + dt
+    if self.elapsed < self.checkInterval then return end
+    self.elapsed = 0
+
+    local cur = UnitHealth("player")
+    local max = UnitHealthMax("player")
+    if max == 0 then return end
+    local pct = (cur / max) * 100
+
+    if not ns_HP or ns_HP <= 0 or ns_HP > 100 then
+        ns_HP = 20
+    end
+
+    if ns_soundEnabled and pct < ns_HP then
+        if not self.alertFrame then
+            self.alertFrame = CreateFrame("Frame")
+            local soundElapsed = 0
+            self.alertFrame:SetScript("OnUpdate", function(s, d)
+                soundElapsed = soundElapsed + d
+                if soundElapsed >= 0.5 then
+                    soundElapsed = 0
+                    PlaySoundFile("Interface\\AddOns\\NSQC\\gob.ogg")
+                end
+            end)
+            PlaySoundFile("Interface\\AddOns\\NSQC\\gob.ogg")
+            self.alertFrame:Show()
+        end
+    else
+        if self.alertFrame then
+            self.alertFrame:Hide()
+            self.alertFrame = nil
+        end
+    end
+end)
+
+f:Show()
