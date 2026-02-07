@@ -2122,23 +2122,51 @@ end
 
 function hunterCheck()
     local _, classUnit = UnitClass("player")
-        if classUnit == "HUNTER" then
-            for slot = 1, 24, 1 do
-                local debuffName = UnitDebuff("target", slot);
-                if debuffName == "Метка охотника" then
-                    for trackingIndex = 1, GetNumTrackingTypes(), 1 do
-                        local name, texture, active, category = GetTrackingInfo(trackingIndex);
-                        if UnitCreatureType("target") ~= nil then
-                            if string.find(name, string.utf8sub(UnitCreatureType("target"), 2, 6)) then
-                                if texture ~= GetTrackingTexture(trackingIndex) then
-                                    SetTracking(trackingIndex);
-                                end;
-                            end;
-                        end;
-                    end;
-                end;
-            end;
+    if classUnit ~= "HUNTER" then return end
+    
+    if not UnitAffectingCombat("player") then
+        -- Вне боя: проверяем, активен ли уже поиск трав/руды
+        local herbsActive, mineralsActive = false, false
+        local herbsIndex, mineralsIndex = nil, nil
+        
+        for trackingIndex = 1, GetNumTrackingTypes() do
+            local name, _, active = GetTrackingInfo(trackingIndex)
+            if name == "Поиск трав" then
+                if active then herbsActive = true else herbsIndex = trackingIndex end
+            elseif name == "Поиск руды" then
+                if active then mineralsActive = true else mineralsIndex = trackingIndex end
+            end
         end
+        
+        -- Если ни травы, ни руды не активны — включаем первый доступный
+        if not herbsActive and not mineralsActive then
+            if herbsIndex then
+                SetTracking(herbsIndex)
+            elseif mineralsIndex then
+                SetTracking(mineralsIndex)
+            end
+        end
+    else
+        -- В бою: оригинальная логика с Меткой охотника
+        for slot = 1, 24 do
+            local debuffName = UnitDebuff("target", slot)
+            if debuffName == "Метка охотника" then
+                local creatureType = UnitCreatureType("target")
+                if creatureType then
+                    local sub = utf8mySub(creatureType, 2, 6)
+                    for trackingIndex = 1, GetNumTrackingTypes() do
+                        local name, texture = GetTrackingInfo(trackingIndex)
+                        if string.find(name, sub) then
+                            if texture ~= GetTrackingTexture(trackingIndex) then
+                                SetTracking(trackingIndex)
+                            end
+                            return
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 function GetVisibleGuildNames()
