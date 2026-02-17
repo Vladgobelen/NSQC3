@@ -2754,3 +2754,234 @@ TryHookContextMenu()
 -- === END ===
 
 
+
+-----------------------------------
+nsDbc = nsDbc or {}
+
+ns_timerMinutes = 0
+ns_timerStart = 0
+ns_isAlarming = false
+ns_alarmTicker = 0
+
+local tButton
+
+local function CreateTimerButton()
+    if tButton then return end
+
+    tButton = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
+    tButton:SetSize(32, 32)
+    tButton:EnableMouse(true)
+    tButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    tButton:RegisterForDrag("LeftButton")
+    tButton:SetMovable(true)
+    
+    -- ИСПРАВЛЕНИЕ 1: Задаем начальную позицию явно, чтобы избежать дефолтного TOPLEFT
+    tButton:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+    tButton:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    tButton:SetBackdropColor(0, 0, 0, 0.8)
+
+    local buttonText = tButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    buttonText:SetText("T")
+    buttonText:SetPoint("CENTER", tButton, "CENTER")
+
+    tButton:SetScript("OnDragStart", function(self)
+        self:StartMoving()
+    end)
+
+    tButton:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        nsDbc["таймер"] = nsDbc["таймер"] or {}
+        
+        -- ИСПРАВЛЕНИЕ 2: Сохраняем точку привязки вместе с координатами
+        local point, _, relativePoint, x, y = self:GetPoint()
+        nsDbc["таймер"].point = point
+        nsDbc["таймер"].relativePoint = relativePoint
+        nsDbc["таймер"].x = x
+        nsDbc["таймер"].y = y
+        nsDbc["таймер"].visible = true
+    end)
+
+    tButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("NSQC3 — Таймер", 1, 0.8, 0)
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        if ns_timerMinutes <= 0 then
+            GameTooltip:AddLine("• СТАТУС: ВЫКЛЮЧЕН", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine("  ЛКМ: Ввести время и включить", 0.7, 0.7, 0.7)
+        else
+            local currentTime = GetTime()
+            local elapsed = currentTime - ns_timerStart
+            local targetSeconds = ns_timerMinutes * 60
+            if ns_isAlarming then
+                GameTooltip:AddLine("• СТАТУС: СИГНАЛ", 1, 0.2, 0.2)
+                GameTooltip:AddLine("  Звук проигрывается.", 1, 1, 1)
+                GameTooltip:AddLine("  ПКМ: Сбросить и ждать снова.", 0.7, 0.7, 0.7)
+            else
+                local left = math.ceil(targetSeconds - elapsed)
+                if left < 0 then left = 0 end
+                local m = math.floor(left / 60)
+                local s = left % 60
+                GameTooltip:AddLine("• СТАТУС: Ожидание", 0.2, 1, 0.2)
+                GameTooltip:AddLine(string.format("  До сигнала: %d мин %d сек", m, s), 1, 1, 1)
+                GameTooltip:AddLine("  ПКМ: Перезапустить отсчет.", 0.7, 0.7, 0.7)
+            end
+            GameTooltip:AddLine(" ", 1, 1, 1)
+            GameTooltip:AddLine("Интервал: " .. ns_timerMinutes .. " мин", 0.7, 0.7, 0.7)
+        end
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("• ЛКМ: Изменить время (0 = Выкл)", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+
+    tButton:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+    end)
+
+    local editBox = CreateFrame("EditBox", nil, tButton)
+    editBox:SetSize(60, 20)
+    editBox:SetPoint("LEFT", tButton, "RIGHT", 5, 0)
+    editBox:Hide()
+    editBox:SetAutoFocus(false)
+    editBox:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    editBox:SetBackdropColor(0, 0, 0, 0.8)
+    editBox:SetTextColor(1, 1, 1, 1)
+    editBox:SetFont(STANDARD_TEXT_FONT, 12)
+
+    editBox:SetScript("OnEnterPressed", function(self)
+        local text = self:GetText()
+        local num = tonumber(text)
+        if num and num >= 0 then
+            ns_timerMinutes = num
+            nsDbc["таймер"] = nsDbc["таймер"] or {}
+            nsDbc["таймер"].time = ns_timerMinutes
+            if ns_timerMinutes > 0 then
+                ns_timerStart = GetTime()
+                ns_isAlarming = false
+                ns_alarmTicker = 0
+            else
+                ns_isAlarming = false
+            end
+        else
+            ns_timerMinutes = 0
+            nsDbc["таймер"] = nsDbc["таймер"] or {}
+            nsDbc["таймер"].time = 0
+        end
+        self:Hide()
+    end)
+
+    editBox:SetScript("OnEscapePressed", function(self)
+        self:Hide()
+    end)
+
+    tButton:SetScript("OnClick", function(self, button)
+        if button == "LeftButton" then
+            editBox:SetText(ns_timerMinutes or 0)
+            editBox:Show()
+            editBox:SetFocus()
+        elseif button == "RightButton" then
+            if ns_timerMinutes > 0 then
+                ns_timerStart = GetTime()
+                ns_isAlarming = false
+                ns_alarmTicker = 0
+            end
+        end
+    end)
+end
+
+local function LoadSettings()
+    local saved = nsDbc["таймер"] or {}
+    ns_timerMinutes = saved.time or 0
+    if ns_timerMinutes > 0 then
+        ns_timerStart = GetTime()
+        ns_isAlarming = false
+        ns_alarmTicker = 0
+    else
+        ns_timerStart = 0
+        ns_isAlarming = false
+    end
+
+    CreateTimerButton()
+
+    local point = saved.point or "CENTER"
+    local relativePoint = saved.relativePoint or "CENTER"
+    local x = saved.x or 0
+    local y = saved.y or 0
+    
+    tButton:ClearAllPoints()
+    -- ИСПРАВЛЕНИЕ 3: Используем сохраненные точки привязки. 
+    -- Если их нет (стый сейв), используем CENTER по умолчанию.
+    tButton:SetPoint(point, UIParent, relativePoint, x, y)
+
+    if saved.visible then
+        tButton:Show()
+    else
+        tButton:Hide()
+    end
+end
+
+SLASH_NSTIMER1 = "/nstimer"
+SlashCmdList["NSTIMER"] = function()
+    if not tButton then
+        LoadSettings()
+    end
+    if tButton:IsShown() then
+        tButton:Hide()
+        nsDbc["таймер"] = nsDbc["таймер"] or {}
+        nsDbc["таймер"].visible = false
+    else
+        LoadSettings()
+        tButton:Show()
+        nsDbc["таймер"] = nsDbc["таймер"] or {}
+        nsDbc["таймер"].visible = true
+    end
+end
+
+local initFrame = CreateFrame("Frame")
+initFrame.startTime = GetTime()
+initFrame:SetScript("OnUpdate", function(self, elapsed)
+    if GetTime() - self.startTime >= 5 then
+        LoadSettings()
+        self:SetScript("OnUpdate", nil)
+        initFrame = nil
+    end
+end)
+
+local f = CreateFrame("Frame")
+f:SetScript("OnUpdate", function(self, dt)
+    if tButton and GameTooltip:IsVisible() and GameTooltip:GetOwner() == tButton then
+        tButton:GetScript("OnEnter")(tButton)
+    end
+
+    if ns_timerMinutes <= 0 then return end
+    if ns_timerStart == 0 then return end
+
+    local currentTime = GetTime()
+    local elapsed = currentTime - ns_timerStart
+    local targetSeconds = ns_timerMinutes * 60
+
+    if not ns_isAlarming then
+        if elapsed >= targetSeconds then
+            ns_isAlarming = true
+            PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\bip.ogg")
+        end
+    else
+        ns_alarmTicker = ns_alarmTicker + dt
+        if ns_alarmTicker >= 1.0 then
+            ns_alarmTicker = 0
+            PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\bip.ogg")
+        end
+    end
+end)
+
+f:Show()
