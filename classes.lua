@@ -7505,9 +7505,12 @@ function SpellQueue:UpdateDebuffState(spellName)
         return
     end
     local debuffName = type(spell.data.debuf) == "string" and spell.data.debuf or spellName
-    local hasDebuff = self:HasDebuff(debuffName)
+    local hasDebuff, expirationTime = self:HasDebuff(debuffName)
     local hadDebuff = spell.hasDebuff
+    
     spell.hasDebuff = hasDebuff
+    spell.debuffExpirationTime = expirationTime
+    
     if hasDebuff then
         spell.icon:SetAlpha(DEBUFF_ALPHA)
     elseif hadDebuff then
@@ -7531,18 +7534,22 @@ end
 
 function SpellQueue:HasDebuff(debuffName)
     if not UnitExists("target") or not UnitCanAttack("player", "target") then
-        return false
+        return false, 0
     end
     for i = 1, 40 do
-        local name = UnitDebuff("target", i)
+        local name, _, _, _, _, _, expirationTime = UnitDebuff("target", i)
         if not name then
             break
         end
         if name == debuffName then
-            return true
+            if expirationTime and expirationTime > 0 then
+                return true, expirationTime
+            else
+                return true, 0
+            end
         end
     end
-    return false
+    return false, 0
 end
 
 function SpellQueue:UpdateBuffState(spellName, isActive)
@@ -8521,6 +8528,21 @@ function SpellQueue:UpdateSpellPosition(spellName)
             return
         end
     end
+    
+    -- Логика Дебаффа (Таймер)
+    local isDebuffActive = false
+    local debuffRemaining = 0
+    if spell.data.debuf then
+        self:UpdateDebuffState(spellName)
+        if spell.hasDebuff and spell.debuffExpirationTime and spell.debuffExpirationTime > 0 then
+            local now = GetTime()
+            if spell.debuffExpirationTime > now then
+                isDebuffActive = true
+                debuffRemaining = spell.debuffExpirationTime - now
+            end
+        end
+    end
+
     -- Кулдаун
     local start, duration, enabled = GetSpellCooldown(spellName)
     local remaining, fullDuration = 0, 0
@@ -8539,6 +8561,26 @@ function SpellQueue:UpdateSpellPosition(spellName)
     spell.active = remaining and remaining > 0
     spell.isReady = not spell.active
     spell.remaining = remaining
+    
+    -- Отображение текста (Приоритет у таймера дебаффа)
+    if isDebuffActive then
+        if debuffRemaining > 3 then
+            spell.cooldownText:SetText(math.floor(debuffRemaining))
+        else
+            spell.cooldownText:SetText(string.format("%.1f", debuffRemaining))
+        end
+        spell.cooldownText:Show()
+    elseif remaining and remaining > 0 then
+        if remaining > 3 then
+            spell.cooldownText:SetText(math.floor(remaining))
+        else
+            spell.cooldownText:SetText(string.format("%.1f", remaining))
+        end
+        spell.cooldownText:Show()
+    else
+        spell.cooldownText:Hide()
+    end
+
     -- Проверка доступности и визуал ГКД
     if spell.isReady then
         local isUsable = IsUsableSpell(spellName)
@@ -8547,11 +8589,14 @@ function SpellQueue:UpdateSpellPosition(spellName)
         if not isUsable and not realIsGCD then
             spell.icon:Hide()
             spell.glow:Hide()
-            spell.cooldownText:Hide()
+            -- Текст уже обработан выше (дебафф или кд)
             if spell.cooldownFrame then
                 spell.cooldownFrame:Hide()
             end
-            return
+            -- Не возвращаем сразу, чтобы текст дебаффа мог остаться видимым
+            if not isDebuffActive then
+                return
+            end
         end
         -- Визуализация ГКД
         if realIsGCD then
@@ -8566,17 +8611,7 @@ function SpellQueue:UpdateSpellPosition(spellName)
             end
         end
     end
-    -- Отображение текста отката
-    if remaining and remaining > 0 then
-        if remaining > 3 then
-            spell.cooldownText:SetText(math.floor(remaining))
-        else
-            spell.cooldownText:SetText(string.format("%.1f", remaining))
-        end
-        spell.cooldownText:Show()
-    else
-        spell.cooldownText:Hide()
-    end
+    
     -- Прозрачность
     if not isGCD then
         if not spell.data.debuf or not spell.hasDebuff then
