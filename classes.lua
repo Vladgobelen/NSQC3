@@ -7379,54 +7379,29 @@ end
 
 SpellQueue = {}
 SpellQueue.__index = SpellQueue
-
 -- Константы
-local COMBO_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga" 
-local POISON_TEXTURE = "IInterface\\AddOns\\NSQC3\\libs\\00t.tga"
-
-
+local COMBO_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga"
+local POISON_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga"
 local FEATURE_HP = 1
 local FEATURE_RESOURCE = 2
 local FEATURE_TARGET = 4
 local FEATURE_COMBO = 8
 local FEATURE_POISON = 16
-
 local FEATURE_COLORS = {
     MANA = {0.0, 0.82, 1.0},
     RAGE = {1.0, 0.0, 0.0},
     ENERGY = {1.0, 1.0, 0.0},
-    RUNIC_POWER = {0.0, 0.82, 1.0}, 
-    HEALTH = {1.0, 0.0, 0.0},    
-    COMBO_ACTIVE = {1.0, 0.5, 0.0}, 
-    POISON_ACTIVE = {0.0, 1.0, 0.0}, 
-    COMBO_EMPTY = {0.1, 0.1, 0.1},      -- Черный
-    COMBO_FILLED = {1.0, 0.5, 0.0},     -- Оранжевый
-    COMBO_FULL = {0.5, 0.0, 1.0},       -- Фиолетовый
-    POISON_EMPTY = {0.1, 0.1, 0.1},     -- Черный
-    POISON_FILLED = {0.0, 1.0, 0.0},    -- Зеленый
-    POISON_FULL = {0.5, 0.0, 1.0}       -- Фиолетовый
+    RUNIC_POWER = {0.0, 0.82, 1.0},
+    HEALTH = {1.0, 0.0, 0.0},
+    COMBO_ACTIVE = {1.0, 0.5, 0.0},
+    POISON_ACTIVE = {0.0, 1.0, 0.0},
+    COMBO_EMPTY = {0.1, 0.1, 0.1},
+    COMBO_FILLED = {1.0, 0.5, 0.0},
+    COMBO_FULL = {0.5, 0.0, 1.0},
+    POISON_EMPTY = {0.1, 0.1, 0.1},
+    POISON_FILLED = {0.0, 1.0, 0.0},
+    POISON_FULL = {0.5, 0.0, 1.0}
 }
-
-local RESOURCE_TYPES = {
-    MANA = 0,      -- Правильный индекс для маны
-    RAGE = 1,      -- Правильный индекс для ярости
-    FOCUS = 2,     -- Добавлено для полноты
-    ENERGY = 3,    -- Энергия
-    RUNIC_POWER = 6,-- Сила рун (правильный индекс для WotLK)
-    RUNES = 5,     -- Руны
-    COMBO_POINTS = 14 -- Комбо-поинты
-}
-
-local RESOURCE_NAMES = {
-    [0] = "Мана",
-    [1] = "Ярость",
-    [3] = "Энергия",
-    [6] = "Сила рун",
-    [5] = "Руны",
-    [14] = "Комбо-поинты"
-}
-
--- Индексы ресурсов (для проверок)
 local RESOURCE_TYPES = {
     MANA = 0,
     RAGE = 1,
@@ -7436,25 +7411,29 @@ local RESOURCE_TYPES = {
     RUNES = 5,
     COMBO_POINTS = 14
 }
-
--- Соответствие классов и их основного ресурса (переименовано, чтобы не конфликтовало)
-local CLASS_RESOURCE_TYPES = {
-    DEATHKNIGHT = 6,  -- Сила рун
-    DRUID = 0,        -- Мана/Энергия (в зависимости от формы)
-    HUNTER = 2,       -- Фокус
-    MAGE = 0,         -- Мана
-    PALADIN = 0,      -- Мана
-    PRIEST = 0,       -- Мана
-    ROGUE = 3,        -- Энергия
-    SHAMAN = 0,       -- Мана
-    WARLOCK = 0,      -- Мана
-    WARRIOR = 1       -- Ярость
+local RESOURCE_NAMES = {
+    [0] = "Мана",
+    [1] = "Ярость",
+    [3] = "Энергия",
+    [6] = "Сила рун",
+    [5] = "Руны",
+    [14] = "Комбо-поинты"
 }
-
+local CLASS_RESOURCE_TYPES = {
+    DEATHKNIGHT = 6,
+    DRUID = 0,
+    HUNTER = 2,
+    MAGE = 0,
+    PALADIN = 0,
+    PRIEST = 0,
+    ROGUE = 3,
+    SHAMAN = 0,
+    WARLOCK = 0,
+    WARRIOR = 1
+}
 local PLAYER_KEY = UnitName("player")
 local RETURN_DELAY = 0.1
 local DEBUFF_UPDATE_DELAY = 0.5
-
 local READY_ALPHA = 1.0
 local COOLDOWN_ALPHA = 0.6
 local DEBUFF_ALPHA = 0.3
@@ -7462,13 +7441,14 @@ local READY_GLOW_COLOR = {0, 1, 0, 0.3}
 local COOLDOWN_GLOW_COLOR = {1, 0, 0, 0.2}
 local INACTIVE_ALPHA = 0.2
 local BUFF_PRIORITY_POSITION = -100
-
 local MODE_COMBAT_ONLY = 1
 local MODE_ALWAYS_VISIBLE = 2
 local MODE_ALWAYS_HIDDEN = 3
 
 function SpellQueue:FindIconBySpellQueueName(spellName)
-    if not ProkIconManager or not ProkIconManager.icons then return nil end
+    if not ProkIconManager or not ProkIconManager.icons then
+        return nil
+    end
     for _, iconData in pairs(ProkIconManager.icons) do
         if iconData.spellqueue_name == spellName and iconData.triggerType == "custom" then
             return iconData
@@ -7481,8 +7461,6 @@ function SpellQueue:ShowProkTexture(spellName, iconData)
     if not self.prokTextures then
         self.prokTextures = {}
     end
-    
-    -- Если фрейм уже существует, используем его
     if not self.prokTextures[spellName] then
         local frame = CreateFrame("Frame", nil, UIParent)
         frame:SetFrameStrata("HIGH")
@@ -7490,22 +7468,14 @@ function SpellQueue:ShowProkTexture(spellName, iconData)
         frame.texture:SetAllPoints()
         self.prokTextures[spellName] = frame
     end
-    
     local frame = self.prokTextures[spellName]
     local profile = ProkIconManager.settings[iconData.profil or 1] or ProkIconManager.settings[1]
-    
-    -- Определяем размеры
     local width = profile.Rx == 0 and GetScreenWidth() or profile.Rx
     local height = profile.Ry == 0 and GetScreenHeight() or profile.Ry
     local x, y = profile.x or 0, profile.y or 0
-    
-    
-    -- Настраиваем фрейм
     frame:SetSize(width, height)
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
-    
-    -- Обрабатываем путь к текстуре
     local texturePath = iconData.icon
     if not strfind(texturePath:lower(), "^interface\\") then
         if not strfind(texturePath:lower(), "%.tga$") and not strfind(texturePath:lower(), "%.blp$") then
@@ -7513,18 +7483,13 @@ function SpellQueue:ShowProkTexture(spellName, iconData)
         end
         texturePath = "Interface\\AddOns\\NSQC\\libs\\" .. texturePath
     end
-    
-    
-    -- Безопасная загрузка текстуры
     local success = pcall(function()
         frame.texture:SetTexture(texturePath)
     end)
-    
     if not success then
         print(string.format("ERROR: Failed to load texture for %s: %s", spellName, texturePath))
         frame.texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     end
-    
     frame:Show()
 end
 
@@ -7536,24 +7501,16 @@ end
 
 function SpellQueue:UpdateDebuffState(spellName)
     local spell = self.spells[spellName]
-    if not spell or not spell.data.debuf then return end
-    
-    -- Получаем имя дебаффа (если указано) или имя скилла
+    if not spell or not spell.data.debuf then
+        return
+    end
     local debuffName = type(spell.data.debuf) == "string" and spell.data.debuf or spellName
-    
-    -- Проверяем наличие дебаффа на цели
     local hasDebuff = self:HasDebuff(debuffName)
-    
-    -- Запоминаем предыдущее состояние
     local hadDebuff = spell.hasDebuff
-    
-    -- Обновляем состояние дебаффа
     spell.hasDebuff = hasDebuff
-    
-    -- Устанавливаем прозрачность в зависимости от состояния дебаффа
     if hasDebuff then
         spell.icon:SetAlpha(DEBUFF_ALPHA)
-    elseif hadDebuff then -- Если дебафф только что спал
+    elseif hadDebuff then
         if spell.isReady then
             spell.icon:SetAlpha(READY_ALPHA)
         else
@@ -7563,37 +7520,40 @@ function SpellQueue:UpdateDebuffState(spellName)
 end
 
 function SpellQueue:ScheduleDebuffCheck(spellName)
-    -- Создаем таймер для проверки дебаффа с задержкой
     self:CreateTimer(DEBUFF_UPDATE_DELAY, function()
         local spell = self.spells[spellName]
-        if not spell or not spell.data.debuf then return end
+        if not spell or not spell.data.debuf then
+            return
+        end
         self:UpdateDebuffState(spellName)
     end)
 end
 
 function SpellQueue:HasDebuff(debuffName)
-    if not UnitExists("target") or not UnitCanAttack("player", "target") then return false end
-    
+    if not UnitExists("target") or not UnitCanAttack("player", "target") then
+        return false
+    end
     for i = 1, 40 do
         local name = UnitDebuff("target", i)
-        if not name then break end
-        if name == debuffName then return true end
+        if not name then
+            break
+        end
+        if name == debuffName then
+            return true
+        end
     end
     return false
 end
 
 function SpellQueue:UpdateBuffState(spellName, isActive)
     local spell = self.spells[spellName]
-    if not spell or spell.data.buf ~= 1 then return end
-    
-    -- Получаем имя баффа (если указано) или имя скилла
+    if not spell or spell.data.buf ~= 1 then
+        return
+    end
     local buffName = type(spell.data.buf) == "string" and spell.data.buf or spellName
-    
-    -- Если событие не связано с нашим баффом - игнорируем
     if isActive and type(spell.data.buf) == "string" and spellName ~= buffName then
         return
     end
-    
     spell.hasBuff = isActive
     if isActive then
         spell.active = false
@@ -7624,8 +7584,6 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
         [3] = "ENERGY",
         [6] = "RUNIC_POWER"
     }
-
-    -- Базовые настройки фрейма
     self.frame = frame
     self.width = width or 300
     self.height = height or 50
@@ -7644,20 +7602,16 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
         FEATURE_COMBO,
         FEATURE_POISON
     )
-    self.timers = {}  -- Инициализация таблицы таймеров
+    self.timers = {}
     self.frame:SetClampedToScreen(true)
-
-    -- Настройка размеров и позиционирования
     frame:SetWidth(self.width)
     frame:SetHeight(self.height)
     if _G.nsDbc.SpellQueuePosition then
-        -- Восстанавливаем сохраненную позицию
         local pos = _G.nsDbc.SpellQueuePosition
         frame:SetPoint(pos.point, UIParent, pos.relativePoint,
             ns_dbc:getKey("настройки", "Skill Queue position", "x"),
             ns_dbc:getKey("настройки", "Skill Queue position", "y"))
     else
-        -- Дефолтное позиционирование
         frame:SetPoint(self.anchorPoint)
     end
     frame:SetMovable(true)
@@ -7667,26 +7621,20 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     frame:SetScale(self.scale)
     frame:Hide()
     self.isClickThrough = false
-
-    -- Фоновый цвет
     local bg = frame:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetTexture(0.1, 0.1, 0.1, 0.8)
     bg:SetVertexColor(0.1, 0.1, 0.1)
     bg:SetAlpha(0.8)
     self.background = bg
-
-    -- Временная шкала
     local timeLine = frame:CreateTexture(nil, "OVERLAY")
     timeLine:SetHeight(2)
-    timeLine:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, height/2 - 10)
-    timeLine:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, height/2 - 10)
+    timeLine:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, height / 2 - 10)
+    timeLine:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, height / 2 - 10)
     timeLine:SetTexture(1, 1, 0.5)
     timeLine:SetVertexColor(1, 1, 0.5)
     timeLine:SetAlpha(0.3)
     self.timeLine = timeLine
-
-    -- Нулевая точка
     local zeroPoint = frame:CreateTexture(nil, "OVERLAY")
     zeroPoint:SetWidth(2)
     zeroPoint:SetHeight(1)
@@ -7695,18 +7643,10 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     zeroPoint:SetVertexColor(1, 0.2, 0.2)
     zeroPoint:SetAlpha(0.5)
     self.zeroPoint = zeroPoint
-
-    -- Удаляем старые элементы
     self.comboPoints = nil
     self.poisonStacks = nil
-
-    -- Создаем новые элементы
     self:CreateComboPoisonElements()
-
-    -- Полосы здоровья и ресурсов
     self:CreateResourceBars()
-
-    -- Комбо-поинты (устаревшие — удалим, если не используются)
     self.comboPoints = {}
     local comboSize = self.height * 0.8
     for i = 1, 5 do
@@ -7718,8 +7658,6 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
         point:Hide()
         table.insert(self.comboPoints, point)
     end
-
-    -- Стаки ядов
     self.poisonStacks = {}
     local poisonSize = self.height * 0.8
     for i = 1, 5 do
@@ -7731,8 +7669,6 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
         stack:Hide()
         table.insert(self.poisonStacks, stack)
     end
-
-    -- Кнопка настроек
     local configButton = CreateFrame("Button", nil, frame)
     configButton:SetSize(20, 20)
     configButton:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -7744,34 +7680,20 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
         end
         self.configFrame:Show()
     end)
-
-    -- === ИСПРАВЛЕННЫЙ OnUpdate ===
     frame:SetScript("OnUpdate", function(_, elapsed)
         if self.frame:IsShown() then
-            -- Обновляем состояние ВСЕХ скиллов
             for spellName, spell in pairs(self.spells) do
                 self:UpdateSpellPosition(spellName)
             end
-
-            -- ОБНОВЛЯЕМ ПОЗИЦИИ ГОТОВЫХ СКИЛЛОВ ОДИН РАЗ ЗА КАДР
             self:UpdateSpellsPriority()
-
-            -- === ИСПРАВЛЕНИЕ 2: Обновляем слои для откатывающихся скиллов ===
-            -- Сортируем так, чтобы самый быстрый откат был выше остальных
             self:UpdateCooldownLayers()
-
-            -- Обновление UI-элементов
             self:UpdateResourceBars()
             self:UpdateComboPoints()
             self:UpdatePoisonStacks()
-
-            -- Прозрачность
             if self.frame:GetAlpha() ~= self.alpha then
                 self.frame:SetAlpha(self.alpha)
             end
         end
-
-        -- Таймеры
         local currentTime = GetTime()
         for i = #self.timers, 1, -1 do
             local timer = self.timers[i]
@@ -7782,7 +7704,6 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
             end
         end
     end)
-
     self.displayMode = ns_dbc:getKey("настройки", "Skill Queue mode") or MODE_COMBAT_ONLY
     self:ApplyDisplayMode()
     self:SetupDrag()
@@ -7815,7 +7736,7 @@ function SpellQueue:ApplyDisplayMode()
         self.frame:Show()
     elseif self.displayMode == MODE_ALWAYS_HIDDEN then
         self.frame:Hide()
-    else -- MODE_COMBAT_ONLY
+    else
         if self.inCombat then
             self.frame:SetAlpha(self.alpha)
             self.frame:Show()
@@ -7826,7 +7747,6 @@ function SpellQueue:ApplyDisplayMode()
 end
 
 function SpellQueue:CreateResourceBars()
-    -- Полоса здоровья игрока
     self.healthBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.healthBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.healthBar:SetHeight(5)
@@ -7834,16 +7754,12 @@ function SpellQueue:CreateResourceBars()
     self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, 10)
     self.healthBar:SetVertexColor(1, 0, 0)
     self.healthBar:Hide()
-    
-    -- Полоса ресурса игрока
     self.resourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.resourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.resourceBar:SetHeight(5)
     self.resourceBar:SetWidth(self.width)
     self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, -1)
     self.resourceBar:Hide()
-    
-    -- Полоса здоровья цели
     self.targetHealthBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.targetHealthBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.targetHealthBar:SetHeight(5)
@@ -7851,8 +7767,6 @@ function SpellQueue:CreateResourceBars()
     self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, -10)
     self.targetHealthBar:SetVertexColor(1, 0, 0)
     self.targetHealthBar:Hide()
-    
-    -- Полоса ресурса цели
     self.targetResourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.targetResourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.targetResourceBar:SetHeight(5)
@@ -7863,28 +7777,24 @@ end
 
 function SpellQueue:CreateComboPoints()
     self.comboPoints = {}
-    local comboSize = 14 -- Размер точки
-    local baseX = 20 -- Стартовое смещение слева
-    local yOffset = -10 -- Смещение по вертикали
-    
+    local comboSize = 14
+    local baseX = 20
+    local yOffset = -10
     for i = 1, 5 do
         local point = self.frame:CreateTexture(nil, "BACKGROUND")
-        point:SetTexture("Interface\\TargetingFrame\\UI-Combopoint") -- Стандартная текстура WoW
+        point:SetTexture("Interface\\TargetingFrame\\UI-Combopoint")
         point:SetSize(comboSize, comboSize)
-        -- Привязка к нижней части фрейма с горизонтальным смещением
-        point:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", baseX + (i-1)*25, yOffset)
-        point:SetVertexColor(0.2, 0.2, 0.2) -- Цвет неактивных точек
+        point:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", baseX + (i - 1) * 25, yOffset)
+        point:SetVertexColor(0.2, 0.2, 0.2)
         table.insert(self.comboPoints, point)
     end
     debug("Комбо-поинты созданы")
 end
 
-
 function SpellQueue:CreatePoisonStacks()
     self.poisonStacks = {}
     local poisonSize = self.height * 0.8
     debug(string.format("Creating poison stacks (size: %d)", poisonSize))
-    
     for i = 1, 5 do
         local stack = self.frame:CreateTexture(nil, "OVERLAY")
         stack:SetSize(poisonSize, poisonSize)
@@ -7897,48 +7807,42 @@ function SpellQueue:CreatePoisonStacks()
     end
 end
 
-
 function SpellQueue:GetPlayerResourceType()
     local _, class = UnitClass("player")
     if class == "DRUID" then
         local form = GetShapeshiftForm()
-        if form == 1 then       -- Медведь
-            return 1            -- RAGE
-        elseif form == 3 then   -- Кошка
-            return 3            -- ENERGY
+        if form == 1 then
+            return 1
+        elseif form == 3 then
+            return 3
         else
-            return 0            -- MANA
+            return 0
         end
     end
-    
     local classResourceMap = {
-        ["DEATHKNIGHT"] = 6,    -- RUNIC_POWER
-        ["DRUID"] = 0,          -- MANA (основной)
-        ["HUNTER"] = 2,         -- FOCUS
-        ["MAGE"] = 0,           -- MANA
-        ["PALADIN"] = 0,        -- MANA
-        ["PRIEST"] = 0,         -- MANA
-        ["ROGUE"] = 3,          -- ENERGY
-        ["SHAMAN"] = 0,         -- MANA
-        ["WARLOCK"] = 0,        -- MANA
-        ["WARRIOR"] = 1         -- RAGE
+        ["DEATHKNIGHT"] = 6,
+        ["DRUID"] = 0,
+        ["HUNTER"] = 0,
+        ["MAGE"] = 0,
+        ["PALADIN"] = 0,
+        ["PRIEST"] = 0,
+        ["ROGUE"] = 3,
+        ["SHAMAN"] = 0,
+        ["WARLOCK"] = 0,
+        ["WARRIOR"] = 1
     }
-    
     return classResourceMap[class] or 0
 end
 
-
 function SpellQueue:GetTargetResourceType()
-    if not UnitExists("target") then 
-        return 0 
+    if not UnitExists("target") then
+        return 0
     end
-    
     local powerType = UnitPowerType("target")
     return powerType
 end
 
 function SpellQueue:UpdateResourceBars()
-    -- Для игрока
     if bit.band(self.features, FEATURE_HP) ~= 0 then
         local maxHP = UnitHealthMax("player")
         local hp = maxHP > 0 and (UnitHealth("player") / maxHP) or 0
@@ -7947,12 +7851,10 @@ function SpellQueue:UpdateResourceBars()
     else
         self.healthBar:Hide()
     end
-    
     if bit.band(self.features, FEATURE_RESOURCE) ~= 0 then
         local resourceType = self:GetPlayerResourceType()
         local current = UnitPower("player", resourceType)
         local max = UnitPowerMax("player", resourceType)
-        
         if max > 0 then
             local color = self:GetResourceColor(resourceType)
             self.resourceBar:SetWidth((current / max) * self.width)
@@ -7964,32 +7866,24 @@ function SpellQueue:UpdateResourceBars()
     else
         self.resourceBar:Hide()
     end
-    
-    -- Для цели - без проверки UnitCanAttack
     if UnitExists("target") and bit.band(self.features, FEATURE_TARGET) ~= 0 then
-        -- Здоровье цели
         local maxHP = UnitHealthMax("target")
         local hp = maxHP > 0 and (UnitHealth("target") / maxHP) or 0
         self.targetHealthBar:SetWidth(self.width * hp)
         self.targetHealthBar:Show()
-        
-        -- Ресурс цели
         local powerType = UnitPowerType("target")
         local current = UnitPower("target", powerType)
         local max = UnitPowerMax("target", powerType)
-        
         if max > 0 then
             local color = self:GetResourceColor(powerType)
             self.targetResourceBar:SetWidth((current / max) * self.width)
             self.targetResourceBar:SetVertexColor(unpack(color))
             self.targetResourceBar:Show()
         else
-            -- Проверяем альтернативные типы ресурсов
             local foundResource = false
             for altType = 0, 12 do
                 current = UnitPower("target", altType)
                 max = UnitPowerMax("target", altType)
-                
                 if max > 0 and current > 0 then
                     color = self:GetResourceColor(altType)
                     self.targetResourceBar:SetWidth((current / max) * self.width)
@@ -7999,7 +7893,6 @@ function SpellQueue:UpdateResourceBars()
                     break
                 end
             end
-            
             if not foundResource then
                 self.targetResourceBar:Hide()
             end
@@ -8012,33 +7905,30 @@ end
 
 function SpellQueue:GetResourceColor(resourceType)
     local colors = {
-        [0] = {0.0, 0.82, 1.0},   -- MANA
-        [1] = {1.0, 0.0, 0.0},    -- RAGE
-        [2] = {1.0, 0.5, 0.0},    -- FOCUS
-        [3] = {1.0, 1.0, 0.0},    -- ENERGY
-        [5] = {0.4, 0.4, 1.0},    -- RUNES
-        [6] = {0.0, 0.82, 1.0},   -- RUNIC_POWER
-        [7] = {0.5, 0.5, 0.5},    -- FUEL
-        [8] = {1.0, 0.5, 0.0},    -- COMBO_POINTS
-        [9] = {0.8, 0.2, 0.8},    -- SOUL_SHARDS
-        [10] = {0.6, 0.4, 0.2},   -- HOLY_POWER
-        [11] = {0.2, 0.8, 0.2},   -- ALTERNATE
-        [12] = {0.8, 0.8, 0.2}    -- MAELSTROM
+        [0] = {0.0, 0.82, 1.0},
+        [1] = {1.0, 0.0, 0.0},
+        [2] = {1.0, 0.5, 0.0},
+        [3] = {1.0, 1.0, 0.0},
+        [5] = {0.4, 0.4, 1.0},
+        [6] = {0.0, 0.82, 1.0},
+        [7] = {0.5, 0.5, 0.5},
+        [8] = {1.0, 0.5, 0.0},
+        [9] = {0.8, 0.2, 0.8},
+        [10] = {0.6, 0.4, 0.2},
+        [11] = {0.2, 0.8, 0.2},
+        [12] = {0.8, 0.8, 0.2}
     }
-    
-    return colors[resourceType] or {1, 1, 1} -- белый по умолчанию
+    return colors[resourceType] or {1, 1, 1}
 end
 
 function SpellQueue:UpdateComboPoints()
-    if bit.band(self.features, FEATURE_COMBO) == 0 then 
+    if bit.band(self.features, FEATURE_COMBO) == 0 then
         self.comboFrame:Hide()
-        return 
+        return
     end
     self.comboFrame:Show()
-    
     local cp = GetComboPoints("player", "target")
     local isFull = cp == 5
-    
     for i = 1, 5 do
         local color
         if isFull then
@@ -8052,7 +7942,6 @@ end
 
 function SpellQueue:UpdateProkSpells()
     if not UnitExists("target") or not UnitCanAttack("player", "target") then
-        -- Скрываем все prok-скиллы
         for spellName, spell in pairs(self.spells) do
             if spell.data.prok then
                 spell.icon:Hide()
@@ -8062,7 +7951,6 @@ function SpellQueue:UpdateProkSpells()
         end
         return
     end
-
     local maxHP = UnitHealthMax("target")
     if maxHP <= 0 then
         for spellName, spell in pairs(self.spells) do
@@ -8074,17 +7962,13 @@ function SpellQueue:UpdateProkSpells()
         end
         return
     end
-
     local currentHP = UnitHealth("target")
     local hpPercent = (currentHP / maxHP) * 100
-
     for spellName, spell in pairs(self.spells) do
         if spell.data.prok then
             if hpPercent <= spell.data.prok then
-                -- Условие выполнено — обновляем позицию и состояние
                 self:UpdateSpellPosition(spellName)
             else
-                -- Не выполнено — скрываем
                 spell.icon:Hide()
                 spell.glow:Hide()
                 spell.cooldownText:Hide()
@@ -8094,17 +7978,14 @@ function SpellQueue:UpdateProkSpells()
 end
 
 function SpellQueue:UpdatePoisonStacks()
-    if bit.band(self.features, FEATURE_POISON) == 0 then 
+    if bit.band(self.features, FEATURE_POISON) == 0 then
         self.poisonFrame:Hide()
-        return 
+        return
     end
     self.poisonFrame:Show()
-    
-    -- Проверяем наличие яда на оружии
     local hasPoison = self:HasWeaponEnchant()
-    local stacks = hasPoison and 5 or 0 -- Пример: всегда 5 стаков если есть яд
+    local stacks = hasPoison and 5 or 0
     local isFull = stacks == 5
-    
     for i = 1, 5 do
         local color
         if isFull then
@@ -8117,7 +7998,6 @@ function SpellQueue:UpdatePoisonStacks()
 end
 
 function SpellQueue:HasWeaponEnchant()
-    -- Возвращает true если есть хотя бы один яд на оружии
     local hasMainHandEnchant, _, _, hasOffHandEnchant = GetWeaponEnchantInfo()
     return hasMainHandEnchant or hasOffHandEnchant
 end
@@ -8132,7 +8012,6 @@ function SpellQueue:ToggleDisplayMode()
     end
     ns_dbc:modKey("настройки", "Skill Queue mode", self.displayMode)
     self:ApplyDisplayMode()
-
     local modeText = {
         [MODE_COMBAT_ONLY] = "'Только в бою'",
         [MODE_ALWAYS_VISIBLE] = "'Всегда видимый'",
@@ -8146,22 +8025,20 @@ function SpellQueue:RegisterAllEvents()
         self.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
         self.frame:RegisterEvent("PLAYER_REGEN_ENABLED")
         self.frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-        
         self.frame:SetScript("OnEvent", function(_, event, ...)
             if event == "PLAYER_REGEN_DISABLED" then
                 self:EnterCombat()
             elseif event == "PLAYER_REGEN_ENABLED" then
                 self:LeaveCombat()
             elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-                local timestamp, subEvent, hideCaster, 
-                      sourceGUID, sourceName, sourceFlags, sourceRaidFlags,
-                      destGUID, destName, destFlags, destRaidFlags,
-                      spellID, spellName, spellSchool = ...
-                
+                local timestamp, subEvent, hideCaster,
+                    sourceGUID, sourceName, sourceFlags, sourceRaidFlags,
+                    destGUID, destName, destFlags, destRaidFlags,
+                    spellID, spellName, spellSchool = ...
                 self:ProcessCombatLogEvent(timestamp, subEvent, hideCaster,
-                                          sourceGUID, sourceName, sourceFlags, sourceRaidFlags,
-                                          destGUID, destName, destFlags, destRaidFlags,
-                                          spellID, spellName, spellSchool)
+                    sourceGUID, sourceName, sourceFlags, sourceRaidFlags,
+                    destGUID, destName, destFlags, destRaidFlags,
+                    spellID, spellName, spellSchool)
             end
         end)
         self.combatRegistered = true
@@ -8171,10 +8048,9 @@ end
 function SpellQueue:ProcessCombatLogEvent(...)
     local args = {...}
     local timestamp, eventType = args[1], args[2]
-    
-    -- Проверяем, что событие от игрока
-    if args[3] ~= UnitGUID("player") then return end
-    
+    if args[3] ~= UnitGUID("player") then
+        return
+    end
     local spellName
     if eventType == "SPELL_MISSED" then
         spellName = args[10]
@@ -8184,7 +8060,6 @@ function SpellQueue:ProcessCombatLogEvent(...)
         self:SpellUsed(spellName)
     else
         spellName = eventType:find("SPELL") and args[10] or "Атака ближнего боя"
-        
         if eventType == "SPELL_CAST_SUCCESS" then
             self:SpellUsed(spellName)
         elseif eventType == "SPELL_AURA_APPLIED" and args[12] == "BUFF" then
@@ -8202,7 +8077,6 @@ function SpellQueue:ProcessCombatLogEvent(...)
 end
 
 function SpellQueue:CheckAllDebuffs()
-    -- Проверяем все скиллы с дебафами, независимо от их состояния
     for spellName, spell in pairs(self.spells) do
         if spell.data.debuf then
             self:UpdateDebuffState(spellName)
@@ -8226,25 +8100,28 @@ function SpellQueue:LeaveCombat()
 end
 
 function SpellQueue:SetIconsTable(tblIcons)
-    -- Отладочный вывод входящей таблицы
     if type(tblIcons) ~= "table" then
-        --print("ERROR: tblIcons is not a table!")
         return
     end
-    -- Базовые настройки фрейма
     self.tblIcons = tblIcons or {}
     self.spells = self.spells or {}
-    -- Очистка предыдущих элементов
     for spellName, spell in pairs(self.spells) do
-        if spell.icon then spell.icon:Hide() end
-        if spell.glow then spell.glow:Hide() end
-        if spell.cooldownText then spell.cooldownText:Hide() end
+        if spell.icon then
+            spell.icon:Hide()
+        end
+        if spell.glow then
+            spell.glow:Hide()
+        end
+        if spell.cooldownText then
+            spell.cooldownText:Hide()
+        end
+        if spell.cooldownFrame then
+            spell.cooldownFrame:Hide()
+        end
     end
     wipe(self.spells)
-    -- Создание новых элементов
     local createdCount = 0
     for spellName, spellData in pairs(self.tblIcons) do
-        -- Проверка валидности данных
         if type(spellName) == "string" and type(spellData) == "table" then
             local iconSize = self.iconSize or (self.height - 10)
             local glowSize = iconSize + (self.glowSizeOffset or 10)
@@ -8272,7 +8149,9 @@ function SpellQueue:SetIconsTable(tblIcons)
             highlight:SetSize(highlightSize, highlightSize)
             highlight:SetPoint("CENTER", icon, "CENTER")
             highlight:Hide()
-            -- Создаем полную копию данных скилла, включая ВСЕ поля
+            local cooldownFrame = CreateFrame("Cooldown", nil, self.frame)
+            cooldownFrame:SetAllPoints(icon)
+            cooldownFrame:Hide()
             local newData = {
                 pos = spellData.pos or 0,
                 buf = spellData.buf or 0,
@@ -8285,7 +8164,8 @@ function SpellQueue:SetIconsTable(tblIcons)
                     amount = spellData.resource.amount
                 } or nil,
                 prok = spellData.prok,
-                texture = spellData.texture
+                texture = spellData.texture,
+                priority = spellData.priority or 0
             }
             self.spells[spellName] = {
                 data = newData,
@@ -8293,6 +8173,7 @@ function SpellQueue:SetIconsTable(tblIcons)
                 glow = glow,
                 cooldownText = cooldownText,
                 highlight = highlight,
+                cooldownFrame = cooldownFrame,
                 active = false,
                 remaining = 0,
                 total = 0,
@@ -8310,23 +8191,18 @@ end
 
 function SpellQueue:HasEnoughResource(spellName)
     local spell = self.spells[spellName]
-    if not spell or not spell.data.resource then return true end
-    
+    if not spell or not spell.data.resource then
+        return true
+    end
     local resourceType = spell.data.resource.type
     local requiredAmount = spell.data.resource.amount or 0
-    
-    -- Для силы рун используем специальный индекс
     if resourceType == RESOURCE_TYPES.RUNIC_POWER then
         local current = UnitPower("player", 6)
         return current >= requiredAmount
     end
-    
-    -- Для рун считаем количество доступных
     if resourceType == RESOURCE_TYPES.RUNES then
         return self:GetAvailableRunes() >= requiredAmount
     end
-    
-    -- Для остальных ресурсов
     local current = UnitPower("player", resourceType)
     return current >= requiredAmount
 end
@@ -8377,32 +8253,31 @@ function SpellQueue:SetAnchored(anchored)
 end
 
 function SpellQueue:UpdateClickThrough()
-    -- Полностью отключаем или включаем взаимодействие с мышью
     self.frame:EnableMouse(not self.isClickThrough)
     self.frame:SetMovable(not self.isClickThrough)
-    
     if self.isClickThrough then
-        self.frame:RegisterForDrag() -- Отменяем регистрацию драга
+        self.frame:RegisterForDrag()
     else
-        self.frame:RegisterForDrag("LeftButton") -- Возвращаем драг
+        self.frame:RegisterForDrag("LeftButton")
     end
-    
-    -- Обновляем кнопку настроек
     if self.configButton then
         self.configButton:EnableMouse(not self.isClickThrough)
     end
 end
 
-
 function SpellQueue:SetupDrag()
     self.frame:SetScript("OnMouseDown", function(frame, button)
-        if self.isClickThrough then return end
+        if self.isClickThrough then
+            return
+        end
         if not self.isAnchored and button == "LeftButton" then
             frame:StartMoving()
         end
     end)
     self.frame:SetScript("OnMouseUp", function(frame, button)
-        if self.isClickThrough then return end
+        if self.isClickThrough then
+            return
+        end
         if button == "LeftButton" then
             frame:StopMovingOrSizing()
             local point, _, relativePoint, x, y = frame:GetPoint(1)
@@ -8428,8 +8303,6 @@ function SpellQueue:SetupDrag()
             end
         end
     end)
-
-    -- Основная (нижняя) кнопка — как была
     local configButton = CreateFrame("Button", nil, self.frame)
     configButton:SetSize(20, 20)
     configButton:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -8451,11 +8324,9 @@ function SpellQueue:SetupDrag()
             self.frame:SetAlpha(self.alpha)
         end
     end)
-
-    -- Новая кнопка (вторая сверху) — такая же, но вызывает /prokicon
     local prokButton = CreateFrame("Button", nil, self.frame)
     prokButton:SetSize(20, 20)
-    prokButton:SetPoint("BOTTOMRIGHT", -2, 25) -- 23px выше основной (20px кнопка + 3px зазор)
+    prokButton:SetPoint("BOTTOMRIGHT", -2, 25)
     prokButton:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
     prokButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
     prokButton:SetScript("OnClick", function()
@@ -8477,20 +8348,13 @@ function SpellQueue:SpellUsed(spellName)
     if not spell then
         return
     end
-    
-    -- Принудительное обновление кулдауна
     local remaining, fullDuration = self:GetSpellCooldown(spellName)
     spell.active = remaining and remaining > 0
     spell.isReady = not spell.active
-    
-    -- Проверяем все скиллы с дебафами сразу после использования скилла
     self:CheckAllDebuffs()
-    
-    -- === ОБРАБОТКА СКИЛЛОВ С ПАРАМЕТРОМ "texture" ===
     if spell.data.texture then
         if ProkIconManager then
             local iconData = nil
-            -- Ищем iconData так же, как в UpdateSpellPosition
             if ProkIconManager.icons and ProkIconManager.icons[spellName] then
                 iconData = ProkIconManager.icons[spellName]
             end
@@ -8505,27 +8369,17 @@ function SpellQueue:SpellUsed(spellName)
                     end
                 end
             end
-            
             if iconData and iconData.triggerType == "custom" then
-                -- Скрываем текстуру при использовании скилла
                 self:HideProkTexture(spellName)
                 spell.textureVisible = false
-                
-                -- Добавляем таймер для повторной проверки через небольшую задержку
                 self:CreateTimer(0.1, function()
                     self:UpdateSpellPosition(spellName)
                 end)
             end
         end
     end
-    
-    -- Обновляем позицию скилла
     self:UpdateSpellPosition(spellName)
-    
-    -- Обновляем приоритеты скиллов
     self:UpdateSpellsPriority()
-    
-    -- Запускаем принудительное обновление для Death Knight
     if self.playerClass == "DEATHKNIGHT" then
         self:CreateTimer(0.1, function()
             if self.frame:IsShown() then
@@ -8537,27 +8391,26 @@ end
 
 function SpellQueue:UpdateSpellPosition(spellName)
     local spell = self.spells[spellName]
-    if not spell then return end
-    -- === Проверка "Текстура" ===
+    if not spell then
+        return
+    end
+    -- Проверка "Текстура"
     if spell.data.texture then
-        -- Если есть параметр texture, то не отображаем на панели
         spell.icon:Hide()
         spell.glow:Hide()
         spell.cooldownText:Hide()
-        -- Кэшируем предыдущее состояние
+        if spell.cooldownFrame then
+            spell.cooldownFrame:Hide()
+        end
         local wasVisible = spell.textureVisible or false
         spell.textureVisible = false
-        -- === Поиск иконки в правильных таблицах ===
         local iconData = nil
-        -- 1. Сначала ищем в ProkIconManager.icons (если доступно)
         if ProkIconManager and ProkIconManager.icons and ProkIconManager.icons[spellName] then
             iconData = ProkIconManager.icons[spellName]
         end
-        -- 2. Если не найдено, ищем в nsDbc.proks
         if not iconData and nsDbc and nsDbc.proks and nsDbc.proks[spellName] then
             iconData = nsDbc.proks[spellName]
         end
-        -- 3. Если все еще не найдено, ищем по spellqueue_name в nsDbc.proks
         if not iconData and nsDbc and nsDbc.proks then
             for name, data in pairs(nsDbc.proks) do
                 if data.spellqueue_name == spellName then
@@ -8566,12 +8419,9 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 end
             end
         end
-        -- === Проверка доступности скилла ===
         local isUsable = IsUsableSpell(spellName)
-        -- === Отображение текстуры ===
         if iconData then
             if iconData.triggerType == "custom" and isUsable then
-                -- Если есть прок - проверяем условие (например, HP цели)
                 if spell.data.prok then
                     if UnitExists("target") and UnitCanAttack("player", "target") then
                         local maxHP = UnitHealthMax("target")
@@ -8583,11 +8433,9 @@ function SpellQueue:UpdateSpellPosition(spellName)
                         end
                     end
                 else
-                    -- Если нет прока - всегда показываем текстуру (если скилл доступен)
                     spell.textureVisible = true
                 end
             elseif iconData.triggerType == "buff" then
-                -- Проверяем наличие баффа на игроке
                 if self:HasBuff(iconData.name) then
                     spell.textureVisible = true
                 else
@@ -8595,7 +8443,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 end
             end
         end
-        -- Показываем/скрываем текстуру только при изменении состояния
         if spell.textureVisible ~= wasVisible then
             if spell.textureVisible then
                 self:ShowProkTexture(spellName, iconData)
@@ -8603,14 +8450,17 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 self:HideProkTexture(spellName)
             end
         end
-        return  -- ← КРИТИЧЕСКИ ВАЖНЫЙ return для выхода из функции
+        return
     end
-    -- === Проверка "Прок" ===
+    -- Проверка "Прок"
     if spell.data.prok then
         if not UnitExists("target") or not UnitCanAttack("player", "target") then
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
         local maxHP = UnitHealthMax("target")
@@ -8618,6 +8468,9 @@ function SpellQueue:UpdateSpellPosition(spellName)
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
         local hpPercent = (UnitHealth("target") / maxHP) * 100
@@ -8625,59 +8478,95 @@ function SpellQueue:UpdateSpellPosition(spellName)
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
     end
-    -- === Комбо-поинты ===
+    -- Комбо-поинты
     if spell.data.combo and spell.data.combo > 0 then
         if not self:HasEnoughComboPoints(spell.data.combo) then
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
     end
-    -- === Ресурсы ===
+    -- Ресурсы
     if spell.data.resource then
         if not self:HasEnoughResource(spellName) then
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
     end
-    -- === Бафф ===
+    -- Бафф
     if spell.data.buf == 1 then
         spell.hasBuff = self:HasBuff(spellName)
         if spell.hasBuff then
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
     end
-    -- === Кулдаун ===
-    local remaining, fullDuration = self:GetSpellCooldown(spellName)
-    -- === Фильтр ГКД ===
-    if fullDuration and fullDuration > 0 and fullDuration < 2.0 then
+    -- Кулдаун
+    local start, duration, enabled = GetSpellCooldown(spellName)
+    local remaining, fullDuration = 0, 0
+    if start and duration and start ~= 0 and duration ~= 0 then
+        local now = GetTime()
+        remaining = (start + duration) - now
+        remaining = remaining > 0 and remaining or 0
+        fullDuration = duration
+    end
+    -- Фильтр ГКД (для позиционирования)
+    local isGCD = (fullDuration > 0 and fullDuration < 2.0)
+    if isGCD then
         remaining = 0
         fullDuration = 0
     end
     spell.active = remaining and remaining > 0
     spell.isReady = not spell.active
     spell.remaining = remaining
-    -- === ПРОВЕРКА ДОСТУПНОСТИ ===
+    -- Проверка доступности и визуал ГКД
     if spell.isReady then
         local isUsable = IsUsableSpell(spellName)
-        if not isUsable then
-            spell.isReady = false
+        local _, realDuration = GetSpellCooldown(spellName)
+        local realIsGCD = (realDuration > 0 and realDuration < 2.0)
+        if not isUsable and not realIsGCD then
             spell.icon:Hide()
             spell.glow:Hide()
             spell.cooldownText:Hide()
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
             return
         end
+        -- Визуализация ГКД
+        if realIsGCD then
+            spell.icon:SetAlpha(0.5)
+            if spell.cooldownFrame then
+                spell.cooldownFrame:SetCooldown(start, realDuration)
+                spell.cooldownFrame:Show()
+            end
+        else
+            if spell.cooldownFrame then
+                spell.cooldownFrame:Hide()
+            end
+        end
     end
-    -- === Отображение текста отката ===
+    -- Отображение текста отката
     if remaining and remaining > 0 then
         if remaining > 3 then
             spell.cooldownText:SetText(math.floor(remaining))
@@ -8688,17 +8577,19 @@ function SpellQueue:UpdateSpellPosition(spellName)
     else
         spell.cooldownText:Hide()
     end
-    -- === Прозрачность ===
-    if not spell.data.debuf or not spell.hasDebuff then
-        if spell.isReady then
-            spell.icon:SetAlpha(READY_ALPHA)
-            spell.glow:SetVertexColor(unpack(READY_GLOW_COLOR))
-        else
-            spell.icon:SetAlpha(COOLDOWN_ALPHA)
-            spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
+    -- Прозрачность
+    if not isGCD then
+        if not spell.data.debuf or not spell.hasDebuff then
+            if spell.isReady then
+                spell.icon:SetAlpha(READY_ALPHA)
+                spell.glow:SetVertexColor(unpack(READY_GLOW_COLOR))
+            else
+                spell.icon:SetAlpha(COOLDOWN_ALPHA)
+                spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
+            end
         end
     end
-    -- === Позиционирование ===
+    -- Позиционирование
     if not spell.isReady then
         local startPos = (spell.data.pos or 0) * (self.height - 10)
         local maxPosition = self.width - (self.height - 10)
@@ -8719,35 +8610,23 @@ function SpellQueue:UpdateSpellPosition(spellName)
         spell.icon:ClearAllPoints()
         spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
     end
-    -- Всегда показываем, если дошли до этого места
     spell.icon:Show()
     spell.glow:Show()
 end
 
 function SpellQueue:UpdateCooldownLayers()
     local activeSpells = {}
-    
-    -- Собираем все активные (на откате) скиллы
     for spellName, spell in pairs(self.spells) do
         if spell.active and spell.icon:IsShown() then
             table.insert(activeSpells, spell)
         end
     end
-    
-    -- Сортируем по оставшемуся времени отката (от меньшего к большему)
-    -- Самый быстрый откат будет в начале списка (индекс 1)
     table.sort(activeSpells, function(a, b)
         return (a.remaining or 999) < (b.remaining or 999)
     end)
-    
-    -- Устанавливаем слои отрисовки. 
-    -- SetDrawLayer(strata, subLevel). Чем выше subLevel, тем выше слой.
-    -- Мы хотим, чтобы скилл с индексом 1 (самый быстрый) был самым верхним.
     local count = #activeSpells
     for i, spell in ipairs(activeSpells) do
-        -- Вычисляем уровень: первому элементу (быстрому) даем макс уровень, последнему - минимальный
         local subLevel = count - i + 1
-        
         spell.icon:SetDrawLayer("OVERLAY", subLevel)
         spell.glow:SetDrawLayer("ARTWORK", subLevel)
         spell.cooldownText:SetDrawLayer("OVERLAY", subLevel)
@@ -8767,37 +8646,37 @@ end
 function SpellQueue:HasBuff(buffName)
     for i = 1, 40 do
         local name = UnitBuff("player", i)
-        if not name then break end
-        if name == buffName then return true end
+        if not name then
+            break
+        end
+        if name == buffName then
+            return true
+        end
     end
     return false
 end
 
 function SpellQueue:UpdateSpellsPriority()
-    local iconSize = self.height - 10
-    local spacing = 5
+    local iconSize = self.iconSize or (self.height - 10)
+    local spacing = self.iconSpacing or 5
     local maxPosition = self.width - iconSize
     local groups = {}
-    
-    -- Собираем готовые скиллы, которые ДОЛЖНЫ быть видны
     for name, spell in pairs(self.spells) do
         if spell.isReady then
             local skip = false
-            
-            -- === ПРОВЕРКА ТЕКСТУРЫ ===
             if spell.data.texture then
-                -- Если есть параметр texture, то не отображаем на панели
                 spell.icon:Hide()
                 spell.glow:Hide()
                 skip = true
             end
-            
-            -- === ПРОВЕРКА ДОСТУПНОСТИ ===
-            if not IsUsableSpell(name) then
-                skip = true
+            if not skip then
+                local isUsable = IsUsableSpell(name)
+                local _, cdDur = GetSpellCooldown(name)
+                local isGCD = (cdDur > 0 and cdDur < 2.0)
+                if not isUsable and not isGCD then
+                    skip = true
+                end
             end
-            
-            -- Прок
             if not skip and spell.data.prok then
                 if not UnitExists("target") or not UnitCanAttack("player", "target") then
                     skip = true
@@ -8813,38 +8692,41 @@ function SpellQueue:UpdateSpellsPriority()
                     end
                 end
             end
-            
-            -- Комбо
             if not skip and spell.data.combo and spell.data.combo > 0 then
                 if not self:HasEnoughComboPoints(spell.data.combo) then
                     skip = true
                 end
             end
-            
-            -- Бафф
             if not skip and spell.data.buf == 1 then
                 if self:HasBuff(name) then
                     skip = true
                 end
             end
-            
             if not skip then
                 local pos = spell.data.pos or 0
-                if not groups[pos] then groups[pos] = {} end
+                if not groups[pos] then
+                    groups[pos] = {}
+                end
                 table.insert(groups[pos], spell)
             else
-                -- Скрываем скиллы, которые не прошли условия
                 spell.icon:Hide()
                 spell.glow:Hide()
+                if spell.cooldownFrame then
+                    spell.cooldownFrame:Hide()
+                end
             end
-        else
-            -- Не готовые скиллы обрабатываются в UpdateSpellPosition — здесь их не трогаем
         end
     end
-    
-    -- Перемещаем и показываем ТОЛЬКО нужные скиллы
     for pos, spells in pairs(groups) do
-        table.sort(spells, function(a, b) return a.data.name < b.data.name end)
+        -- Сортировка по приоритету (возрастание), затем по имени
+        table.sort(spells, function(a, b)
+            local pA = a.data.priority or 0
+            local pB = b.data.priority or 0
+            if pA ~= pB then
+                return pA < pB
+            end
+            return a.data.name < b.data.name
+        end)
         local baseX = pos * (iconSize + spacing)
         for i, spell in ipairs(spells) do
             local x = baseX + (i - 1) * (iconSize + spacing)
@@ -8860,12 +8742,14 @@ function SpellQueue:CreateConfigWindow()
     local configFrame = CreateFrame("Frame", "SpellQueueConfig", UIParent)
     configFrame.parent = self
     configFrame.spellQueue = self
-    configFrame:SetSize(350, 550)
+    configFrame:SetSize(310, 450)
     configFrame:SetPoint("CENTER")
     configFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
         insets = {left = 11, right = 12, top = 12, bottom = 11}
     })
     configFrame:SetMovable(true)
@@ -8875,17 +8759,16 @@ function SpellQueue:CreateConfigWindow()
     configFrame:SetScript("OnDragStop", configFrame.StopMovingOrSizing)
     configFrame:Hide()
 
-    -- Заголовок
     local title = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -15)
     title:SetText("Настройки SpellQueue")
 
-    -- Кнопка закрытия
     local closeButton = CreateFrame("Button", nil, configFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
-    closeButton:SetScript("OnClick", function() configFrame:Hide() end)
+    closeButton:SetScript("OnClick", function()
+        configFrame:Hide()
+    end)
 
-    -- Поле ввода названия с кнопкой удаления
     local nameLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameLabel:SetPoint("TOPLEFT", 15, -45)
     nameLabel:SetText("Название скилла:")
@@ -8895,14 +8778,26 @@ function SpellQueue:CreateConfigWindow()
     editBox:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -5)
     editBox:SetAutoFocus(false)
 
-    -- Кнопка удаления скилла
-    local deleteButton = CreateFrame("Button", "SpellQueueDeleteButton", configFrame, "UIPanelButtonTemplate")
-    deleteButton:SetSize(80, 22)
+    -- Объявляем все переменные заранее
+    local deleteButton, addButton
+    local posDropdown
+    local buffCheckButton, buffNameEditBox
+    local debuffCheckButton, debuffNameEditBox
+    local comboCheckButton, comboDropdown
+    local resourceCheckButton, resourceDropdown, resourceAmountEditBox
+    local prokCheckButton, prokHPEditBox
+    local textureCheckButton
+    local priorityCheckButton, priorityEditBox
+
+    deleteButton = CreateFrame("Button", "SpellQueueDeleteButton", configFrame, "UIPanelButtonTemplate")
+    deleteButton:SetSize(25, 25)
     deleteButton:SetPoint("LEFT", editBox, "RIGHT", 5, 0)
-    deleteButton:SetText("Удалить")
+    deleteButton:SetText("-")
     deleteButton:SetScript("OnClick", function()
         local spellName = editBox:GetText()
-        if not spellName or spellName == "" then return end
+        if not spellName or spellName == "" then
+            return
+        end
         local name = GetSpellInfo(spellName)
         if not name then
             message("Скилл не найден!")
@@ -8911,224 +8806,31 @@ function SpellQueue:CreateConfigWindow()
         if _G.nsDbc.skills3[PLAYER_KEY] and _G.nsDbc.skills3[PLAYER_KEY][name] then
             _G.nsDbc.skills3[PLAYER_KEY][name] = nil
             self:UpdateSkillTables()
-            message("Скилл "..name.." удален!")
+            message("Скилл " .. name .. " удален!")
             editBox:SetText("")
         else
-            message("Скилл "..name.." не найден в списке!")
+            message("Скилл " .. name .. " не найден в списке!")
         end
     end)
 
-    -- Выпадающий список позиций
-    local posLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    posLabel:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -15)
-    posLabel:SetText("Позиция:")
-
-    local posDropdown = CreateFrame("Frame", "SpellQueuePosDropdown", configFrame, "UIDropDownMenuTemplate")
-    posDropdown:SetPoint("TOPLEFT", posLabel, "BOTTOMLEFT", -15, -5)
-    UIDropDownMenu_SetWidth(posDropdown, 100)
-
-    local function PosDropDown_Initialize()
-        local info = UIDropDownMenu_CreateInfo()
-        for i = 0, 10 do
-            info.text = i
-            info.value = i
-            info.func = function()
-                UIDropDownMenu_SetSelectedValue(posDropdown, i)
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end
-
-    UIDropDownMenu_Initialize(posDropdown, PosDropDown_Initialize)
-    UIDropDownMenu_SetSelectedValue(posDropdown, 0)
-
-    -- Чекбокс баффа
-    local buffCheckButton = CreateFrame("CheckButton", "SpellQueueBuffCheckButton", configFrame, "UICheckButtonTemplate")
-    buffCheckButton:SetSize(24, 24)
-    buffCheckButton:SetPoint("TOPLEFT", posDropdown, "BOTTOMLEFT", 15, -10)
-    buffCheckButton.text = buffCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    buffCheckButton.text:SetText("Бафф")
-    buffCheckButton.text:SetPoint("LEFT", buffCheckButton, "RIGHT", 5, 0)
-
-    local buffNameEditBox = CreateFrame("EditBox", "SpellQueueBuffNameEditBox", configFrame, "InputBoxTemplate")
-    buffNameEditBox:SetSize(150, 20)
-    buffNameEditBox:SetPoint("LEFT", buffCheckButton.text, "RIGHT", 10, 0)
-    buffNameEditBox:SetAutoFocus(false)
-    buffNameEditBox:Hide()
-
-    buffCheckButton:SetScript("OnClick", function(self)
-        if self:GetChecked() then
-            buffNameEditBox:Show()
-        else
-            buffNameEditBox:Hide()
-            buffNameEditBox:SetText("")
-        end
-    end)
-
-    -- Чекбокс дебаффа
-    local debuffCheckButton = CreateFrame("CheckButton", "SpellQueueDebuffCheckButton", configFrame, "UICheckButtonTemplate")
-    debuffCheckButton:SetSize(24, 24)
-    debuffCheckButton:SetPoint("TOPLEFT", buffCheckButton, "BOTTOMLEFT", 0, -10)
-    debuffCheckButton.text = debuffCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    debuffCheckButton.text:SetText("Дебафф")
-    debuffCheckButton.text:SetPoint("LEFT", debuffCheckButton, "RIGHT", 5, 0)
-
-    local debuffNameEditBox = CreateFrame("EditBox", "SpellQueueDebuffNameEditBox", configFrame, "InputBoxTemplate")
-    debuffNameEditBox:SetSize(150, 20)
-    debuffNameEditBox:SetPoint("LEFT", debuffCheckButton.text, "RIGHT", 10, 0)
-    debuffNameEditBox:SetAutoFocus(false)
-    debuffNameEditBox:Hide()
-
-    debuffCheckButton:SetScript("OnClick", function(self)
-        if self:GetChecked() then
-            debuffNameEditBox:Show()
-        else
-            debuffNameEditBox:Hide()
-            debuffNameEditBox:SetText("")
-        end
-    end)
-
-    -- Чекбокс комбо-поинтов
-    local comboCheckButton = CreateFrame("CheckButton", "SpellQueueComboCheckButton", configFrame, "UICheckButtonTemplate")
-    comboCheckButton:SetSize(24, 24)
-    comboCheckButton:SetPoint("TOPLEFT", debuffCheckButton, "BOTTOMLEFT", 0, -10)
-    comboCheckButton.text = comboCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    comboCheckButton.text:SetText("Комбо-поинты:")
-    comboCheckButton.text:SetPoint("LEFT", comboCheckButton, "RIGHT", 5, 0)
-
-    local comboDropdown = CreateFrame("Frame", "SpellQueueComboDropdown", configFrame, "UIDropDownMenuTemplate")
-    comboDropdown:SetPoint("LEFT", comboCheckButton.text, "RIGHT", 10, 0)
-    comboDropdown:SetAlpha(0)
-    UIDropDownMenu_SetWidth(comboDropdown, 50)
-
-    local function ComboDropDown_Initialize()
-        local info = UIDropDownMenu_CreateInfo()
-        for i = 1, 5 do
-            info.text = i
-            info.value = i
-            info.func = function()
-                UIDropDownMenu_SetSelectedValue(comboDropdown, i)
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end
-
-    UIDropDownMenu_Initialize(comboDropdown, ComboDropDown_Initialize)
-    UIDropDownMenu_SetSelectedValue(comboDropdown, 1)
-
-    comboCheckButton:SetScript("OnClick", function(self)
-        if self:GetChecked() then
-            comboDropdown:SetAlpha(1)
-        else
-            comboDropdown:SetAlpha(0)
-        end
-    end)
-
-    -- Чекбокс ресурса
-    local resourceCheckButton = CreateFrame("CheckButton", "SpellQueueResourceCheckButton", configFrame, "UICheckButtonTemplate")
-    resourceCheckButton:SetSize(24, 24)
-    resourceCheckButton:SetPoint("TOPLEFT", comboCheckButton, "BOTTOMLEFT", 0, -10)
-    resourceCheckButton.text = resourceCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    resourceCheckButton.text:SetText("Ресурс:")
-    resourceCheckButton.text:SetPoint("LEFT", resourceCheckButton, "RIGHT", 5, 0)
-
-    local resourceDropdown = CreateFrame("Frame", "SpellQueueResourceDropdown", configFrame, "UIDropDownMenuTemplate")
-    resourceDropdown:SetPoint("LEFT", resourceCheckButton.text, "RIGHT", 10, 0)
-    resourceDropdown:SetAlpha(0)
-    UIDropDownMenu_SetWidth(resourceDropdown, 120)
-
-    local function ResourceDropDown_Initialize()
-        local info = UIDropDownMenu_CreateInfo()
-        local resources = {
-            {text = "Мана", value = 0},
-            {text = "Ярость", value = 1},
-            {text = "Энергия", value = 3},
-            {text = "Сила рун", value = 6},
-            {text = "Руны", value = 5},
-            {text = "Комбо-поинты", value = 14}
-        }
-        for _, resource in ipairs(resources) do
-            info.text = resource.text
-            info.value = resource.value
-            info.func = function()
-                UIDropDownMenu_SetSelectedValue(resourceDropdown, resource.value)
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end
-
-    UIDropDownMenu_Initialize(resourceDropdown, ResourceDropDown_Initialize)
-    UIDropDownMenu_SetSelectedValue(resourceDropdown, 0)
-
-    local resourceAmountEditBox = CreateFrame("EditBox", "SpellQueueResourceAmountEditBox", configFrame, "InputBoxTemplate")
-    resourceAmountEditBox:SetSize(50, 20)
-    resourceAmountEditBox:SetPoint("LEFT", resourceDropdown, "RIGHT", 15, 0)
-    resourceAmountEditBox:SetAutoFocus(false)
-    resourceAmountEditBox:Hide()
-    resourceAmountEditBox:SetText("0")
-
-    resourceCheckButton:SetScript("OnClick", function(self)
-        if self:GetChecked() then
-            resourceDropdown:SetAlpha(1)
-            resourceAmountEditBox:Show()
-        else
-            resourceDropdown:SetAlpha(0)
-            resourceAmountEditBox:Hide()
-            resourceAmountEditBox:SetText("0")
-        end
-    end)
-
-    -- Чекбокс Прок
-    local prokCheckButton = CreateFrame("CheckButton", "SpellQueueProkCheckButton", configFrame, "UICheckButtonTemplate")
-    prokCheckButton:SetSize(24, 24)
-    prokCheckButton:SetPoint("TOPLEFT", resourceCheckButton, "BOTTOMLEFT", 0, -10)
-    prokCheckButton.text = prokCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    prokCheckButton.text:SetText("Прок")
-    prokCheckButton.text:SetPoint("LEFT", prokCheckButton, "RIGHT", 5, 0)
-
-    local prokHPEditBox = CreateFrame("EditBox", "SpellQueueProkHPEditBox", configFrame, "InputBoxTemplate")
-    prokHPEditBox:SetSize(50, 20)
-    prokHPEditBox:SetPoint("LEFT", prokCheckButton.text, "RIGHT", 10, 0)
-    prokHPEditBox:SetAutoFocus(false)
-    prokHPEditBox:Hide()
-    prokHPEditBox:SetText("50")
-
-    prokCheckButton:SetScript("OnClick", function(self)
-        if self:GetChecked() then
-            prokHPEditBox:Show()
-        else
-            prokHPEditBox:Hide()
-            prokHPEditBox:SetText("50")
-        end
-    end)
-
-    -- Чекбокс Текстура (НОВЫЙ)
-    local textureCheckButton = CreateFrame("CheckButton", "SpellQueueTextureCheckButton", configFrame, "UICheckButtonTemplate")
-    textureCheckButton:SetSize(24, 24)
-    textureCheckButton:SetPoint("TOPLEFT", prokCheckButton, "BOTTOMLEFT", 0, -10)
-    textureCheckButton.text = textureCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    textureCheckButton.text:SetText("Текстура")
-    textureCheckButton.text:SetPoint("LEFT", textureCheckButton, "RIGHT", 5, 0)
-
-    -- Кнопка добавления
-    local addButton = CreateFrame("Button", "SpellQueueAddButton", configFrame, "UIPanelButtonTemplate")
-    addButton:SetSize(120, 25)
-    addButton:SetPoint("BOTTOM", 0, 70)
-    addButton:SetText("Добавить")
+    addButton = CreateFrame("Button", "SpellQueueAddButton", configFrame, "UIPanelButtonTemplate")
+    addButton:SetSize(25, 25)
+    addButton:SetPoint("LEFT", deleteButton, "RIGHT", 5, 0)
+    addButton:SetText("+")
     addButton:SetScript("OnClick", function()
         local spellName = editBox:GetText()
-        if not spellName or spellName == "" then return end
+        if not spellName or spellName == "" then
+            return
+        end
         local name, _, icon = GetSpellInfo(spellName)
         if not name then
             message("Скилл не найден!")
             return
         end
-
         local comboValue = 0
         if comboCheckButton:GetChecked() then
             comboValue = UIDropDownMenu_GetSelectedValue(comboDropdown)
         end
-
         local resourceValue = nil
         if resourceCheckButton:GetChecked() then
             local amount = tonumber(resourceAmountEditBox:GetText()) or 0
@@ -9137,34 +8839,35 @@ function SpellQueue:CreateConfigWindow()
                 amount = amount
             }
         end
-
         local buffParam = nil
         if buffCheckButton:GetChecked() then
             local buffName = buffNameEditBox:GetText()
             buffParam = buffName ~= "" and buffName or 1
         end
-
         local debuffParam = nil
         if debuffCheckButton:GetChecked() then
             local debuffName = debuffNameEditBox:GetText()
             debuffParam = debuffName ~= "" and debuffName or 1
         end
-
         local prokParam = nil
         if prokCheckButton:GetChecked() then
             local hpPercent = tonumber(prokHPEditBox:GetText()) or 50
-            if hpPercent < 0 then hpPercent = 0 end
-            if hpPercent > 100 then hpPercent = 100 end
+            if hpPercent < 0 then
+                hpPercent = 0
+            end
+            if hpPercent > 100 then
+                hpPercent = 100
+            end
             prokParam = hpPercent
         end
-
-        -- НОВЫЙ параметр: Текстура
         local textureParam = textureCheckButton:GetChecked()
-
+        local priorityValue = 0
+        if priorityCheckButton:GetChecked() then
+            priorityValue = tonumber(priorityEditBox:GetText()) or 0
+        end
         if not _G.nsDbc.skills3[PLAYER_KEY] then
             _G.nsDbc.skills3[PLAYER_KEY] = {}
         end
-
         _G.nsDbc.skills3[PLAYER_KEY][name] = {
             pos = UIDropDownMenu_GetSelectedValue(posDropdown),
             buf = buffParam,
@@ -9172,16 +8875,14 @@ function SpellQueue:CreateConfigWindow()
             combo = comboValue,
             resource = resourceValue,
             prok = prokParam,
-            texture = textureParam,  -- сохраняем параметр текстуры
-            icon = icon
+            texture = textureParam,
+            icon = icon,
+            priority = priorityValue
         }
-
         _G.SpellQueueInstance:UpdateSkillTables()
         if _G.SpellQueueInstance.inCombat then
-            _G.SpellQueueInstance:UpdateAllSpells()
+            _G.SpellQueueInstance:ForceUpdateAllSpells()
         end
-
-        -- Сбрасываем поля формы
         editBox:SetText("")
         buffCheckButton:SetChecked(false)
         buffNameEditBox:SetText("")
@@ -9199,64 +8900,238 @@ function SpellQueue:CreateConfigWindow()
         prokHPEditBox:SetText("50")
         prokHPEditBox:Hide()
         textureCheckButton:SetChecked(false)
-        message("Скилл "..name.." добавлен!")
+        priorityCheckButton:SetChecked(false)
+        priorityEditBox:SetText("0")
+        priorityEditBox:Hide()
+        message("Скилл " .. name .. " добавлен!")
+    end)
+
+    local posLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    posLabel:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -15)
+    posLabel:SetText("Позиция:")
+
+    posDropdown = CreateFrame("Frame", "SpellQueuePosDropdown", configFrame, "UIDropDownMenuTemplate")
+    posDropdown:SetPoint("TOPLEFT", posLabel, "BOTTOMLEFT", -15, -5)
+    UIDropDownMenu_SetWidth(posDropdown, 100)
+    local function PosDropDown_Initialize()
+        local info = UIDropDownMenu_CreateInfo()
+        for i = 0, 10 do
+            info.text = i
+            info.value = i
+            info.func = function()
+                UIDropDownMenu_SetSelectedValue(posDropdown, i)
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end
+    UIDropDownMenu_Initialize(posDropdown, PosDropDown_Initialize)
+    UIDropDownMenu_SetSelectedValue(posDropdown, 0)
+
+    buffCheckButton = CreateFrame("CheckButton", "SpellQueueBuffCheckButton", configFrame, "UICheckButtonTemplate")
+    buffCheckButton:SetSize(24, 24)
+    buffCheckButton:SetPoint("TOPLEFT", posDropdown, "BOTTOMLEFT", 15, -10)
+    buffCheckButton.text = buffCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    buffCheckButton.text:SetText("Бафф")
+    buffCheckButton.text:SetPoint("LEFT", buffCheckButton, "RIGHT", 5, 0)
+    buffNameEditBox = CreateFrame("EditBox", "SpellQueueBuffNameEditBox", configFrame, "InputBoxTemplate")
+    buffNameEditBox:SetSize(150, 20)
+    buffNameEditBox:SetPoint("LEFT", buffCheckButton.text, "RIGHT", 10, 0)
+    buffNameEditBox:SetAutoFocus(false)
+    buffNameEditBox:Hide()
+    buffCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            buffNameEditBox:Show()
+        else
+            buffNameEditBox:Hide()
+            buffNameEditBox:SetText("")
+        end
+    end)
+
+    debuffCheckButton = CreateFrame("CheckButton", "SpellQueueDebuffCheckButton", configFrame, "UICheckButtonTemplate")
+    debuffCheckButton:SetSize(24, 24)
+    debuffCheckButton:SetPoint("TOPLEFT", buffCheckButton, "BOTTOMLEFT", 0, -10)
+    debuffCheckButton.text = debuffCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    debuffCheckButton.text:SetText("Дебафф")
+    debuffCheckButton.text:SetPoint("LEFT", debuffCheckButton, "RIGHT", 5, 0)
+    debuffNameEditBox = CreateFrame("EditBox", "SpellQueueDebuffNameEditBox", configFrame, "InputBoxTemplate")
+    debuffNameEditBox:SetSize(150, 20)
+    debuffNameEditBox:SetPoint("LEFT", debuffCheckButton.text, "RIGHT", 10, 0)
+    debuffNameEditBox:SetAutoFocus(false)
+    debuffNameEditBox:Hide()
+    debuffCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            debuffNameEditBox:Show()
+        else
+            debuffNameEditBox:Hide()
+            debuffNameEditBox:SetText("")
+        end
+    end)
+
+    comboCheckButton = CreateFrame("CheckButton", "SpellQueueComboCheckButton", configFrame, "UICheckButtonTemplate")
+    comboCheckButton:SetSize(24, 24)
+    comboCheckButton:SetPoint("TOPLEFT", debuffCheckButton, "BOTTOMLEFT", 0, -10)
+    comboCheckButton.text = comboCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    comboCheckButton.text:SetText("Комбо-поинты:")
+    comboCheckButton.text:SetPoint("LEFT", comboCheckButton, "RIGHT", 5, 0)
+    comboDropdown = CreateFrame("Frame", "SpellQueueComboDropdown", configFrame, "UIDropDownMenuTemplate")
+    comboDropdown:SetPoint("LEFT", comboCheckButton.text, "RIGHT", 10, 0)
+    comboDropdown:SetAlpha(0)
+    UIDropDownMenu_SetWidth(comboDropdown, 50)
+    local function ComboDropDown_Initialize()
+        local info = UIDropDownMenu_CreateInfo()
+        for i = 1, 5 do
+            info.text = i
+            info.value = i
+            info.func = function()
+                UIDropDownMenu_GetSelectedValue(comboDropdown, i)
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end
+    UIDropDownMenu_Initialize(comboDropdown, ComboDropDown_Initialize)
+    UIDropDownMenu_SetSelectedValue(comboDropdown, 1)
+    comboCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            comboDropdown:SetAlpha(1)
+        else
+            comboDropdown:SetAlpha(0)
+        end
+    end)
+
+    resourceCheckButton = CreateFrame("CheckButton", "SpellQueueResourceCheckButton", configFrame, "UICheckButtonTemplate")
+    resourceCheckButton:SetSize(24, 24)
+    resourceCheckButton:SetPoint("TOPLEFT", comboCheckButton, "BOTTOMLEFT", 0, -10)
+    resourceCheckButton.text = resourceCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    resourceCheckButton.text:SetText("Ресурс:")
+    resourceCheckButton.text:SetPoint("LEFT", resourceCheckButton, "RIGHT", 5, 0)
+    resourceDropdown = CreateFrame("Frame", "SpellQueueResourceDropdown", configFrame, "UIDropDownMenuTemplate")
+    resourceDropdown:SetPoint("LEFT", resourceCheckButton.text, "RIGHT", 10, 0)
+    resourceDropdown:SetAlpha(0)
+    UIDropDownMenu_SetWidth(resourceDropdown, 120)
+    local function ResourceDropDown_Initialize()
+        local info = UIDropDownMenu_CreateInfo()
+        local resources = {
+            {text = "Мана", value = 0},
+            {text = "Ярость", value = 1},
+            {text = "Энергия", value = 3},
+            {text = "Сила рун", value = 6},
+            {text = "Руны", value = 5},
+            {text = "Комбо-поинты", value = 14}
+        }
+        for _, res in ipairs(resources) do
+            info.text = res.text
+            info.value = res.value
+            info.func = function()
+                UIDropDownMenu_SetSelectedValue(resourceDropdown, res.value)
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end
+    UIDropDownMenu_Initialize(resourceDropdown, ResourceDropDown_Initialize)
+    UIDropDownMenu_SetSelectedValue(resourceDropdown, 0)
+    resourceAmountEditBox = CreateFrame("EditBox", "SpellQueueResourceAmountEditBox", configFrame, "InputBoxTemplate")
+    resourceAmountEditBox:SetSize(50, 20)
+    resourceAmountEditBox:SetPoint("LEFT", resourceDropdown, "RIGHT", 15, 0)
+    resourceAmountEditBox:SetAutoFocus(false)
+    resourceAmountEditBox:Hide()
+    resourceAmountEditBox:SetText("0")
+    resourceCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            resourceDropdown:SetAlpha(1)
+            resourceAmountEditBox:Show()
+        else
+            resourceDropdown:SetAlpha(0)
+            resourceAmountEditBox:Hide()
+            resourceAmountEditBox:SetText("0")
+        end
+    end)
+
+    prokCheckButton = CreateFrame("CheckButton", "SpellQueueProkCheckButton", configFrame, "UICheckButtonTemplate")
+    prokCheckButton:SetSize(24, 24)
+    prokCheckButton:SetPoint("TOPLEFT", resourceCheckButton, "BOTTOMLEFT", 0, -10)
+    prokCheckButton.text = prokCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    prokCheckButton.text:SetText("Прок")
+    prokCheckButton.text:SetPoint("LEFT", prokCheckButton, "RIGHT", 5, 0)
+    prokHPEditBox = CreateFrame("EditBox", "SpellQueueProkHPEditBox", configFrame, "InputBoxTemplate")
+    prokHPEditBox:SetSize(50, 20)
+    prokHPEditBox:SetPoint("LEFT", prokCheckButton.text, "RIGHT", 10, 0)
+    prokHPEditBox:SetAutoFocus(false)
+    prokHPEditBox:Hide()
+    prokHPEditBox:SetText("50")
+    prokCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            prokHPEditBox:Show()
+        else
+            prokHPEditBox:Hide()
+            prokHPEditBox:SetText("50")
+        end
+    end)
+
+    textureCheckButton = CreateFrame("CheckButton", "SpellQueueTextureCheckButton", configFrame, "UICheckButtonTemplate")
+    textureCheckButton:SetSize(24, 24)
+    textureCheckButton:SetPoint("TOPLEFT", prokCheckButton, "BOTTOMLEFT", 0, -10)
+    textureCheckButton.text = textureCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    textureCheckButton.text:SetText("Текстура")
+    textureCheckButton.text:SetPoint("LEFT", textureCheckButton, "RIGHT", 5, 0)
+
+    priorityCheckButton = CreateFrame("CheckButton", "SpellQueuePriorityCheckButton", configFrame, "UICheckButtonTemplate")
+    priorityCheckButton:SetSize(24, 24)
+    priorityCheckButton:SetPoint("TOPLEFT", textureCheckButton, "BOTTOMLEFT", 0, -10)
+    priorityCheckButton.text = priorityCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    priorityCheckButton.text:SetText("Приоритет:")
+    priorityCheckButton.text:SetPoint("LEFT", priorityCheckButton, "RIGHT", 5, 0)
+    priorityEditBox = CreateFrame("EditBox", "SpellQueuePriorityEditBox", configFrame, "InputBoxTemplate")
+    priorityEditBox:SetSize(50, 20)
+    priorityEditBox:SetPoint("LEFT", priorityCheckButton.text, "RIGHT", 10, 0)
+    priorityEditBox:SetAutoFocus(false)
+    priorityEditBox:Hide()
+    priorityEditBox:SetText("0")
+    priorityCheckButton:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            priorityEditBox:Show()
+        else
+            priorityEditBox:Hide()
+            priorityEditBox:SetText("0")
+        end
     end)
 
     self.configFrame = configFrame
 end
 
 function SpellQueue:UpdateSkillTables()
-    -- Инициализация nsDbc
     _G.nsDbc = _G.nsDbc or {}
     _G.nsDbc.skills3 = _G.nsDbc.skills3 or {}
     _G.nsDbc.skills3[PLAYER_KEY] = _G.nsDbc.skills3[PLAYER_KEY] or {}
-
-    -- Создаём объединённую таблицу
     local combined = {}
-    
-    -- Копируем скиллы из tblIcons
     if self.tblIcons then
         for k, v in pairs(self.tblIcons) do
             combined[k] = v
-            -- Добавляем поле resource если его нет
             if not combined[k].resource then
                 combined[k].resource = nil
             end
         end
     end
-    
-    -- Копируем сохранённые скиллы из nsDbc.skills3
     if _G.nsDbc.skills3[PLAYER_KEY] then
         for k, v in pairs(_G.nsDbc.skills3[PLAYER_KEY]) do
             if not combined[k] then
                 combined[k] = v
-                -- Добавляем поле resource если его нет
                 if not combined[k].resource then
                     combined[k].resource = nil
                 end
-            else
-                --print(string.format("  Skipped (duplicate): %s", k))
             end
         end
     end
-    
-    -- Обновляем отображение
     self:SetIconsTable(combined)
 end
 
 function SpellQueue:ForceUpdateAllSpells()
-    -- Принудительно обновляем размеры фрейма
     self.frame:SetWidth(self.width)
     self.frame:SetHeight(self.height)
-    -- Обновляем все видимые элементы
     self:UpdateComboPoints()
     self:UpdatePoisonStacks()
     self:UpdateResourceBars()
-    -- Основная логика обновления заклинаний
     for spellName, spell in pairs(self.spells) do
         local skipSpell = false
-        
-        -- Проверка на ресурсы
         if spell.data.resource then
             if not self:HasEnoughResource(spellName) then
                 spell.icon:Hide()
@@ -9265,8 +9140,6 @@ function SpellQueue:ForceUpdateAllSpells()
                 skipSpell = true
             end
         end
-        
-        -- Проверка на комбо-поинты (только если не пропускаем)
         if not skipSpell and spell.data.combo and spell.data.combo > 0 then
             if not self:HasEnoughComboPoints(spell.data.combo) then
                 spell.icon:Hide()
@@ -9275,19 +9148,14 @@ function SpellQueue:ForceUpdateAllSpells()
                 skipSpell = true
             end
         end
-        
         if skipSpell then
-            -- Пропускаем остальную обработку для этого скилла
         else
-            -- Обновляем кулдаун
             local remaining, fullDuration = self:GetSpellCooldown(spellName)
             spell.active = remaining and remaining > 0
             spell.isReady = not spell.active
-            -- Обновляем баффы
             if spell.data.buf == 1 then
                 spell.hasBuff = self:HasBuff(spellName)
             end
-            -- Обновляем дебаффы
             if spell.data.debuf then
                 self:UpdateDebuffState(spellName)
             elseif spell.isReady then
@@ -9295,17 +9163,13 @@ function SpellQueue:ForceUpdateAllSpells()
             else
                 spell.icon:SetAlpha(COOLDOWN_ALPHA)
             end
-            -- Перерисовываем позицию
             self:UpdateSpellPosition(spellName)
         end
     end
-    -- Финализируем обновления
     self:UpdateSpellsPriority()
-    -- УБРАНО: self:ApplyDisplayMode() - это вызывало мигание
 end
 
 function SpellQueue:SetAppearanceSettings(options)
-    -- Сохраняем основные настройки glow
     self.glowSizeOffset = options.glowSizeOffset or 10
     self.glowAlpha = options.glowAlpha or 0.3
     self.highlightSizeOffset = options.highlightSizeOffset or 15
@@ -9328,28 +9192,22 @@ function SpellQueue:SetAppearanceSettings(options)
             self.frame:SetAlpha(self.alpha)
         end
     end
-
-    -- Обновляем все glow-текстуры
     for _, spell in pairs(self.spells) do
         if spell.icon then
             spell.icon:SetSize(self.iconSize, self.iconSize)
         end
-        
         if spell.glow then
             local glowSize = self.iconSize + self.glowSizeOffset
             spell.glow:SetSize(glowSize, glowSize)
             spell.glow:SetAlpha(self.glowAlpha)
             spell.glow:SetPoint("CENTER", spell.icon, "CENTER")
         end
-        
         if spell.highlight then
             local highlightSize = self.iconSize + self.highlightSizeOffset
             spell.highlight:SetSize(highlightSize, highlightSize)
             spell.highlight:SetPoint("CENTER", spell.icon, "CENTER")
         end
     end
-
-    -- Основные параметры панели
     if options.width then
         self.width = options.width
         self.frame:SetWidth(self.width)
@@ -9362,8 +9220,6 @@ function SpellQueue:SetAppearanceSettings(options)
         self.scale = options.scale
         self.frame:SetScale(self.scale)
     end
-
-    -- Настройки прозрачности
     if options.alpha then
         self.alpha = options.alpha
         if self.inCombat then
@@ -9376,8 +9232,6 @@ function SpellQueue:SetAppearanceSettings(options)
             self.frame:SetAlpha(INACTIVE_ALPHA)
         end
     end
-
-    -- Полоса здоровья игрока
     if options.healthBarHeight then
         self.healthBar:SetHeight(options.healthBarHeight)
     end
@@ -9388,8 +9242,6 @@ function SpellQueue:SetAppearanceSettings(options)
     if options.healthBarColor then
         self.healthBar:SetVertexColor(unpack(options.healthBarColor))
     end
-
-    -- Полоса ресурса игрока
     if options.resourceBarHeight then
         self.resourceBar:SetHeight(options.resourceBarHeight)
     end
@@ -9400,8 +9252,6 @@ function SpellQueue:SetAppearanceSettings(options)
     if options.resourceBarColor then
         self.resourceBar:SetVertexColor(unpack(options.resourceBarColor))
     end
-
-    -- Полоса здоровья цели
     if options.targetHealthBarHeight then
         self.targetHealthBar:SetHeight(options.targetHealthBarHeight)
     end
@@ -9412,8 +9262,6 @@ function SpellQueue:SetAppearanceSettings(options)
     if options.targetHealthBarColor then
         self.targetHealthBar:SetVertexColor(unpack(options.targetHealthBarColor))
     end
-
-    -- Полоса ресурса цели
     if options.targetResourceBarHeight then
         self.targetResourceBar:SetHeight(options.targetResourceBarHeight)
     end
@@ -9424,94 +9272,73 @@ function SpellQueue:SetAppearanceSettings(options)
     if options.targetResourceBarColor then
         self.targetResourceBar:SetVertexColor(unpack(options.targetResourceBarColor))
     end
-
-    -- Комбо-поинты
     if options.comboSize or options.comboSpacing or options.comboOffset then
         local size = options.comboSize or 6
         local spacing = options.comboSpacing or 0
         local offsetX = options.comboOffset and options.comboOffset.x or 0
         local offsetY = options.comboOffset and options.comboOffset.y or 24
-        
         for i, square in ipairs(self.comboSquares) do
             square:SetSize(size, size)
             square:ClearAllPoints()
-            square:SetPoint("BOTTOM", self.comboFrame, "BOTTOM", 0, (i-1)*(size + spacing))
+            square:SetPoint("BOTTOM", self.comboFrame, "BOTTOM", 0, (i - 1) * (size + spacing))
         end
-        
         self.comboFrame:SetPoint("RIGHT", self.frame, "LEFT", offsetX, offsetY)
     end
-
-    -- Яды
     if options.poisonSize or options.poisonSpacing or options.poisonOffset then
         local size = options.poisonSize or 6
         local spacing = options.poisonSpacing or 0
         local offsetX = options.poisonOffset and options.poisonOffset.x or 0
         local offsetY = options.poisonOffset and options.poisonOffset.y or 24
-        
         for i, square in ipairs(self.poisonSquares) do
             square:SetSize(size, size)
             square:ClearAllPoints()
-            square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i-1)*(size + spacing))
+            square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i - 1) * (size + spacing))
         end
-        
         self.poisonFrame:SetPoint("LEFT", self.frame, "RIGHT", offsetX, offsetY)
     end
-
-    -- Временная линия
     if options.timeLinePosition then
-        self.timeLine:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 0, self.height/2 - options.timeLinePosition)
+        self.timeLine:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 0, self.height / 2 - options.timeLinePosition)
     end
-
-    -- Принудительное обновление
     self:ForceUpdateAllSpells()
 end
 
 function SpellQueue:CreateComboPoisonElements()
-    -- Настройки
     local square_size = 12
     local spacing = 4
     local total_height = (square_size + spacing) * 5 - spacing
-    
-    -- Фрейм для комбо-поинтов (слева)
     self.comboFrame = CreateFrame("Frame", nil, self.frame)
     self.comboFrame:SetSize(square_size, total_height)
     self.comboFrame:SetPoint("RIGHT", self.frame, "LEFT", -10, 0)
-    
-    -- Комбо-поинты
     self.comboSquares = {}
     for i = 1, 5 do
         local square = self.comboFrame:CreateTexture(nil, "OVERLAY")
         square:SetSize(square_size, square_size)
         square:SetTexture("Interface\\Buttons\\WHITE8X8")
-        square:SetPoint("BOTTOM", self.comboFrame, "BOTTOM", 0, (i-1)*(square_size + spacing))
+        square:SetPoint("BOTTOM", self.comboFrame, "BOTTOM", 0, (i - 1) * (square_size + spacing))
         square:SetVertexColor(unpack(FEATURE_COLORS.COMBO_EMPTY))
         table.insert(self.comboSquares, square)
     end
-
-    -- Фрейм для ядов (справа)
     self.poisonFrame = CreateFrame("Frame", nil, self.frame)
     self.poisonFrame:SetSize(square_size, total_height)
     self.poisonFrame:SetPoint("LEFT", self.frame, "RIGHT", 10, 0)
-    
-    -- Яды
     self.poisonSquares = {}
     for i = 1, 5 do
         local square = self.poisonFrame:CreateTexture(nil, "OVERLAY")
         square:SetSize(square_size, square_size)
         square:SetTexture("Interface\\Buttons\\WHITE8X8")
-        square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i-1)*(square_size + spacing))
+        square:SetPoint("BOTTOM", self.poisonFrame, "BOTTOM", 0, (i - 1) * (square_size + spacing))
         square:SetVertexColor(unpack(FEATURE_COLORS.POISON_EMPTY))
         table.insert(self.poisonSquares, square)
     end
 end
 
 function SpellQueue:UpdateGlowSettings()
-    if not self.iconSize then return end
-    
+    if not self.iconSize then
+        return
+    end
     local glowOffset = self.glowSizeOffset or 10
     local glowAlpha = self.glowAlpha or 0.3
     local highlightOffset = self.highlightSizeOffset or 15
-    
     for _, spell in pairs(self.spells) do
         if spell.glow then
             spell.glow:SetSize(self.iconSize + glowOffset, self.iconSize + glowOffset)
@@ -9530,7 +9357,6 @@ SlashCmdList["SPELLQUEUE"] = function()
     SpellQueue.configFrame:Show()
 end
 SLASH_SPELLQUEUE1 = "/sq"
-
 SlashCmdList["SPELLQUEUEMODE"] = function()
     if _G.SpellQueueInstance then
         _G.SpellQueueInstance:ToggleDisplayMode()
@@ -9539,7 +9365,6 @@ SlashCmdList["SPELLQUEUEMODE"] = function()
     end
 end
 SLASH_SPELLQUEUEMODE1 = "/sqmode"
-
 SlashCmdList["SPELLQUEUE_HP"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_HP)
     if bit.band(SpellQueueInstance.features, FEATURE_HP) ~= 0 then
@@ -9549,7 +9374,6 @@ SlashCmdList["SPELLQUEUE_HP"] = function()
     end
 end
 SLASH_SPELLQUEUE_HP1 = "/sqhp"
-
 SlashCmdList["SPELLQUEUE_RES"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_RESOURCE)
     if bit.band(SpellQueueInstance.features, FEATURE_RESOURCE) ~= 0 then
@@ -9559,7 +9383,6 @@ SlashCmdList["SPELLQUEUE_RES"] = function()
     end
 end
 SLASH_SPELLQUEUE_RES1 = "/sqres"
-
 SlashCmdList["SPELLQUEUE_COMBO"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_COMBO)
     for _, point in ipairs(SpellQueueInstance.comboPoints) do
@@ -9573,7 +9396,6 @@ SlashCmdList["SPELLQUEUE_COMBO"] = function()
     end
 end
 SLASH_SPELLQUEUE_COMBO1 = "/sqcp"
-
 SlashCmdList["SPELLQUEUE_POISON"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_POISON)
     for _, stack in ipairs(SpellQueueInstance.poisonStacks) do
