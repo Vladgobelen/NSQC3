@@ -10556,6 +10556,8 @@ end
 GuildRecruiter = {}
 GuildRecruiter.__index = GuildRecruiter
 
+if not nsDbc then nsDbc = {} end
+
 local CLASSES = {
     "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST",
     "DEATHKNIGHT", "SHAMAN", "MAGE", "WARLOCK", "DRUID"
@@ -10566,99 +10568,6 @@ local ALL_RACES = {}
 for _, r in ipairs(RACES_ALLIANCE) do table.insert(ALL_RACES, r) end
 for _, r in ipairs(RACES_HORDE) do table.insert(ALL_RACES, r) end
 
-    function GuildRecruiter:ManualSave()
-        nsDbc["набор в гильдию"] = {
-            exceptions = self.exceptions,
-            settings = {
-                minLevel = self.settings.minLevel,
-                maxLevel = self.settings.maxLevel,
-                step = self.settings.step,
-                autoAccept = self.settings.autoAccept,
-                autoHideAfterSearch = self.settings.autoHideAfterSearch,
-                factions = {
-                    Alliance = self.settings.factions.Alliance,
-                    Horde = self.settings.factions.Horde
-                },
-                classes = self.settings.classes,
-                races = self.settings.races
-            }
-        }
-        print("Настройки сохранены (С).")
-    end
-
-    function GuildRecruiter:ManualLoad()
-        local saved = nsDbc["набор в гильдию"]
-        if not saved or not saved.settings then
-            print("Нет сохраненных настроек для загрузки.")
-            return
-        end
-
-        -- Загрузка данных в переменные
-        if saved.settings.minLevel then self.settings.minLevel = saved.settings.minLevel end
-        if saved.settings.maxLevel then self.settings.maxLevel = saved.settings.maxLevel end
-        if saved.settings.step then self.settings.step = saved.settings.step end
-        if type(saved.settings.autoAccept) == "boolean" then self.settings.autoAccept = saved.settings.autoAccept end
-        if type(saved.settings.autoHideAfterSearch) == "boolean" then self.settings.autoHideAfterSearch = saved.settings.autoHideAfterSearch end
-        
-        if saved.settings.factions then
-            if saved.settings.factions.Alliance ~= nil then self.settings.factions.Alliance = saved.settings.factions.Alliance end
-            if saved.settings.factions.Horde ~= nil then self.settings.factions.Horde = saved.settings.factions.Horde end
-        end
-
-        if saved.settings.classes then
-            for cls, val in pairs(saved.settings.classes) do
-                if self.settings.classes[cls] ~= nil then
-                    self.settings.classes[cls] = val
-                end
-            end
-        end
-
-        if saved.settings.races then
-            for race, val in pairs(saved.settings.races) do
-                if self.settings.races[race] ~= nil then
-                    self.settings.races[race] = val
-                end
-            end
-        end
-
-        if saved.exceptions then
-            self.exceptions = saved.exceptions
-        end
-
-        -- Обновление интерфейса
-        if self.ui then
-            if self.ui.minLevelBtn then self.ui.minLevelBtn:SetText(self.settings.minLevel) end
-            if self.ui.maxLevelBtn then self.ui.maxLevelBtn:SetText(self.settings.maxLevel) end
-            if self.ui.stepDD then UIDropDownMenu_SetText(self.ui.stepDD, "Шаг: " .. tostring(self.settings.step)) end
-            
-            if self.ui.autoCB then self.ui.autoCB:SetChecked(self.settings.autoAccept) end
-            if self.ui.autoHideCB then self.ui.autoHideCB:SetChecked(self.settings.autoHideAfterSearch) end
-
-            if self.ui.factionChecks then
-                self.ui.factionChecks.Alliance:SetChecked(self.settings.factions.Alliance)
-                self.ui.factionChecks.Horde:SetChecked(self.settings.factions.Horde)
-            end
-
-            if self.ui.classChecks then
-                for cls, cb in pairs(self.ui.classChecks) do
-                    if self.settings.classes[cls] ~= nil then
-                        cb:SetChecked(self.settings.classes[cls])
-                    end
-                end
-            end
-
-            if self.ui.raceChecks then
-                for race, cb in pairs(self.ui.raceChecks) do
-                    if self.settings.races[race] ~= nil then
-                        cb:SetChecked(self.settings.races[race])
-                    end
-                end
-            end
-        end
-        print("Настройки загружены (З).")
-    end
-
--- Безопасный LevelPicker без UIPanelScrollBarTemplate
 local function CreateLevelPicker(parent, current, callback)
     local frame = CreateFrame("Frame", nil, parent)
     frame:SetSize(180, 300)
@@ -10679,9 +10588,8 @@ local function CreateLevelPicker(parent, current, callback)
     content:SetWidth(160)
     content:SetHeight(80 * 22)
 
-    -- === КЛЮЧЕВОЕ: обновить размер дочернего контента у ScrollFrame ===
     scrollFrame:SetScrollChild(content)
-    scrollFrame:UpdateScrollChildRect() -- ← ЭТО ОБЯЗАТЕЛЬНО В 3.3.5
+    scrollFrame:UpdateScrollChildRect()
 
     local slider = CreateFrame("Slider", nil, frame)
     slider:SetOrientation("VERTICAL")
@@ -10695,13 +10603,11 @@ local function CreateLevelPicker(parent, current, callback)
         insets = { left = 3, right = 3, top = 6, bottom = 6 }
     })
 
-    -- Вычисляем максимальное значение для слайдера
     local scrollRange = math.max(0, content:GetHeight() - scrollFrame:GetHeight())
     slider:SetMinMaxValues(0, scrollRange)
     slider:SetValue(0)
     slider:SetValueStep(10)
 
-    -- Привязка через frame (без замыканий)
     frame.scrollFrame = scrollFrame
     frame.slider = slider
 
@@ -10744,7 +10650,92 @@ local function CreateLevelPicker(parent, current, callback)
     return frame
 end
 
-GuildRecruiter.autoHideButton = nil
+function GuildRecruiter:ManualSave()
+    nsDbc["набор в гильдию"] = {
+        exceptions = self.exceptions,
+        settings = {
+            minLevel = self.settings.minLevel,
+            maxLevel = self.settings.maxLevel,
+            step = self.settings.step,
+            autoAccept = self.settings.autoAccept,
+            factions = {
+                Alliance = self.settings.factions.Alliance,
+                Horde = self.settings.factions.Horde
+            },
+            classes = self.settings.classes,
+            races = self.settings.races
+        }
+    }
+    print("Настройки сохранены (С).")
+end
+
+function GuildRecruiter:ManualLoad()
+    local saved = nsDbc["набор в гильдию"]
+    if not saved or not saved.settings then
+        print("Нет сохраненных настроек для загрузки.")
+        return
+    end
+
+    if saved.settings.minLevel then self.settings.minLevel = saved.settings.minLevel end
+    if saved.settings.maxLevel then self.settings.maxLevel = saved.settings.maxLevel end
+    if saved.settings.step then self.settings.step = saved.settings.step end
+    if type(saved.settings.autoAccept) == "boolean" then self.settings.autoAccept = saved.settings.autoAccept end
+
+    if saved.settings.factions then
+        if saved.settings.factions.Alliance ~= nil then self.settings.factions.Alliance = saved.settings.factions.Alliance end
+        if saved.settings.factions.Horde ~= nil then self.settings.factions.Horde = saved.settings.factions.Horde end
+    end
+
+    if saved.settings.classes then
+        for cls, val in pairs(saved.settings.classes) do
+            if self.settings.classes[cls] ~= nil then
+                self.settings.classes[cls] = val
+            end
+        end
+    end
+
+    if saved.settings.races then
+        for race, val in pairs(saved.settings.races) do
+            if self.settings.races[race] ~= nil then
+                self.settings.races[race] = val
+            end
+        end
+    end
+
+    if saved.exceptions then
+        self.exceptions = saved.exceptions
+    end
+
+    if self.ui then
+        if self.ui.minLevelBtn then self.ui.minLevelBtn:SetText(self.settings.minLevel) end
+        if self.ui.maxLevelBtn then self.ui.maxLevelBtn:SetText(self.settings.maxLevel) end
+        if self.ui.stepDD then UIDropDownMenu_SetText(self.ui.stepDD, "Шаг: " .. tostring(self.settings.step)) end
+        
+        if self.ui.autoCB then self.ui.autoCB:SetChecked(self.settings.autoAccept) end
+
+        if self.ui.factionChecks then
+            self.ui.factionChecks.Alliance:SetChecked(self.settings.factions.Alliance)
+            self.ui.factionChecks.Horde:SetChecked(self.settings.factions.Horde)
+        end
+
+        if self.ui.classChecks then
+            for cls, cb in pairs(self.ui.classChecks) do
+                if self.settings.classes[cls] ~= nil then
+                    cb:SetChecked(self.settings.classes[cls])
+                end
+            end
+        end
+
+        if self.ui.raceChecks then
+            for race, cb in pairs(self.ui.raceChecks) do
+                if self.settings.races[race] ~= nil then
+                    cb:SetChecked(self.settings.races[race])
+                end
+            end
+        end
+    end
+    print("Настройки загружены (З).")
+end
 
 function GuildRecruiter.new()
     local self = setmetatable({}, GuildRecruiter)
@@ -10766,17 +10757,16 @@ function GuildRecruiter.new()
         self.frame:SetParent(WhoFrame)
         self.frame:SetPoint("TOPLEFT", WhoFrame, "TOPRIGHT", 10, 0)
     end
-    -- === ГАРАНТИРОВАННАЯ ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ===
+    
     local saved = nsDbc["набор в гильдию"] or {}
     self.exceptions = type(saved.exceptions) == "table" and saved.exceptions or {}
-    -- Инициализация фракций
+    
     local factions = saved.settings and saved.settings.factions or {}
     self.settings = {
         minLevel = type(saved.settings) == "table" and type(saved.settings.minLevel) == "number" and saved.settings.minLevel or 1,
         maxLevel = type(saved.settings) == "table" and type(saved.settings.maxLevel) == "number" and saved.settings.maxLevel or 80,
         step = type(saved.settings) == "table" and type(saved.settings.step) == "number" and saved.settings.step or 5,
         autoAccept = (saved.settings and saved.settings.autoAccept) == true,
-        autoHideAfterSearch = (saved.settings and saved.settings.autoHideAfterSearch) == true,
         factions = {
             Alliance = (factions.Alliance == true),
             Horde = (factions.Horde == true)
@@ -10790,13 +10780,11 @@ function GuildRecruiter.new()
     for _, race in ipairs(ALL_RACES) do
         self.settings.races[race] = (saved.settings and saved.settings.races and saved.settings.races[race]) == true
     end
-    self.originalFriendsFramePoint = nil
     self.isUIBuilt = false
     self.results = {}
     self.cooldown = false
     self.autoInviteLoop = false
     self.isSearching = false
-    self.lastInvited = nil
     self.searchTimer = nil
     self.autoInviteTimer = nil
     self.cooldownTimer = nil
@@ -10840,7 +10828,6 @@ function GuildRecruiter:BuildUI()
     if self.isUIBuilt then return end
     self.isUIBuilt = true
     
-    -- Очистка старых исключений (логика оставлена без изменений)
     local now = time()
     for name, inviteTime in pairs(self.exceptions) do
         if type(inviteTime) == "number" and now - inviteTime > 7 * 24 * 60 * 60 then
@@ -10853,44 +10840,24 @@ function GuildRecruiter:BuildUI()
         self.loadingText = nil
     end
     
-    local y = -10
+    local y = -45
     
-    -- === НОВЫЕ КНОПКИ: Сохранить (С) и Загрузить (З) ===
     local saveBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     saveBtn:SetSize(32, 32)
     saveBtn:SetPoint("TOPLEFT", 5, -5)
     saveBtn:SetText("С")
     saveBtn:SetScript("OnClick", function() self:ManualSave() end)
-
+    
     local loadBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     loadBtn:SetSize(32, 32)
     loadBtn:SetPoint("TOPLEFT", saveBtn, "BOTTOMLEFT", 37, 32)
     loadBtn:SetText("З")
     loadBtn:SetScript("OnClick", function() self:ManualLoad() end)
-
+    
     local title = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetText("Набор в гильдию")
-    -- Сдвигаем заголовок правее, чтобы кнопки его не перекрывали
     title:SetPoint("TOP", 25, -10)
-
-    -- Автоскрытие (без авто-сохранения)
-    local autoHideCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
-    autoHideCB:SetPoint("TOPRIGHT", -10, -10)
-    autoHideCB:SetChecked(self.settings.autoHideAfterSearch)
-    autoHideCB:SetScript("OnClick", function()
-        self.settings.autoHideAfterSearch = autoHideCB:GetChecked()
-        -- Убрано: self:SaveSettings()
-        self:ApplyAutoHideSetting()
-    end)
-    autoHideCB:SetScript("OnEnter", function()
-        GameTooltip:SetOwner(autoHideCB, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Скрывать окно поиска после завершения", 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    autoHideCB:SetScript("OnLeave", GameTooltip_Hide)
-
-    y = y - 35
-    -- Кнопки выбора уровней (без авто-сохранения в callback)
+    
     local minLevelBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     minLevelBtn:SetSize(40, 20)
     minLevelBtn:SetPoint("TOPLEFT", 20, y)
@@ -10904,12 +10871,11 @@ function GuildRecruiter:BuildUI()
     local minPicker = CreateLevelPicker(self.frame, self.settings.minLevel, function(lvl)
         self.settings.minLevel = lvl
         minLevelBtn:SetText(lvl)
-        -- Убрано: self:SaveSettings()
     end)
+    
     local maxPicker = CreateLevelPicker(self.frame, self.settings.maxLevel, function(lvl)
         self.settings.maxLevel = lvl
         maxLevelBtn:SetText(lvl)
-        -- Убрано: self:SaveSettings()
     end)
     
     minLevelBtn:SetScript("OnClick", function() minPicker:Show() end)
@@ -10925,7 +10891,6 @@ function GuildRecruiter:BuildUI()
             info.func = function()
                 UIDropDownMenu_SetText(stepDD, "Шаг: " .. tostring(v))
                 self.settings.step = v
-                -- Убрано: self:SaveSettings()
             end
             UIDropDownMenu_AddButton(info)
         end
@@ -10934,7 +10899,6 @@ function GuildRecruiter:BuildUI()
     
     y = y - 35
     
-    -- === ФРАКЦИИ ===
     local factionChecks = {}
     for i, f in ipairs({"Alliance", "Horde"}) do
         local cb = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
@@ -10950,16 +10914,15 @@ function GuildRecruiter:BuildUI()
                     self.ui.raceChecks[race]:SetChecked(isChecked)
                 end
             end
-            -- Убрано: self:SaveSettings()
         end)
         local lbl = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetText(f); lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
+        lbl:SetText(f)
+        lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
         factionChecks[f] = cb
     end
-
-    -- === ГАЛОЧКА "ВСЕ КЛАССЫ" ===
+    
     local allClassesCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
-    allClassesCB:SetPoint("TOPLEFT", 220, y) -- Справа от фракций
+    allClassesCB:SetPoint("TOPLEFT", 220, y)
     allClassesCB:SetScript("OnClick", function()
         local isChecked = allClassesCB:GetChecked()
         for _, cls in ipairs(CLASSES) do
@@ -10968,15 +10931,13 @@ function GuildRecruiter:BuildUI()
                 self.ui.classChecks[cls]:SetChecked(isChecked)
             end
         end
-        -- Убрано: self:SaveSettings()
     end)
     local lblAll = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     lblAll:SetText("Все классы")
     lblAll:SetPoint("LEFT", allClassesCB, "RIGHT", 5, 0)
-
+    
     y = y - 30
     
-    -- Классы (добавлен classChecks в self.ui для работы ManualLoad и "Все классы")
     local classChecks = {}
     for i, cls in ipairs(CLASSES) do
         local col = (i-1) % 2
@@ -10989,15 +10950,15 @@ function GuildRecruiter:BuildUI()
         cb:SetScript("OnClick", function()
             local isChecked = cb:GetChecked()
             self.settings.classes[cls] = isChecked
-            -- Убрано: self:SaveSettings()
         end)
         local lbl = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetText(cls); lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
+        lbl:SetText(cls)
+        lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
         classChecks[cls] = cb
     end
     
     y = y - 110
-    -- Расы (без авто-сохранения)
+    
     local raceChecks = {}
     for i, race in ipairs(ALL_RACES) do
         local col = (i-1) % 2
@@ -11010,28 +10971,25 @@ function GuildRecruiter:BuildUI()
         cb:SetScript("OnClick", function()
             local isChecked = cb:GetChecked()
             self.settings.races[race] = isChecked
-            -- Убрано: self:SaveSettings()
         end)
         local lbl = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetText(race); lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
+        lbl:SetText(race)
+        lbl:SetPoint("LEFT", cb, "RIGHT", 5, 0)
         raceChecks[race] = cb
     end
     
     y = y - 110
-
-    -- ScrollFrame и Slider (Логика прокрутки без изменений)
+    
     local scrollFrame = CreateFrame("ScrollFrame", "GuildRecruiterScrollFrame", self.frame)
     scrollFrame:SetPoint("TOPLEFT", 15, y)
     scrollFrame:SetPoint("BOTTOMRIGHT", -28, 60)
-
     local playerList = CreateFrame("Frame", nil, scrollFrame)
     playerList:SetWidth(scrollFrame:GetWidth() - 20)
     playerList:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
     playerList:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", 0, 0)
-
     scrollFrame:SetScrollChild(playerList)
     scrollFrame:UpdateScrollChildRect()
-
+    
     local slider = CreateFrame("Slider", "GuildRecruiterScrollSlider", self.frame)
     slider:SetOrientation("VERTICAL")
     slider:SetPoint("TOPRIGHT", -8, y)
@@ -11046,7 +11004,7 @@ function GuildRecruiter:BuildUI()
     slider:SetMinMaxValues(0, 0)
     slider:SetValue(0)
     slider:SetValueStep(10)
-
+    
     scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
         local maxRange = math.max(0, playerList:GetHeight() - scrollFrame:GetHeight())
         offset = math.max(0, math.min(offset, maxRange))
@@ -11054,11 +11012,11 @@ function GuildRecruiter:BuildUI()
         slider:SetMinMaxValues(0, maxRange)
         slider:SetValue(offset)
     end)
-
+    
     slider:SetScript("OnValueChanged", function(self, value)
         scrollFrame:SetVerticalScroll(value)
     end)
-
+    
     self.frame:EnableMouseWheel(true)
     self.frame:SetScript("OnMouseWheel", function(self, delta)
         local sf = GuildRecruiter.instance.ui.scroll
@@ -11071,14 +11029,12 @@ function GuildRecruiter:BuildUI()
         sf:SetVerticalScroll(newOffset)
         GuildRecruiter.instance.ui.slider:SetValue(newOffset)
     end)
-
-    -- Нижние кнопки (без авто-сохранения)
+    
     local autoCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
     autoCB:SetPoint("BOTTOMLEFT", 20, 30)
     autoCB:SetChecked(self.settings.autoAccept)
     autoCB:SetScript("OnClick", function()
         self.settings.autoAccept = autoCB:GetChecked()
-        -- Убрано: self:SaveSettings()
         if self.settings.autoAccept and #self.results > 0 then
             self:StartAutoInvite()
         end
@@ -11099,13 +11055,11 @@ function GuildRecruiter:BuildUI()
             self:StopSearch()
             searchBtn:SetText("Найти")
         else
-            -- Убрано: self:SaveSettings()
             self:StartSearch()
             searchBtn:SetText("Стоп")
         end
     end)
     
-    -- Сохраняем ссылки на UI
     self.ui = {
         minLevelBtn = minLevelBtn,
         maxLevelBtn = maxLevelBtn,
@@ -11116,15 +11070,11 @@ function GuildRecruiter:BuildUI()
         scroll = scrollFrame,
         slider = slider,
         autoCB = autoCB,
-        autoHideCB = autoHideCB,
         searchBtn = searchBtn,
         raceChecks = raceChecks,
         factionChecks = factionChecks,
-        classChecks = classChecks -- Добавлено для ManualLoad
+        classChecks = classChecks
     }
-    
-    -- Убрано: self:LoadSettings()
-    self:ApplyAutoHideSetting()
 end
 
 function GuildRecruiter:LoadSettings()
@@ -11133,7 +11083,6 @@ function GuildRecruiter:LoadSettings()
     self.ui.maxLevelBtn:SetText(self.settings.maxLevel)
     UIDropDownMenu_SetText(self.ui.stepDD, "Шаг: " .. tostring(self.settings.step))
     self.ui.autoCB:SetChecked(self.settings.autoAccept)
-    self.ui.autoHideCB:SetChecked(self.settings.autoHideAfterSearch)
 
     if self.ui.factionChecks then
         self.ui.factionChecks.Alliance:SetChecked(self.settings.factions.Alliance)
@@ -11147,57 +11096,6 @@ function GuildRecruiter:LoadSettings()
     end
 end
 
-function GuildRecruiter:ApplyAutoHideSetting()
-    if not FriendsFrame then return end
-
-    if self.settings.autoHideAfterSearch then
-        if not self.originalFriendsFramePoint then
-            local point, relativeTo, relativePoint, xOfs, yOfs = FriendsFrame:GetPoint()
-            self.originalFriendsFramePoint = {point, relativeTo, relativePoint, xOfs, yOfs}
-        end
-        FriendsFrame:ClearAllPoints()
-        FriendsFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -5000, 0)
-
-        if not GuildRecruiter.autoHideButton then
-            local btn = CreateFrame("Button", "GuildRecruiterRestoreButton", UIParent)
-            btn:SetSize(32, 32)
-            btn:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -100)
-            btn:SetNormalTexture("Interface\\Icons\\INV_Misc_EngGizmos_02")
-            btn:SetPushedTexture("Interface\\Icons\\INV_Misc_EngGizmos_02")
-            btn:SetHighlightTexture("Interface\\Icons\\INV_Misc_EngGizmos_02")
-            btn:SetScript("OnClick", function()
-                if self.ui and self.ui.autoHideCB then
-                    self.ui.autoHideCB:SetChecked(false)
-                    self.settings.autoHideAfterSearch = false
-                    self:SaveSettings()
-                    self:ApplyAutoHideSetting()
-                end
-            end)
-            btn:SetScript("OnEnter", function()
-                GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-                GameTooltip:SetText("Показать окно набора", 1, 1, 1)
-                GameTooltip:Show()
-            end)
-            btn:SetScript("OnLeave", GameTooltip_Hide)
-            GuildRecruiter.autoHideButton = btn
-        else
-            GuildRecruiter.autoHideButton:Show()
-        end
-    else
-        if self.originalFriendsFramePoint then
-            FriendsFrame:ClearAllPoints()
-            FriendsFrame:SetPoint(unpack(self.originalFriendsFramePoint))
-        else
-            FriendsFrame:ClearAllPoints()
-            FriendsFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -100)
-        end
-        if GuildRecruiter.autoHideButton then
-            GuildRecruiter.autoHideButton:Hide()
-        end
-    end
-end
-
--- === Остальные методы без изменений ===
 function GuildRecruiter:EnableEventMonitoring()
     self.frame:RegisterEvent("WHO_LIST_UPDATE")
     self.frame:RegisterEvent("GUILD_INVITE_REQUEST")
@@ -11217,6 +11115,10 @@ function GuildRecruiter:StartSearch()
     self.currentLevel = self.settings.minLevel
     self.results = {}
     self.autoInviteLoop = false
+    
+    FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
+    SetWhoToUI(1)
+
     self:EnableEventMonitoring()
     self:SendNextWhoQuery()
 end
@@ -11225,11 +11127,14 @@ function GuildRecruiter:StopSearch()
     self.isSearching = false
     self:DisableEventMonitoring()
     self.autoInviteLoop = false
+    
+    FriendsFrame:RegisterEvent("WHO_LIST_UPDATE")
+    SetWhoToUI(1)
+
     if self.ui and self.ui.searchBtn then
         self.ui.searchBtn:SetText("Найти")
     end
     
-    -- Очищаем таймер поиска
     if self.searchTimer then
         self.searchTimer:SetScript("OnUpdate", nil)
         self.searchTimer:Hide()
@@ -11239,37 +11144,21 @@ end
 
 function GuildRecruiter:SendNextWhoQuery()
     if self.currentLevel > self.settings.maxLevel then
-        self.isSearching = false
-        self:DisableEventMonitoring()
-        self:UpdatePlayerList()
-        if self.ui and self.ui.searchBtn then
-            self.ui.searchBtn:SetText("Найти")
-        end
+        self:StopSearch()
+        
         if self.settings.autoAccept and #self.results > 0 then
             self:StartAutoInvite()
         end
-        if self.settings.autoHideAfterSearch then
-            self.frame:Hide()
-        end
-        -- Очищаем таймер поиска
-        if self.searchTimer then
-            self.searchTimer:SetScript("OnUpdate", nil)
-            self.searchTimer:Hide()
-            self.searchTimer = nil
-        end
         return
     end
-
+    
     local maxL = math.min(self.currentLevel + self.settings.step - 1, self.settings.maxLevel)
     local query = self.currentLevel .. "-" .. maxL
-    local wasVisible = WhoFrame and WhoFrame:IsShown()
+    
     SendWho(query)
-    if WhoFrame and WhoFrame:IsShown() and not wasVisible then
-        WhoFrame:Hide()
-    end
+    
     self.currentLevel = maxL + 1
-
-    -- Гарантированно запускаем таймер
+    
     if not self.searchTimer then
         self.searchTimer = CreateFrame("Frame")
         self.searchTimer.guildRecruiter = self
@@ -11307,13 +11196,9 @@ function GuildRecruiter:ProcessWhoResults()
 end
 
 function GuildRecruiter:MatchesFilters(race, class)
-    -- Класс: должен быть включён
     if not self.settings.classes[class] then return false end
-
-    -- Раса: должна быть включена (любое "истинное" значение)
     if not self.settings.races[race] then return false end
 
-    -- Фракция
     if tContains(RACES_ALLIANCE, race) then
         return self.settings.factions.Alliance
     elseif tContains(RACES_HORDE, race) then
@@ -11328,13 +11213,11 @@ function GuildRecruiter:UpdatePlayerList()
     local list = self.ui.playerList
     local scroll = self.ui.scroll
 
-    -- Скрыть все старые кнопки
     for i = 1, 200 do
         local btn = _G["GuildRecruiterPlayerBtn" .. i]
         if btn then btn:Hide() end
     end
 
-    -- Создать/обновить кнопки
     for i, p in ipairs(self.results) do
         local btnName = "GuildRecruiterPlayerBtn" .. i
         local btn = _G[btnName]
@@ -11342,41 +11225,47 @@ function GuildRecruiter:UpdatePlayerList()
             btn = CreateFrame("Button", btnName, list, "UIPanelButtonTemplate")
             btn:SetSize(list:GetWidth() - 20, 20)
             btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+            
             btn:SetScript("OnClick", function(self, button)
                 if GuildRecruiter.instance.cooldown then return end
+                
                 if button == "LeftButton" then
                     GuildInvite(p.name)
                     GuildRecruiter.instance.exceptions[p.name] = time()
+                    
+                    if GuildRecruiter.instance.exceptions[p.name] then
+                        print("|cFF00FF00[GUILD RECRUITER]|r (Клик) " .. p.name .. " добавлен в игнор.")
+                    else
+                        print("|cFFFF0000[GUILD RECRUITER]|r (Клик) ОШИБКА добавления " .. p.name)
+                    end
+                    
                     GuildRecruiter.instance:RemoveFromList(p.name)
-                    -- Убрано: GuildRecruiter.instance:SaveSettings()
                     GuildRecruiter.instance:SetCooldown()
+                    
                 elseif button == "RightButton" then
                     GuildRecruiter.instance.exceptions[p.name] = time()
+                    print("|cFF00FF00[GUILD RECRUITER]|r (ПКМ) " .. p.name .. " добавлен в игнор без инвайта.")
                     GuildRecruiter.instance:RemoveFromList(p.name)
-                    -- Убрано: GuildRecruiter.instance:SaveSettings()
                 end
             end)
         end
+        
         btn:SetText(p.name)
         btn:Show()
         btn:SetPoint("TOP", list, "TOP", 0, -5 - (i - 1) * 25)
     end
 
-    -- Установить высоту контента
     local contentHeight = math.max(1, #self.results) * 25 + 10
     list:SetHeight(contentHeight)
 
-    -- Обновить ScrollFrame
     scroll:SetScrollChild(list)
     scroll:UpdateScrollChildRect()
 
-    -- === Автоматический скролл вниз ===
     local _, maxRange = scroll:GetVerticalScrollRange()
     if maxRange and maxRange > 0 then
         scroll:SetVerticalScroll(maxRange)
     end
 
-    -- === Колесо прокрутки ===
     scroll:SetScript("OnMouseWheel", function(self, delta)
         local current = self:GetVerticalScroll()
         local _, range = self:GetVerticalScrollRange()
@@ -11390,23 +11279,32 @@ function GuildRecruiter:UpdatePlayerList()
 end
 
 function GuildRecruiter:InviteAndExclude(name)
+    if self.exceptions[name] then
+        print("|cFFFF0000[GUILD RECRUITER]|r АВТО-ИНВАЙТ: " .. name .. " УЖЕ есть в списке исключений. Приглашение ОТМЕНЕНО.")
+        return
+    end
+
     GuildInvite(name)
     self.exceptions[name] = time()
+
+    if self.exceptions[name] then
+        print("|cFF00FF00[GUILD RECRUITER]|r АВТО-ИНВАЙТ: Игрок " .. name .. " приглашен. ДОБАВЛЕН в игнор-лист.")
+    else
+        print("|cFFFF0000[GUILD RECRUITER]|r ОШИБКА: Игрок " .. name .. " НЕ добавился в игнор-лист!")
+    end
+
     self:RemoveFromList(name)
-    -- Убрано: self:SaveSettings()
     self:SetCooldown()
 end
 
 function GuildRecruiter:ExcludeOnly(name)
     self.exceptions[name] = time()
     self:RemoveFromList(name)
-    -- Убрано: self:SaveSettings()
 end
 
 function GuildRecruiter:SetCooldown()
     self.cooldown = true
     
-    -- Создаем или переиспользуем таймер cooldown
     if not self.cooldownTimer then
         self.cooldownTimer = CreateFrame("Frame")
         self.cooldownTimer.elapsed = 0
@@ -11424,7 +11322,7 @@ function GuildRecruiter:SetCooldown()
             end
         end)
     else
-        self.cooldownTimer.elapsed = 0 -- Сбрасываем таймер
+        self.cooldownTimer.elapsed = 0
     end
     self.cooldownTimer:Show()
 end
@@ -11443,7 +11341,6 @@ function GuildRecruiter:StartAutoInvite()
     if self.autoInviteLoop or #self.results == 0 then return end
     self.autoInviteLoop = true
     
-    -- Очищаем существующий таймер
     if self.autoInviteTimer then
         self.autoInviteTimer:SetScript("OnUpdate", nil)
         self.autoInviteTimer:Hide()
@@ -11468,7 +11365,6 @@ function GuildRecruiter:ProcessAutoInvite()
     if p then
         self:InviteAndExclude(p.name)
 
-        -- Гарантированно запускаем таймер
         if not self.autoInviteTimer then
             self.autoInviteTimer = CreateFrame("Frame")
             self.autoInviteTimer.guildRecruiter = self
@@ -11506,7 +11402,6 @@ function GuildRecruiter:OnEvent(event, ...)
 end
 
 function GuildRecruiter:SaveSettings()
-    
     nsDbc["набор в гильдию"] = {
         exceptions = self.exceptions,
         settings = {
@@ -11514,7 +11409,6 @@ function GuildRecruiter:SaveSettings()
             maxLevel = self.settings.maxLevel,
             step = self.settings.step,
             autoAccept = self.settings.autoAccept,
-            autoHideAfterSearch = self.settings.autoHideAfterSearch,
             factions = {
                 Alliance = self.settings.factions.Alliance,
                 Horde = self.settings.factions.Horde
@@ -11523,7 +11417,4 @@ function GuildRecruiter:SaveSettings()
             races = self.settings.races
         }
     }
-    
-    -- Проверка сохранения
-    local saved = nsDbc["набор в гильдию"]
 end
