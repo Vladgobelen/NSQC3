@@ -7489,7 +7489,6 @@ function SpellQueue:ShowProkTexture(spellName, iconData)
         frame.texture:SetTexture(texturePath)
     end)
     if not success then
-        print(string.format("ERROR: Failed to load texture for %s: %s", spellName, texturePath))
         frame.texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     end
     frame:Show()
@@ -7632,28 +7631,6 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
     self.poisonStacks = nil
     self:CreateComboPoisonElements()
     self:CreateResourceBars()
-    self.comboPoints = {}
-    local comboSize = self.height * 0.8
-    for i = 1, 5 do
-        local point = frame:CreateTexture(nil, "OVERLAY")
-        point:SetSize(comboSize, comboSize)
-        point:SetTexture("Interface\\TargetingFrame\\UI-Combopoint")
-        point:SetPoint("LEFT", frame, "LEFT", -comboSize * (6 - i), 0)
-        point:SetVertexColor(0.1, 0.1, 0.1)
-        point:Hide()
-        table.insert(self.comboPoints, point)
-    end
-    self.poisonStacks = {}
-    local poisonSize = self.height * 0.8
-    for i = 1, 5 do
-        local stack = frame:CreateTexture(nil, "OVERLAY")
-        stack:SetSize(poisonSize, poisonSize)
-        stack:SetTexture("Interface\\TargetingFrame\\UI-Combopoint")
-        stack:SetPoint("RIGHT", frame, "RIGHT", poisonSize * (i - 3), 0)
-        stack:SetVertexColor(0.1, 0.1, 0.1)
-        stack:Hide()
-        table.insert(self.poisonStacks, stack)
-    end
     local configButton = CreateFrame("Button", nil, frame)
     configButton:SetSize(20, 20)
     configButton:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -7665,7 +7642,27 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
         end
         self.configFrame:Show()
     end)
-    -- --- ONUUPDATE: Без заморозки, пересчет всегда ---
+    configButton:SetScript("OnMouseUp", function(_, button)
+        if button == "RightButton" then
+            self.isAnchored = false
+            self.isClickThrough = false
+            self.frame:EnableMouse(true)
+            self.frame:SetMovable(true)
+            self.frame:RegisterForDrag("LeftButton")
+            self.frame:SetAlpha(self.alpha)
+        end
+    end)
+    local prokButton = CreateFrame("Button", nil, frame)
+    prokButton:SetSize(20, 20)
+    prokButton:SetPoint("BOTTOMRIGHT", -2, 25)
+    prokButton:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+    prokButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+    prokButton:SetScript("OnClick", function()
+        if not ProkIconManager.configFrame then
+            ProkIconManager:CreateConfigUI()
+        end
+        ProkIconManager.configFrame:Show()
+    end)
     frame:SetScript("OnUpdate", function(_, elapsed)
         if self.frame:IsShown() then
             local stateChanged = false
@@ -7676,16 +7673,13 @@ function SpellQueue:Create(name, width, height, anchorPoint, parentFrame)
                     self.lastReadyState[spellName] = spell.isReady
                 end
             end
-            -- Всегда пересчитываем приоритеты при изменении состояния
             if stateChanged or self.priorityDirty then
                 self:UpdateSpellsPriority()
                 self.priorityDirty = false
-                -- позиции пересчитывать только тут
                 for spellName, spell in pairs(self.spells) do
                     self:UpdateSpellPosition(spellName)
                 end
             end
-            -- Всегда обновляем позиции
             for spellName, spell in pairs(self.spells) do
                 self:UpdateSpellPosition(spellName)
             end
@@ -8124,7 +8118,6 @@ function SpellQueue:SetIconsTable(tblIcons)
             local iconSize = self.iconSize or (self.height - 10)
             local glowSize = iconSize + (self.glowSizeOffset or 10)
             local highlightSize = iconSize + (self.highlightSizeOffset or 15)
-            -- Получаем иконку из GetSpellInfo если не сохранена
             local spellInfoName, _, spellIcon = GetSpellInfo(spellName)
             local texturePath = spellData.icon or spellIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
             local icon = self.frame:CreateTexture(nil, "OVERLAY")
@@ -8186,7 +8179,7 @@ function SpellQueue:SetIconsTable(tblIcons)
                 startTime = nil,
                 endTime = nil,
                 readyPosition = initPos,
-                lastPosition = initPos,
+                lastPosition = -9999,
                 lastStart = 0,
                 lastDuration = 0
             }
@@ -8308,38 +8301,6 @@ function SpellQueue:SetupDrag()
                 self.frame:SetAlpha(self.alpha)
             end
         end
-    end)
-    local configButton = CreateFrame("Button", nil, self.frame)
-    configButton:SetSize(20, 20)
-    configButton:SetPoint("BOTTOMRIGHT", -2, 2)
-    configButton:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
-    configButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
-    configButton:SetScript("OnClick", function()
-        if not self.configFrame then
-            self:CreateConfigWindow()
-        end
-        self.configFrame:Show()
-    end)
-    configButton:SetScript("OnMouseUp", function(_, button)
-        if button == "RightButton" then
-            self.isAnchored = false
-            self.isClickThrough = false
-            self.frame:EnableMouse(true)
-            self.frame:SetMovable(true)
-            self.frame:RegisterForDrag("LeftButton")
-            self.frame:SetAlpha(self.alpha)
-        end
-    end)
-    local prokButton = CreateFrame("Button", nil, self.frame)
-    prokButton:SetSize(20, 20)
-    prokButton:SetPoint("BOTTOMRIGHT", -2, 25)
-    prokButton:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
-    prokButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
-    prokButton:SetScript("OnClick", function()
-        if not ProkIconManager.configFrame then
-            ProkIconManager:CreateConfigUI()
-        end
-        ProkIconManager.configFrame:Show()
     end)
 end
 
@@ -8594,31 +8555,30 @@ function SpellQueue:UpdateSpellPosition(spellName)
     else
         spell.position = usePos
     end
-    if spell.lastPosition ~= spell.position then
-        spell.icon:ClearAllPoints()
-        spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
-        spell.lastPosition = spell.position
-    end
+    spell.icon:ClearAllPoints()
+    spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
+    spell.lastPosition = spell.position
     spell.icon:Show()
     spell.glow:Show()
 end
 
 function SpellQueue:UpdateCooldownLayers()
-    local activeSpells = {}
+    local shownSpells = {}
     for spellName, spell in pairs(self.spells) do
-        if spell.active and spell.icon:IsShown() then
-            table.insert(activeSpells, spell)
+        if spell.icon:IsShown() then
+            table.insert(shownSpells, spell)
         end
     end
-    table.sort(activeSpells, function(a, b)
+    table.sort(shownSpells, function(a, b)
+        if a.active ~= b.active then
+            return a.active
+        end
         return (a.remaining or 999) < (b.remaining or 999)
     end)
-    local count = #activeSpells
-    for i, spell in ipairs(activeSpells) do
-        local subLevel = count - i + 1
-        spell.icon:SetDrawLayer("OVERLAY", subLevel)
-        spell.glow:SetDrawLayer("ARTWORK", subLevel)
-        spell.cooldownText:SetDrawLayer("OVERLAY", subLevel)
+    for i, spell in ipairs(shownSpells) do
+        spell.icon:SetDrawLayer("OVERLAY", i)
+        spell.glow:SetDrawLayer("ARTWORK", i)
+        spell.cooldownText:SetDrawLayer("OVERLAY", i + 10)
     end
 end
 
@@ -8648,7 +8608,6 @@ end
 function SpellQueue:UpdateSpellsPriority()
     local iconSize = self.iconSize or (self.height - 10)
     local spacing = self.iconSpacing or 5
-    
     local groups = {}
     for name, spell in pairs(self.spells) do
         local pos = spell.data.pos or 0
@@ -8657,50 +8616,34 @@ function SpellQueue:UpdateSpellsPriority()
         end
         table.insert(groups[pos], spell)
     end
-
     for pos, spells in pairs(groups) do
-        -- Сортируем:
-        -- 1. Скрытые (Hidden) - в конец списка (или в -10000)
-        -- 2. Готовые (Ready) - в начало
-        -- 3. На касте/КД (Active) - после готовых
         table.sort(spells, function(a, b)
-            -- Проверяем скрытие (бафы/текстуры)
             local hideA = false
             if a.data.texture then hideA = true end
             if not hideA and a.data.buf then
                 local bName = type(a.data.buf) == "string" and a.data.buf or a.data.name
                 if self:HasBuff(bName) then hideA = true end
             end
-
             local hideB = false
             if b.data.texture then hideB = true end
             if not hideB and b.data.buf then
                 local bName = type(b.data.buf) == "string" and b.data.buf or b.data.name
                 if self:HasBuff(bName) then hideB = true end
             end
-
             if hideA and hideB then return a.data.name < b.data.name end
-            if hideA then return false end -- A скрыт, B виден -> B раньше
-            if hideB then return true end  -- B скрыт, A виден -> A раньше
-
-            -- Оба видны. Сортируем по готовности.
-            -- isReady = true (Готов) должен быть ПЕРЕД isReady = false (КД)
+            if hideA then return false end
+            if hideB then return true end
             if a.isReady ~= b.isReady then
-                return a.isReady -- true > false (готовые вверху)
+                return a.isReady
             end
-
-            -- Внутри одной категории (оба готовы или оба КД) - по приоритету
             local pA = a.data.priority or 0
             local pB = b.data.priority or 0
             if pA ~= pB then return pA < pB end
             return a.data.name < b.data.name
         end)
-
         local baseX = pos * (iconSize + spacing)
         local step = iconSize + spacing
         local maxPosition = self.width - iconSize
-
-        -- Расставляем плотно
         for i, spell in ipairs(spells) do
             local hide = false
             if spell.data.texture then hide = true end
@@ -8708,12 +8651,9 @@ function SpellQueue:UpdateSpellsPriority()
                 local bName = type(spell.data.buf) == "string" and spell.data.buf or spell.data.name
                 if self:HasBuff(bName) then hide = true end
             end
-
             if hide then
                 spell.readyPosition = -10000
             else
-                -- Плотная упаковка: i-1 (индекс в таблице) * шаг
-                -- Если первые 2 готовые, 3-й на КД встанет сразу после них.
                 spell.readyPosition = math.min(baseX + (i - 1) * step, maxPosition)
             end
         end
@@ -9146,7 +9086,6 @@ function SpellQueue:ForceUpdateAllSpells()
         if spell.data.debuf then
             self:UpdateDebuffState(spellName)
         end
-        -- Принудительно обновляем текстуру иконки если пуста
         if spell.icon and not spell.icon:GetTexture() then
             local _, _, spellIcon = GetSpellInfo(spellName)
             if spellIcon then
