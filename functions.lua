@@ -2985,3 +2985,222 @@ f:SetScript("OnUpdate", function(self, dt)
 end)
 
 f:Show()
+
+-----------------------------------------
+-- ============================================================================
+-- LFDfix - Исправление ошибок LFD для WoW 3.3.5 (Wrath of the Lich King)
+-- Версия 15.0: FINAL RELEASE
+-- ============================================================================
+
+LFDfixRewardData = LFDfixRewardData or {}
+LFDfixIconOffset = 30
+
+-- ============================================================================
+-- Создать индикатор СПРАВА от фрейма
+-- ============================================================================
+local function CreateBagIndicator(texture, anchorFrame)
+    if (not texture or not anchorFrame) then return nil end
+    
+    if (LFDfixIndicatorFrame) then
+        LFDfixIndicatorFrame:Hide()
+        LFDfixIndicatorFrame = nil
+    end
+    
+    local frame = CreateFrame("Frame", "LFDfixIndicatorFrame", UIParent)
+    frame:SetSize(128, 128)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetFrameLevel(100)
+    frame:EnableMouse(false)
+    
+    local icon = frame:CreateTexture(nil, "OVERLAY")
+    icon:SetAllPoints(frame)
+    icon:SetTexture(texture)
+    icon:Show()
+    
+    local border = frame:CreateTexture(nil, "BORDER")
+    border:SetAllPoints(frame)
+    border:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Border")
+    border:SetTexCoord(0.2, 0.8, 0.2, 0.8)
+    border:SetVertexColor(0, 1, 0, 1)
+    border:Show()
+    
+    frame:ClearAllPoints()
+    frame:SetPoint("LEFT", anchorFrame, "RIGHT", LFDfixIconOffset, 0)
+    frame:Show()
+    
+    return frame
+end
+
+-- ============================================================================
+-- Скрыть индикатор
+-- ============================================================================
+local function HideBagIndicator()
+    if (LFDfixIndicatorFrame) then
+        LFDfixIndicatorFrame:Hide()
+        LFDfixIndicatorFrame = nil
+    end
+end
+
+-- ============================================================================
+-- Есть ли сумка в наградах подземелья?
+-- ============================================================================
+local function DoesDungeonHaveBag(dungeonID)
+    for i = 1, 10 do
+        local name, texture = GetLFGDungeonRewardInfo(dungeonID, i)
+        if (name and texture and texture:find("INV_Misc_Bag_17")) then
+            return texture, i, name
+        end
+    end
+    return nil, nil, nil
+end
+
+-- ============================================================================
+-- Получить текстуру из rewardID
+-- ============================================================================
+local function GetTextureFromRewardID(rewardID)
+    local _, _, _, _, _, _, _, _, _, itemTexture = GetItemInfo(rewardID)
+    if (itemTexture) then return itemTexture, "item" end
+    
+    for i = 1, 10 do
+        local _, texture = GetLFGDungeonRewardInfo(rewardID, i)
+        if (texture) then return texture, "dungeon" end
+    end
+    
+    return nil, nil
+end
+
+-- ============================================================================
+-- Найти фрейм с эмблемами
+-- ============================================================================
+local function FindEmblemRewardFrame()
+    for i = 2, 4 do
+        local frameName = "LFDDungeonReadyDialogRewardsFrameReward" .. i
+        local frame = _G[frameName]
+        if (frame and frame:IsShown()) then return frame end
+    end
+    return _G["LFDDungeonReadyDialogRewardsFrameReward2"]
+end
+
+-- ============================================================================
+-- Переопределение функции
+-- ============================================================================
+function LFDDungeonReadyDialogReward_SetReward(rewardFrame, reward)
+    if (not rewardFrame or not reward) then return end
+
+    local texture = nil
+    local rewardID = nil
+    local dungeonID = nil
+    local fixWasNeeded = false
+
+    -- Проверка: Был ли баг?
+    if (type(reward) == "number") then
+        fixWasNeeded = true
+        rewardID = reward
+        dungeonID = reward
+        texture = GetTextureFromRewardID(rewardID)
+    elseif (type(reward) == "table") then
+        texture = reward.texture
+        rewardID = reward.rewardID
+        dungeonID = reward.dungeonID
+        if (not texture and rewardID) then
+            texture = GetTextureFromRewardID(rewardID)
+        end
+    end
+
+    -- Индикатор: ТОЛЬКО если фикс сработал И сумка есть в наградах
+    if (fixWasNeeded and dungeonID) then
+        local bagTexture = DoesDungeonHaveBag(dungeonID)
+        if (bagTexture) then
+            local emblemFrame = FindEmblemRewardFrame()
+            CreateBagIndicator(bagTexture, emblemFrame or rewardFrame)
+        end
+    end
+
+    -- Применение фикса
+    if (texture and rewardFrame.texture) then
+        rewardFrame.texture:SetTexture(texture)
+        rewardFrame.texture:Show()
+    elseif (rewardFrame.texture) then
+        rewardFrame.texture:Hide()
+    end
+
+    if (rewardFrame.border) then
+        rewardFrame.border:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-LOOT")
+        rewardFrame.border:Show()
+    end
+
+    if (texture and rewardFrame.portrait) then
+        SetPortraitToTexture(rewardFrame.portrait, texture)
+        rewardFrame.portrait:Show()
+    elseif (rewardFrame.portrait) then
+        rewardFrame.portrait:Hide()
+    end
+
+    -- Tooltip
+    LFDfixRewardData[rewardFrame:GetName()] = {
+        dungeonID = dungeonID,
+        texture = texture,
+        rewardID = rewardID
+    }
+    
+    rewardFrame:SetScript("OnEnter", function(self)
+        local data = LFDfixRewardData[self:GetName()]
+        if (data and data.dungeonID) then
+            local tt = self.tooltip or GameTooltip
+            if (tt) then
+                pcall(function()
+                    tt:SetOwner(self, "ANCHOR_RIGHT")
+                    tt:SetLFGDungeonReward(data.dungeonID, 1)
+                end)
+            end
+        end
+    end)
+    
+    rewardFrame:SetScript("OnLeave", function(self)
+        local tt = self.tooltip or GameTooltip
+        if (tt) then tt:Hide() end
+    end)
+
+    rewardFrame:Show()
+end
+
+-- ============================================================================
+-- Скрытие индикатора при закрытии LFD окна
+-- ============================================================================
+local LFDParentFrame = LFDDungeonReadyDialog or LFDDungeonReadyPopup
+if (LFDParentFrame) then
+    local origHide = LFDParentFrame.Hide
+    LFDParentFrame.Hide = function(self)
+        HideBagIndicator()
+        return origHide(self)
+    end
+end
+
+-- ============================================================================
+-- Инициализация
+-- ============================================================================
+local function FixExistingFrames()
+    for _, name in ipairs({
+        "LFDDungeonReadyDialogRewardsFrameReward1",
+        "LFDDungeonReadyDialogRewardsFrameReward2",
+        "LFDDungeonReadyDialogRewardsFrameReward3", 
+        "LFDDungeonReadyDialogRewardsFrameReward4"
+    }) do
+        local f = _G[name]
+        if (f) then
+            f:SetScript("OnLeave", function(self)
+                local tt = self.tooltip or GameTooltip
+                if (tt) then tt:Hide() end
+            end)
+        end
+    end
+end
+
+local initFrame = CreateFrame("Frame")
+initFrame:RegisterEvent("ADDON_LOADED")
+initFrame:SetScript("OnEvent", function(self, event, name)
+    if (name == "LFDfix") then
+        FixExistingFrames()
+        self:UnregisterEvent("ADDON_LOADED")
+    end
+end)
