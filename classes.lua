@@ -7379,6 +7379,7 @@ end
 
 SpellQueue = {}
 SpellQueue.__index = SpellQueue
+
 -- Константы
 local COMBO_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga"
 local POISON_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga"
@@ -8178,7 +8179,8 @@ function SpellQueue:SetIconsTable(tblIcons)
                 lastPosition = -9999,
                 lastStart = 0,
                 lastDuration = 0,
-                visualIndex = 0
+                visualIndex = 0,
+                cooldownTargetPosition = initPos
             }
             createdCount = createdCount + 1
         end
@@ -8288,15 +8290,12 @@ function SpellQueue:UpdateSpellPosition(spellName)
     if not spell then
         return
     end
-
     spell.cooldownText:Hide()
-
     -- Обработка текстур прока (ProkIconManager)
     if spell.data.texture then
         local wasVisible = spell.textureVisible or false
         spell.textureVisible = false
         local iconData = nil
-
         if ProkIconManager and ProkIconManager.icons and ProkIconManager.icons[spellName] then
             iconData = ProkIconManager.icons[spellName]
         elseif nsDbc and nsDbc.proks and nsDbc.proks[spellName] then
@@ -8309,7 +8308,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 end
             end
         end
-
         local isUsable = IsUsableSpell(spellName)
         if iconData then
             if iconData.triggerType == "custom" and isUsable then
@@ -8332,7 +8330,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 end
             end
         end
-
         if spell.textureVisible ~= wasVisible then
             if spell.textureVisible then
                 self:ShowProkTexture(spellName, iconData)
@@ -8340,14 +8337,12 @@ function SpellQueue:UpdateSpellPosition(spellName)
                 self:HideProkTexture(spellName)
             end
         end
-
         spell.icon:SetAlpha(INACTIVE_ALPHA)
         spell.icon:Show()
         spell.glow:Show()
         spell.glow:SetAlpha(0)
         return
     end
-
     -- Проверка условий активации (проки, комбо, ресурсы, баффы)
     local prokActive = true
     if spell.data.prok then
@@ -8365,21 +8360,18 @@ function SpellQueue:UpdateSpellPosition(spellName)
             end
         end
     end
-
     local comboOk = true
     if spell.data.combo and spell.data.combo > 0 then
         if not self:HasEnoughComboPoints(spell.data.combo) then
             comboOk = false
         end
     end
-
     local resourceOk = true
     if spell.data.resource then
         if not self:HasEnoughResource(spellName) then
             resourceOk = false
         end
     end
-
     local buffOk = true
     if spell.data.buf then
         local buffName = type(spell.data.buf) == "string" and spell.data.buf or spellName
@@ -8388,7 +8380,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             buffOk = false
         end
     end
-
     -- Проверка дебаффа на цели
     local isDebuffActive = false
     local debuffRemaining = 0
@@ -8402,7 +8393,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
             end
         end
     end
-
     -- Проверка кулдауна
     local start, duration, enabled = GetSpellCooldown(spellName)
     local remaining, fullDuration = 0, 0
@@ -8412,10 +8402,8 @@ function SpellQueue:UpdateSpellPosition(spellName)
         remaining = remaining > 0 and remaining or 0
         fullDuration = duration
     end
-
     local isGCD = (fullDuration > 0 and fullDuration < 2.0)
     local oldIsReady = spell.isReady
-
     if isGCD then
         spell.active = false
         spell.isReady = true
@@ -8425,35 +8413,28 @@ function SpellQueue:UpdateSpellPosition(spellName)
         spell.isReady = not spell.active
         spell.remaining = remaining
     end
-
     if oldIsReady ~= spell.isReady then
         self.priorityDirty = true
     end
-
     local gcdChanged = (spell.lastStart ~= start or spell.lastDuration ~= duration)
     spell.lastStart = start
     spell.lastDuration = duration
-
     if gcdChanged and isGCD then
         self.priorityDirty = true
     end
-
     local shouldHide = false
     if spell.data.buf and not buffOk then
         shouldHide = true
     end
-
     -- Логика прозрачности (Alpha)
     local alpha = READY_ALPHA
     if spell.active then
         alpha = COOLDOWN_ALPHA
     end
-
     -- Дебафф делает скилл полупрозрачным независимо от КД
     if isDebuffActive then
         alpha = DEBUFF_ALPHA
     end
-
     -- Проверка ресурсов не должна полностью скрывать дебафф
     if not resourceOk then
         if isDebuffActive then
@@ -8462,25 +8443,20 @@ function SpellQueue:UpdateSpellPosition(spellName)
             alpha = INACTIVE_ALPHA
         end
     end
-
     if not comboOk then
         alpha = alpha * NO_RESOURCE_ALPHA
     end
-
     if not buffOk then
         alpha = INACTIVE_ALPHA
     end
-
     if not prokActive then
         alpha = INACTIVE_ALPHA
     end
-
     local isUsable = IsUsableSpell(spellName)
     -- isUsable проверка не переопределяет дебафф-альфу
     if not isUsable and not isDebuffActive then
         alpha = INACTIVE_ALPHA
     end
-
     -- Отображение текста кулдауна
     if isDebuffActive and not spell.active then
         if spell.cooldownFrame then
@@ -8513,18 +8489,15 @@ function SpellQueue:UpdateSpellPosition(spellName)
             spell.cooldownText:Show()
         end
     end
-
     if shouldHide then
         spell.icon:Hide()
         spell.glow:Hide()
         spell.cooldownText:Hide()
         return
     end
-
     -- Применение прозрачности
     spell.icon:SetAlpha(alpha)
     spell.glow:SetAlpha(alpha * (self.glowAlpha or 0.3))
-
     if spell.active then
         spell.glow:SetVertexColor(unpack(COOLDOWN_GLOW_COLOR))
     elseif isDebuffActive then
@@ -8532,7 +8505,6 @@ function SpellQueue:UpdateSpellPosition(spellName)
     else
         spell.glow:SetVertexColor(unpack(READY_GLOW_COLOR))
     end
-
     -- Расчет позиции
     local iconSize = self.iconSize or (self.height - 10)
     local spacing = self.iconSpacing or 5
@@ -8540,21 +8512,20 @@ function SpellQueue:UpdateSpellPosition(spellName)
     local maxPosition = self.width - iconSize
     local groupPos = spell.data.pos or 0
     local baseX = groupPos * step
-    local groupEndPos = self.groupEndPositions[groupPos] or baseX
     local targetPos = baseX
-
     if spell.active and fullDuration > 0 then
+        -- Используем уникальную целевую позицию для каждого скилла на КД, чтобы избежать наложения
+        local target = spell.cooldownTargetPosition or spell.readyPosition
         local cooldownStartPos = maxPosition
         local progress = 1 - (remaining / fullDuration)
-        targetPos = cooldownStartPos - (cooldownStartPos - groupEndPos) * progress
-        targetPos = math.max(targetPos, groupEndPos)
+        targetPos = cooldownStartPos - (cooldownStartPos - target) * progress
+        targetPos = math.max(targetPos, target)
     else
         targetPos = spell.readyPosition
         if targetPos == -10000 or targetPos == nil then
             targetPos = baseX
         end
     end
-
     spell.position = targetPos
     spell.icon:ClearAllPoints()
     spell.icon:SetPoint("LEFT", self.frame, "LEFT", spell.position, 0)
@@ -8658,8 +8629,8 @@ function SpellQueue:UpdateSpellsPriority()
         end)
         local baseX = pos * step
         local maxPosition = self.width - iconSize
-        local readyIndex = 0
-        local cooldownSpells = {}
+        local readySpells = {}
+        local activeSpells = {}
         for i, spell in ipairs(spells) do
             local hide = false
             if spell.data.texture then
@@ -8674,23 +8645,48 @@ function SpellQueue:UpdateSpellsPriority()
             if hide then
                 spell.readyPosition = -10000
             elseif not spell.active then
-                spell.readyPosition = math.min(baseX + readyIndex * step, maxPosition)
-                spell.visualIndex = readyIndex
-                readyIndex = readyIndex + 1
+                table.insert(readySpells, spell)
             else
-                spell.visualIndex = -1
-                table.insert(cooldownSpells, spell)
+                table.insert(activeSpells, spell)
             end
         end
-        -- ИСПРАВЛЕНО: lastReadyPos теперь указывает на позицию ПОСЛЕ последнего готового скилла
-        -- Это конец последней занятой ячейки, куда должен вернуться скилл из КД
-        local lastReadyPos = readyIndex > 0 and (baseX + readyIndex * step) or baseX
-        lastReadyPos = math.min(lastReadyPos, maxPosition)
-        for i, spell in ipairs(cooldownSpells) do
-            spell.readyPosition = math.min(baseX + (readyIndex + i - 1) * step, maxPosition)
-            spell.cooldownTargetPosition = lastReadyPos
+        -- Сортировка готовых скиллов (по приоритету)
+        table.sort(readySpells, function(a, b)
+            local pA = a.data.priority or 0
+            local pB = b.data.priority or 0
+            if pA ~= pB then
+                return pA < pB
+            end
+            return a.data.name < b.data.name
+        end)
+        -- Сортировка активных скиллов (по времени отката, затем по приоритету)
+        -- Меньшее время = ближе к готовым. При одинаковом времени = меньший приоритет ближе.
+        table.sort(activeSpells, function(a, b)
+            if a.remaining ~= b.remaining then
+                return a.remaining < b.remaining
+            end
+            local pA = a.data.priority or 0
+            local pB = b.data.priority or 0
+            if pA ~= pB then
+                return pA < pB
+            end
+            return a.data.name < b.data.name
+        end)
+        local readyIndex = 0
+        for i, spell in ipairs(readySpells) do
+            spell.readyPosition = math.min(baseX + readyIndex * step, maxPosition)
+            spell.visualIndex = readyIndex
+            readyIndex = readyIndex + 1
         end
-        self.groupEndPositions[pos] = lastReadyPos
+        -- Активные скиллы выстраиваются после готовых, каждый в свой слот
+        local lastReadyPos = baseX + readyIndex * step
+        lastReadyPos = math.min(lastReadyPos, maxPosition)
+        for i, spell in ipairs(activeSpells) do
+            -- Уникальная целевая позиция для каждого скилла на КД
+            spell.cooldownTargetPosition = math.min(baseX + (readyIndex + i - 1) * step, maxPosition)
+            spell.visualIndex = -1
+        end
+        self.groupEndPositions[pos] = baseX + (readyIndex + #activeSpells) * step
         self.groupReadyCount[pos] = readyIndex
     end
 end
@@ -9315,99 +9311,6 @@ function SpellQueue:UpdateGlowSettings()
     end
 end
 
-function SpellQueue:TestPanel()
-    print("=== SpellQueue Тест Панели ===")
-    -- ИСПРАВЛЕНО: Правильный подсчёт скиллов
-    local totalSpells = 0
-    for _ in pairs(self.spells) do
-        totalSpells = totalSpells + 1
-    end
-    print("Всего скиллов на панели: " .. totalSpells)
-    
-    local emptyCells = 0
-    local shownSpells = 0
-    local hiddenSpells = 0
-    
-    for spellName, spell in pairs(self.spells) do
-        if spell.icon:IsShown() then
-            shownSpells = shownSpells + 1
-        else
-            hiddenSpells = hiddenSpells + 1
-        end
-        
-        if not spell.icon:IsShown() and not spell.data.buf then
-            local start, duration = GetSpellCooldown(spellName)
-            if not start or start == 0 then
-                emptyCells = emptyCells + 1
-                print("  [ПУСТО] " .. spellName .. " - позиция: " .. (spell.data.pos or 0))
-            end
-        end
-    end
-    
-    print("Отображается: " .. shownSpells .. ", Скрыто: " .. hiddenSpells .. ", Пустых ячеек: " .. emptyCells)
-    
-    local curseSpellName = "Проклятие стихий"
-    local curseSpell = self.spells[curseSpellName]
-    
-    print("\n=== Информация о скилле '" .. curseSpellName .. "' ===")
-    if curseSpell then
-        local isShown = curseSpell.icon:IsShown()
-        local position = curseSpell.position or 0
-        local readyPosition = curseSpell.readyPosition or 0
-        local isActive = curseSpell.active or false
-        local isReady = curseSpell.isReady or false
-        local remaining = curseSpell.remaining or 0
-        local hasBuff = curseSpell.hasBuff or false
-        local hasDebuff = curseSpell.hasDebuff or false
-        local groupPos = curseSpell.data.pos or 0
-        local priority = curseSpell.data.priority or 0
-        local comboReq = curseSpell.data.combo or 0
-        local resourceReq = curseSpell.data.resource
-        
-        print("  Отображается: " .. (isShown and "Да" or "Нет"))
-        print("  Текущая позиция: " .. string.format("%.2f", position))
-        print("  Позиция готовности: " .. string.format("%.2f", readyPosition))
-        print("  Группа: " .. groupPos)
-        print("  Приоритет: " .. priority)
-        print("  Активен (КД): " .. (isActive and "Да" or "Нет"))
-        print("  Готов: " .. (isReady and "Да" or "Нет"))
-        print("  Остаток КД: " .. string.format("%.2f", remaining) .. " сек")
-        print("  Есть бафф: " .. (hasBuff and "Да" or "Нет"))
-        print("  Есть дебафф: " .. (hasDebuff and "Да" or "Нет"))
-        print("  Требуется комбо: " .. (comboReq > 0 and comboReq or "Нет"))
-        
-        if resourceReq then
-            print("  Требуется ресурс: " .. (RESOURCE_NAMES[resourceReq.type] or resourceReq.type) .. " - " .. (resourceReq.amount or 0))
-        else
-            print("  Требуется ресурс: Нет")
-        end
-        
-        local start, duration = GetSpellCooldown(curseSpellName)
-        if start and duration and start > 0 then
-            local now = GetTime()
-            local cdRemaining = (start + duration) - now
-            print("  Реальный КД: " .. string.format("%.2f", cdRemaining > 0 and cdRemaining or 0) .. " сек (из " .. duration .. ")")
-        else
-            print("  Реальный КД: Готов")
-        end
-        
-        local alpha = curseSpell.icon:GetAlpha()
-        print("  Альфа иконки: " .. string.format("%.2f", alpha))
-        
-        -- ИСПРАВЛЕНО: Добавлена проверка на проблему с дебаффом
-        if hasDebuff and isReady then
-            print("  [ВНИМАНИЕ] Дебафф активен, но скилл готов к использованию!")
-        end
-    else
-        print("  Скилл '" .. curseSpellName .. "' не найден на панели!")
-        print("  Доступные скиллы:")
-        for name, _ in pairs(self.spells) do
-            print("    - " .. name)
-        end
-    end
-    print("=== Конец теста ===")
-end
-
 SlashCmdList["SPELLQUEUE"] = function()
     if not _G.SpellQueueConfig then
         SpellQueue:CreateConfigWindow()
@@ -9415,7 +9318,6 @@ SlashCmdList["SPELLQUEUE"] = function()
     SpellQueue.configFrame:Show()
 end
 SLASH_SPELLQUEUE1 = "/sq"
-
 SlashCmdList["SPELLQUEUEMODE"] = function()
     if _G.SpellQueueInstance then
         _G.SpellQueueInstance:ToggleDisplayMode()
@@ -9424,7 +9326,6 @@ SlashCmdList["SPELLQUEUEMODE"] = function()
     end
 end
 SLASH_SPELLQUEUEMODE1 = "/sqmode"
-
 SlashCmdList["SPELLQUEUE_HP"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_HP)
     if bit.band(SpellQueueInstance.features, FEATURE_HP) ~= 0 then
@@ -9434,7 +9335,6 @@ SlashCmdList["SPELLQUEUE_HP"] = function()
     end
 end
 SLASH_SPELLQUEUE_HP1 = "/sqhp"
-
 SlashCmdList["SPELLQUEUE_RES"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_RESOURCE)
     if bit.band(SpellQueueInstance.features, FEATURE_RESOURCE) ~= 0 then
@@ -9444,7 +9344,6 @@ SlashCmdList["SPELLQUEUE_RES"] = function()
     end
 end
 SLASH_SPELLQUEUE_RES1 = "/sqres"
-
 SlashCmdList["SPELLQUEUE_COMBO"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_COMBO)
     for _, point in ipairs(SpellQueueInstance.comboPoints) do
@@ -9458,7 +9357,6 @@ SlashCmdList["SPELLQUEUE_COMBO"] = function()
     end
 end
 SLASH_SPELLQUEUE_COMBO1 = "/sqcp"
-
 SlashCmdList["SPELLQUEUE_POISON"] = function()
     SpellQueueInstance.features = bit.bxor(SpellQueueInstance.features, FEATURE_POISON)
     for _, stack in ipairs(SpellQueueInstance.poisonStacks) do
@@ -9472,16 +9370,6 @@ SlashCmdList["SPELLQUEUE_POISON"] = function()
     end
 end
 SLASH_SPELLQUEUE_POISON1 = "/sqps"
-
--- Новая команда для тестирования
-SlashCmdList["SPELLQUEUE_TEST"] = function()
-    if _G.SpellQueueInstance then
-        _G.SpellQueueInstance:TestPanel()
-    else
-        print("SpellQueue не инициализирован")
-    end
-end
-SLASH_SPELLQUEUE_TEST1 = "/sqtest"
 
 
 ProkIconManager = {
