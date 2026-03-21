@@ -902,6 +902,7 @@ function set_miniButton()
     local TOOLTIP_COLOR_GEARSORE = "|cFF6495EDGearScore: "
     local TOOLTIP_COLOR_LEFT_CLICK = "|cffFF8C00ЛКМ|cffFFFFE0 - открыть аддон"
     local TOOLTIP_COLOR_RIGHT_CLICK = "|cffF4A460ПКМ|cffFFFFE0 - показать настройки"
+    local TOOLTIP_COLOR_MIDDLE_CLICK = "|cff32CD32СКМ|cffFFFFE0 - гильдбанк"
 
     local function CreateTooltip(self)
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")  -- Отправляем запрос
@@ -933,6 +934,7 @@ function set_miniButton()
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(TOOLTIP_COLOR_LEFT_CLICK)
         GameTooltip:AddLine(TOOLTIP_COLOR_RIGHT_CLICK)
+        GameTooltip:AddLine(TOOLTIP_COLOR_MIDDLE_CLICK)
         GameTooltip:Show()
     end
 
@@ -945,13 +947,36 @@ function set_miniButton()
         GameTooltip:Hide()
     end)
 
-    miniMapButton:SetScript("OnClick", function(self)
-        if FriendsFrame:IsVisible() then
-            FriendsFrameCloseButton:Click()
+    -- ВАЖНО: Регистрируем все кнопки мыши для WoW 3.3.5
+    miniMapButton:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
+
+    -- Обработчик кликов с поддержкой всех кнопок мыши
+    miniMapButton:SetScript("OnClick", function(self, button)
+        if button == "LeftButton" then
+            -- Левая кнопка - открыть аддон
+            if FriendsFrame:IsVisible() then
+                FriendsFrameCloseButton:Click()
+            end
+            sendAch("Великий открыватор", -1)
+            mFldName = GetUnitName("player")
+            SendAddonMessage("getFld " .. mFldName, "", "guild")
+        elseif button == "RightButton" then
+            -- Правая кнопка - показать настройки (если есть функция)
+            if NSQC3_ShowSettings then
+                NSQC3_ShowSettings()
+            end
+        elseif button == "MiddleButton" then
+            -- Колесо мыши - открыть гильдбанк NSAuk
+            if NSAukGuildBankInstance_A then
+                if NSAukGuildBankInstance_A.Show then
+                    NSAukGuildBankInstance_A:Show()
+                else
+                    print("|cFFFF0000[NSAuk] Ошибка: метод Show() не найден|r")
+                end
+            else
+                print("|cFFFF0000[NSAuk] Ошибка: экземпляр гильдбанка не создан|r")
+            end
         end
-        sendAch("Великий открыватор", -1)
-        mFldName = GetUnitName("player")
-        SendAddonMessage("getFld " .. mFldName, "", "guild")
     end)
 
     -- Инициализация таблицы для сохранения позиции
