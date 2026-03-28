@@ -3516,10 +3516,42 @@ function AdaptiveFrame:new(parent)
     end)
 
     UpdatePlayerMarkerButtonState()
+    
+    -- === КНОПКА: запуск мини-игры ===
+    self.gameStartButton = CreateFrame("Button", nil, self.frame)
+    self.gameStartButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.gameStartButton:SetPoint("TOPRIGHT", self.togglePlayerMarkerButton, "BOTTOMRIGHT", 0, -5)
+    self.gameStartButton:SetNormalTexture("Interface\\AddOns\\NSQC3\\libs\\5.tga")
+    self.gameStartButton:SetPushedTexture("Interface\\AddOns\\NSQC3\\libs\\5.tga")
+    self.gameStartButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    
+    self.gameStartButton:SetScript("OnClick", function()
+        -- Создаем экземпляр клиентского класса и запускаем игру
+        local GameClient = ns_loadfile("Interface\\AddOns\\NSQC3\\game_client.lua")()
+        local gameClient = GameClient:new()
+        
+        -- Получаем имя владельца участка и имя текущего игрока
+        local ownerName = self.owner or UnitName("player")
+        local starterName = UnitName("player")
+        
+        -- Запускаем игру
+        gameClient:StartGame(ownerName, starterName)
+    end)
+    
+    self.gameStartButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.gameStartButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Запустить игру")
+        GameTooltip:Show()
+    end)
+    
+    self.gameStartButton:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    
     -- Кнопка крафта
     self.craftButton = CreateFrame("Button", nil, self.frame)
     self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
-    self.craftButton:SetPoint("TOPRIGHT", self.togglePlayerMarkerButton, "BOTTOMRIGHT", 0, -5)
+    self.craftButton:SetPoint("TOPRIGHT", self.gameStartButton, "BOTTOMRIGHT", 0, -5)
     self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
     self.craftButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
     self.craftButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")

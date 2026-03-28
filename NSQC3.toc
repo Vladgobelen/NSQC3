@@ -15,3 +15,5 @@ chats.lua
 NSQC3.xml
 tooltips.lua
 NSAukGuildBank.lua
+game_server.lua
+game_client.lua
