@@ -133,6 +133,18 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:NSQC3_GAME"] = {
+        {
+            keyword = {
+                { word = "NSQC3_GAME", position = 1, source = "prefix" },
+            },
+            func = "nsqc_game_start",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
     ["prefix:sendPoint"] = {
         {
             keyword = {
@@ -959,7 +971,36 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:NSQC3_GAME"] = {
+        {
+            keyword = {
+                { word = "NSQC3_GAME", position = 1, source = "prefix" },
+            },
+            func = "onGameStart",
+            conditions = {
+                function(channel, text, sender, prefix)
+                    -- Проверяем, что сообщение пришло от владельца участка или нам
+                    local kod2 = prefix:match(WORD_POSITION_PATTERNS[2])
+                    local myNome = GetUnitName("player")
+                    return kod2 == myNome
+                end
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
+
+function onGameStart(channel, text, sender, prefix)
+    -- Извлекаем имена из префикса
+    local ownerName = prefix:match(WORD_POSITION_PATTERNS[2])
+    local starterName = prefix:match(WORD_POSITION_PATTERNS[3])
+    
+    -- Создаем экземпляр серверного класса и передаем имена
+    local GameServer = loadfile("Interface\\AddOns\\NSQC3\\game_server.lua")()
+    local gameServer = GameServer:new()
+    gameServer:StartGame(ownerName, starterName)
+end
 
 -- Обработчики аддона
 
@@ -1496,6 +1537,21 @@ end
 
 function OnTestTrigger(channel, text, sender, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
+end
+
+function nsqc_game_start(channel, text, sender, prefix)
+    -- Парсим префикс для получения имен игроков
+    -- Формат префикса: NSQC3_GAME:ownerName:starterName
+    local parts = mysplit(prefix)
+    if #parts >= 3 then
+        local ownerName = parts[2]
+        local starterName = parts[3]
+        
+        -- Создаем экземпляр серверного класса и запускаем игру
+        local GameServer = ns_loadfile("Interface\\AddOns\\NSQC3\\game_server.lua")()
+        local gameServer = GameServer:new()
+        gameServer:StartGame(ownerName, starterName)
+    end
 end
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
