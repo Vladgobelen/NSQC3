@@ -1006,101 +1006,14 @@ local triggersByAddress = {
 -- GuildCoordsReceiver.lua
 -- Версия WoW: 3.3.5
 
+local DEBUG = true
 local iconPath = "Interface\\AddOns\\NSQC3\\libs\\121212.tga"
 local commPrefix = "GCOORDS"
 
 playerMarkers = playerMarkers or {}
 
--- ------------------------------------------------------------------
--- ТАБЛИЦА ПЕРЕВОДА ЗОН (Английский -> Русский)
--- ------------------------------------------------------------------
-local zoneTranslation = {
-    ["SilvermoonCity"] = "Луносвет",
-    ["Eversong Woods"] = "Леса Вечной Песни",
-    ["Ghostlands"] = "Призрачные Земли",
-    ["Isle of Quel'Danas"] = "Остров Кель'Данас",
-    ["Undercity"] = "Подгород",
-    ["Tirisfal Glades"] = "Тирисфальские леса",
-    ["Silverpine Forest"] = "Серебряный Бор",
-    ["Hillsbrad Foothills"] = "Предгорья Хилсбрада",
-    ["Alterac Mountains"] = "Альтеракские горы",
-    ["Western Plaguelands"] = "Западные Чумные земли",
-    ["Eastern Plaguelands"] = "Восточные Чумные земли",
-    ["Stratholme"] = "Стратхольм",
-    ["Scholomance"] = "Некроситет",
-    ["Stormwind"] = "Штормград",
-    ["Elwynn Forest"] = "Элвинский лес",
-    ["Westfall"] = "Западный Край",
-    ["Redridge Mountains"] = "Красногорье",
-    ["Duskwood"] = "Сумеречный лес",
-    ["Deadwind Pass"] = "Перевал Мёртвого Ветра",
-    ["Dun Morogh"] = "Дун Морог",
-    ["Loch Modan"] = "Лок Модан",
-    ["Wetlands"] = "Болотина",
-    ["Arathi Highlands"] = "Нагорье Арати",
-    ["Badlands"] = "Бесплодные земли",
-    ["Searing Gorge"] = "Тлеющее ущелье",
-    ["Ironforge"] = "Стальгорн",
-    ["Darnassus"] = "Дарнас",
-    ["Teldrassil"] = "Тельдрассил",
-    ["Darkshore"] = "Тёмные берега",
-    ["Azshara"] = "Азшара",
-    ["Booty Bay"] = "Пиратская Бухта",
-    ["Tanaris"] = "Танарис",
-    ["Un'Goro Crater"] = "Кратер Ун'Горо",
-    ["Silithus"] = "Силитус",
-    ["Feralas"] = "Фералас",
-    ["Thousand Needles"] = "Тысяча Игл",
-    ["Desolace"] = "Пустоши",
-    ["Dustwallow Marsh"] = "Пылевые топи",
-    ["The Barrens"] = "Степи",
-    ["Orgrimmar"] = "Оргриммар",
-    ["Durotar"] = "Дуротар",
-    ["Mulgore"] = "Мулгор",
-    ["Thunder Bluff"] = "Громовой Утёс",
-    ["Stonetalon Mountains"] = "Когтистые горы",
-    ["Ashenvale"] = "Ясеневый лес",
-    ["Felwood"] = "Оскверненный лес",
-    ["Moonglade"] = "Лунная поляна",
-    ["Winterspring"] = "Зимние Ключи",
-    ["Blackrock Mountain"] = "Гора Чёрной Скалы",
-    ["Blackrock Spire"] = "Пик Чёрной Скалы",
-    ["Blackwing Lair"] = "Логово Крыла Тьмы",
-    ["Molten Core"] = "Огненные Недра",
-    ["Onyxia's Lair"] = "Логово Ониксии",
-    ["Zul'Gurub"] = "Зул'Гуруб",
-    ["Ruins of Ahn'Qiraj"] = "Руины Ан'Киража",
-    ["Temple of Ahn'Qiraj"] = "Храм Ан'Киража",
-    ["Naxxramas"] = "Наксрамас",
-    ["Razorfen Downs"] = "Курганы Иглошкуров",
-    ["Razorfen Kraul"] = "Лабиринты Иглошкуров",
-    ["Maraudon"] = "Мародон",
-    ["Dire Maul"] = "Забытый Город",
-    ["Icecrown"] = "Ледяная Корона",
-    ["Storm Peaks"] = "Грозовая Гряда",
-    ["Crystalsong Forest"] = "Лес Хрустальной Песни",
-    ["Borean Tundra"] = "Борейская тундра",
-    ["Dragonblight"] = "Драконий Погост",
-    ["Grizzly Hills"] = "Седые холмы",
-    ["Zul'Drak"] = "Зул'Драк",
-    ["Sholazar Basin"] = "Низина Шолазар",
-    ["Wintergrasp"] = "Озеро Ледяных Оков",
-    ["Dalaran"] = "Даларан",
-    ["Icecrown Citadel"] = "Цитадель Ледяной Короны",
-    ["Ulduar"] = "Ульдуар",
-    ["Trial of the Crusader"] = "Испытание крестоносца",
-    ["Vault of Archavon"] = "Хранилище Аркавона",
-    ["The Eye of Eternity"] = "Око Вечности",
-    ["Azeroth"] = "Азерот",
-    ["Kalimdor"] = "Калимдор",
-    ["Outland"] = "Запределье",
-    ["Northrend"] = "Нордскол",
-    ["Eastern Kingdoms"] = "Восточные Королевства",
-}
-
-local function TranslateZone(enZone)
-    if not enZone then return nil end
-    return zoneTranslation[enZone] or enZone
+local function DebugPrint(...)
+    if DEBUG then print("[GC]", ...) end
 end
 
 -- ------------------------------------------------------------------
@@ -1124,15 +1037,26 @@ end)
 -- ------------------------------------------------------------------
 -- ФУНКЦИЯ ОТРИСОВКИ
 -- ------------------------------------------------------------------
-function CreateOrUpdateMarker(playerName, zone, subzone, x, y)
-    if not WorldMapButton then return end
+function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerMapID)
+    DebugPrint("=== ОТРИСОВКА ===")
+    DebugPrint("Игрок:", playerName)
+    DebugPrint("Зона игрока:", zone)
+    DebugPrint("MapID игрока:", playerMapID)
+    DebugPrint("Координаты:", x, y)
+    
+    if not WorldMapButton then
+        DebugPrint("ERROR: Нет WorldMapButton")
+        return
+    end
     
     local button = nil
     local isNew = false
     
     if playerMarkers[playerName] and playerMarkers[playerName].button then
         button = playerMarkers[playerName].button
+        DebugPrint("Метка существует")
     else
+        DebugPrint("Создаем новую метку")
         local safeName = playerName:gsub("[^%w]", "")
         button = CreateFrame("Button", "GuildCoordsMarker_" .. safeName, WorldMapButton)
         button:SetSize(16, 16)
@@ -1160,6 +1084,7 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y)
     playerMarkers[playerName].zone = zone
     playerMarkers[playerName].x = x
     playerMarkers[playerName].y = y
+    playerMarkers[playerName].mapID = playerMapID
     
     if WorldMapButton:GetWidth() and WorldMapButton:GetHeight() then
         button:ClearAllPoints()
@@ -1168,36 +1093,54 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y)
             -(y / 100) * WorldMapButton:GetHeight())
     end
     
+    -- Проверка карты
     local mapShown = WorldMapFrame and WorldMapFrame:IsShown()
-    local mapInfo = mapShown and GetMapInfo()
-    local mapZoneRU = nil
+    DebugPrint("Карта открыта:", mapShown)
     
-    if mapInfo then
-        local mapZoneEN = string.match(mapInfo, "([^%s]+)")
-        mapZoneRU = TranslateZone(mapZoneEN)
+    local currentMapID = 0
+    if mapShown then
+        _, _, currentMapID = GetMapInfo()
     end
+    DebugPrint("MapID карты:", currentMapID)
     
-    if mapShown and mapZoneRU and zone == mapZoneRU then
+    -- Сравниваем цифровые ID!
+    DebugPrint("Сравнение: MapID игрока [", playerMapID, "] == MapID карты [", currentMapID, "]")
+    DebugPrint("Результат:", playerMapID == currentMapID)
+    
+    if mapShown and currentMapID and playerMapID == currentMapID then
         button:Show()
+        DebugPrint(">>> ПОКАЗЫВАЕМ <<<")
     else
         button:Hide()
+        DebugPrint(">>> СКРЫВАЕМ <<<")
     end
     
     if isNew then button:Show() end
+    DebugPrint("==============")
 end
 
 -- ------------------------------------------------------------------
 -- ОСНОВНАЯ ФУНКЦИЯ
 -- ------------------------------------------------------------------
 function GCOORDS(channel, text, sender, prefix)
-    local zone, subzone, x, y = string.match(text, "([^|]+)|([^|]+)|([^|]+)|([^|]+)")
-    if not zone or not x or not y then return end
+    DebugPrint("=== СООБЩЕНИЕ ===")
+    DebugPrint("От:", sender)
+    DebugPrint("Текст:", text)
+    
+    local zone, subzone, x, y, mapID = string.match(text, "([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+    if not zone or not x or not y then
+        DebugPrint("ERROR: Парсинг failed")
+        return
+    end
     
     x = tonumber(x)
     y = tonumber(y)
-    if not x or not y then return end
+    mapID = tonumber(mapID) or 0
     
-    CreateOrUpdateMarker(sender, zone, subzone, x, y)
+    DebugPrint("Зона:", zone, "X:", x, "Y:", y, "MapID:", mapID)
+    DebugPrint("================")
+    
+    CreateOrUpdateMarker(sender, zone, subzone, x, y, mapID)
 end
 
 function onGameStart(channel, text, sender, prefix)

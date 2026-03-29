@@ -3241,7 +3241,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "GuildCoords" then
         RegisterAddonMessagePrefix(commPrefix)
-        print("GuildCoords: Загружен. Отправка координат активна.")
+        print("GuildCoords: Загружен.")
     end
 end)
 
@@ -3254,8 +3254,16 @@ timerFrame:SetScript("OnUpdate", function(self, elapsed)
             local x, y = GetPlayerMapPosition("player")
             local zone = GetRealZoneText()
             local subzone = GetMinimapZoneText()
-            -- Отправляем всегда, даже если координаты 0,0
-            SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f", zone, subzone, x * 100, y * 100), "GUILD")
+            
+            -- Получаем ID карты текущей зоны игрока
+            local mapID = 0
+            if WorldMapFrame then
+                WorldMapFrame:SetMapToCurrentZone()
+                _, _, mapID = GetMapInfo()
+            end
+            
+            -- Отправляем: Зона|Подзона|X|Y|MapID
+            SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f|%d", zone, subzone, x * 100, y * 100, mapID or 0), "GUILD")
         end
     end
 end)
