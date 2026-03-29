@@ -1006,7 +1006,6 @@ local triggersByAddress = {
 -- GuildCoordsReceiver.lua
 -- Версия WoW: 3.3.5
 
-local DEBUG = true
 local iconPath = "Interface\\AddOns\\NSQC3\\libs\\121212.tga"
 local commPrefix = "GCOORDS"
 
@@ -1016,7 +1015,6 @@ playerMarkers = playerMarkers or {}
 -- ТАБЛИЦА ПЕРЕВОДА ЗОН (Английский -> Русский)
 -- ------------------------------------------------------------------
 local zoneTranslation = {
-    -- Восточные Королевства
     ["SilvermoonCity"] = "Луносвет",
     ["Eversong Woods"] = "Леса Вечной Песни",
     ["Ghostlands"] = "Призрачные Земли",
@@ -1078,8 +1076,6 @@ local zoneTranslation = {
     ["Razorfen Kraul"] = "Лабиринты Иглошкуров",
     ["Maraudon"] = "Мародон",
     ["Dire Maul"] = "Забытый Город",
-    
-    -- Нордскол
     ["Icecrown"] = "Ледяная Корона",
     ["Storm Peaks"] = "Грозовая Гряда",
     ["Crystalsong Forest"] = "Лес Хрустальной Песни",
@@ -1095,8 +1091,6 @@ local zoneTranslation = {
     ["Trial of the Crusader"] = "Испытание крестоносца",
     ["Vault of Archavon"] = "Хранилище Аркавона",
     ["The Eye of Eternity"] = "Око Вечности",
-    
-    -- Континенты
     ["Azeroth"] = "Азерот",
     ["Kalimdor"] = "Калимдор",
     ["Outland"] = "Запределье",
@@ -1104,14 +1098,7 @@ local zoneTranslation = {
     ["Eastern Kingdoms"] = "Восточные Королевства",
 }
 
-local function DebugPrint(...)
-    if DEBUG then print("[GC]", ...) end
-end
-
--- ------------------------------------------------------------------
--- ФУНКЦИЯ ПЕРЕВОДА ЗОНЫ
--- ------------------------------------------------------------------
-function TranslateZone(enZone)
+local function TranslateZone(enZone)
     if not enZone then return nil end
     return zoneTranslation[enZone] or enZone
 end
@@ -1138,25 +1125,14 @@ end)
 -- ФУНКЦИЯ ОТРИСОВКИ
 -- ------------------------------------------------------------------
 function CreateOrUpdateMarker(playerName, zone, subzone, x, y)
-    DebugPrint("=== ОТРИСОВКА МЕТКИ ===")
-    DebugPrint("Игрок:", playerName)
-    DebugPrint("Зона игрока (из сообщения):", zone)
-    DebugPrint("Подзона игрока:", subzone)
-    DebugPrint("Координаты игрока:", x, y)
-    
-    if not WorldMapButton then
-        DebugPrint("ERROR: WorldMapButton не существует")
-        return
-    end
+    if not WorldMapButton then return end
     
     local button = nil
     local isNew = false
     
     if playerMarkers[playerName] and playerMarkers[playerName].button then
         button = playerMarkers[playerName].button
-        DebugPrint("Метка существует, обновляем")
     else
-        DebugPrint("Создаем новую метку")
         local safeName = playerName:gsub("[^%w]", "")
         button = CreateFrame("Button", "GuildCoordsMarker_" .. safeName, WorldMapButton)
         button:SetSize(16, 16)
@@ -1192,81 +1168,34 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y)
             -(y / 100) * WorldMapButton:GetHeight())
     end
     
-    -- === ПРОВЕРКА КАРТЫ ===
-    DebugPrint("=== ПРОВЕРКА КАРТЫ ===")
-    
     local mapShown = WorldMapFrame and WorldMapFrame:IsShown()
-    DebugPrint("Карта открыта:", mapShown)
-    
     local mapInfo = mapShown and GetMapInfo()
-    DebugPrint("GetMapInfo():", mapInfo)
-    
-    local mapZoneEN = nil
     local mapZoneRU = nil
+    
     if mapInfo then
-        mapZoneEN = string.match(mapInfo, "([^%s]+)")
+        local mapZoneEN = string.match(mapInfo, "([^%s]+)")
         mapZoneRU = TranslateZone(mapZoneEN)
-        DebugPrint("Зона на карте (EN):", mapZoneEN)
-        DebugPrint("Зона на карте (RU):", mapZoneRU)
-    else
-        DebugPrint("Зона на карте: nil (видна вся планета)")
     end
-    
-    DebugPrint("Где я физически:", GetRealZoneText())
-    
-    -- === РЕШЕНИЕ ===
-    DebugPrint("=== РЕШЕНИЕ ===")
-    DebugPrint("Условие 1 - Карта открыта:", mapShown)
-    DebugPrint("Условие 2 - Зона карты определена:", mapZoneRU ~= nil)
-    DebugPrint("Условие 3 - Зоны совпадают:", zone == mapZoneRU)
     
     if mapShown and mapZoneRU and zone == mapZoneRU then
         button:Show()
-        DebugPrint(">>> ПОКАЗЫВАЕМ метку <<<")
     else
         button:Hide()
-        DebugPrint(">>> СКРЫВАЕМ метку <<<")
-        if not mapShown then DebugPrint("Причина: карта закрыта") end
-        if not mapZoneRU then DebugPrint("Причина: видна вся планета (nil)") end
-        if zone ~= mapZoneRU then DebugPrint("Причина: зоны не совпадают (", zone, "~=", mapZoneRU, ")") end
     end
     
     if isNew then button:Show() end
-    
-    DebugPrint("========================")
 end
 
 -- ------------------------------------------------------------------
 -- ОСНОВНАЯ ФУНКЦИЯ
 -- ------------------------------------------------------------------
 function GCOORDS(channel, text, sender, prefix)
-    DebugPrint("========================================")
-    DebugPrint("ПОЛУЧЕНО СООБЩЕНИЕ")
-    DebugPrint("Канал:", channel)
-    DebugPrint("Отправитель:", sender)
-    DebugPrint("Текст:", text)
-    
     local zone, subzone, x, y = string.match(text, "([^|]+)|([^|]+)|([^|]+)|([^|]+)")
-    
-    if not zone or not x or not y then
-        DebugPrint("ERROR: Не удалось распарсить сообщение")
-        return
-    end
+    if not zone or not x or not y then return end
     
     x = tonumber(x)
     y = tonumber(y)
-    
-    if not x or not y then
-        DebugPrint("ERROR: Координаты не числа")
-        return
-    end
-    
-    DebugPrint("Парсинг успешен:")
-    DebugPrint("  Зона:", zone)
-    DebugPrint("  Подзона:", subzone)
-    DebugPrint("  X:", x)
-    DebugPrint("  Y:", y)
-    DebugPrint("========================================")
+    if not x or not y then return end
     
     CreateOrUpdateMarker(sender, zone, subzone, x, y)
 end
