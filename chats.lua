@@ -1006,7 +1006,7 @@ local triggersByAddress = {
 -- GuildCoordsReceiver.lua
 -- Версия WoW: 3.3.5
 
-local DEBUG = true
+local DEBUG = false
 local iconPath = "Interface\\AddOns\\NSQC3\\libs\\121212.tga"
 local commPrefix = "GCOORDS"
 
@@ -1037,26 +1037,15 @@ end)
 -- ------------------------------------------------------------------
 -- ФУНКЦИЯ ОТРИСОВКИ
 -- ------------------------------------------------------------------
-function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerMapID)
-    DebugPrint("=== ОТРИСОВКА ===")
-    DebugPrint("Игрок:", playerName)
-    DebugPrint("Зона игрока:", zone)
-    DebugPrint("MapID игрока:", playerMapID)
-    DebugPrint("Координаты:", x, y)
-    
-    if not WorldMapButton then
-        DebugPrint("ERROR: Нет WorldMapButton")
-        return
-    end
+function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerAreaID)
+    if not WorldMapButton then return end
     
     local button = nil
     local isNew = false
     
     if playerMarkers[playerName] and playerMarkers[playerName].button then
         button = playerMarkers[playerName].button
-        DebugPrint("Метка существует")
     else
-        DebugPrint("Создаем новую метку")
         local safeName = playerName:gsub("[^%w]", "")
         button = CreateFrame("Button", "GuildCoordsMarker_" .. safeName, WorldMapButton)
         button:SetSize(16, 16)
@@ -1084,7 +1073,7 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerMapID)
     playerMarkers[playerName].zone = zone
     playerMarkers[playerName].x = x
     playerMarkers[playerName].y = y
-    playerMarkers[playerName].mapID = playerMapID
+    playerMarkers[playerName].areaID = playerAreaID
     
     if WorldMapButton:GetWidth() and WorldMapButton:GetHeight() then
         button:ClearAllPoints()
@@ -1093,21 +1082,14 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerMapID)
             -(y / 100) * WorldMapButton:GetHeight())
     end
     
-    -- Проверка карты
+    -- Получаем ID открытой карты
     local mapShown = WorldMapFrame and WorldMapFrame:IsShown()
-    DebugPrint("Карта открыта:", mapShown)
+    local currentAreaID = mapShown and GetCurrentMapAreaID() or 0
     
-    local currentMapID = 0
-    if mapShown then
-        _, _, currentMapID = GetMapInfo()
-    end
-    DebugPrint("MapID карты:", currentMapID)
+    DebugPrint("Игрок:", playerName, "AreaID игрока:", playerAreaID, "AreaID карты:", currentAreaID)
     
-    -- Сравниваем цифровые ID!
-    DebugPrint("Сравнение: MapID игрока [", playerMapID, "] == MapID карты [", currentMapID, "]")
-    DebugPrint("Результат:", playerMapID == currentMapID)
-    
-    if mapShown and currentMapID and playerMapID == currentMapID then
+    -- Сравниваем цифровые ID
+    if mapShown and playerAreaID > 0 and playerAreaID == currentAreaID then
         button:Show()
         DebugPrint(">>> ПОКАЗЫВАЕМ <<<")
     else
@@ -1116,31 +1098,23 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerMapID)
     end
     
     if isNew then button:Show() end
-    DebugPrint("==============")
 end
 
 -- ------------------------------------------------------------------
 -- ОСНОВНАЯ ФУНКЦИЯ
 -- ------------------------------------------------------------------
 function GCOORDS(channel, text, sender, prefix)
-    DebugPrint("=== СООБЩЕНИЕ ===")
-    DebugPrint("От:", sender)
-    DebugPrint("Текст:", text)
-    
-    local zone, subzone, x, y, mapID = string.match(text, "([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)")
-    if not zone or not x or not y then
-        DebugPrint("ERROR: Парсинг failed")
-        return
-    end
+    print(sender)
+    local zone, subzone, x, y, areaID = string.match(text, "([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+    if not zone or not x or not y then return end
     
     x = tonumber(x)
     y = tonumber(y)
-    mapID = tonumber(mapID) or 0
+    areaID = tonumber(areaID) or 0
     
-    DebugPrint("Зона:", zone, "X:", x, "Y:", y, "MapID:", mapID)
-    DebugPrint("================")
+    DebugPrint("Получено от:", sender, "Зона:", zone, "AreaID:", areaID)
     
-    CreateOrUpdateMarker(sender, zone, subzone, x, y, mapID)
+    CreateOrUpdateMarker(sender, zone, subzone, x, y, areaID)
 end
 
 function onGameStart(channel, text, sender, prefix)

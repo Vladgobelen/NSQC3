@@ -3254,16 +3254,10 @@ timerFrame:SetScript("OnUpdate", function(self, elapsed)
             local x, y = GetPlayerMapPosition("player")
             local zone = GetRealZoneText()
             local subzone = GetMinimapZoneText()
+            local areaID = GetCurrentMapAreaID() or 0
             
-            -- Получаем ID карты текущей зоны игрока
-            local mapID = 0
-            if WorldMapFrame then
-                WorldMapFrame:SetMapToCurrentZone()
-                _, _, mapID = GetMapInfo()
-            end
-            
-            -- Отправляем: Зона|Подзона|X|Y|MapID
-            SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f|%d", zone, subzone, x * 100, y * 100, mapID or 0), "GUILD")
+            -- Отправляем: Зона|Подзона|X|Y|AreaID
+            SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f|%d", zone, subzone, x * 100, y * 100, areaID), "GUILD")
         end
     end
 end)
