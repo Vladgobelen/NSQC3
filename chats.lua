@@ -1006,15 +1006,10 @@ local triggersByAddress = {
 -- GuildCoordsReceiver.lua
 -- Версия WoW: 3.3.5
 
-local DEBUG = false
 local iconPath = "Interface\\AddOns\\NSQC3\\libs\\121212.tga"
 local commPrefix = "GCOORDS"
 
 playerMarkers = playerMarkers or {}
-
-local function DebugPrint(...)
-    if DEBUG then print("[GC]", ...) end
-end
 
 -- ------------------------------------------------------------------
 -- ИНИЦИАЛИЗАЦИЯ
@@ -1050,7 +1045,12 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerAreaID)
         button = CreateFrame("Button", "GuildCoordsMarker_" .. safeName, WorldMapButton)
         button:SetSize(16, 16)
         button:SetNormalTexture(iconPath)
-        isNew = true
+        
+        -- ВАЖНО: Поднимаем уровень фрейма чтобы тултип работал
+        button:SetFrameLevel(WorldMapButton:GetFrameLevel() + 10)
+        button:SetFrameStrata("HIGH")
+        button:EnableMouse(true)
+        button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         
         if not playerMarkers[playerName] then
             playerMarkers[playerName] = {}
@@ -1062,6 +1062,9 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerAreaID)
             GameTooltip:AddLine(playerName, 1, 1, 1)
             GameTooltip:AddLine(string.format("Координаты: %.1f, %.1f", x, y), 0.5, 0.5, 0.5)
             GameTooltip:AddLine(string.format("Зона: %s", zone), 0.5, 0.5, 0.5)
+            if subzone and subzone ~= "" then
+                GameTooltip:AddLine(string.format("Подзона: %s", subzone), 0.5, 0.5, 0.5)
+            end
             GameTooltip:Show()
         end)
         
@@ -1071,6 +1074,7 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerAreaID)
     end
     
     playerMarkers[playerName].zone = zone
+    playerMarkers[playerName].subzone = subzone
     playerMarkers[playerName].x = x
     playerMarkers[playerName].y = y
     playerMarkers[playerName].areaID = playerAreaID
@@ -1086,15 +1090,11 @@ function CreateOrUpdateMarker(playerName, zone, subzone, x, y, playerAreaID)
     local mapShown = WorldMapFrame and WorldMapFrame:IsShown()
     local currentAreaID = mapShown and GetCurrentMapAreaID() or 0
     
-    DebugPrint("Игрок:", playerName, "AreaID игрока:", playerAreaID, "AreaID карты:", currentAreaID)
-    
     -- Сравниваем цифровые ID
     if mapShown and playerAreaID > 0 and playerAreaID == currentAreaID then
         button:Show()
-        DebugPrint(">>> ПОКАЗЫВАЕМ <<<")
     else
         button:Hide()
-        DebugPrint(">>> СКРЫВАЕМ <<<")
     end
     
     if isNew then button:Show() end
@@ -1104,15 +1104,12 @@ end
 -- ОСНОВНАЯ ФУНКЦИЯ
 -- ------------------------------------------------------------------
 function GCOORDS(channel, text, sender, prefix)
-    print(sender)
     local zone, subzone, x, y, areaID = string.match(text, "([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)")
     if not zone or not x or not y then return end
     
     x = tonumber(x)
     y = tonumber(y)
     areaID = tonumber(areaID) or 0
-    
-    DebugPrint("Получено от:", sender, "Зона:", zone, "AreaID:", areaID)
     
     CreateOrUpdateMarker(sender, zone, subzone, x, y, areaID)
 end

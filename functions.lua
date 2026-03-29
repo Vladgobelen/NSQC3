@@ -3241,7 +3241,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "GuildCoords" then
         RegisterAddonMessagePrefix(commPrefix)
-        print("GuildCoords: Загружен.")
+        print("GuildCoords: Загружен. Отправка координат активна.")
     end
 end)
 
