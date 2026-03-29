@@ -3229,3 +3229,34 @@ initFrame:SetScript("OnEvent", function(self, event, name)
         self:UnregisterEvent("ADDON_LOADED")
     end
 end)
+--- координаты ---
+-- GuildCoords.lua
+-- Версия WoW: 3.3.5
+
+local commPrefix = "GCOORDS"
+local elapsedTime = 0.0
+
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("ADDON_LOADED")
+eventFrame:SetScript("OnEvent", function(self, event, arg1)
+    if event == "ADDON_LOADED" and arg1 == "GuildCoords" then
+        RegisterAddonMessagePrefix(commPrefix)
+        print("GuildCoords: Загружен. Отправка координат активна.")
+    end
+end)
+
+local timerFrame = CreateFrame("Frame")
+timerFrame:SetScript("OnUpdate", function(self, elapsed)
+    elapsedTime = elapsedTime + elapsed
+    if elapsedTime >= 1.0 then
+        elapsedTime = 0.0
+        if IsInGuild() then
+            local x, y = GetPlayerMapPosition("player")
+            local zone = GetRealZoneText()
+            local subzone = GetMinimapZoneText()
+            -- Отправляем всегда, даже если координаты 0,0
+            SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f", zone, subzone, x * 100, y * 100), "GUILD")
+        end
+    end
+end)
+--- координаты ---

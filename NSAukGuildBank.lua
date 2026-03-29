@@ -1777,3 +1777,8 @@ end
 -- УНИКАЛЬНЫЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ВЕРСИИ A
 NSAukGuildBank_A = NSAukGuildBankClass_A
 NSAukGuildBankInstance_A = NSAukGuildBankClass_A.new(nil)
+
+
+
+
+
