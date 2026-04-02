@@ -3230,35 +3230,180 @@ initFrame:SetScript("OnEvent", function(self, event, name)
     end
 end)
 --- координаты ---
--- GuildCoords.lua
--- Версия WoW: 3.3.5
+-- -- GuildCoords.lua
+-- -- Версия WoW: 3.3.5
 
-local commPrefix = "GCOORDS"
-local elapsedTime = 0.0
+-- local commPrefix = "GCOORDS"
+-- local elapsedTime = 0.0
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("ADDON_LOADED")
-eventFrame:SetScript("OnEvent", function(self, event, arg1)
-    if event == "ADDON_LOADED" and arg1 == "GuildCoords" then
-        RegisterAddonMessagePrefix(commPrefix)
-        print("GuildCoords: Загружен. Отправка координат активна.")
-    end
-end)
+-- local eventFrame = CreateFrame("Frame")
+-- eventFrame:RegisterEvent("ADDON_LOADED")
+-- eventFrame:SetScript("OnEvent", function(self, event, arg1)
+--     if event == "ADDON_LOADED" and arg1 == "GuildCoords" then
+--         RegisterAddonMessagePrefix(commPrefix)
+--         print("GuildCoords: Загружен. Отправка координат активна.")
+--     end
+-- end)
 
-local timerFrame = CreateFrame("Frame")
-timerFrame:SetScript("OnUpdate", function(self, elapsed)
-    elapsedTime = elapsedTime + elapsed
-    if elapsedTime >= 1.0 then
-        elapsedTime = 0.0
-        if IsInGuild() then
-            local x, y = GetPlayerMapPosition("player")
-            local zone = GetRealZoneText()
-            local subzone = GetMinimapZoneText()
-            local areaID = GetCurrentMapAreaID() or 0
+-- local timerFrame = CreateFrame("Frame")
+-- timerFrame:SetScript("OnUpdate", function(self, elapsed)
+--     elapsedTime = elapsedTime + elapsed
+--     if elapsedTime >= 1.0 then
+--         elapsedTime = 0.0
+--         if IsInGuild() then
+--             local x, y = GetPlayerMapPosition("player")
+--             local zone = GetRealZoneText()
+--             local subzone = GetMinimapZoneText()
+--             local areaID = GetCurrentMapAreaID() or 0
             
-            -- Отправляем: Зона|Подзона|X|Y|AreaID
-            SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f|%d", zone, subzone, x * 100, y * 100, areaID), "GUILD")
-        end
+--             -- Отправляем: Зона|Подзона|X|Y|AreaID
+--             SendAddonMessage(commPrefix, string.format("%s|%s|%.1f|%.1f|%d", zone, subzone, x * 100, y * 100, areaID), "GUILD")
+--         end
+--     end
+-- end)
+-- --- координаты ---
+
+----гитхаб
+-- ==========================================
+-- Префикс аддона и очередь отправки
+-- ==========================================
+local BUGS_PREFIX = "ns_bugs"
+
+-- Фрейм для отложенной отправки (эмуляция таймера без C_Timer)
+local SendTimerFrame = CreateFrame("Frame")
+local sendQueue = {}
+local queueIndex = 1
+local timeSinceLastSend = 0
+
+SendTimerFrame:Hide()
+SendTimerFrame:SetScript("OnUpdate", function(self, elapsed)
+    timeSinceLastSend = timeSinceLastSend + elapsed
+    if timeSinceLastSend >= 0.01 and queueIndex <= #sendQueue then
+        local msg = sendQueue[queueIndex]
+        SendAddonMessage("ns_bugsRe", msg, "GUILD")
+        print("[DEBUG][ns_bugs] Отправлен пакет " .. queueIndex .. "/" .. #sendQueue)
+        queueIndex = queueIndex + 1
+        timeSinceLastSend = 0
+    end
+    if queueIndex > #sendQueue then
+        sendQueue = {}
+        queueIndex = 1
+        timeSinceLastSend = 0
+        self:Hide()
     end
 end)
---- координаты ---
+
+-- ==========================================
+-- Создание окна интерфейса
+-- ==========================================
+local function CreateBugReportFrame()
+    if _G["BugReportFrame"] then return _G["BugReportFrame"] end
+
+    local frame = CreateFrame("Frame", "BugReportFrame", UIParent)
+    frame:SetWidth(768)
+    frame:SetHeight(600)
+    frame:SetPoint("CENTER")
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    
+    frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+    
+    frame:SetBackdrop({
+        bgFile = "Interface\\BUTTONS\\WHITE8X8",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    frame:SetBackdropColor(0, 0, 0, 1)
+
+    -- Кнопка закрытия
+    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    closeBtn:SetWidth(24)
+    closeBtn:SetHeight(24)
+    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    closeBtn:SetText("X")
+    closeBtn:SetScript("OnClick", function(self) self:GetParent():Hide() end)
+
+    -- Кнопка "Загрузить"
+    local loadBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    loadBtn:SetWidth(120)
+    loadBtn:SetHeight(24)
+    loadBtn:SetPoint("TOPLEFT", 15, -15)
+    loadBtn:SetText("Загрузить")
+
+    -- Поле ввода
+    local inputBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+    inputBox:SetHeight(24)
+    inputBox:SetPoint("LEFT", loadBtn, "RIGHT", 10, 0)
+    inputBox:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0)
+    inputBox:SetAutoFocus(false)
+    inputBox:SetMaxLetters(255)
+    inputBox:SetText("")
+    inputBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    -- Область вывода с прокруткой
+    local listFrame = CreateFrame("ScrollingMessageFrame", "BugReportList", frame)
+    listFrame:SetPoint("TOPLEFT", loadBtn, "BOTTOMLEFT", 5, -15)
+    listFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -15, 15)
+    -- [ИЗМЕНЕНО] Установлен тройной размер шрифта для теста (стандарт ~14 -> 42)
+    listFrame:SetFont("Fonts\\FRIZQT__.TTF", 13, "") 
+    listFrame:SetMaxLines(2000)
+    listFrame:SetFading(false)
+    listFrame:SetJustifyH("LEFT")
+    listFrame:EnableMouse(true)
+    listFrame:EnableMouseWheel(true)
+    listFrame:SetScript("OnMouseWheel", function(self, delta)
+        if delta > 0 then self:ScrollUp() else self:ScrollDown() end
+    end)
+
+    -- Счётчик найденных записей
+    local counterText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    counterText:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 0, 5)
+    counterText:SetText("Найдено: 0")
+    _G["BugReportCounterText"] = counterText
+    _G["BugReportCount"] = 0
+
+    -- Функция очистки списка
+    local function ClearList()
+        listFrame:Clear()
+        _G["BugReportCount"] = 0
+        counterText:SetText("Найдено: 0")
+    end
+
+    -- Функция отправки запроса
+    local function SendRequest()
+        local msg = inputBox:GetText() or ""
+        
+        -- 1. Очищаем текущий вывод перед новым запросом
+        ClearList()
+        
+        -- 2. Отправляем запрос в гильдию
+        SendAddonMessage(BUGS_PREFIX, msg, "GUILD")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Bugs]|r Запрос отправлен в гильдию: " .. (msg ~= "" and msg or "(пусто)"))
+        
+        -- 3. Очищаем поле ввода и снимаем фокус
+        inputBox:SetText("")
+        inputBox:ClearFocus()
+    end
+
+    loadBtn:SetScript("OnClick", SendRequest)
+    inputBox:SetScript("OnEnterPressed", function(self)
+        SendRequest()
+        self:ClearFocus()
+    end)
+
+    return frame
+end
+
+-- ==========================================
+-- Регистрация команды /bugs
+-- ==========================================
+SLASH_BUGS1 = "/bugs"
+SlashCmdList["BUGS"] = function()
+    CreateBugReportFrame():Show()
+end
+---гитхаб

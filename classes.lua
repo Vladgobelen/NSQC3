@@ -3526,16 +3526,37 @@ function AdaptiveFrame:new(parent)
     self.gameStartButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     
     self.gameStartButton:SetScript("OnClick", function()
-        -- Создаем экземпляр клиентского класса и запускаем игру
-        local GameClient = ns_loadfile("Interface\\AddOns\\NSQC3\\game_client.lua")()
-        local gameClient = GameClient:new()
-        
-        -- Получаем имя владельца участка и имя текущего игрока
-        local ownerName = self.owner or UnitName("player")
-        local starterName = UnitName("player")
-        
-        -- Запускаем игру
-        gameClient:StartGame(ownerName, starterName)
+        -- Проверяем, существует ли уже экземпляр игрового клиента
+        if self.gameClient and self.gameClient:IsActive() then
+            -- Класс существует и игра активна - завершаем игру
+            self.gameClient:EndGame()
+            self.gameClient = nil
+            print("|cFFFF0000[Игра]|r Игра завершена")
+        else
+            -- Класс не существует или игра не активна - создаем и запускаем
+            self.gameClient = GameClient:new()
+            
+            -- Получаем имя владельца участка из заголовка окна
+            local ownerName = self.owner
+            if not ownerName and self.textField then
+                local headerText = self.textField:GetText() or ""
+                -- Разбиваем заголовок по пробелам и берем первое слово
+                local parts = mysplit(headerText)
+                if parts and parts[1] then
+                    ownerName = parts[1]
+                end
+            end
+            if not ownerName or ownerName == "" then
+                ownerName = UnitName("player")
+            end
+            
+            -- Имя игрока, который кликнул на кнопку
+            local starterName = UnitName("player")
+            
+            -- Запускаем игру
+            self.gameClient:StartGame(ownerName, starterName)
+            print("|cFF00FF00[Игра]|r Игра запущена")
+        end
     end)
     
     self.gameStartButton:SetScript("OnEnter", function()

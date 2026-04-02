@@ -1,7 +1,7 @@
 -- Клиентская часть мини-игры
 -- Отправка сигналов серверу через чат аддонов
 
-local GameClient = {}
+GameClient = {}
 GameClient.__index = GameClient
 
 function GameClient:new()
@@ -12,10 +12,16 @@ end
 function GameClient:StartGame(ownerName, starterName)
     -- Отправляем сигнал серверу через чат аддонов в гильдию
     -- Формат сообщения: START:ownerName:starterName
-    local message = "START:" .. ownerName .. ":" .. starterName
-    
+    local message = ownerName .. " " .. starterName
     -- Используем встроенную функцию отправки сообщений аддона через гильдию
     SendAddonMessage("NSQC3_GAME", message, "GUILD")
 end
 
-return GameClient
+function GameClient:EndGame()
+    -- Отправляем сигнал завершения игры серверу через чат аддонов в гильдию
+    -- Формат сообщения: END:ownerName:starterName
+    local ownerName = UnitName("player")
+    local message = "END " .. ownerName
+    -- Используем встроенную функцию отправки сообщений аддона через гильдию
+    SendAddonMessage("NSQC3_GAME", message, "GUILD")
+end

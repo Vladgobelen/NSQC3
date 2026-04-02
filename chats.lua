@@ -133,24 +133,24 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
-    ["prefix:NSQC3_GAME"] = {
-        {
-            keyword = {
-                { word = "NSQC3_GAME", position = 1, source = "prefix" },
-            },
-            func = "nsqc_game_start",
-            conditions = {
-            },
-            chatType = {"ADDON"},
-            stopOnMatch = true,
-        }
-    },
     ["prefix:sendPoint"] = {
         {
             keyword = {
                 { word = "sendPoint", position = 1, source = "prefix" },
             },
             func = "sendPoint",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:ns_bugsRe"] = {
+        {
+            keyword = {
+                { word = "ns_bugsRe", position = 1, source = "prefix" },
+            },
+            func = "ns_bugsRe",
             conditions = {
             },
             chatType = {"ADDON"},
@@ -1003,6 +1003,55 @@ local triggersByAddress = {
     },
 }
 
+-- ==========================================
+-- Обработчик входящих сообщений (ns_bugsRe)
+-- ==========================================
+function ns_bugsRe(channel, text, sender, full_prefix)
+    if not text or text == "" then return end
+    
+    local list = _G["BugReportList"]
+    if not list then return end
+
+    -- [ИЗМЕНЕНО] Парсим пришедшую строку: разделяем владельца и текст по "||"
+    local owner, wishText = string.match(text, "^(.-)||(.+)$")
+    if not owner then
+        -- Фолбэк на случай поврежденного пакета
+        owner = "Неизвестно"
+        wishText = text
+    end
+
+    -- Удаляем юникстайм из конца строки (если есть)
+    wishText = string.gsub(wishText, "%s%d+$", "")
+
+    -- [ИЗМЕНЕНО] Проверяем, начинается ли запрос с '*' (учитываем возможные пробелы)
+    local isGreen = string.match(wishText, "^%s*%*")
+
+    -- Формируем строку для отображения: Владелец: Текст запроса
+    local displayText = owner .. ": " .. wishText
+
+    -- Применяем зелёный цвет, если найден маркер
+    if isGreen then
+        displayText = "|cff00ff00" .. displayText .. "|r"
+    end
+
+    -- Добавляем в список
+    list:AddMessage(displayText)
+
+    -- Обновляем счётчик
+    local count = (_G["BugReportCount"] or 0) + 1
+    _G["BugReportCount"] = count
+    local counter = _G["BugReportCounterText"]
+    if counter then
+        counter:SetText("Найдено: " .. count)
+    end
+
+    -- Автопоказ окна
+    local frame = _G["BugReportFrame"]
+    if frame and not frame:IsShown() then
+        frame:Show()
+    end
+end
+
 -- GuildCoordsReceiver.lua
 -- Версия WoW: 3.3.5
 
@@ -1305,12 +1354,10 @@ end
 
 function uT(channel, text, sender, prefix)
     getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, false)
-    print('111')
 end
 
 function uTH(channel, text, sender, prefix)
     getUnixTime(prefix:match(WORD_POSITION_PATTERNS[1]), text, _, sender, true)
-    print('222')
 end
 
 function ns_bonusQuestFinal(channel, text, sender, prefix)
@@ -1662,20 +1709,7 @@ function OnTestTrigger(channel, text, sender, prefix)
     SendChatMessage("Триггер 'тест' сработал!", "GUILD")
 end
 
-function nsqc_game_start(channel, text, sender, prefix)
-    -- Парсим префикс для получения имен игроков
-    -- Формат префикса: NSQC3_GAME:ownerName:starterName
-    local parts = mysplit(prefix)
-    if #parts >= 3 then
-        local ownerName = parts[2]
-        local starterName = parts[3]
-        
-        -- Создаем экземпляр серверного класса и запускаем игру
-        local GameServer = ns_loadfile("Interface\\AddOns\\NSQC3\\game_server.lua")()
-        local gameServer = GameServer:new()
-        gameServer:StartGame(ownerName, starterName)
-    end
-end
+
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
 chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON",})
