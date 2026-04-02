@@ -1009,24 +1009,33 @@ local triggersByAddress = {
 function ns_bugsRe(channel, text, sender, full_prefix)
     if not text or text == "" then return end
     
-    local list = _G["BugReportList"]
-    if not list then return end
+    -- [ИЗМЕНЕНО] Парсим формат ответа: RES:RequesterName||Owner||WishText
+    local prefix, rest = string.match(text, "^(RES:.-)||(.+)$")
+    if not prefix or not rest then return end -- Игнорируем повреждённые/чужие пакеты
 
-    -- [ИЗМЕНЕНО] Парсим пришедшую строку: разделяем владельца и текст по "||"
-    local owner, wishText = string.match(text, "^(.-)||(.+)$")
-    if not owner then
-        -- Фолбэк на случай поврежденного пакета
-        owner = "Неизвестно"
-        wishText = text
+    local targetRequester = string.sub(prefix, 5) -- Убираем "RES:"
+    local myName = UnitName("player") or ""
+    local isAdmin = ns_bugs_Admins[myName] == true
+
+    -- [ИЗМЕНЕНО] Проверяем, предназначен ли ответ нам. Админы пропускаются.
+    if targetRequester ~= myName and not isAdmin then
+        return -- Игнорируем результаты чужих запросов
     end
 
-    -- Удаляем юникстайм из конца строки (если есть)
+    -- Разделяем владельца и текст пожелания
+    local owner, wishText = string.match(rest, "^(.-)||(.+)$")
+    if not owner or not wishText then
+        owner = "Неизвестно"
+        wishText = rest
+    end
+
+    -- Вырезаем юникстайм из конца строки (если есть)
     wishText = string.gsub(wishText, "%s%d+$", "")
 
-    -- [ИЗМЕНЕНО] Проверяем, начинается ли запрос с '*' (учитываем возможные пробелы)
+    -- Проверяем, начинается ли запрос с '*' (учитываем пробелы)
     local isGreen = string.match(wishText, "^%s*%*")
 
-    -- Формируем строку для отображения: Владелец: Текст запроса
+    -- Формируем строку для отображения: Владелец: Текст
     local displayText = owner .. ": " .. wishText
 
     -- Применяем зелёный цвет, если найден маркер
@@ -1034,8 +1043,10 @@ function ns_bugsRe(channel, text, sender, full_prefix)
         displayText = "|cff00ff00" .. displayText .. "|r"
     end
 
-    -- Добавляем в список
-    list:AddMessage(displayText)
+    local list = _G["BugReportList"]
+    if list then
+        list:AddMessage(displayText)
+    end
 
     -- Обновляем счётчик
     local count = (_G["BugReportCount"] or 0) + 1
