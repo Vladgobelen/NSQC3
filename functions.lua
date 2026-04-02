@@ -3265,15 +3265,9 @@ end)
 
 ----гитхаб
 -- ==========================================
--- Префикс аддона и таблица администраторов
+-- Префикс аддона и очередь отправки
 -- ==========================================
 local BUGS_PREFIX = "ns_bugs"
-
--- [ИЗМЕНЕНО] Статическая таблица привилегированных пользователей
--- Те, кто в списке, видят запросы любого игрока без ограничений
-ns_bugs_Admins = {
-    ["Шеф"] = true,
-}
 
 -- Фрейм для отложенной отправки (эмуляция таймера без C_Timer)
 local SendTimerFrame = CreateFrame("Frame")
@@ -3287,6 +3281,7 @@ SendTimerFrame:SetScript("OnUpdate", function(self, elapsed)
     if timeSinceLastSend >= 0.01 and queueIndex <= #sendQueue then
         local msg = sendQueue[queueIndex]
         SendAddonMessage("ns_bugsRe", msg, "GUILD")
+        print("[DEBUG][ns_bugs] Отправлен пакет " .. queueIndex .. "/" .. #sendQueue)
         queueIndex = queueIndex + 1
         timeSinceLastSend = 0
     end
@@ -3383,7 +3378,7 @@ local function CreateBugReportFrame()
         local msg = inputBox:GetText() or ""
         ClearList()
 
-        -- [ИЗМЕНЕНО] Формируем пакет запроса с ником просителя: REQ:Ник||Текст
+        -- Формируем пакет запроса с ником просителя: REQ:Ник||Текст
         local myName = UnitName("player") or "Unknown"
         local queryPayload = "REQ:" .. myName .. "||" .. msg
 

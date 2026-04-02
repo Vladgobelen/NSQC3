@@ -1009,17 +1009,17 @@ local triggersByAddress = {
 function ns_bugsRe(channel, text, sender, full_prefix)
     if not text or text == "" then return end
     
-    -- [ИЗМЕНЕНО] Парсим формат ответа: RES:RequesterName||Owner||WishText
-    local prefix, rest = string.match(text, "^(RES:.-)||(.+)$")
-    if not prefix or not rest then return end -- Игнорируем повреждённые/чужие пакеты
+    -- Парсим формат ответа: RES:RequesterName||Owner||WishText
+    local prefixTag, rest = string.match(text, "^(RES:.-)||(.+)$")
+    if not prefixTag or not rest then return end
 
-    local targetRequester = string.sub(prefix, 5) -- Убираем "RES:"
+    local targetRequester = string.sub(prefixTag, 5) -- Убираем "RES:"
     local myName = UnitName("player") or ""
-    local isAdmin = ns_bugs_Admins[myName] == true
 
-    -- [ИЗМЕНЕНО] Проверяем, предназначен ли ответ нам. Админы пропускаются.
-    if targetRequester ~= myName and not isAdmin then
-        return -- Игнорируем результаты чужих запросов
+    -- СТРОГАЯ ПРОВЕРКА: отображаем ТОЛЬКО если запрос делал текущий игрок
+    -- Даже админы из таблицы не видят чужие ответы, пока сами не отправят запрос
+    if targetRequester ~= myName then
+        return 
     end
 
     -- Разделяем владельца и текст пожелания
@@ -1032,7 +1032,7 @@ function ns_bugsRe(channel, text, sender, full_prefix)
     -- Вырезаем юникстайм из конца строки (если есть)
     wishText = string.gsub(wishText, "%s%d+$", "")
 
-    -- Проверяем, начинается ли запрос с '*' (учитываем пробелы)
+    -- Проверяем, начинается ли запрос с '*' (учитываем ведущие пробелы)
     local isGreen = string.match(wishText, "^%s*%*")
 
     -- Формируем строку для отображения: Владелец: Текст
@@ -1043,6 +1043,7 @@ function ns_bugsRe(channel, text, sender, full_prefix)
         displayText = "|cff00ff00" .. displayText .. "|r"
     end
 
+    -- Добавляем в список
     local list = _G["BugReportList"]
     if list then
         list:AddMessage(displayText)
