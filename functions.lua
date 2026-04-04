@@ -2796,7 +2796,8 @@ local function CreateTimerButton()
     tButton = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
     tButton:SetSize(32, 32)
     tButton:EnableMouse(true)
-    tButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- ДОБАВЛЕНО: MiddleButtonUp для обработки клика колесом мыши
+    tButton:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
     tButton:RegisterForDrag("LeftButton")
     tButton:SetMovable(true)
     
@@ -2839,6 +2840,7 @@ local function CreateTimerButton()
         if ns_timerMinutes <= 0 then
             GameTooltip:AddLine("• СТАТУС: ВЫКЛЮЧЕН", 0.5, 0.5, 0.5)
             GameTooltip:AddLine("  ЛКМ: Ввести время и включить", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("  СКМ (Колесо): Мгновенно выключить таймер", 0.7, 0.7, 0.7)
         else
             local currentTime = GetTime()
             local elapsed = currentTime - ns_timerStart
@@ -2861,6 +2863,7 @@ local function CreateTimerButton()
         end
         GameTooltip:AddLine(" ", 1, 1, 1)
         GameTooltip:AddLine("• ЛКМ: Изменить время (0 = Выкл)", 1, 1, 1)
+        GameTooltip:AddLine("• СКМ (Колесо): Мгновенно выключить таймер", 1, 1, 1)
         GameTooltip:Show()
     end)
 
@@ -2920,6 +2923,14 @@ local function CreateTimerButton()
                 ns_isAlarming = false
                 ns_alarmTicker = 0
             end
+        elseif button == "MiddleButton" then
+            -- Аналог ввода 0 и нажатия Enter: мгновенное выключение таймера
+            ns_timerMinutes = 0
+            nsDbc["таймер"] = nsDbc["таймер"] or {}
+            nsDbc["таймер"].time = 0
+            ns_timerStart = 0
+            ns_isAlarming = false
+            ns_alarmTicker = 0
         end
     end)
 end
@@ -2945,7 +2956,7 @@ local function LoadSettings()
     
     tButton:ClearAllPoints()
     -- ИСПРАВЛЕНИЕ 3: Используем сохраненные точки привязки. 
-    -- Если их нет (стый сейв), используем CENTER по умолчанию.
+    -- Если их нет (старый сейв), используем CENTER по умолчанию.
     tButton:SetPoint(point, UIParent, relativePoint, x, y)
 
     if saved.visible then
@@ -3010,7 +3021,6 @@ f:SetScript("OnUpdate", function(self, dt)
 end)
 
 f:Show()
-
 -----------------------------------------
 -- ============================================================================
 -- LFDfix - Исправление ошибок LFD для WoW 3.3.5 (Wrath of the Lich King)
