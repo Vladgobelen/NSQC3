@@ -1349,6 +1349,10 @@ end
 
 local set = true
 
+-- Фрейм-таймер создаётся один раз за пределами функции и переиспользуется
+local delayTimerFrame = CreateFrame("Frame")
+delayTimerFrame:Hide()
+
 function fBtnClick(id, obj)
     if not set then return end
     set = false
@@ -1363,9 +1367,22 @@ function fBtnClick(id, obj)
         SendAddonMessage(actionPrefix .. mFldName .. " " .. id, obj, "guild")
     end
 
-    C_Timer.After(0.3, function()
-        set = true
+    -- Инициализация таймера на 0.3 секунды
+    delayTimerFrame.elapsed = 0
+    delayTimerFrame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        
+        if self.elapsed >= 0.3 then
+            set = true
+            -- Останавливаем выполнение скрипта и скрываем фрейм
+            -- Это аналог "удаления" в рамках ограничений движка WoW 3.3.5
+            self:SetScript("OnUpdate", nil)
+            self:Hide()
+        end
     end)
+    
+    -- Запуск таймера (OnUpdate срабатывает только у видимых фреймов)
+    delayTimerFrame:Show()
 end
 
 function ns_crtH(id, obj, craft)
@@ -3307,7 +3324,12 @@ end)
 -- Создание окна интерфейса
 -- ==========================================
 local function CreateBugReportFrame()
-    if _G["BugReportFrame"] then return _G["BugReportFrame"] end
+    if _G["BugReportFrame"] then 
+        print("[DEBUG] Фрейм уже существует, возвращаем существующий экземпляр.")
+        return _G["BugReportFrame"] 
+    end
+    
+    print("[DEBUG] Инициализация BugReportFrame...")
 
     local frame = CreateFrame("Frame", "BugReportFrame", UIParent)
     frame:SetWidth(768)
@@ -3381,14 +3403,41 @@ local function CreateBugReportFrame()
         listFrame:Clear()
         _G["BugReportCount"] = 0
         counterText:SetText("Найдено: 0")
+        print("[DEBUG] Список очищен.")
     end
+
+    -- Функция добавления строки с авто-окраской
+    local function AddReportLine(text)
+        if not text or text == "" then return end
+
+        -- Удаляем все ведущие пробелы, табуляции и невидимые символы
+        local cleanText = text:gsub("^%s+", "")
+        local firstChar = cleanText:sub(1, 1)
+
+        local colorCode
+        if firstChar == "*" then
+            colorCode = "|cff00ff00" -- Зелёный
+        elseif firstChar == "-" or firstChar == "–" or firstChar == "—" or firstChar == "‐" then
+            colorCode = "|cffff0000" -- Красный (учтены все виды дефисов/тире)
+        else
+            colorCode = "|cffffffff" -- Белый
+        end
+
+        listFrame:AddMessage(colorCode .. cleanText .. "|r")
+
+        _G["BugReportCount"] = (_G["BugReportCount"] or 0) + 1
+        counterText:SetText("Найдено: " .. _G["BugReportCount"])
+    end
+
+    -- Экспорт функции для вызова из обработчика CHAT_MSG_ADDON или очереди
+    _G["BugReportAddLine"] = AddReportLine
+    print("[DEBUG] Функция _G['BugReportAddLine'] зарегистрирована.")
 
     -- Функция отправки запроса
     local function SendRequest()
         local msg = inputBox:GetText() or ""
         ClearList()
 
-        -- Формируем пакет запроса с ником просителя: REQ:Ник||Текст
         local myName = UnitName("player") or "Unknown"
         local queryPayload = "REQ:" .. myName .. "||" .. msg
 
@@ -3405,6 +3454,7 @@ local function CreateBugReportFrame()
         self:ClearFocus()
     end)
 
+    print("[DEBUG] BugReportFrame успешно создан.")
     return frame
 end
 

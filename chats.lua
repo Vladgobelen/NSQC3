@@ -10,6 +10,30 @@ local triggersByAddress = {
             forbiddenWords = {},
         }
     },
+    ["prefix:NSQC3_GAME_dice"] = {
+        {
+            keyword = {
+                { word = "NSQC3_GAME_dice", position = 1, source = "prefix" },
+            },
+            func = "NSQC3_GAME_dice",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:NSQC3_GAME_id"] = {
+        {
+            keyword = {
+                { word = "NSQC3_GAME_id", position = 1, source = "prefix" },
+            },
+            func = "NSQC3_GAME_id",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
     ["prefix:nsqc_fld1"] = {
         {
             keyword = {
@@ -1003,6 +1027,105 @@ local triggersByAddress = {
     },
 }
 
+function NSQC3_GAME_id(channel, text, sender, full_prefix)
+    local id = full_prefix:match(WORD_POSITION_PATTERNS[2])
+    local name1 = text:match(WORD_POSITION_PATTERNS[1])
+    local name2 = text:match(WORD_POSITION_PATTERNS[2])
+    if name1 == UnitName("player") or name2 == UnitName("player") then
+        ns_game_table = {id = id, name1 = name1, name2 = name2}
+    end
+end
+
+function NSQC3_GAME_dice(channel, text, sender, full_prefix)
+    -- 1. Парсинг входящих данных
+    local cellIndex = tonumber(text:match(WORD_POSITION_PATTERNS[1]))
+    local diceValue = tonumber(text:match(WORD_POSITION_PATTERNS[2]))
+    local owner = full_prefix:match(WORD_POSITION_PATTERNS[2])
+    local id = full_prefix:match(WORD_POSITION_PATTERNS[3])
+
+    -- 2. Базовая валидация
+    if not ns_game_table or ns_game_table.id ~= id then return end
+    if not cellIndex or cellIndex < 1 or cellIndex > 100 then return end
+    if not diceValue or diceValue < 1 or diceValue > 6 then return end
+    if not adaptiveFrame or not adaptiveFrame.children or not adaptiveFrame.children[cellIndex] then return end
+
+    local cell = adaptiveFrame.children[cellIndex]
+    local cellFrame = cell.frame
+
+    -- 3. Чтение текущей текстуры клетки
+    local currentTex = cellFrame:GetNormalTexture()
+    local currentPath = currentTex and currentTex:GetTexture() or ""
+    local miniKey = nil
+
+    if currentPath ~= "" then
+        -- Извлекаем имя файла после последнего слэша и убираем .tga
+        miniKey = currentPath:match("([^\\]+)$")
+        if miniKey then miniKey = miniKey:gsub("%.tga$", "") end
+    end
+
+    -- 4. Отрисовка миниатюры в угле 2 (верх-центр)
+    adaptiveFrame:SetCellIcon(cellIndex, miniKey, 2, nil, true)
+
+    -- 5. Установка новой основной текстуры кубика
+    local newTexPath = "Interface\\AddOns\\NSQC3\\libs\\" .. diceValue .. ".tga"
+    cellFrame:SetNormalTexture(newTexPath)
+
+    -- 6. Обновление внутреннего состояния и тултипов
+    local textureKey = tostring(diceValue)
+    cell:SetTexture(textureKey, textureKey)
+    cell:SetTextT("")
+
+    local tooltipText = string.format("Кость: %d\nВладелец: %s", diceValue, owner)
+    if miniKey then
+        tooltipText = tooltipText .. string.format("\nПредыдущая текстура: %s", miniKey)
+    end
+    cell:SetMultiLineTooltip(tooltipText)
+
+    -- Хук наведения
+    cell:SetOnEnter(function()
+        cell:SetMultiLineTooltip(tooltipText)
+        if GameTooltip then
+            GameTooltip:SetOwner(cellFrame, "ANCHOR_RIGHT")
+            GameTooltip:ClearLines()
+            for line in tooltipText:gmatch("[^\n]+") do
+                GameTooltip:AddLine(line, 1, 1, 1, true)
+            end
+            GameTooltip:Show()
+        end
+
+        local activePath = cellFrame:GetNormalTexture():GetTexture() or ""
+        local activeKey = activePath:match("([^\\]+)$")
+        if activeKey then activeKey = activeKey:gsub("%.tga$", "") else activeKey = "0" end
+        if type(fBtnEnter) == "function" then
+            fBtnEnter(cellIndex, activeKey)
+        end
+    end)
+
+    -- Хук клика
+    cell:SetOnClick(function()
+        local activePath = cellFrame:GetNormalTexture():GetTexture() or ""
+        local activeKey = activePath:match("([^\\]+)$")
+        if activeKey then activeKey = activeKey:gsub("%.tga$", "") else activeKey = "0" end
+        if type(fBtnClick) == "function" then
+            fBtnClick(cellIndex, activeKey)
+        end
+    end)
+
+    -- 7. Сохранение полного состояния клетки
+    if not ns_game_table.board then 
+        ns_game_table.board = {} 
+    end
+
+    -- ИСПРАВЛЕНО: таблица закрывается фигурной скобкой }, а не end
+    ns_game_table.board[cellIndex] = {
+        dice = diceValue,
+        owner = owner,
+        miniTex = miniKey,               -- Ключ текстуры, которая стояла до этого хода
+        mainTex = textureKey,            -- Ключ текущей текстуры кубика
+        lastUpdated = GetTime(),         -- Метка времени
+        cellIndex = cellIndex            -- Дублируем индекс для удобного итерирования
+    }
+end
 -- ==========================================
 -- Обработчик входящих сообщений (ns_bugsRe)
 -- ==========================================
@@ -1017,7 +1140,6 @@ function ns_bugsRe(channel, text, sender, full_prefix)
     local myName = UnitName("player") or ""
 
     -- СТРОГАЯ ПРОВЕРКА: отображаем ТОЛЬКО если запрос делал текущий игрок
-    -- Даже админы из таблицы не видят чужие ответы, пока сами не отправят запрос
     if targetRequester ~= myName then
         return 
     end
@@ -1032,15 +1154,20 @@ function ns_bugsRe(channel, text, sender, full_prefix)
     -- Вырезаем юникстайм из конца строки (если есть)
     wishText = string.gsub(wishText, "%s%d+$", "")
 
-    -- Проверяем, начинается ли запрос с '*' (учитываем ведущие пробелы)
-    local isGreen = string.match(wishText, "^%s*%*")
+    -- Проверяем маркеры в начале текста (учитываем ведущие пробелы)
+    local isGreen = string.match(wishText, "^%s*%*")  -- Звёздочка
+    local isRed   = string.match(wishText, "^%s*%-")  -- Минус
 
     -- Формируем строку для отображения: Владелец: Текст
     local displayText = owner .. ": " .. wishText
 
-    -- Применяем зелёный цвет, если найден маркер
+    -- Применяем цвета в зависимости от маркера
     if isGreen then
-        displayText = "|cff00ff00" .. displayText .. "|r"
+        displayText = "|cff00ff00" .. displayText .. "|r" -- Ярко-зелёный
+    elseif isRed then
+        displayText = "|cFFFF0000" .. displayText .. "|r" -- Ярко-красный
+    else
+        displayText = "|cffcccccc" .. displayText .. "|r" -- Светло-серый по умолчанию
     end
 
     -- Добавляем в список
@@ -1725,3 +1852,4 @@ end
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
 chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON",})
+

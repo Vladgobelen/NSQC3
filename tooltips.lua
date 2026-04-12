@@ -92,6 +92,36 @@ CustomAchievementsStatic = {
     }
 }
 ns_tooltips = {
+    ["s\\1"] = {
+        tooltips = {
+            "|cFF6495EDКость",
+        }
+    },
+        ["s\\2"] = {
+        tooltips = {
+            "|cFF6495EDКость",
+        }
+    },
+        ["s\\3"] = {
+        tooltips = {
+            "|cFF6495EDКость",
+        }
+    },
+        ["s\\4"] = {
+        tooltips = {
+            "|cFF6495EDКость",
+        }
+    },
+        ["s\\5"] = {
+        tooltips = {
+            "|cFF6495EDКость",
+        }
+    },
+        ["s\\6"] = {
+        tooltips = {
+            "|cFF6495EDКость",
+        }
+    },
     ["00t"] = {
         mod = 1,
         viewHP = 999,
