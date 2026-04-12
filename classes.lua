@@ -11544,8 +11544,8 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.5 - RELEASE (DYNAMIC LAYOUT & COUNTDOWN)
--- Для WoW 3.3.5a. Адаптивная ширина, защита ставки лидера, таймер.
+-- NS Auction System v5.5 - RELEASE (TOGGLE, PASS FIX, ADAPTIVE LAYOUT)
+-- Для WoW 3.3.5a. Строгая маршрутизация, защита ставки, таймер.
 -- ============================================================================
 
 local NSAuk = {}
@@ -11559,6 +11559,7 @@ local checkFrame = CreateFrame("Frame")
 checkFrame.elapsed = 0
 checkFrame:SetScript("OnUpdate", nil)
 local scrollFrameID = 0
+local isMinimized = false
 
 local CLASS_COLORS = {
     WARRIOR     = {r = 0.78, g = 0.61, b = 0.43, hex = "|cffC79C6E"},
@@ -11721,6 +11722,7 @@ function NSAuk.CreateAuctionFrame()
     minBtn:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-Down")
     minBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
     minBtn:SetScript("OnClick", function()
+        isMinimized = true
         frame:Hide()
         if not minimapIcon then NSAuk.CreateMinimapIcon() end
         minimapIcon:Show()
@@ -11734,7 +11736,6 @@ function NSAuk.CreateAuctionFrame()
     frame.infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.infoText:SetPoint("TOPLEFT", 10, -35)
     
-    -- Таймер обратного отсчета
     frame.countdownText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.countdownText:SetPoint("TOPRIGHT", -10, -35)
     frame.countdownText:SetJustifyH("RIGHT")
@@ -11771,6 +11772,7 @@ function NSAuk.CreateAuctionFrame()
         if not d.active then return end
         local myName = UnitName("player")
         local myBid = d.active.bids[myName]
+        if myBid and myBid.passed then return end -- Уже в пасе
         
         local maxAmount = 0
         for _, b in pairs(d.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
@@ -11815,6 +11817,7 @@ function NSAuk.DestroyAuctionWindow()
 end
 
 function NSAuk.UpdateAuctionWindow()
+    if isMinimized then return end
     local db = NSAuk.EnsureDB()
     if not db.active then return end
     local frame = NSAuk.CreateAuctionFrame()
@@ -11845,36 +11848,45 @@ function NSAuk.UpdateAuctionWindow()
 
     local totalHeight = 5
     local rowHeight = 22
-    local maxLeftWidth = 0
-    local maxRightWidth = 0
+    local maxRowWidth = 280
 
     for i, bid in ipairs(sortedBids) do
         local row = CreateFrame("Frame", nil, content)
         row:SetHeight(rowHeight)
         row:SetPoint("TOPLEFT", 10, -totalHeight)
-        row:SetPoint("TOPRIGHT", -10, -totalHeight) -- Растягиваем на ширину контента
+        row:SetPoint("TOPRIGHT", -10, -totalHeight)
 
         local cc = CLASS_COLORS[bid.data.class] or CLASS_COLORS.WARRIOR
+        local isPassed = bid.data.passed
+
+        -- Имя/Заметка
         local nt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nt:SetPoint("LEFT", 5, 0)
         local dn = bid.name
         if bid.data.public and bid.data.public ~= "" and bid.data.public ~= "НЕ В ГИЛЬДИИ" then dn = dn .. " (" .. bid.data.public .. ")" end
-        nt:SetText(cc.hex .. dn .. "|r")
+        local nameColor = isPassed and "|cff808080" or cc.hex
+        nt:SetText(nameColor .. dn .. "|r")
 
+        -- GP (строго 20px справа от имени)
         local gt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        gt:SetPoint("LEFT", nt, "RIGHT", 10, 0)
-        gt:SetText(bid.data.gp and bid.data.gp > 0 and ("|cff808080["..bid.data.gp.." GP]|r") or "|cffff0000[БЕЗ ГП]|r")
+        gt:SetPoint("LEFT", nt, "RIGHT", 20, 0)
+        local gpText = bid.data.gp and bid.data.gp > 0 and ("|cff808080["..bid.data.gp.." GP]|r") or "|cffff0000[БЕЗ ГП]|r"
+        if isPassed then gpText = "|cff808080[БЕЗ ГП]|r" end
+        gt:SetText(gpText)
 
+        -- Ставка (справа)
         local bt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         bt:SetPoint("RIGHT", -5, 0)
-        bt:SetText(bid.data.passed and "|cff808080ПАС|r" or (bid.data.amount == 0 and "|cff8080800 GP|r" or "|cff00ff00"..bid.data.amount.." GP|r"))
+        if isPassed then
+            bt:SetText("|cff808080ПАС|r")
+        else
+            bt:SetText(bid.data.amount == 0 and "|cff8080800 GP|r" or "|cff00ff00"..bid.data.amount.." GP|r")
+        end
 
-        -- Замеряем реальную ширину элементов после рендера
         row:Show()
-        local lWidth = nt:GetStringWidth() + 10 + gt:GetStringWidth() + 10
-        local rWidth = bt:GetStringWidth() + 10
-        if lWidth > maxLeftWidth then maxLeftWidth = lWidth end
-        if rWidth > maxRightWidth then maxRightWidth = rWidth end
+        -- Точный расчет ширины с учетом отступа 20px
+        local rw = nt:GetStringWidth() + 20 + gt:GetStringWidth() + 10 + bt:GetStringWidth() + 25
+        if rw > maxRowWidth then maxRowWidth = rw end
 
         content.rows[i] = row
         totalHeight = totalHeight + rowHeight
@@ -11891,8 +11903,6 @@ function NSAuk.UpdateAuctionWindow()
         er:Show()
         content.rows[1] = er
         totalHeight = totalHeight + rowHeight
-        maxLeftWidth = 120
-        maxRightWidth = 120
     end
 
     local mx, ld = 0, nil
@@ -11903,12 +11913,39 @@ function NSAuk.UpdateAuctionWindow()
     if ld then frame.leaderText:SetText("Лидер: " .. ld .. " (" .. mx .. " GP)"); frame.leaderText:Show() else frame.leaderText:Hide() end
 
     content:SetHeight(totalHeight + 10)
+    content:SetWidth(maxRowWidth)
+    NSAuk.SmoothResize(frame, maxRowWidth + 20, totalHeight + 110, 0.15)
+end
 
-    -- Адаптивный расчет ширины под самый длинный ник+GP
-    local requiredContentWidth = math.max(maxLeftWidth + maxRightWidth, 280)
-    content:SetWidth(requiredContentWidth)
-    local frameWidth = requiredContentWidth + 20
-    NSAuk.SmoothResize(frame, frameWidth, totalHeight + 110, 0.15)
+function NSAuk.FinishAuction(initiator)
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
+    
+    local w, wa = nil, 0
+    for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and d.amount > wa then w, wa = n, d.amount end end
+    
+    if w and wa > 0 then
+        local bc = {}
+        for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
+        table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
+        if #db.history > 10 then table.remove(db.history, 1) end
+        
+        if initiator == UnitName("player") then
+            SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
+            SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
+        end
+    else
+        if initiator == UnitName("player") then
+            SendChatMessage("Аукцион завершен без ставок.", "RAID_WARNING")
+        end
+    end
+    
+    db.active = nil
+    isMinimized = false
+    NSAuk.DestroyAuctionWindow()
+    if minimapIcon then minimapIcon:Hide() end
+    checkFrame:SetScript("OnUpdate", nil)
 end
 
 function NSAuk.CreateMinimapIcon()
@@ -11930,6 +11967,7 @@ function NSAuk.CreateMinimapIcon()
         d.iconPosition.y = y
     end)
     minimapIcon:SetScript("OnClick", function()
+        isMinimized = false
         minimapIcon:Hide()
         NSAuk.UpdateAuctionWindow()
     end)
@@ -12083,36 +12121,19 @@ function NSAuk.StartCloseTimer()
         local d = NSAuk.EnsureDB()
         if not d.active then self:SetScript("OnUpdate", nil); closeTimerFrame = nil; return end
         
-        -- Обновляем визуальный таймер в окне
         if auctionFrame and auctionFrame.countdownText then
             local lastTime = d.active.lastBidTime or d.active.startTime
             local rem = math.max(0, math.floor(d.active.closeTime - (GetTime() - lastTime)))
             auctionFrame.countdownText:SetText(rem .. "с")
         end
 
-        -- Только организатор контролирует закрытие
         if d.active.startedBy ~= UnitName("player") then return end
         
         if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
             self:SetScript("OnUpdate", nil)
             closeTimerFrame = nil
             SendAddonMessage("AUC_END", "", "RAID")
-            if d.active then
-                local w, wa = nil, 0
-                for n, dt in pairs(d.active.bids) do if dt.hasAction and not dt.passed and dt.amount > wa then w, wa = n, dt.amount end end
-                if w and wa > 0 then
-                    local bc = {}
-                    for n, dt in pairs(d.active.bids) do bc[n] = { amount = dt.amount, class = dt.class, public = dt.public, gp = dt.gp, passed = dt.passed, hasAction = dt.hasAction } end
-                    table.insert(d.history, { item = d.active.item, endTime = GetTime(), startedBy = d.active.startedBy, winner = w, winAmount = wa, bids = bc })
-                    if #d.history > 10 then table.remove(d.history, 1) end
-                    SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. d.active.item, "RAID_WARNING")
-                    SendChatMessage("Ты выиграл " .. d.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
-                end
-            end
-            d.active = nil
-            NSAuk.DestroyAuctionWindow()
-            if minimapIcon then minimapIcon:Hide() end
-            checkFrame:SetScript("OnUpdate", nil)
+            NSAuk.FinishAuction(d.active.startedBy)
         end
     end)
 end
@@ -12120,7 +12141,7 @@ end
 function NSAuk.CheckAndFixWindow()
     local db = NSAuk.EnsureDB()
     if not db.active then checkFrame:SetScript("OnUpdate", nil); return end
-    if not auctionFrame or not auctionFrame:IsShown() then NSAuk.UpdateAuctionWindow() end
+    if not isMinimized and (not auctionFrame or not auctionFrame:IsShown()) then NSAuk.UpdateAuctionWindow() end
 end
 
 function NSAuk.EnableCheckFrame()
@@ -12159,14 +12180,11 @@ local function ProcessRaidMessage(sender, msg, event)
     local cleanMsg = msg:match("^%s*(.-)%s*$") or ""
     local isLeaderChannel = (event == "CHAT_MSG_RAID_WARNING" or event == "CHAT_MSG_RAID_LEADER")
 
-    -- 1. Проверка подкоманд (история, показать, закрыть)
     if cleanMsg:match("^АУК") then
-        -- АУК история / история <N> -> Только от себя
         if cleanMsg:match("^АУК%s+история") then
             if sender == myName then NSAuk.CreateHistoryWindow(tonumber(cleanMsg:match("%d+"))) end
             return true
         end
-        -- АУК показать -> RW/RL от любого, но только если лидер (стартер) аукциона
         if cleanMsg:match("^АУК%s+показать") then
             if isLeaderChannel and db.active and db.active.startedBy == sender then
                 local gpStr = ""
@@ -12177,64 +12195,74 @@ local function ProcessRaidMessage(sender, msg, event)
             end
             return true
         end
-        -- АУК закрыть -> RW/RL от любого
         if cleanMsg:match("^АУК%s+закрыть") then
             if isLeaderChannel then
                 SendAddonMessage("AUC_CANCEL", "", "RAID")
                 if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
                 db.active = nil
                 NSAuk.DestroyAuctionWindow()
+                isMinimized = false
                 if minimapIcon then minimapIcon:Hide() end
                 checkFrame:SetScript("OnUpdate", nil)
             end
             return true
         end
 
-        -- 2. Базовая команда АУК (старт) -> RW/RL от любого
-        if isLeaderChannel and not db.active then
-            local parsed = NSAuk.ParseAuctionCommand(cleanMsg)
-            local item = parsed.item
-            local step = parsed.step or db.settings.defaultStep
-            local ct = parsed.closeTime or db.settings.defaultTime
+        -- ТОГГЛ ЗАПУСКА/ЗАВЕРШЕНИЯ
+        if isLeaderChannel then
+            if db.active then
+                -- Повторная команда лидера -> досрочное завершение
+                SendAddonMessage("AUC_END", "", "RAID")
+                return true
+            else
+                local parsed = NSAuk.ParseAuctionCommand(cleanMsg)
+                local item = parsed.item
+                local step = parsed.step or db.settings.defaultStep
+                local ct = parsed.closeTime or db.settings.defaultTime
 
-            db.active = {
-                item = item,
-                startTime = GetTime(),
-                startedBy = sender,
-                step = step,
-                closeTime = ct,
-                lastBidTime = GetTime(),
-                bids = {}
-            }
+                db.active = {
+                    item = item,
+                    startTime = GetTime(),
+                    startedBy = sender,
+                    step = step,
+                    closeTime = ct,
+                    lastBidTime = GetTime(),
+                    bids = {}
+                }
+                isMinimized = false
 
-            local gpData = NSAuk.GetRaidGPData()
-            for name, data in pairs(gpData) do
-                db.active.bids[name] = { amount = 0, class = data.class, public = data.public, gp = data.gp, passed = false, hasAction = false }
-            end
-            if not db.active.bids[myName] then
-                local _, c = UnitClass("player")
-                db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false }
-            end
-
-            if sender == myName then
-                local gpStr = ""
+                local gpData = NSAuk.GetRaidGPData()
                 for name, data in pairs(gpData) do
-                    gpStr = gpStr .. name .. ":" .. data.gp .. ":" .. data.class .. ":" .. data.public .. ";"
+                    db.active.bids[name] = { amount = 0, class = data.class, public = data.public, gp = data.gp, passed = false, hasAction = false }
                 end
-                SendAddonMessage("AUC_START", item .. "^^" .. step .. "^^" .. ct .. "^^" .. gpStr, "RAID")
-            end
+                if not db.active.bids[myName] then
+                    local _, c = UnitClass("player")
+                    db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false }
+                end
 
-            NSAuk.UpdateAuctionWindow()
-            NSAuk.StartCloseTimer()
-            NSAuk.EnableCheckFrame()
-            return true
+                if sender == myName then
+                    local gpStr = ""
+                    for name, data in pairs(gpData) do
+                        gpStr = gpStr .. name .. ":" .. data.gp .. ":" .. data.class .. ":" .. data.public .. ";"
+                    end
+                    SendAddonMessage("AUC_START", item .. "^^" .. step .. "^^" .. ct .. "^^" .. gpStr, "RAID")
+                end
+
+                NSAuk.UpdateAuctionWindow()
+                NSAuk.StartCloseTimer()
+                NSAuk.EnableCheckFrame()
+                return true
+            end
         end
         return false
     end
 
-    -- 3. Ставки и Пас -> Только от себя
     if sender ~= myName then return false end
     if not db.active then return false end
+    if db.active.bids[sender] and db.active.bids[sender].passed then
+        if sender == myName then print("Вы уже сделали пас.") end
+        return true
+    end
 
     if cleanMsg:match("^[Пп]ас$") then
         local myBid = db.active.bids[myName]
@@ -12309,6 +12337,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 lastBidTime = GetTime(),
                 bids = {}
             }
+            isMinimized = false
             for pd in (parts[4] or ""):gmatch("([^;]+);") do
                 local n, g, c, p = pd:match("([^:]+):([^:]+):([^:]+):(.*)")
                 if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false } end
@@ -12328,11 +12357,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                     local _, c = UnitClass(addonSender)
                     db.active.bids[addonSender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true }
                 end
-                db.active.bids[addonSender].amount = a
-                db.active.bids[addonSender].passed = false
-                db.active.bids[addonSender].hasAction = true
-                db.active.lastBidTime = GetTime()
-                NSAuk.UpdateAuctionWindow()
+                if not db.active.bids[addonSender].passed then
+                    db.active.bids[addonSender].amount = a
+                    db.active.bids[addonSender].passed = false
+                    db.active.bids[addonSender].hasAction = true
+                    db.active.lastBidTime = GetTime()
+                    NSAuk.UpdateAuctionWindow()
+                end
             end
 
         elseif prefix == "AUC_PASS" and db.active then
@@ -12347,27 +12378,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             NSAuk.UpdateAuctionWindow()
 
         elseif prefix == "AUC_END" and db.active then
-            local w, wa = nil, 0
-            for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and d.amount > wa then w, wa = n, d.amount end end
-            if w and wa > 0 then
-                local bc = {}
-                for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
-                table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
-                if #db.history > 10 then table.remove(db.history, 1) end
-                if db.active.startedBy == myName then
-                    SendChatMessage(w.." побеждает, поставив "..wa.." ГП. Предмет: "..db.active.item, "RAID_WARNING")
-                    SendChatMessage("Ты выиграл "..db.active.item.." за "..wa.." ГП!", "WHISPER", nil, w)
-                end
-            end
-            if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
-            db.active = nil
-            NSAuk.DestroyAuctionWindow()
-            if minimapIcon then minimapIcon:Hide() end
-            checkFrame:SetScript("OnUpdate", nil)
+            NSAuk.FinishAuction(db.active.startedBy)
 
         elseif prefix == "AUC_CANCEL" then
             if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
             db.active = nil
+            isMinimized = false
             NSAuk.DestroyAuctionWindow()
             if minimapIcon then minimapIcon:Hide() end
             checkFrame:SetScript("OnUpdate", nil)
@@ -12383,6 +12399,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 lastBidTime = GetTime(),
                 bids = {}
             }
+            isMinimized = false
             for pd in (parts[4] or ""):gmatch("([^;]+);") do
                 local n, g, c, p = pd:match("([^:]+):([^:]+):([^:]+):(.*)")
                 if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false } end
