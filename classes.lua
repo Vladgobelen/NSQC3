@@ -11544,8 +11544,8 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.5 - RELEASE (TOGGLE, PASS FIX, ADAPTIVE LAYOUT)
--- Для WoW 3.3.5a. Строгая маршрутизация, защита ставки, таймер.
+-- NS Auction System v5.5 - RELEASE (UNIVERSAL RAID CHAT & ANNOUNCEMENTS)
+-- Для WoW 3.3.5a. Чтение ставок/паса из всех рейд-чатов, адаптивная верстка.
 -- ============================================================================
 
 local NSAuk = {}
@@ -11573,6 +11573,14 @@ local CLASS_COLORS = {
     WARLOCK     = {r = 0.58, g = 0.51, b = 0.79, hex = "|cff9482C9"},
     DRUID       = {r = 1.00, g = 0.49, b = 0.04, hex = "|cffFF7D0A"},
 }
+
+-- Анонс только от стартера аукциона (обычно РЛ)
+local function AnnounceRaid(msg)
+    local db = NSAuk.EnsureDB()
+    if db.active and db.active.startedBy == UnitName("player") then
+        SendChatMessage(msg, "RAID")
+    end
+end
 
 function NSAuk.EnsureDB()
     if not nsDbc then nsDbc = {} end
@@ -11772,7 +11780,7 @@ function NSAuk.CreateAuctionFrame()
         if not d.active then return end
         local myName = UnitName("player")
         local myBid = d.active.bids[myName]
-        if myBid and myBid.passed then return end -- Уже в пасе
+        if myBid and myBid.passed then return end
         
         local maxAmount = 0
         for _, b in pairs(d.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
@@ -11859,7 +11867,6 @@ function NSAuk.UpdateAuctionWindow()
         local cc = CLASS_COLORS[bid.data.class] or CLASS_COLORS.WARRIOR
         local isPassed = bid.data.passed
 
-        -- Имя/Заметка
         local nt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nt:SetPoint("LEFT", 5, 0)
         local dn = bid.name
@@ -11867,14 +11874,12 @@ function NSAuk.UpdateAuctionWindow()
         local nameColor = isPassed and "|cff808080" or cc.hex
         nt:SetText(nameColor .. dn .. "|r")
 
-        -- GP (строго 20px справа от имени)
         local gt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         gt:SetPoint("LEFT", nt, "RIGHT", 20, 0)
         local gpText = bid.data.gp and bid.data.gp > 0 and ("|cff808080["..bid.data.gp.." GP]|r") or "|cffff0000[БЕЗ ГП]|r"
         if isPassed then gpText = "|cff808080[БЕЗ ГП]|r" end
         gt:SetText(gpText)
 
-        -- Ставка (справа)
         local bt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         bt:SetPoint("RIGHT", -5, 0)
         if isPassed then
@@ -11884,7 +11889,6 @@ function NSAuk.UpdateAuctionWindow()
         end
 
         row:Show()
-        -- Точный расчет ширины с учетом отступа 20px
         local rw = nt:GetStringWidth() + 20 + gt:GetStringWidth() + 10 + bt:GetStringWidth() + 25
         if rw > maxRowWidth then maxRowWidth = rw end
 
@@ -12180,6 +12184,7 @@ local function ProcessRaidMessage(sender, msg, event)
     local cleanMsg = msg:match("^%s*(.-)%s*$") or ""
     local isLeaderChannel = (event == "CHAT_MSG_RAID_WARNING" or event == "CHAT_MSG_RAID_LEADER")
 
+    -- 1. Команды аукциона
     if cleanMsg:match("^АУК") then
         if cleanMsg:match("^АУК%s+история") then
             if sender == myName then NSAuk.CreateHistoryWindow(tonumber(cleanMsg:match("%d+"))) end
@@ -12208,10 +12213,8 @@ local function ProcessRaidMessage(sender, msg, event)
             return true
         end
 
-        -- ТОГГЛ ЗАПУСКА/ЗАВЕРШЕНИЯ
         if isLeaderChannel then
             if db.active then
-                -- Повторная команда лидера -> досрочное завершение
                 SendAddonMessage("AUC_END", "", "RAID")
                 return true
             else
@@ -12257,60 +12260,68 @@ local function ProcessRaidMessage(sender, msg, event)
         return false
     end
 
-    if sender ~= myName then return false end
-    if not db.active then return false end
-    if db.active.bids[sender] and db.active.bids[sender].passed then
-        if sender == myName then print("Вы уже сделали пас.") end
-        return true
+    -- 2. ЧТЕНИЕ ВСЕХ РЕЙД-СООБЩЕНИЙ НА СТАВКИ/ПАС
+    if db.active then
+        local isPass = (cleanMsg:match("^[Пп]ас$") or cleanMsg == "-")
+        local amount = tonumber(cleanMsg:match("^%s*(%d+)%s*$"))
+
+        if isPass or amount then
+            local bidData = db.active.bids[sender]
+            if not bidData then
+                local _, c = UnitClass(sender)
+                db.active.bids[sender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true }
+                bidData = db.active.bids[sender]
+            end
+
+            if isPass then
+                if not bidData.passed then
+                    local maxAmount = 0
+                    for _, b in pairs(db.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
+                    if bidData.amount >= maxAmount and maxAmount > 0 then
+                        if sender == myName then print("Нельзя выйти из торгов, пока вы лидируете.") end
+                        return true
+                    end
+                    bidData.passed = true
+                    bidData.amount = 0
+                    bidData.hasAction = true
+                    db.active.lastBidTime = GetTime()
+                    AnnounceRaid(sender .. " делает ПАС и выбывает из торгов.")
+                    NSAuk.UpdateAuctionWindow()
+                end
+                return true
+            end
+
+            if amount then
+                if bidData.passed then
+                    if sender == myName then print("Вы уже сделали пас.") end
+                    return true
+                end
+
+                local mx = 0
+                for n, d in pairs(db.active.bids) do
+                    if n ~= sender and d.hasAction and not d.passed and d.amount > mx then mx = d.amount end
+                end
+                local mn = mx + db.active.step
+                if amount >= mn and (bidData.gp == 0 or amount <= bidData.gp) then
+                    bidData.amount = amount
+                    bidData.passed = false
+                    bidData.hasAction = true
+                    db.active.lastBidTime = GetTime()
+
+                    local newMx, newLd = 0, nil
+                    for n, d in pairs(db.active.bids) do
+                        if d.hasAction and not d.passed and d.amount > newMx then newMx, newLd = d.amount, n end
+                    end
+                    if newLd then AnnounceRaid(newLd .. " лидирует с " .. newMx .. " GP.") end
+                    NSAuk.UpdateAuctionWindow()
+                elseif sender == myName then
+                    print(bidData.gp > 0 and "Недостаточно GP! У вас: "..bidData.gp or "Ставка >= "..mn.." GP")
+                end
+                return true
+            end
+        end
     end
 
-    if cleanMsg:match("^[Пп]ас$") then
-        local myBid = db.active.bids[myName]
-        local maxAmount = 0
-        for _, b in pairs(db.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
-        if myBid and myBid.hasAction and not myBid.passed and myBid.amount >= maxAmount and myBid.amount > 0 then
-            print("Нельзя выйти из торгов, пока вы лидируете.")
-            return true
-        end
-        if db.active.bids[sender] then
-            db.active.bids[sender].passed = true
-            db.active.bids[sender].amount = 0
-            db.active.bids[sender].hasAction = true
-        else
-            local _, c = UnitClass(sender)
-            db.active.bids[sender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = true, hasAction = true }
-        end
-        SendAddonMessage("AUC_PASS", "", "RAID")
-        NSAuk.UpdateAuctionWindow()
-        return true
-    end
-
-    local amount = tonumber(cleanMsg:match("^%s*(%d+)%s*$"))
-    if amount and not cleanMsg:match("%s") then
-        if not db.active.bids[sender] then
-            local _, c = UnitClass(sender)
-            db.active.bids[sender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true }
-        end
-        local pd = db.active.bids[sender]
-        local mx, ld = 0, nil
-        for n, d in pairs(db.active.bids) do
-            if n ~= sender and d.hasAction and not d.passed and d.amount > mx then mx, ld = d.amount, n end
-        end
-        if sender == myName and pd.amount == mx and mx > 0 and ld ~= myName then return true end
-
-        local mn = mx + db.active.step
-        if amount >= mn and (pd.gp == 0 or amount <= pd.gp) then
-            pd.amount = amount
-            pd.passed = false
-            pd.hasAction = true
-            db.active.lastBidTime = GetTime()
-            SendAddonMessage("AUC_BID", tostring(amount), "RAID")
-            NSAuk.UpdateAuctionWindow()
-        elseif sender == myName then
-            print(pd.gp > 0 and "Недостаточно GP! У вас: "..pd.gp or "Ставка >= "..mn.." GP")
-        end
-        return true
-    end
     return false
 end
 
@@ -12362,7 +12373,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                     db.active.bids[addonSender].passed = false
                     db.active.bids[addonSender].hasAction = true
                     db.active.lastBidTime = GetTime()
-                    NSAuk.UpdateAuctionWindow()
+                    NSAuk.UpdateAuctionWindow() -- Синхронизация без анонса (анонс уже был из чата)
                 end
             end
 
@@ -12375,7 +12386,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 db.active.bids[addonSender].amount = 0
                 db.active.bids[addonSender].hasAction = true
             end
-            NSAuk.UpdateAuctionWindow()
+            NSAuk.UpdateAuctionWindow() -- Синхронизация без анонса
 
         elseif prefix == "AUC_END" and db.active then
             NSAuk.FinishAuction(db.active.startedBy)
