@@ -11544,8 +11544,8 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.5 - RELEASE (FINAL ROUTING & PASS LOCK)
--- Для WoW 3.3.5a. Строгая маршрутизация, защита ставки лидера.
+-- NS Auction System v5.5 - RELEASE (DYNAMIC LAYOUT & COUNTDOWN)
+-- Для WoW 3.3.5a. Адаптивная ширина, защита ставки лидера, таймер.
 -- ============================================================================
 
 local NSAuk = {}
@@ -11733,6 +11733,12 @@ function NSAuk.CreateAuctionFrame()
 
     frame.infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.infoText:SetPoint("TOPLEFT", 10, -35)
+    
+    -- Таймер обратного отсчета
+    frame.countdownText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    frame.countdownText:SetPoint("TOPRIGHT", -10, -35)
+    frame.countdownText:SetJustifyH("RIGHT")
+    frame.countdownText:SetText("0с")
 
     frame.leaderText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.leaderText:SetPoint("BOTTOMLEFT", 10, 35)
@@ -11766,7 +11772,6 @@ function NSAuk.CreateAuctionFrame()
         local myName = UnitName("player")
         local myBid = d.active.bids[myName]
         
-        -- Блокировка паса для текущего лидера
         local maxAmount = 0
         for _, b in pairs(d.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
         if myBid and myBid.hasAction and not myBid.passed and myBid.amount >= maxAmount and myBid.amount > 0 then
@@ -11822,7 +11827,11 @@ function NSAuk.UpdateAuctionWindow()
     content.rows = {}
 
     frame.itemTitle:SetText(db.active.item or "Предмет")
-    frame.infoText:SetText("Шаг: " .. db.active.step .. " GP | Автозакрытие: " .. db.active.closeTime .. "с")
+    
+    local lastTime = db.active.lastBidTime or db.active.startTime
+    local remaining = math.max(0, math.floor(db.active.closeTime - (GetTime() - lastTime)))
+    frame.infoText:SetText("Шаг: " .. db.active.step .. " GP | Осталось:")
+    if frame.countdownText then frame.countdownText:SetText(remaining .. "с") end
 
     local sortedBids = {}
     for name, data in pairs(db.active.bids) do
@@ -11835,41 +11844,55 @@ function NSAuk.UpdateAuctionWindow()
     end)
 
     local totalHeight = 5
-    local maxWidth = 200
     local rowHeight = 22
+    local maxLeftWidth = 0
+    local maxRightWidth = 0
+
     for i, bid in ipairs(sortedBids) do
         local row = CreateFrame("Frame", nil, content)
-        row:SetSize(content:GetWidth() - 20, rowHeight)
+        row:SetHeight(rowHeight)
         row:SetPoint("TOPLEFT", 10, -totalHeight)
+        row:SetPoint("TOPRIGHT", -10, -totalHeight) -- Растягиваем на ширину контента
+
         local cc = CLASS_COLORS[bid.data.class] or CLASS_COLORS.WARRIOR
         local nt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nt:SetPoint("LEFT", 5, 0)
         local dn = bid.name
         if bid.data.public and bid.data.public ~= "" and bid.data.public ~= "НЕ В ГИЛЬДИИ" then dn = dn .. " (" .. bid.data.public .. ")" end
         nt:SetText(cc.hex .. dn .. "|r")
+
         local gt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         gt:SetPoint("LEFT", nt, "RIGHT", 10, 0)
         gt:SetText(bid.data.gp and bid.data.gp > 0 and ("|cff808080["..bid.data.gp.." GP]|r") or "|cffff0000[БЕЗ ГП]|r")
+
         local bt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         bt:SetPoint("RIGHT", -5, 0)
         bt:SetText(bid.data.passed and "|cff808080ПАС|r" or (bid.data.amount == 0 and "|cff8080800 GP|r" or "|cff00ff00"..bid.data.amount.." GP|r"))
+
+        -- Замеряем реальную ширину элементов после рендера
         row:Show()
+        local lWidth = nt:GetStringWidth() + 10 + gt:GetStringWidth() + 10
+        local rWidth = bt:GetStringWidth() + 10
+        if lWidth > maxLeftWidth then maxLeftWidth = lWidth end
+        if rWidth > maxRightWidth then maxRightWidth = rWidth end
+
         content.rows[i] = row
         totalHeight = totalHeight + rowHeight
-        local tw = nt:GetStringWidth() + gt:GetStringWidth() + bt:GetStringWidth() + 40
-        if tw > maxWidth then maxWidth = tw end
     end
 
     if #sortedBids == 0 then
         local er = CreateFrame("Frame", nil, content)
-        er:SetSize(content:GetWidth() - 20, rowHeight)
+        er:SetHeight(rowHeight)
         er:SetPoint("TOPLEFT", 10, -totalHeight)
+        er:SetPoint("TOPRIGHT", -10, -totalHeight)
         local et = er:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         et:SetPoint("CENTER", 0, 0)
         et:SetText("|cff808080Ожидание ставок...|r")
         er:Show()
         content.rows[1] = er
         totalHeight = totalHeight + rowHeight
+        maxLeftWidth = 120
+        maxRightWidth = 120
     end
 
     local mx, ld = 0, nil
@@ -11880,7 +11903,12 @@ function NSAuk.UpdateAuctionWindow()
     if ld then frame.leaderText:SetText("Лидер: " .. ld .. " (" .. mx .. " GP)"); frame.leaderText:Show() else frame.leaderText:Hide() end
 
     content:SetHeight(totalHeight + 10)
-    NSAuk.SmoothResize(frame, math.max(maxWidth, 350), totalHeight + 110, 0.15)
+
+    -- Адаптивный расчет ширины под самый длинный ник+GP
+    local requiredContentWidth = math.max(maxLeftWidth + maxRightWidth, 280)
+    content:SetWidth(requiredContentWidth)
+    local frameWidth = requiredContentWidth + 20
+    NSAuk.SmoothResize(frame, frameWidth, totalHeight + 110, 0.15)
 end
 
 function NSAuk.CreateMinimapIcon()
@@ -12054,7 +12082,17 @@ function NSAuk.StartCloseTimer()
         lc = ct
         local d = NSAuk.EnsureDB()
         if not d.active then self:SetScript("OnUpdate", nil); closeTimerFrame = nil; return end
+        
+        -- Обновляем визуальный таймер в окне
+        if auctionFrame and auctionFrame.countdownText then
+            local lastTime = d.active.lastBidTime or d.active.startTime
+            local rem = math.max(0, math.floor(d.active.closeTime - (GetTime() - lastTime)))
+            auctionFrame.countdownText:SetText(rem .. "с")
+        end
+
+        -- Только организатор контролирует закрытие
         if d.active.startedBy ~= UnitName("player") then return end
+        
         if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
             self:SetScript("OnUpdate", nil)
             closeTimerFrame = nil
