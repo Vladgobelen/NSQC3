@@ -12391,45 +12391,7 @@ function NSAuk.SetWinner(playerName, winAmount)
     checkFrame:SetScript("OnUpdate", nil)
 end
 
-function NSAuk.FinishAuction(initiator)
-    local db = NSAuk.EnsureDB()
-    if not db.active then return end
-    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
-    
-    local w, wa = nil, 0
-    for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and not d.banned and d.amount > wa then w, wa = n, d.amount end end
-    
-    if w and wa > 0 then
-        -- Расчет ГП ТОЛЬКО у стартера аукциона
-        if db.active.startedBy == UnitName("player") then
-            if db.settings.autoDeductGP then
-                NSAuk.DeductGPFromRoster(w, wa)
-            else
-                print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", w, wa))
-            end
-        end
-        
-        local bc = {}
-        for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
-        table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
-        if #db.history > 10 then table.remove(db.history, 1) end
-        
-        if initiator == UnitName("player") then
-            SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
-            SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
-        end
-    else
-        if initiator == UnitName("player") then
-            SendChatMessage("Аукцион завершен без ставок.", "RAID_WARNING")
-        end
-    end
-    
-    db.active = nil
-    isMinimized = false
-    NSAuk.DestroyAuctionWindow()
-    if minimapIcon then minimapIcon:Hide() end
-    checkFrame:SetScript("OnUpdate", nil)
-end
+
 
 function NSAuk.UpdateAuctionWindow()
     if isMinimized then return end
@@ -12568,21 +12530,41 @@ end
 function NSAuk.FinishAuction(initiator)
     local db = NSAuk.EnsureDB()
     if not db.active then return end
-    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
+    if closeTimerFrame then 
+        closeTimerFrame:SetScript("OnUpdate", nil)
+        closeTimerFrame = nil 
+    end
     
     local w, wa = nil, 0
-    for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and not d.banned and d.amount > wa then w, wa = n, d.amount end end
+    for n, d in pairs(db.active.bids) do 
+        if d.hasAction and not d.passed and not d.banned and d.amount > wa then 
+            w, wa = n, d.amount 
+        end 
+    end
     
     if w and wa > 0 then
-        local bc = {}
-        for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
-        table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
-        if #db.history > 10 then table.remove(db.history, 1) end
-        
-        -- Расчет ГП при автозавершении, если чекбокс включен
-        if db.settings.autoDeductGP then
-            NSAuk.DeductGPFromRoster(w, wa)
+        -- Расчет/списание ГП ТОЛЬКО у того, кто запустил аукцион
+        if db.active.startedBy == UnitName("player") then
+            if db.settings.autoDeductGP then
+                NSAuk.DeductGPFromRoster(w, wa)
+            else
+                print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", w, wa))
+            end
         end
+        
+        local bc = {}
+        for n, d in pairs(db.active.bids) do 
+            bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } 
+        end
+        table.insert(db.history, { 
+            item = db.active.item, 
+            endTime = GetTime(), 
+            startedBy = db.active.startedBy, 
+            winner = w, 
+            winAmount = wa, 
+            bids = bc 
+        })
+        if #db.history > 10 then table.remove(db.history, 1) end
         
         if initiator == UnitName("player") then
             SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
