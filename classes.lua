@@ -12322,6 +12322,46 @@ end
 function NSAuk.DeductGPFromRoster(playerName, amount)
     if not playerName or not amount or amount <= 0 then return end
 
+    -- [FIX] Базовая проверка гильдии
+    if not IsInGuild() then
+        print("|cffff0000[NSAuk]|r Вы не в гильдии. Автоматическое списание ГП невозможно.")
+        return
+    end
+
+    -- [FIX] Проверка прав на редактирование офицерских заметок
+    -- В 3.3.5a только ГМ и ранги с включенным флагом "Изменять офицерские заметки" могут это делать
+    local canDeduct = false
+    if IsGuildLeader() then
+        canDeduct = true
+    else
+        -- Находим индекс ранга текущего игрока
+        local myName = UnitName("player")
+        local myRankIdx = nil
+        for i = 1, GetNumGuildMembers(true) do
+            local name = GetGuildRosterInfo(i)
+            if name == myName then
+                _, _, myRankIdx = GetGuildRosterInfo(i)
+                break
+            end
+        end
+
+        if myRankIdx then
+            GuildControlSetRank(myRankIdx)
+            local flags = GuildControlGetRankFlags()
+            -- flags[3] в 3.3.5a отвечает за "Edit Officer Note"
+            if flags and flags[3] then
+                canDeduct = true
+            end
+            GuildControlSetRank(0) -- Сброс выбранного ранга в интерфейсе
+        end
+    end
+
+    if not canDeduct then
+        print("|cffff0000[NSAuk]|r Недостаточно прав для списания ГП (требуется ГМ или ранг с правами на офицерские заметки).")
+        return
+    end
+
+    -- Выполняем списание
     for i = 1, GetNumGuildMembers(true) do
         local name = GetGuildRosterInfo(i)
         if name == playerName or name:match("^" .. playerName) then
@@ -12329,25 +12369,24 @@ function NSAuk.DeductGPFromRoster(playerName, amount)
             local parts = NSAuk.mysplit(officerNote or "", "%s+")
 
             if #parts >= 3 then
-                local playerID = parts[2]          -- ID из второго слова
+                local playerID = parts[2]
                 local oldGP = tonumber(parts[3]) or 0
                 local newGP = math.max(0, oldGP - amount)
 
-                parts[3] = tostring(newGP)         -- Обновляем ГП (третье слово)
+                parts[3] = tostring(newGP)
                 local newNote = table.concat(parts, " ")
 
-                GuildRosterSetOfficerNote(i, newNote)
+                -- Защита от частых вызовов (WoW ограничивает обновление заметок)
+                pcall(function()
+                    GuildRosterSetOfficerNote(i, newNote)
+                end)
 
-                -- nsGP1: минус + ник
                 SendAddonMessage("nsGP1 -" .. amount, name, "guild")
-
-                -- nsGPlog: явная склейка с минусом, чтобы сервер точно записал списание
-                local logStr = "Аукцион -" .. amount .. " " .. playerID
-                SendAddonMessage("nsGPlog", logStr, "guild")
+                SendAddonMessage("nsGPlog", "Аукцион -" .. amount .. " " .. playerID, "guild")
 
                 print(string.format("|cff00ff00[NSAuk]|r Списано %d ГП с %s (ID: %s). Осталось: %d ГП.", amount, name, playerID, newGP))
             else
-                print(string.format("|cffff0000[NSAuk]|r Ошибка: Офицерская заметка %s имеет неверный формат (ожидается: Префикс ID ГП).", name))
+                print(string.format("|cffff0000[NSAuk]|r Ошибка: Офицерская заметка %s имеет неверный формат.", name))
             end
             break
         end
