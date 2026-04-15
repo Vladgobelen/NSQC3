@@ -887,7 +887,7 @@ function GpDb:_CreateLogWindow()
     self.logWindow.filters:SetPoint("RIGHT", -10, 0)
     self.logWindow.filters:SetHeight(30)
     -- Поле "Количество"
-    self.logWindow.countFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.countFilter = CreateFrame("EditBox", "EditKolvo", self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.countFilter:SetSize(60, 20)
     self.logWindow.countFilter:SetPoint("LEFT", self.logWindow.filters, "LEFT")
     self.logWindow.countFilter:SetAutoFocus(false)
@@ -898,7 +898,7 @@ function GpDb:_CreateLogWindow()
         self:UpdateLogDisplay()
     end)
     -- Поле "День" (вместо "Время")
-    self.logWindow.timeFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.timeFilter = CreateFrame("EditBox", "EditDay", self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.timeFilter:SetSize(70, 20)
     self.logWindow.timeFilter:SetPoint("LEFT", self.logWindow.countFilter, "RIGHT", 5, 0)
     self.logWindow.timeFilter:SetAutoFocus(false)
@@ -909,7 +909,7 @@ function GpDb:_CreateLogWindow()
         self:UpdateLogDisplay()
     end)
     -- Поле "РЛ"
-    self.logWindow.rlFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.rlFilter = CreateFrame("EditBox", "EditRL", self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.rlFilter:SetSize(70, 20)
     self.logWindow.rlFilter:SetPoint("LEFT", self.logWindow.timeFilter, "RIGHT", 5, 0)
     self.logWindow.rlFilter:SetAutoFocus(false)
@@ -920,7 +920,7 @@ function GpDb:_CreateLogWindow()
         self:UpdateLogDisplay()
     end)
     -- Поле "Рейд"
-    self.logWindow.raidFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.raidFilter = CreateFrame("EditBox", "EditRaid", self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.raidFilter:SetSize(100, 20)
     self.logWindow.raidFilter:SetPoint("LEFT", self.logWindow.rlFilter, "RIGHT", 5, 0)
     self.logWindow.raidFilter:SetAutoFocus(false)
@@ -931,7 +931,7 @@ function GpDb:_CreateLogWindow()
         self:UpdateLogDisplay()
     end)
     -- Поле "Ник"
-    self.logWindow.nameFilter = CreateFrame("EditBox", nil, self.logWindow.filters, "InputBoxTemplate")
+    self.logWindow.nameFilter = CreateFrame("EditBox", "EditNik", self.logWindow.filters, "InputBoxTemplate")
     self.logWindow.nameFilter:SetSize(100, 20)
     self.logWindow.nameFilter:SetPoint("LEFT", self.logWindow.raidFilter, "RIGHT", 5, 0)
     self.logWindow.nameFilter:SetAutoFocus(false)
@@ -1136,7 +1136,7 @@ function GpDb:_CreateWindow()
         self.showOnlyNotes = self.window.notesCheckbox:GetChecked()
     end)
     -- 5.2 Поле фильтрации по нику (без надписи "Фильтр:")
-    self.window.filterEditBox = CreateFrame("EditBox", nil, self.window, "InputBoxTemplate")
+    self.window.filterEditBox = CreateFrame("EditBox", "fdsfdsa3333", self.window, "InputBoxTemplate")
     self.window.filterEditBox:SetPoint("TOPLEFT", self.window.notesCheckbox.text, "BOTTOMLEFT", 0, -5)
     self.window.filterEditBox:SetPoint("RIGHT", self.window.closeButton, "LEFT", -40, 0)
     self.window.filterEditBox:SetHeight(20)
@@ -2249,7 +2249,7 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.otherText:SetPoint("TOPLEFT", self.raidWindow.dropdown, "BOTTOMLEFT", 0, -10)
     self.raidWindow.otherText:SetText("Другое:")
     -- Поле ввода "Другое"
-    self.raidWindow.editBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
+    self.raidWindow.editBox = CreateFrame("EditBox", "fdsfsda111111", self.raidWindow, "InputBoxTemplate")
     self.raidWindow.editBox:SetPoint("TOPLEFT", self.raidWindow.otherText, "BOTTOMLEFT", 0, -5)
     self.raidWindow.editBox:SetPoint("RIGHT", -260, 0)
     self.raidWindow.editBox:SetHeight(20)
@@ -2341,7 +2341,7 @@ function GpDb:_CreateRaidSelectionWindow()
     end)
 
     -- Поле ввода ГП
-    self.raidWindow.gpEditBox = CreateFrame("EditBox", nil, self.raidWindow, "InputBoxTemplate")
+    self.raidWindow.gpEditBox = CreateFrame("EditBox", "fdjkjfkjkj33333", self.raidWindow, "InputBoxTemplate")
     self.raidWindow.gpEditBox:SetPoint("BOTTOMLEFT", 10, 5)
     self.raidWindow.gpEditBox:SetSize(100, 20)
     self.raidWindow.gpEditBox:SetAutoFocus(false)
@@ -3043,7 +3043,7 @@ function GpDb:_CreateRlNotesEditor()
     scrollChild:SetHeight(1000)
     scrollFrame:SetScrollChild(scrollChild)
     -- EditBox внутри скролла
-    self.rlNotesEditor.editBox = CreateFrame("EditBox", nil, scrollChild, "InputBoxTemplate")
+    self.rlNotesEditor.editBox = CreateFrame("EditBox", "jjjj1111", scrollChild, "InputBoxTemplate")
     self.rlNotesEditor.editBox:SetSize(360, 220)
     self.rlNotesEditor.editBox:SetPoint("TOPLEFT")
     self.rlNotesEditor.editBox:SetMultiLine(true)
@@ -10138,7 +10138,7 @@ function ProkIconManager:CreateInputField(label, fieldName, yOffset, isNumeric)
     labelText:SetPoint("TOPLEFT", 20, -yOffset)
     labelText:SetText(label..":")
 
-    local input = CreateFrame("EditBox", nil, self.configFrame, "InputBoxTemplate")
+    local input = CreateFrame("EditBox", "fdfjkjk111111111", self.configFrame, "InputBoxTemplate")
     input:SetWidth(200)
     input:SetHeight(20)
     input:SetPoint("TOPLEFT", 150, -yOffset)
@@ -11544,8 +11544,9 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.5 - RELEASE (UNIVERSAL RAID CHAT & ANNOUNCEMENTS)
--- Для WoW 3.3.5a. Чтение ставок/паса из всех рейд-чатов, адаптивная верстка.
+-- NS Auction System v5.6 - RELEASE (FINAL 3.3.5a COMPATIBLE)
+-- Для WoW 3.3.5a. Чтение ставок/паса из рейд-чата, адаптивная верстка, GP-расчет, быстрые ставки, тултипы.
+-- Исправлено: панель быстрых ставок теперь отдельное окно слева. Исправлено реальное списание ГП.
 -- ============================================================================
 
 local NSAuk = {}
@@ -11574,24 +11575,27 @@ local CLASS_COLORS = {
     DRUID       = {r = 1.00, g = 0.49, b = 0.04, hex = "|cffFF7D0A"},
 }
 
--- Анонс только от стартера аукциона (обычно РЛ)
-local function AnnounceRaid(msg)
-    local db = NSAuk.EnsureDB()
-    if db.active and db.active.startedBy == UnitName("player") then
-        SendChatMessage(msg, "RAID")
-    end
-end
+-- ============================================================================
+-- БАЗОВЫЕ УТИЛИТЫ
+-- ============================================================================
 
 function NSAuk.EnsureDB()
     if not nsDbc then nsDbc = {} end
     if not nsDbc["аук"] then nsDbc["аук"] = {} end
-    if not nsDbc["аук"].history then nsDbc["аук"].history = {} end
-    if not nsDbc["аук"].iconPosition then nsDbc["аук"].iconPosition = {x = 0, y = 0} end
-    if not nsDbc["аук"].windowPosition then nsDbc["аук"].windowPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"} end
-    if not nsDbc["аук"].historyPosition then nsDbc["аук"].historyPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"} end
-    if not nsDbc["аук"].settings then nsDbc["аук"].settings = {defaultStep = 10, defaultTime = 20} end
-    if nsDbc["аук"].active == nil then nsDbc["аук"].active = nil end
-    return nsDbc["аук"]
+    local db = nsDbc["аук"]
+    if not db.history then db.history = {} end
+    if not db.iconPosition then db.iconPosition = {x = 0, y = 0} end
+    if not db.windowPosition then db.windowPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"} end
+    if not db.historyPosition then db.historyPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"} end
+    if not db.settings then db.settings = {defaultStep = 10, defaultTime = 20} end
+    
+    -- [FIX] Явная инициализация состояния чекбокса. nil приводится к true по умолчанию.
+    if db.settings.autoDeductGP == nil then db.settings.autoDeductGP = true end
+    db.settings.autoDeductGP = (db.settings.autoDeductGP == true)
+    
+    if not db.customButtons then db.customButtons = {} end
+    if db.active == nil then db.active = nil end
+    return db
 end
 
 function NSAuk.mysplit(inputstr, sep)
@@ -11644,9 +11648,15 @@ end
 
 function NSAuk.ParseAuctionCommand(msg)
     local clean = msg:gsub("^%s+", ""):gsub("%s+$", "")
-    local res = { item = "", step = nil, closeTime = nil }
+    local res = { item = "Предмет", itemLink = nil, step = nil, closeTime = nil }
     if not clean:match("^АУК") then return res end
     local rest = clean:gsub("^АУК%s*", "")
+
+    local linkFull = rest:match("|.-|h.-|h|r")
+    if linkFull then
+        res.itemLink = linkFull
+    end
+
     local sm = rest:match("%s+шаг%s+(%d+)%s*$") or rest:match("%s+шаг%s+(%d+)")
     if sm then
         res.step = tonumber(sm)
@@ -11657,7 +11667,11 @@ function NSAuk.ParseAuctionCommand(msg)
         res.closeTime = tonumber(tm)
         rest = rest:gsub("%s+время%s+" .. tm .. "%s*$", ""):gsub("%s+время%s+" .. tm, "")
     end
-    res.item = rest:match("^%s*(.-)%s*$") or "Предмет"
+
+    local itemName = rest:match("^%s*(.-)%s*$")
+    if itemName and itemName ~= "" then
+        res.item = itemName:gsub("|.-|h(.-)|h|r", "%1"):gsub("|.-|h", "")
+    end
     return res
 end
 
@@ -11690,15 +11704,124 @@ function NSAuk.GetRaidGPData()
     return gpData
 end
 
-function NSAuk.CreateAuctionFrame()
-    if auctionFrame and auctionFrame:IsShown() then return auctionFrame end
-    if auctionFrame then auctionFrame:Hide(); auctionFrame:SetParent(nil); auctionFrame = nil end
+-- ============================================================================
+-- ИНТЕРФЕЙС И UI
+-- ============================================================================
 
-    auctionFrame = CreateFrame("Frame", "NSAukAuctionWindow", UIParent)
+function NSAuk.ShowConfirm(title, text, onYes, onNo)
+    if NSAuk.confirmFrame and NSAuk.confirmFrame:IsShown() then NSAuk.confirmFrame:Hide() end
+    
+    local f = CreateFrame("Frame", "NSAukConfirm", UIParent)
+    f:SetSize(280, 110)
+    f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
+    f:SetBackdropColor(0, 0, 0, 0.9)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+
+    local t = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    t:SetPoint("TOP", 0, -15)
+    t:SetText(title)
+
+    local tx = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    tx:SetPoint("TOP", t, "BOTTOM", 0, -8)
+    tx:SetText(text)
+    tx:SetWidth(240)
+    tx:SetJustifyH("CENTER")
+
+    local btnY = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    btnY:SetSize(80, 22)
+    btnY:SetPoint("BOTTOMRIGHT", -15, 15)
+    btnY:SetText("Да")
+    btnY:SetScript("OnClick", function() if onYes then onYes() end f:Hide() end)
+
+    local btnN = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    btnN:SetSize(80, 22)
+    btnN:SetPoint("BOTTOMLEFT", 15, 15)
+    btnN:SetText("Нет")
+    btnN:SetScript("OnClick", function() if onNo then onNo() end f:Hide() end)
+
+    NSAuk.confirmFrame = f
+    f:Show()
+end
+
+function NSAuk.RenderCustomButtons()
+    local frame = auctionFrame
+    if not frame or not frame.customButtonBar then return end
+    local bar = frame.customButtonBar
+    
+    -- Очистка старых кнопок
+    for _, btn in ipairs(bar.buttons) do
+        btn:Hide()
+        btn:SetParent(nil)
+    end
+    bar.buttons = {}
+
+    local db = NSAuk.EnsureDB()
+    local btns = db.customButtons
+    if #btns == 0 then
+        bar:SetHeight(0)
+        return
+    end
+
+    local btnW = 60
+    local gap = 6
+    local totalW = 0
+    for i, val in ipairs(btns) do
+        local b = CreateFrame("Button", "NSAukQuickBid_" .. i, bar, "UIPanelButtonTemplate")
+        b:SetSize(btnW, 22)
+        b:SetPoint("LEFT", totalW, 0)
+        b:SetText(tostring(val) .. " GP")
+        b:SetScript("OnClick", function()
+            local d = NSAuk.EnsureDB()
+            if not d.active then return end
+            
+            local myName = UnitName("player")
+            local myBid = d.active.bids[myName]
+            if not myBid or myBid.banned then
+                print("|cffff0000[NSAuk]|r Вы забанены в этом аукционе.")
+                return
+            end
+            
+            -- [FIX] Проверка ГП перед ставкой
+            if (myBid.gp or 0) < val then
+                print("|cffff0000[NSAuk]|r Недостаточно ГП для ставки " .. val .. ". У вас: " .. (myBid.gp or 0))
+                return
+            end
+            
+            -- [NEW] Проверка на лидерство (аналогично основной кнопке "Ставка")
+            local mx = 0
+            for _, v in pairs(d.active.bids) do
+                if v.hasAction and not v.passed and v.amount > mx then
+                    mx = v.amount
+                end
+            end
+            if (myBid.amount or 0) == mx and mx > 0 then
+                print("|cffff0000[NSAuk]|r Вы уже лидер. Нельзя перебить свою ставку.")
+                return
+            end
+            
+            SendChatMessage(tostring(val), "RAID")
+        end)
+        bar.buttons[i] = b
+        totalW = totalW + btnW + gap
+    end
+    
+    bar:SetWidth(totalW - gap)
+    bar:SetHeight(25)
+end
+
+function NSAuk.CreateAuctionFrame()
+    if auctionFrame then NSAuk.DestroyAuctionWindow() end
+
+    auctionFrame = CreateFrame("Frame", "NSAukAuctionFrame", UIParent)
     local frame = auctionFrame
     frame:SetSize(350, 250)
-    frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
-    frame:SetBackdropColor(0, 0, 0, 0.9)
+frame:SetBackdrop({ bgFile = "Interface\\Buttons\\White8x8", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 8, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
+frame:SetBackdropColor(0, 0, 0, 0.95)    frame:SetBackdropColor(0, 0, 0, 0.9)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
@@ -11715,74 +11838,216 @@ function NSAuk.CreateAuctionFrame()
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         NSAuk.ClampFrameToScreen(self)
-        NSAuk.SaveWindowPosition(self, NSAuk.EnsureDB().windowPosition)
+        NSAuk.SaveWindowPosition(self, db.windowPosition)
+        if self.customPanel then
+            self.customPanel:ClearAllPoints()
+            self.customPanel:SetPoint("TOPRIGHT", self, "TOPLEFT", -5, 0)
+        end
     end)
-    frame:SetScript("OnHide", function(self) NSAuk.SaveWindowPosition(self, NSAuk.EnsureDB().windowPosition) end)
 
-    -- Кнопка "?" вместо закрытия
-    local helpBtn = CreateFrame("Button", nil, frame)
+    -- Сохранение чекбокса точно как координат (на OnHide + OnClick)
+    frame:SetScript("OnHide", function(self)
+        if self.autoDeductCB then 
+            -- [FIX] GetChecked() в 3.3.5a возвращает 1 или nil
+            db.settings.autoDeductGP = (self.autoDeductCB:GetChecked() == 1) 
+        end
+        NSAuk.SaveWindowPosition(self, db.windowPosition)
+        if self.customPanel then self.customPanel:Hide() end
+    end)
+
+    -- === ПАНЕЛЬ БЫСТРЫХ СТАВОК ===
+    local customPanel = CreateFrame("Frame", "NSAukBidPanel", UIParent)
+    customPanel:SetSize(118, 26)
+    customPanel:SetPoint("TOPRIGHT", frame, "TOPLEFT", -5, 0)
+    customPanel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 16, edgeSize = 16, insets = { left = 5, right = 5, top = 5, bottom = 5 } })
+    customPanel:SetBackdropColor(0, 0, 0, 0.8)
+    customPanel:SetBackdropBorderColor(0.5, 0.5, 0.5, 1.0)
+    customPanel:Hide()
+    customPanel.isExpanded = false
+    frame.customPanel = customPanel
+
+    local cpEdit = CreateFrame("EditBox", "NSAukBidInput", customPanel, "InputBoxTemplate")
+    cpEdit:SetSize(50, 20)
+    cpEdit:SetPoint("LEFT", 5, 0)
+    cpEdit:SetAutoFocus(false)
+    cpEdit:SetMaxLetters(4)
+    cpEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    cpEdit:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+    local cpAdd = CreateFrame("Button", "NSAukBtnAdd", customPanel, "UIPanelButtonTemplate")
+    cpAdd:SetSize(20, 20)
+    cpAdd:SetPoint("LEFT", cpEdit, "RIGHT", 2, 0)
+    cpAdd:SetText("+")
+    cpAdd:SetScript("OnClick", function()
+        local val = tonumber(cpEdit:GetText())
+        if val and val > 0 then
+            local db = NSAuk.EnsureDB()
+            if #db.customButtons < 8 and not tContains(db.customButtons, val) then
+                table.insert(db.customButtons, val)
+                table.sort(db.customButtons)
+                NSAuk.RenderCustomButtons()
+                print("|cff00ff00[NSAuk]|r Кнопка " .. val .. " ГП добавлена.")
+            end
+            cpEdit:SetText("")
+        end
+    end)
+
+    local cpRem = CreateFrame("Button", "NSAukBtnRem", customPanel, "UIPanelButtonTemplate")
+    cpRem:SetSize(20, 20)
+    cpRem:SetPoint("LEFT", cpAdd, "RIGHT", 2, 0)
+    cpRem:SetText("-")
+    cpRem:SetScript("OnClick", function()
+        local val = tonumber(cpEdit:GetText())
+        if not val or val <= 0 then print("|cffFF8080[NSAuk]|r Введите число для удаления."); return end
+        local db = NSAuk.EnsureDB()
+        for i, btnVal in ipairs(db.customButtons) do
+            if btnVal == val then
+                table.remove(db.customButtons, i)
+                NSAuk.RenderCustomButtons()
+                print("|cff00ff00[NSAuk]|r Кнопка " .. val .. " ГП удалена.")
+                cpEdit:SetText("")
+                return
+            end
+        end
+        print("|cffFF8080[NSAuk]|r Кнопка " .. val .. " ГП не найдена.")
+    end)
+
+    local panelTitle = customPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    panelTitle:SetPoint("BOTTOMLEFT", customPanel, "TOPLEFT", 5, 2)
+    panelTitle:SetText("Быстрые ставки")
+    panelTitle:SetTextColor(1, 0.82, 0)
+
+    local togglePanelBtn = CreateFrame("Button", "NSAukTogglePanel", frame)
+    togglePanelBtn:SetSize(24, 24)
+    togglePanelBtn:SetPoint("TOPLEFT", 5, -5)
+    local toggleTex = togglePanelBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    toggleTex:SetPoint("CENTER")
+    toggleTex:SetText(">")
+    togglePanelBtn:SetScript("OnClick", function()
+        frame.customPanel.isExpanded = not frame.customPanel.isExpanded
+        toggleTex:SetText(frame.customPanel.isExpanded and "v" or ">")
+        if frame.customPanel.isExpanded then frame.customPanel:Show() else frame.customPanel:Hide() end
+    end)
+
+    -- [FIX] Чекбокс: корректная работа с GetChecked() (возвращает 1, а не true)
+    local autoDeductCB = CreateFrame("CheckButton", "NSAukAutoDeductCB", frame, "UICheckButtonTemplate")
+    autoDeductCB:SetPoint("LEFT", togglePanelBtn, "RIGHT", 8, 0)
+    autoDeductCB:SetChecked(db.settings.autoDeductGP == true)
+    if autoDeductCB.Text then
+        autoDeductCB.Text:SetText("Авто-списание ГП")
+        autoDeductCB.Text:SetFontObject(GameFontNormalSmall)
+    end
+    autoDeductCB:SetScript("OnClick", function(self)
+        -- В 3.3.5a GetChecked() возвращает 1 (вкл) или nil (выкл)
+        local isChecked = (self:GetChecked() == 1)
+        db.settings.autoDeductGP = isChecked
+        print("|cff00FF00[NSAuk]|r Авто-списание: " .. (isChecked and "ВКЛ" or "ВЫКЛ"))
+    end)
+    autoDeductCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+        GameTooltip:SetText("Автоматическое списание ГП", 1, 0.8, 0)
+        GameTooltip:AddLine("При завершении аукциона аддон автоматически спишет ГП с победителя.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    autoDeductCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    frame.autoDeductCB = autoDeductCB
+
+    local helpBtn = CreateFrame("Button", "NSAukHelpBtn", frame)
     helpBtn:SetSize(24, 24)
     helpBtn:SetPoint("TOPRIGHT", -5, -5)
     helpBtn:RegisterForClicks("AnyUp")
-    
     local helpText = helpBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     helpText:SetPoint("CENTER", 0, 1)
     helpText:SetText("?")
-    
-    helpBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
-        GameTooltip:ClearLines()
-        
-        GameTooltip:AddLine("|cffFFD100NS Auction System v5.5 - Справка|r")
-        GameTooltip:AddLine(" ")
-        
-        GameTooltip:AddLine("|cffffff00Команды (в чат):|r", 1, 1, 1)
-        GameTooltip:AddLine("|cff00ff00/АУК [предмет]|r - Запуск аукциона.", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff00ff00/АУК [предмет] шаг [N] время [N]|r - С кастомными параметрами.", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cffff8080/АУК закрыть|r - Отмена/завершение (только РЛ).", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff80ffff/АУК показать|r - Синхронизация данных (только РЛ).", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff80ffff/АУК история [N]|r - Просмотр прошлых торгов.", 0.8, 0.8, 0.8)
-        
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00Ставки (в рейд-чат):|r", 1, 1, 1)
-        GameTooltip:AddLine("• Число (напр: |cff00ff00150|r) - Ваша ставка.", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("• |cffff8080Пас|r или |cffff8080-|r - Выход из торгов.", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("• Мин. ставка = Текущий лидер + Шаг.", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("• Нельзя сделать пас, если вы лидируете.", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("• Ставка ограничена вашим GP (из заметок гильдии).", 0.8, 0.8, 0.8)
-        
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00Интерфейс:|r", 1, 1, 1)
-        GameTooltip:AddLine("• Перетаскивание за заголовок, сворачивание на [-].", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("• Кнопки [Пас] и [Ставка] в самом окне для удобства.", 0.8, 0.8, 0.8)
-        
-        GameTooltip:Show()
-    end)
+helpBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+    GameTooltip:ClearLines()
+    GameTooltip:AddLine("|cffFFD100NS Auction System v5.6|r", 1, 0.82, 0)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cffffff00=== КОМАНДЫ (в чат рейда) ===|r", 1, 1, 1)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff00ff00АУК [предмет]|r", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("  Запуск аукциона с параметрами по умолчанию.", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff00ff00АУК [предмет] шаг [N] время [M]|r", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("  Пример: |cffffaa00АУК Меч шаг 5 время 30|r", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine("  Запуск с кастомным шагом и временем.", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cffff8080АУК закрыть|r", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("  Принудительное завершение аукциона (только РЛ).", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff00ff00АУК показать|r", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("  Синхронизация состояния аукциона (только РЛ).", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff00ff00АУК история [N]|r", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("  Показать историю (N - номер записи, опционально).", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cffffff00=== ИГРОВЫЕ КОМАНДЫ ===|r", 1, 1, 1)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff88ff88[ЧИСЛО]|r - сделать ставку (например: |cffffaa0050|r)", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("|cff88ff88пас|r или |cff88ff88-|r - отказаться от торгов", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cffffff00=== УПРАВЛЕНИЕ ОКНОМ ===|r", 1, 1, 1)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff88ff88ЛКМ|r по игроку - назначить победителем (РЛ)", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("|cff88ff88ПКМ|r по игроку - забанить/разбанить (РЛ)", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("|cff88ff88Кнопка [>]|r - панель быстрых ставок", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("|cff88ff88Кнопка [-]|r - свернуть в иконку на миникарте", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cffffff00=== НАСТРОЙКИ ===|r", 1, 1, 1)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cff88ff88/nsauk|r - открыть окно настроек", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("|cff88ff88Галочка \"Авто-списание ГП\"|r - включить/выключить", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("|cffffff00=== ИНФОРМАЦИЯ ===|r", 1, 1, 1)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("  Система списывает ГП из офицерской заметки.", 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end)
     helpBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    local minBtn = CreateFrame("Button", nil, frame)
+    local minBtn = CreateFrame("Button", "NSAukMinBtn", frame)
     minBtn:SetSize(24, 24)
     minBtn:SetPoint("TOPRIGHT", helpBtn, "TOPLEFT", -2, 0)
     minBtn:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
     minBtn:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-Down")
     minBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
     minBtn:SetScript("OnClick", function()
-        isMinimized = true
-        frame:Hide()
-        if not minimapIcon then NSAuk.CreateMinimapIcon() end
-        minimapIcon:Show()
+        isMinimized = true; frame:Hide(); if frame.customPanel then frame.customPanel:Hide() end
+        if not minimapIcon then NSAuk.CreateMinimapIcon() end; minimapIcon:Show()
     end)
 
     frame.itemTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    frame.itemTitle:SetPoint("TOPLEFT", 10, -15)
-    frame.itemTitle:SetPoint("TOPRIGHT", -30, -15)
+    frame.itemTitle:SetPoint("TOPLEFT", 10, -30)
+    frame.itemTitle:SetPoint("TOPRIGHT", -10, -30)
     frame.itemTitle:SetJustifyH("LEFT")
+    frame.itemTitle:SetText(db.active.item or "Предмет")
+    if db.active.itemLink then
+        local hex = db.active.itemLink:match("|cff(%x%x%x%x%x%x)")
+        if hex then
+            frame.itemTitle:SetTextColor(tonumber(hex:sub(1,2), 16)/255, tonumber(hex:sub(3,4), 16)/255, tonumber(hex:sub(5,6), 16)/255)
+        end
+    end
+
+    local titleMouseFrame = CreateFrame("Frame", "NSAukTitleMouse", frame)
+    titleMouseFrame:SetAllPoints(frame.itemTitle)
+    titleMouseFrame:EnableMouse(true)
+    titleMouseFrame:SetScript("OnEnter", function()
+        local d = NSAuk.EnsureDB()
+        if not d.active then return end
+        GameTooltip:SetOwner(titleMouseFrame, "ANCHOR_TOPRIGHT")
+        GameTooltip:ClearLines()
+        if d.active.itemLink and d.active.itemLink:match("item:") then GameTooltip:SetHyperlink(d.active.itemLink)
+        else GameTooltip:SetText(d.active.item, 1, 1, 1); GameTooltip:AddLine("|cff808080(Shift-кликните предмет при запуске.)|r", 0.8, 0.8, 0.8, true) end
+        GameTooltip:Show()
+    end)
+    titleMouseFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     frame.infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.infoText:SetPoint("TOPLEFT", 10, -35)
+    frame.infoText:SetPoint("TOPLEFT", 10, -50)
     
     frame.countdownText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.countdownText:SetPoint("TOPRIGHT", -10, -35)
+    frame.countdownText:SetPoint("TOPRIGHT", -10, -50)
     frame.countdownText:SetJustifyH("RIGHT")
     frame.countdownText:SetText("0с")
 
@@ -11795,20 +12060,20 @@ function NSAuk.CreateAuctionFrame()
     local div = frame:CreateTexture(nil, "OVERLAY")
     div:SetTexture(0.5, 0.5, 0.5, 0.5)
     div:SetSize(frame:GetWidth() - 20, 1)
-    div:SetPoint("TOPLEFT", 10, -45)
-    div:SetPoint("TOPRIGHT", -10, -45)
+    div:SetPoint("TOPLEFT", 10, -60)
+    div:SetPoint("TOPRIGHT", -10, -60)
 
     scrollFrameID = scrollFrameID + 1
     local sf = CreateFrame("ScrollFrame", "NSAukScrollFrame" .. scrollFrameID, frame, "UIPanelScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT", 10, -50)
+    sf:SetPoint("TOPLEFT", 10, -65)
     sf:SetPoint("BOTTOMRIGHT", -25, 55)
-    local content = CreateFrame("Frame", nil, sf)
+    local content = CreateFrame("Frame", "NSAukScrollContent" .. scrollFrameID, sf)
     content:SetSize(300, 100)
     sf:SetScrollChild(content)
     frame.content = content
     content.rows = {}
 
-    local passBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    local passBtn = CreateFrame("Button", "NSAukPassBtn", frame, "UIPanelButtonTemplate")
     passBtn:SetSize(80, 22)
     passBtn:SetPoint("BOTTOMRIGHT", -90, 10)
     passBtn:SetText("Пас")
@@ -11827,166 +12092,60 @@ function NSAuk.CreateAuctionFrame()
         end
         
         SendAddonMessage("AUC_PASS", "", "RAID")
-        if myBid then
-            myBid.passed = true
-            myBid.amount = 0
-            myBid.hasAction = true
-        end
+        if myBid then myBid.passed = true; myBid.amount = 0; myBid.hasAction = true end
         NSAuk.UpdateAuctionWindow()
     end)
 
-    local bidBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    local bidBtn = CreateFrame("Button", "NSAukBidBtn", frame, "UIPanelButtonTemplate")
     bidBtn:SetSize(80, 22)
     bidBtn:SetPoint("BOTTOMRIGHT", -5, 10)
     bidBtn:SetText("Ставка")
     bidBtn:SetScript("OnClick", function()
         local d = NSAuk.EnsureDB()
         if d.active then
-            local mx, me = 0, UnitName("player")
+            local me = UnitName("player")
+            local myBid = d.active.bids[me] or {amount=0, gp=0}
+            local mx = 0
             for _, v in pairs(d.active.bids) do
                 if v.hasAction and not v.passed and v.amount > mx then mx = v.amount end
             end
-            if (d.active.bids[me] and d.active.bids[me].amount or 0) == mx and mx > 0 then print("Вы лидер"); return end
+            if mx + d.active.step > (myBid.gp or 0) then
+                print("|cffff0000[NSAuk]|r Недостаточно ГП! Ваша ставка превысит доступный баланс.")
+                return
+            end
+            if (myBid.amount or 0) == mx and mx > 0 then print("Вы лидер"); return end
             SendChatMessage(tostring(mx + d.active.step), "RAID")
         end
     end)
 
+    local cbar = CreateFrame("Frame", "NSAukCustomBar", frame)
+    cbar:SetSize(300, 25)
+    cbar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, -35)
+    cbar.buttons = {}
+    frame.customButtonBar = cbar
+
+    NSAuk.RenderCustomButtons()
     frame:Show()
     frame:Raise()
     return frame
 end
 
 function NSAuk.DestroyAuctionWindow()
-    if auctionFrame then auctionFrame:Hide(); auctionFrame:SetParent(nil); auctionFrame = nil end
-    if resizeAnimation then resizeAnimation:SetScript("OnUpdate", nil); resizeAnimation = nil end
-end
-
-function NSAuk.UpdateAuctionWindow()
-    if isMinimized then return end
-    local db = NSAuk.EnsureDB()
-    if not db.active then return end
-    local frame = NSAuk.CreateAuctionFrame()
-    local content = frame.content
-    if not content then return end
-
-    if content.rows then
-        for _, c in ipairs(content.rows) do if c then c:Hide(); c:SetParent(nil) end end
-    end
-    content.rows = {}
-
-    frame.itemTitle:SetText(db.active.item or "Предмет")
-    
-    local lastTime = db.active.lastBidTime or db.active.startTime
-    local remaining = math.max(0, math.floor(db.active.closeTime - (GetTime() - lastTime)))
-    frame.infoText:SetText("Шаг: " .. db.active.step .. " GP | Осталось:")
-    if frame.countdownText then frame.countdownText:SetText(remaining .. "с") end
-
-    local sortedBids = {}
-    for name, data in pairs(db.active.bids) do
-        if data.hasAction then table.insert(sortedBids, {name = name, data = data}) end
-    end
-    table.sort(sortedBids, function(a, b)
-        if a.data.passed and not b.data.passed then return false end
-        if not a.data.passed and b.data.passed then return true end
-        return a.data.amount > b.data.amount
-    end)
-
-    local totalHeight = 5
-    local rowHeight = 22
-    local maxRowWidth = 280
-
-    for i, bid in ipairs(sortedBids) do
-        local row = CreateFrame("Frame", nil, content)
-        row:SetHeight(rowHeight)
-        row:SetPoint("TOPLEFT", 10, -totalHeight)
-        row:SetPoint("TOPRIGHT", -10, -totalHeight)
-
-        local cc = CLASS_COLORS[bid.data.class] or CLASS_COLORS.WARRIOR
-        local isPassed = bid.data.passed
-
-        local nt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nt:SetPoint("LEFT", 5, 0)
-        local dn = bid.name
-        if bid.data.public and bid.data.public ~= "" and bid.data.public ~= "НЕ В ГИЛЬДИИ" then dn = dn .. " (" .. bid.data.public .. ")" end
-        local nameColor = isPassed and "|cff808080" or cc.hex
-        nt:SetText(nameColor .. dn .. "|r")
-
-        local gt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        gt:SetPoint("LEFT", nt, "RIGHT", 20, 0)
-        local gpText = bid.data.gp and bid.data.gp > 0 and ("|cff808080["..bid.data.gp.." GP]|r") or "|cffff0000[БЕЗ ГП]|r"
-        if isPassed then gpText = "|cff808080[БЕЗ ГП]|r" end
-        gt:SetText(gpText)
-
-        local bt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        bt:SetPoint("RIGHT", -5, 0)
-        if isPassed then
-            bt:SetText("|cff808080ПАС|r")
-        else
-            bt:SetText(bid.data.amount == 0 and "|cff8080800 GP|r" or "|cff00ff00"..bid.data.amount.." GP|r")
+    if auctionFrame then 
+        auctionFrame:Hide()
+        if auctionFrame.customPanel then
+            auctionFrame.customPanel:Hide()
+            auctionFrame.customPanel:SetParent(nil)
+            auctionFrame.customPanel = nil
         end
-
-        row:Show()
-        local rw = nt:GetStringWidth() + 20 + gt:GetStringWidth() + 10 + bt:GetStringWidth() + 25
-        if rw > maxRowWidth then maxRowWidth = rw end
-
-        content.rows[i] = row
-        totalHeight = totalHeight + rowHeight
+        -- Полный отрыв от UI и обнуление ссылки
+        auctionFrame:SetParent(nil)
+        auctionFrame = nil 
     end
-
-    if #sortedBids == 0 then
-        local er = CreateFrame("Frame", nil, content)
-        er:SetHeight(rowHeight)
-        er:SetPoint("TOPLEFT", 10, -totalHeight)
-        er:SetPoint("TOPRIGHT", -10, -totalHeight)
-        local et = er:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        et:SetPoint("CENTER", 0, 0)
-        et:SetText("|cff808080Ожидание ставок...|r")
-        er:Show()
-        content.rows[1] = er
-        totalHeight = totalHeight + rowHeight
+    if resizeAnimation then 
+        resizeAnimation:SetScript("OnUpdate", nil)
+        resizeAnimation = nil 
     end
-
-    local mx, ld = 0, nil
-    for n, d in pairs(db.active.bids) do
-        if d.hasAction and not d.passed and d.amount > mx then mx, ld = d.amount, n end
-    end
-    frame.nextBidText:SetText("Мин. ставка: " .. (mx + db.active.step) .. " GP")
-    if ld then frame.leaderText:SetText("Лидер: " .. ld .. " (" .. mx .. " GP)"); frame.leaderText:Show() else frame.leaderText:Hide() end
-
-    content:SetHeight(totalHeight + 10)
-    content:SetWidth(maxRowWidth)
-    NSAuk.SmoothResize(frame, maxRowWidth + 20, totalHeight + 110, 0.15)
-end
-
-function NSAuk.FinishAuction(initiator)
-    local db = NSAuk.EnsureDB()
-    if not db.active then return end
-    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
-    
-    local w, wa = nil, 0
-    for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and d.amount > wa then w, wa = n, d.amount end end
-    
-    if w and wa > 0 then
-        local bc = {}
-        for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
-        table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
-        if #db.history > 10 then table.remove(db.history, 1) end
-        
-        if initiator == UnitName("player") then
-            SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
-            SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
-        end
-    else
-        if initiator == UnitName("player") then
-            SendChatMessage("Аукцион завершен без ставок.", "RAID_WARNING")
-        end
-    end
-    
-    db.active = nil
-    isMinimized = false
-    NSAuk.DestroyAuctionWindow()
-    if minimapIcon then minimapIcon:Hide() end
-    checkFrame:SetScript("OnUpdate", nil)
 end
 
 function NSAuk.CreateMinimapIcon()
@@ -12119,7 +12278,7 @@ function NSAuk.CreateSettingsWindow()
     local st = settingsWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     st:SetPoint("TOPLEFT", 20, -50)
     st:SetText("Шаг по умолчанию:")
-    local se = CreateFrame("EditBox", nil, settingsWindow, "InputBoxTemplate")
+    local se = CreateFrame("EditBox", "fdsfdsfsad", settingsWindow, "InputBoxTemplate")
     se:SetSize(60, 25)
     se:SetPoint("LEFT", st, "RIGHT", 10, 0)
     se:SetText(tostring(db.settings.defaultStep))
@@ -12128,7 +12287,7 @@ function NSAuk.CreateSettingsWindow()
     local tt = settingsWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     tt:SetPoint("TOPLEFT", st, "BOTTOMLEFT", 0, -15)
     tt:SetText("Автозакрытие:")
-    local te = CreateFrame("EditBox", nil, settingsWindow, "InputBoxTemplate")
+    local te = CreateFrame("EditBox", "fdsfdsfsdaff", settingsWindow, "InputBoxTemplate")
     te:SetSize(60, 25)
     te:SetPoint("LEFT", tt, "RIGHT", 10, 0)
     te:SetText(tostring(db.settings.defaultTime))
@@ -12147,6 +12306,289 @@ function NSAuk.CreateSettingsWindow()
         settingsWindow:Hide()
     end)
     return settingsWindow
+end
+
+-- ============================================================================
+-- ЛОГИКА АУКЦИОНА
+-- ============================================================================
+
+local function AnnounceRaid(msg)
+    local db = NSAuk.EnsureDB()
+    if db.active and db.active.startedBy == UnitName("player") then
+        SendChatMessage(msg, "RAID")
+    end
+end
+
+function NSAuk.DeductGPFromRoster(playerName, amount)
+    if not playerName or not amount or amount <= 0 then return end
+
+    for i = 1, GetNumGuildMembers(true) do
+        local name = GetGuildRosterInfo(i)
+        if name == playerName or name:match("^" .. playerName) then
+            local _, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(i)
+            local parts = NSAuk.mysplit(officerNote or "", "%s+")
+
+            if #parts >= 3 then
+                local playerID = parts[2]          -- ID из второго слова
+                local oldGP = tonumber(parts[3]) or 0
+                local newGP = math.max(0, oldGP - amount)
+
+                parts[3] = tostring(newGP)         -- Обновляем ГП (третье слово)
+                local newNote = table.concat(parts, " ")
+
+                GuildRosterSetOfficerNote(i, newNote)
+
+                -- nsGP1: минус + ник
+                SendAddonMessage("nsGP1 -" .. amount, name, "guild")
+
+                -- nsGPlog: явная склейка с минусом, чтобы сервер точно записал списание
+                local logStr = "Аукцион -" .. amount .. " " .. playerID
+                SendAddonMessage("nsGPlog", logStr, "guild")
+
+                print(string.format("|cff00ff00[NSAuk]|r Списано %d ГП с %s (ID: %s). Осталось: %d ГП.", amount, name, playerID, newGP))
+            else
+                print(string.format("|cffff0000[NSAuk]|r Ошибка: Офицерская заметка %s имеет неверный формат (ожидается: Префикс ID ГП).", name))
+            end
+            break
+        end
+    end
+end
+
+function NSAuk.SetWinner(playerName, winAmount)
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
+    
+    -- Расчет/списание ГП только если чекбокс включён
+    if db.settings.autoDeductGP then
+        NSAuk.DeductGPFromRoster(playerName, winAmount)
+    else
+        print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", playerName, winAmount))
+    end
+    
+    local bc = {}
+    for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
+    table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = playerName, winAmount = winAmount or 0, bids = bc })
+    if #db.history > 10 then table.remove(db.history, 1) end
+    
+    if db.active.startedBy == UnitName("player") then
+        SendChatMessage(playerName .. " побеждает, поставив " .. (winAmount or 0) .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
+        SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. (winAmount or 0) .. " ГП!", "WHISPER", nil, playerName)
+    end
+    
+    -- Полный сброс состояния
+    db.active = nil
+    isMinimized = false
+    NSAuk.DestroyAuctionWindow()
+    if minimapIcon then minimapIcon:Hide() end
+    checkFrame:SetScript("OnUpdate", nil)
+end
+
+function NSAuk.FinishAuction(initiator)
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
+    
+    local w, wa = nil, 0
+    for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and not d.banned and d.amount > wa then w, wa = n, d.amount end end
+    
+    if w and wa > 0 then
+        local bc = {}
+        for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
+        table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
+        if #db.history > 10 then table.remove(db.history, 1) end
+        
+        -- Расчет ГП только если чекбокс включён
+        if db.settings.autoDeductGP then
+            NSAuk.DeductGPFromRoster(w, wa)
+        else
+            print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", w, wa))
+        end
+        
+        if initiator == UnitName("player") then
+            SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
+            SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
+        end
+    else
+        if initiator == UnitName("player") then
+            SendChatMessage("Аукцион завершен без ставок.", "RAID_WARNING")
+        end
+    end
+    
+    -- Полный сброс состояния
+    db.active = nil
+    isMinimized = false
+    NSAuk.DestroyAuctionWindow()
+    if minimapIcon then minimapIcon:Hide() end
+    checkFrame:SetScript("OnUpdate", nil)
+end
+
+function NSAuk.UpdateAuctionWindow()
+    if isMinimized then return end
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    local frame = NSAuk.CreateAuctionFrame()
+    local content = frame.content
+    if not content then return end
+
+    if content.rows then
+        for _, c in ipairs(content.rows) do if c then c:Hide(); c:SetParent(nil) end end
+    end
+    content.rows = {}
+
+    frame.itemTitle:SetText(db.active.item or "Предмет")
+    
+    local lastTime = db.active.lastBidTime or db.active.startTime
+    local remaining = math.max(0, math.floor(db.active.closeTime - (GetTime() - lastTime)))
+    frame.infoText:SetText("Шаг: " .. db.active.step .. " GP | Осталось:")
+    if frame.countdownText then frame.countdownText:SetText(remaining .. "с") end
+
+    local sortedBids = {}
+    for name, data in pairs(db.active.bids) do
+        if data.hasAction then table.insert(sortedBids, {name = name, data = data}) end
+    end
+    table.sort(sortedBids, function(a, b)
+        if a.data.passed and not b.data.passed then return false end
+        if not a.data.passed and b.data.passed then return true end
+        return a.data.amount > b.data.amount
+    end)
+
+    local totalHeight = 5
+    local rowHeight = 22
+    local maxRowWidth = 280
+    local myName = UnitName("player")
+    local isRL = (db.active.startedBy == myName)
+
+    for i, bid in ipairs(sortedBids) do
+        local row = CreateFrame("Frame", nil, content)
+        row:SetHeight(rowHeight)
+        row:SetPoint("TOPLEFT", 10, -totalHeight)
+        row:SetPoint("TOPRIGHT", -10, -totalHeight)
+        row:EnableMouse(true)
+
+        local cc = CLASS_COLORS[bid.data.class] or CLASS_COLORS.WARRIOR
+        local isPassed = bid.data.passed
+        local isBanned = bid.data.banned == true
+
+        local nt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nt:SetPoint("LEFT", 5, 0)
+        local dn = bid.name
+        if bid.data.public and bid.data.public ~= "" and bid.data.public ~= "НЕ В ГИЛЬДИИ" then dn = dn .. " (" .. bid.data.public .. ")" end
+        local nameColor = isBanned and "|cffff0000" or (isPassed and "|cff808080" or cc.hex)
+        local banSuffix = isBanned and " |cffff0000[ЗАБАНЕН]|r" or ""
+        nt:SetText(nameColor .. dn .. banSuffix .. "|r")
+
+        local gt = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        gt:SetPoint("LEFT", nt, "RIGHT", 20, 0)
+        local gpText = isBanned and "|cff808080[БАН]|r" or (bid.data.gp and bid.data.gp > 0 and ("|cff808080["..bid.data.gp.." GP]|r") or "|cffff0000[БЕЗ ГП]|r")
+        if isPassed and not isBanned then gpText = "|cff808080[БЕЗ ГП]|r" end
+        gt:SetText(gpText)
+
+        local bt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        bt:SetPoint("RIGHT", -5, 0)
+        if isBanned then
+            bt:SetText("|cffff0000БАН|r")
+        elseif isPassed then
+            bt:SetText("|cff808080ПАС|r")
+        else
+            bt:SetText(bid.data.amount == 0 and "|cff8080800 GP|r" or "|cff00ff00"..bid.data.amount.." GP|r")
+        end
+
+        -- [FIX] ЛКМ теперь работает идентично чат-команде "АУК закрыть", но с назначением победителя
+        row:SetScript("OnMouseUp", function(_, button)
+            if button == "LeftButton" and isRL and not isBanned and not isPassed then
+                NSAuk.ShowConfirm("Назначить победителем?", "Назначить " .. bid.name .. " победителем и завершить аукцион?",
+                    function() 
+                        NSAuk.SetWinner(bid.name, bid.data.amount) 
+                    end,
+                    nil
+                )
+            elseif button == "RightButton" and isRL and not isBanned then
+                NSAuk.ShowConfirm("Забанить игрока?", "Игрок " .. bid.name .. " будет заблокирован до конца аукциона. Его ставки будут игнорироваться.",
+                    function()
+                        bid.data.banned = true
+                        bid.data.passed = true
+                        NSAuk.UpdateAuctionWindow()
+                    end,
+                    nil
+                )
+            end
+        end)
+
+        row:Show()
+        local rw = nt:GetStringWidth() + 20 + gt:GetStringWidth() + 10 + bt:GetStringWidth() + 25
+        if rw > maxRowWidth then maxRowWidth = rw end
+
+        content.rows[i] = row
+        totalHeight = totalHeight + rowHeight
+    end
+
+    if #sortedBids == 0 then
+        local er = CreateFrame("Frame", nil, content)
+        er:SetHeight(rowHeight)
+        er:SetPoint("TOPLEFT", 10, -totalHeight)
+        er:SetPoint("TOPRIGHT", -10, -totalHeight)
+        local et = er:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        et:SetPoint("CENTER", 0, 0)
+        et:SetText("|cff808080Ожидание ставок...|r")
+        er:Show()
+        content.rows[1] = er
+        totalHeight = totalHeight + rowHeight
+    end
+
+    local mx, ld = 0, nil
+    for n, d in pairs(db.active.bids) do
+        if d.hasAction and not d.passed and not d.banned and d.amount > mx then mx, ld = d.amount, n end
+    end
+    frame.nextBidText:SetText("Мин. ставка: " .. (mx + db.active.step) .. " GP")
+    if ld then frame.leaderText:SetText("Лидер: " .. ld .. " (" .. mx .. " GP)"); frame.leaderText:Show() else frame.leaderText:Hide() end
+
+    content:SetHeight(totalHeight + 10)
+    content:SetWidth(maxRowWidth)
+    NSAuk.SmoothResize(frame, maxRowWidth + 20, totalHeight + 140, 0.15)
+    NSAuk.RenderCustomButtons()
+    
+    -- Обновляем позицию панели быстрых кнопок при изменении размера
+    if frame.customPanel then
+        frame.customPanel:ClearAllPoints()
+        frame.customPanel:SetPoint("TOPRIGHT", frame, "TOPLEFT", -5, 0)
+    end
+end
+
+function NSAuk.FinishAuction(initiator)
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
+    
+    local w, wa = nil, 0
+    for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and not d.banned and d.amount > wa then w, wa = n, d.amount end end
+    
+    if w and wa > 0 then
+        local bc = {}
+        for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
+        table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
+        if #db.history > 10 then table.remove(db.history, 1) end
+        
+        -- Расчет ГП при автозавершении, если чекбокс включен
+        if db.settings.autoDeductGP then
+            NSAuk.DeductGPFromRoster(w, wa)
+        end
+        
+        if initiator == UnitName("player") then
+            SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
+            SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
+        end
+    else
+        if initiator == UnitName("player") then
+            SendChatMessage("Аукцион завершен без ставок.", "RAID_WARNING")
+        end
+    end
+    
+    db.active = nil
+    isMinimized = false
+    NSAuk.DestroyAuctionWindow()
+    if minimapIcon then minimapIcon:Hide() end
+    checkFrame:SetScript("OnUpdate", nil)
 end
 
 function NSAuk.StartCloseTimer()
@@ -12196,6 +12638,10 @@ function NSAuk.EnableCheckFrame()
     end)
 end
 
+-- ============================================================================
+-- СОБЫТИЯ И ЧАТ
+-- ============================================================================
+
 SLASH_NSAUK1 = "/nsauk"
 SlashCmdList["NSAUK"] = function(msg)
     local db = NSAuk.EnsureDB()
@@ -12233,7 +12679,7 @@ local function ProcessRaidMessage(sender, msg, event)
                 for n, d in pairs(db.active.bids) do
                     gpStr = gpStr .. n .. ":" .. (d.gp or 0) .. ":" .. (d.class or "WARRIOR") .. ":" .. (d.public or "") .. ";"
                 end
-                SendAddonMessage("AUC_SYNC", db.active.item .. "^^" .. db.active.step .. "^^" .. db.active.closeTime .. "^^" .. gpStr, "RAID")
+                SendAddonMessage("AUC_SYNC", db.active.item .. "^^" .. db.active.step .. "^^" .. db.active.closeTime .. "^^" .. (db.active.itemLink or "") .. "^^" .. gpStr, "RAID")
             end
             return true
         end
@@ -12257,11 +12703,13 @@ local function ProcessRaidMessage(sender, msg, event)
             else
                 local parsed = NSAuk.ParseAuctionCommand(cleanMsg)
                 local item = parsed.item
+                local itemLink = parsed.itemLink
                 local step = parsed.step or db.settings.defaultStep
                 local ct = parsed.closeTime or db.settings.defaultTime
 
                 db.active = {
                     item = item,
+                    itemLink = itemLink,
                     startTime = GetTime(),
                     startedBy = sender,
                     step = step,
@@ -12273,11 +12721,11 @@ local function ProcessRaidMessage(sender, msg, event)
 
                 local gpData = NSAuk.GetRaidGPData()
                 for name, data in pairs(gpData) do
-                    db.active.bids[name] = { amount = 0, class = data.class, public = data.public, gp = data.gp, passed = false, hasAction = false }
+                    db.active.bids[name] = { amount = 0, class = data.class, public = data.public, gp = data.gp, passed = false, hasAction = false, banned = false }
                 end
                 if not db.active.bids[myName] then
                     local _, c = UnitClass("player")
-                    db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false }
+                    db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
                 end
 
                 if sender == myName then
@@ -12285,7 +12733,7 @@ local function ProcessRaidMessage(sender, msg, event)
                     for name, data in pairs(gpData) do
                         gpStr = gpStr .. name .. ":" .. data.gp .. ":" .. data.class .. ":" .. data.public .. ";"
                     end
-                    SendAddonMessage("AUC_START", item .. "^^" .. step .. "^^" .. ct .. "^^" .. gpStr, "RAID")
+                    SendAddonMessage("AUC_START", item .. "^^" .. step .. "^^" .. ct .. "^^" .. (itemLink or "") .. "^^" .. gpStr, "RAID")
                 end
 
                 NSAuk.UpdateAuctionWindow()
@@ -12306,16 +12754,18 @@ local function ProcessRaidMessage(sender, msg, event)
             local bidData = db.active.bids[sender]
             if not bidData then
                 local _, c = UnitClass(sender)
-                db.active.bids[sender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true }
+                db.active.bids[sender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true, banned = false }
                 bidData = db.active.bids[sender]
             end
+
+            if bidData.banned then return true end
 
             if isPass then
                 if not bidData.passed then
                     local maxAmount = 0
                     for _, b in pairs(db.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
                     if bidData.amount >= maxAmount and maxAmount > 0 then
-                        if sender == myName then print("Нельзя выйти из торгов, пока вы лидируете.") end
+                        if sender == myName then print("|cffff0000[NSAuk]|r Нельзя выйти из торгов, пока вы лидируете.") end
                         return true
                     end
                     bidData.passed = true
@@ -12330,16 +12780,24 @@ local function ProcessRaidMessage(sender, msg, event)
 
             if amount then
                 if bidData.passed then
-                    if sender == myName then print("Вы уже сделали пас.") end
+                    if sender == myName then print("|cffff0000[NSAuk]|r Вы уже сделали пас.") end
                     return true
                 end
 
                 local mx = 0
                 for n, d in pairs(db.active.bids) do
-                    if n ~= sender and d.hasAction and not d.passed and d.amount > mx then mx = d.amount end
+                    if n ~= sender and d.hasAction and not d.passed and not d.banned and d.amount > mx then mx = d.amount end
                 end
                 local mn = mx + db.active.step
-                if amount >= mn and (bidData.gp == 0 or amount <= bidData.gp) then
+
+                -- [FIX] ЖЁСТКАЯ ПРОВЕРКА ГП. Ставка отклоняется, если превышает баланс.
+                local playerGP = bidData.gp or 0
+                if amount > playerGP then
+                    if sender == myName then print("|cffff0000[NSAuk]|r Недостаточно ГП! У вас: " .. playerGP .. ", ставка: " .. amount) end
+                    return true
+                end
+
+                if amount >= mn then
                     bidData.amount = amount
                     bidData.passed = false
                     bidData.hasAction = true
@@ -12347,12 +12805,12 @@ local function ProcessRaidMessage(sender, msg, event)
 
                     local newMx, newLd = 0, nil
                     for n, d in pairs(db.active.bids) do
-                        if d.hasAction and not d.passed and d.amount > newMx then newMx, newLd = d.amount, n end
+                        if d.hasAction and not d.passed and not d.banned and d.amount > newMx then newMx, newLd = d.amount, n end
                     end
                     if newLd then AnnounceRaid(newLd .. " лидирует с " .. newMx .. " GP.") end
                     NSAuk.UpdateAuctionWindow()
                 elseif sender == myName then
-                    print(bidData.gp > 0 and "Недостаточно GP! У вас: "..bidData.gp or "Ставка >= "..mn.." GP")
+                    print("|cffff0000[NSAuk]|r Минимальная ставка: " .. mn .. " GP.")
                 end
                 return true
             end
@@ -12378,6 +12836,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             local parts = NSAuk.mysplit(addonMsg or "", "%^%^")
             db.active = {
                 item = parts[1] or "Предмет",
+                itemLink = parts[4] or nil,
                 startTime = GetTime(),
                 startedBy = addonSender,
                 step = tonumber(parts[2]) or 10,
@@ -12386,13 +12845,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 bids = {}
             }
             isMinimized = false
-            for pd in (parts[4] or ""):gmatch("([^;]+);") do
+            for pd in (parts[5] or ""):gmatch("([^;]+);") do
                 local n, g, c, p = pd:match("([^:]+):([^:]+):([^:]+):(.*)")
-                if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false } end
+                if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false, banned = false } end
             end
             if not db.active.bids[myName] then
                 local _, c = UnitClass("player")
-                db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false }
+                db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
             end
             NSAuk.UpdateAuctionWindow()
             NSAuk.StartCloseTimer()
@@ -12403,27 +12862,27 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             if a then
                 if not db.active.bids[addonSender] then
                     local _, c = UnitClass(addonSender)
-                    db.active.bids[addonSender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true }
+                    db.active.bids[addonSender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true, banned = false }
                 end
-                if not db.active.bids[addonSender].passed then
+                if not db.active.bids[addonSender].passed and not db.active.bids[addonSender].banned then
                     db.active.bids[addonSender].amount = a
                     db.active.bids[addonSender].passed = false
                     db.active.bids[addonSender].hasAction = true
                     db.active.lastBidTime = GetTime()
-                    NSAuk.UpdateAuctionWindow() -- Синхронизация без анонса (анонс уже был из чата)
+                    NSAuk.UpdateAuctionWindow()
                 end
             end
 
         elseif prefix == "AUC_PASS" and db.active then
             if not db.active.bids[addonSender] then
                 local _, c = UnitClass(addonSender)
-                db.active.bids[addonSender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = true, hasAction = true }
+                db.active.bids[addonSender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = true, hasAction = true, banned = false }
             else
                 db.active.bids[addonSender].passed = true
                 db.active.bids[addonSender].amount = 0
                 db.active.bids[addonSender].hasAction = true
             end
-            NSAuk.UpdateAuctionWindow() -- Синхронизация без анонса
+            NSAuk.UpdateAuctionWindow()
 
         elseif prefix == "AUC_END" and db.active then
             NSAuk.FinishAuction(db.active.startedBy)
@@ -12440,6 +12899,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             local parts = NSAuk.mysplit(addonMsg or "", "%^%^")
             db.active = {
                 item = parts[1] or "Предмет",
+                itemLink = parts[4] or nil,
                 startTime = GetTime(),
                 startedBy = addonSender,
                 step = tonumber(parts[2]) or 10,
@@ -12448,13 +12908,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 bids = {}
             }
             isMinimized = false
-            for pd in (parts[4] or ""):gmatch("([^;]+);") do
+            for pd in (parts[5] or ""):gmatch("([^;]+);") do
                 local n, g, c, p = pd:match("([^:]+):([^:]+):([^:]+):(.*)")
-                if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false } end
+                if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false, banned = false } end
             end
             if not db.active.bids[myName] then
                 local _, c = UnitClass("player")
-                db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false }
+                db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
             end
             NSAuk.UpdateAuctionWindow()
             NSAuk.StartCloseTimer()
@@ -12469,4 +12929,4 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
-print("|cff00ff00[NS Auction System v5.5]|r Загружен.")
+print("|cff00ff00[NS Auction System v5.6]|r Загружен. Исправления: панель быстрых ставок, реальное списание ГП.")
