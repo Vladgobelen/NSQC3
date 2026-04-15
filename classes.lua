@@ -12321,51 +12321,15 @@ end
 
 function NSAuk.DeductGPFromRoster(playerName, amount)
     if not playerName or not amount or amount <= 0 then return end
-
-    -- [FIX] Базовая проверка гильдии
     if not IsInGuild() then
         print("|cffff0000[NSAuk]|r Вы не в гильдии. Автоматическое списание ГП невозможно.")
         return
     end
 
-    -- [FIX] Проверка прав на редактирование офицерских заметок
-    -- В 3.3.5a только ГМ и ранги с включенным флагом "Изменять офицерские заметки" могут это делать
-    local canDeduct = false
-    if IsGuildLeader() then
-        canDeduct = true
-    else
-        -- Находим индекс ранга текущего игрока
-        local myName = UnitName("player")
-        local myRankIdx = nil
-        for i = 1, GetNumGuildMembers(true) do
-            local name = GetGuildRosterInfo(i)
-            if name == myName then
-                _, _, myRankIdx = GetGuildRosterInfo(i)
-                break
-            end
-        end
-
-        if myRankIdx then
-            GuildControlSetRank(myRankIdx)
-            local flags = GuildControlGetRankFlags()
-            -- flags[3] в 3.3.5a отвечает за "Edit Officer Note"
-            if flags and flags[3] then
-                canDeduct = true
-            end
-            GuildControlSetRank(0) -- Сброс выбранного ранга в интерфейсе
-        end
-    end
-
-    if not canDeduct then
-        print("|cffff0000[NSAuk]|r Недостаточно прав для списания ГП (требуется ГМ или ранг с правами на офицерские заметки).")
-        return
-    end
-
-    -- Выполняем списание
     for i = 1, GetNumGuildMembers(true) do
         local name = GetGuildRosterInfo(i)
         if name == playerName or name:match("^" .. playerName) then
-            local _, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(i)
+            local _, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(i)
             local parts = NSAuk.mysplit(officerNote or "", "%s+")
 
             if #parts >= 3 then
@@ -12376,15 +12340,18 @@ function NSAuk.DeductGPFromRoster(playerName, amount)
                 parts[3] = tostring(newGP)
                 local newNote = table.concat(parts, " ")
 
-                -- Защита от частых вызовов (WoW ограничивает обновление заметок)
-                pcall(function()
+                -- pcall ловит ошибки прав гильдии или серверного лимита без вылета аддона
+                local success = pcall(function()
                     GuildRosterSetOfficerNote(i, newNote)
                 end)
 
-                SendAddonMessage("nsGP1 -" .. amount, name, "guild")
-                SendAddonMessage("nsGPlog", "Аукцион -" .. amount .. " " .. playerID, "guild")
-
-                print(string.format("|cff00ff00[NSAuk]|r Списано %d ГП с %s (ID: %s). Осталось: %d ГП.", amount, name, playerID, newGP))
+                if success then
+                    SendAddonMessage("nsGP1 -" .. amount, name, "guild")
+                    SendAddonMessage("nsGPlog", "Аукцион -" .. amount .. " " .. playerID, "guild")
+                    print(string.format("|cff00ff00[NSAuk]|r Списано %d ГП с %s (ID: %s). Осталось: %d ГП.", amount, name, playerID, newGP))
+                else
+                    print("|cffff0000[NSAuk]|r Ошибка списания: недостаточно прав гильдии или превышен лимит обновлений заметок.")
+                end
             else
                 print(string.format("|cffff0000[NSAuk]|r Ошибка: Офицерская заметка %s имеет неверный формат.", name))
             end
@@ -12398,11 +12365,13 @@ function NSAuk.SetWinner(playerName, winAmount)
     if not db.active then return end
     if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
     
-    -- Расчет/списание ГП только если чекбокс включён
-    if db.settings.autoDeductGP then
-        NSAuk.DeductGPFromRoster(playerName, winAmount)
-    else
-        print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", playerName, winAmount))
+    -- Расчет/списание ГП ТОЛЬКО у того, кто запустил аукцион
+    if db.active.startedBy == UnitName("player") then
+        if db.settings.autoDeductGP then
+            NSAuk.DeductGPFromRoster(playerName, winAmount)
+        else
+            print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", playerName, winAmount))
+        end
     end
     
     local bc = {}
@@ -12415,7 +12384,6 @@ function NSAuk.SetWinner(playerName, winAmount)
         SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. (winAmount or 0) .. " ГП!", "WHISPER", nil, playerName)
     end
     
-    -- Полный сброс состояния
     db.active = nil
     isMinimized = false
     NSAuk.DestroyAuctionWindow()
@@ -12432,17 +12400,19 @@ function NSAuk.FinishAuction(initiator)
     for n, d in pairs(db.active.bids) do if d.hasAction and not d.passed and not d.banned and d.amount > wa then w, wa = n, d.amount end end
     
     if w and wa > 0 then
+        -- Расчет ГП ТОЛЬКО у стартера аукциона
+        if db.active.startedBy == UnitName("player") then
+            if db.settings.autoDeductGP then
+                NSAuk.DeductGPFromRoster(w, wa)
+            else
+                print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", w, wa))
+            end
+        end
+        
         local bc = {}
         for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
         table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = w, winAmount = wa, bids = bc })
         if #db.history > 10 then table.remove(db.history, 1) end
-        
-        -- Расчет ГП только если чекбокс включён
-        if db.settings.autoDeductGP then
-            NSAuk.DeductGPFromRoster(w, wa)
-        else
-            print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", w, wa))
-        end
         
         if initiator == UnitName("player") then
             SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
@@ -12454,7 +12424,6 @@ function NSAuk.FinishAuction(initiator)
         end
     end
     
-    -- Полный сброс состояния
     db.active = nil
     isMinimized = false
     NSAuk.DestroyAuctionWindow()
@@ -12533,7 +12502,6 @@ function NSAuk.UpdateAuctionWindow()
             bt:SetText(bid.data.amount == 0 and "|cff8080800 GP|r" or "|cff00ff00"..bid.data.amount.." GP|r")
         end
 
-        -- [FIX] ЛКМ теперь работает идентично чат-команде "АУК закрыть", но с назначением победителя
         row:SetScript("OnMouseUp", function(_, button)
             if button == "LeftButton" and isRL and not isBanned and not isPassed then
                 NSAuk.ShowConfirm("Назначить победителем?", "Назначить " .. bid.name .. " победителем и завершить аукцион?",
@@ -12543,10 +12511,14 @@ function NSAuk.UpdateAuctionWindow()
                     nil
                 )
             elseif button == "RightButton" and isRL and not isBanned then
-                NSAuk.ShowConfirm("Забанить игрока?", "Игрок " .. bid.name .. " будет заблокирован до конца аукциона. Его ставки будут игнорироваться.",
+                NSAuk.ShowConfirm("Забанить игрока?", "Игрок " .. bid.name .. " будет заблокирован до конца аукциона.",
                     function()
                         bid.data.banned = true
                         bid.data.passed = true
+                        -- Синхронизация бана: отправляет ТОЛЬКО стартер аукциона
+                        if db.active and db.active.startedBy == UnitName("player") then
+                            SendAddonMessage("AUC_BAN", bid.name, "RAID")
+                        end
                         NSAuk.UpdateAuctionWindow()
                     end,
                     nil
@@ -12587,7 +12559,6 @@ function NSAuk.UpdateAuctionWindow()
     NSAuk.SmoothResize(frame, maxRowWidth + 20, totalHeight + 140, 0.15)
     NSAuk.RenderCustomButtons()
     
-    -- Обновляем позицию панели быстрых кнопок при изменении размера
     if frame.customPanel then
         frame.customPanel:ClearAllPoints()
         frame.customPanel:SetPoint("TOPRIGHT", frame, "TOPLEFT", -5, 0)
@@ -12922,6 +12893,15 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 db.active.bids[addonSender].hasAction = true
             end
             NSAuk.UpdateAuctionWindow()
+
+        elseif prefix == "AUC_BAN" and db.active then
+            local targetName = addonMsg
+            if db.active.bids[targetName] then
+                db.active.bids[targetName].banned = true
+                db.active.bids[targetName].passed = true
+                print("|cffff0000[NSAuk]|r Игрок " .. targetName .. " забанен на аукционе.")
+                NSAuk.UpdateAuctionWindow()
+            end
 
         elseif prefix == "AUC_END" and db.active then
             NSAuk.FinishAuction(db.active.startedBy)
