@@ -1022,10 +1022,99 @@ local triggersByAddress = {
                 end
             },
             chatType = {"ADDON"},
+            stopOnMatch = false,
+        }
+    },
+    ["prefix:NSQC3_GAME_END_client"] = {
+        {
+            keyword = {
+                { word = "NSQC3_GAME_END_client", position = 1, source = "prefix" },
+            },
+            func = "NSQC3_GAME_END_client",
+            conditions = {
+            },
+            chatType = {"ADDON"},
             stopOnMatch = true,
         }
     },
 }
+
+function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
+    local ownerName, initiatorName = text:match("^(%S+)%s+(%S+)$")
+
+    -- 1. Восстановление только игровых ячеек по сохранённому состоянию доски
+    if ns_game_table and ns_game_table.board then
+        for cellIndexStr, cellData in pairs(ns_game_table.board) do
+            local idx = tonumber(cellIndexStr)
+            if idx and adaptiveFrame and adaptiveFrame.children and adaptiveFrame.children[idx] then
+                local cell = adaptiveFrame.children[idx]
+                local frame = cell.frame
+                if frame then
+                    local oldPath = nil
+                    if cellData.miniTex and cellData.miniTex ~= "" then
+                        oldPath = "Interface\\AddOns\\NSQC3\\libs\\" .. cellData.miniTex .. ".tga"
+                    end
+
+                    -- Полный сброс состояний текстуры кнопки
+                    frame:SetNormalTexture(oldPath)
+                    frame:SetHighlightTexture(nil)
+                    frame:SetPushedTexture(nil)
+                    frame:SetDisabledTexture(nil)
+
+                    -- Сброс цвета подсветки
+                    local tex = frame:GetNormalTexture()
+                    if tex then tex:SetVertexColor(1, 1, 1) end
+
+                    -- Очистка миниатюры (угол 2: верх-центр)
+                    if adaptiveFrame.SetCellIcon then
+                        adaptiveFrame:SetCellIcon(idx, nil, 2)
+                    end
+
+                    -- 🔄 ВОССТАНОВЛЕНИЕ ТУЛТИПОВ
+                    if cell.SetTextT then cell:SetTextT("") end
+                    if cell.SetMultiLineTooltip then cell:SetMultiLineTooltip("") end
+                    
+                    -- 🎨 СКРЫТИЕ РАМКИ ВЛАДЕЛЬЦА (добавлено)
+                    if frame._Border then frame._Border:Hide() end
+                end
+            end
+        end
+        -- Полная очистка таблицы состояния доски
+        ns_game_table.board = {}
+    end
+
+    -- 2. Сброс экземпляра игрового клиента
+    if adaptiveFrame and adaptiveFrame.gameClient then
+        adaptiveFrame.gameClient.active = false
+        adaptiveFrame.gameClient.ownerName = nil
+        adaptiveFrame.gameClient.starterName = nil
+        adaptiveFrame.gameClient = nil
+    end
+
+    -- 3. Возврат кнопки запуска в исходное состояние
+    if adaptiveFrame and adaptiveFrame.gameStartButton then
+        local normTex = adaptiveFrame.gameStartButton:GetNormalTexture()
+        if normTex then
+            normTex:SetDesaturated(false)
+            normTex:SetVertexColor(1, 1, 1)
+        end
+        adaptiveFrame.gameStartButton:SetAlpha(1)
+    end
+
+    -- 4. Убираем подсветку возможных ходов
+    _G.ns_move_st = nil
+
+    -- 5. Очищаем метаданные текущей игровой сессии
+    if ns_game_table then
+        ns_game_table.id = nil
+        ns_game_table.name1 = nil
+        ns_game_table.name2 = nil
+    end
+
+    -- 6. Логирование завершения
+    print(string.format("|cFFFF0000[Игра]|r Завершена. Владелец: %s | Инициатор: %s", 
+        tostring(ownerName or sender), tostring(initiatorName or sender)))
+end
 
 function NSQC3_GAME_id(channel, text, sender, full_prefix)
     local id = full_prefix:match(WORD_POSITION_PATTERNS[2])
@@ -1058,7 +1147,6 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
     local miniKey = nil
 
     if currentPath ~= "" then
-        -- Извлекаем имя файла после последнего слэша и убираем .tga
         miniKey = currentPath:match("([^\\]+)$")
         if miniKey then miniKey = miniKey:gsub("%.tga$", "") end
     end
@@ -1092,13 +1180,10 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
             end
             GameTooltip:Show()
         end
-
         local activePath = cellFrame:GetNormalTexture():GetTexture() or ""
         local activeKey = activePath:match("([^\\]+)$")
         if activeKey then activeKey = activeKey:gsub("%.tga$", "") else activeKey = "0" end
-        if type(fBtnEnter) == "function" then
-            fBtnEnter(cellIndex, activeKey)
-        end
+        if type(fBtnEnter) == "function" then fBtnEnter(cellIndex, activeKey) end
     end)
 
     -- Хук клика
@@ -1106,24 +1191,44 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
         local activePath = cellFrame:GetNormalTexture():GetTexture() or ""
         local activeKey = activePath:match("([^\\]+)$")
         if activeKey then activeKey = activeKey:gsub("%.tga$", "") else activeKey = "0" end
-        if type(fBtnClick) == "function" then
-            fBtnClick(cellIndex, activeKey)
-        end
+        if type(fBtnClick) == "function" then fBtnClick(cellIndex, activeKey) end
     end)
+
+    -- 🎨 ПРИМЕНЕНИЕ ЦВЕТНОЙ РАМКИ КУБИКА
+    if not cellFrame._Border then
+        cellFrame._Border = CreateFrame("Frame", nil, cellFrame)
+        cellFrame._Border:SetAllPoints()
+        cellFrame._Border:SetFrameLevel(cellFrame:GetFrameLevel() + 2) -- Поверх всех текстур кнопки
+        cellFrame._Border:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 3,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 }
+        })
+        cellFrame._Border:SetBackdropColor(0, 0, 0, 0) -- Центр полностью прозрачный
+    end
+
+    -- Выбор цвета в зависимости от владельца
+    local r, g, b = 1, 1, 1 -- По умолчанию белый/нейтральный
+    if ns_game_table.name1 and owner == ns_game_table.name1 then
+        r, g, b = 1, 0.25, 0.25 -- 🔴 Красный
+    elseif ns_game_table.name2 and owner == ns_game_table.name2 then
+        r, g, b = 0.25, 0.55, 1 -- 🔵 Синий
+    end
+    cellFrame._Border:SetBackdropBorderColor(r, g, b, 1)
+    cellFrame._Border:Show()
 
     -- 7. Сохранение полного состояния клетки
     if not ns_game_table.board then 
         ns_game_table.board = {} 
     end
-
-    -- ИСПРАВЛЕНО: таблица закрывается фигурной скобкой }, а не end
     ns_game_table.board[cellIndex] = {
         dice = diceValue,
         owner = owner,
-        miniTex = miniKey,               -- Ключ текстуры, которая стояла до этого хода
-        mainTex = textureKey,            -- Ключ текущей текстуры кубика
-        lastUpdated = GetTime(),         -- Метка времени
-        cellIndex = cellIndex            -- Дублируем индекс для удобного итерирования
+        miniTex = miniKey,
+        mainTex = textureKey,
+        lastUpdated = GetTime(),
+        cellIndex = cellIndex
     }
 end
 -- ==========================================

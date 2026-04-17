@@ -3380,6 +3380,16 @@ function AdaptiveFrame:new(parent)
     self.frame:SetSize(self.width, self.height)
     self.skipSizeCheck = false
     self.frame:SetPoint("CENTER", self.parent, "CENTER", 150, 100)
+    self.frame:SetScript("OnShow", function()
+        if not ns_game_table or not ns_game_table.board then return end
+        for idxStr, data in pairs(ns_game_table.board) do
+            local idx = tonumber(idxStr)
+            if idx and self.children[idx] and self.children[idx].frame and data.mainTex then
+                local texPath = "Interface\\AddOns\\NSQC3\\libs\\" .. data.mainTex .. ".tga"
+                self.children[idx].frame:SetNormalTexture(texPath)
+            end
+        end
+    end)
     self.frame:SetFrameStrata("HIGH")
     self.frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",

