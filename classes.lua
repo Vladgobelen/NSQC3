@@ -11554,9 +11554,10 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.6 - RELEASE (FINAL 3.3.5a COMPATIBLE)
+-- NS Auction System v5.7 - RELEASE (FINAL 3.3.5a COMPATIBLE)
 -- Для WoW 3.3.5a. Чтение ставок/паса из рейд-чата, адаптивная верстка, GP-расчет, быстрые ставки, тултипы.
 -- Исправлено: панель быстрых ставок теперь отдельное окно слева. Исправлено реальное списание ГП.
+-- Добавлено: /nsauk reset (сброс настроек), /nsauk find (подсветка окон)
 -- ============================================================================
 
 local NSAuk = {}
@@ -11606,6 +11607,191 @@ function NSAuk.EnsureDB()
     if not db.customButtons then db.customButtons = {} end
     if db.active == nil then db.active = nil end
     return db
+end
+
+-- [NEW] Функция полного сброса настроек
+function NSAuk.ResetAllSettings()
+    local db = NSAuk.EnsureDB()
+    
+    -- Сброс позиций
+    db.iconPosition = {x = 0, y = 0}
+    db.windowPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"}
+    db.historyPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"}
+    
+    -- Сброс настроек аукциона
+    db.settings = {defaultStep = 10, defaultTime = 20, autoDeductGP = true}
+    
+    -- Очистка кастомных кнопок
+    db.customButtons = {}
+    
+    -- Сброс позиций открытых окон
+    if auctionFrame then
+        auctionFrame:ClearAllPoints()
+        auctionFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        NSAuk.SaveWindowPosition(auctionFrame, db.windowPosition)
+        if auctionFrame.customPanel then
+            auctionFrame.customPanel:ClearAllPoints()
+            auctionFrame.customPanel:SetPoint("TOPRIGHT", auctionFrame, "TOPLEFT", -5, 0)
+        end
+    end
+    
+    if minimapIcon then
+        minimapIcon:ClearAllPoints()
+        minimapIcon:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
+    end
+    
+    if historyWindow then
+        historyWindow:ClearAllPoints()
+        historyWindow:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        NSAuk.SaveWindowPosition(historyWindow, db.historyPosition)
+    end
+    
+    -- Перерисовка кнопок
+    if auctionFrame then
+        NSAuk.RenderCustomButtons()
+    end
+    
+    print("|cff00ff00[NSAuk]|r Все настройки сброшены до значений по умолчанию.")
+end
+
+-- [NEW] Функция подсветки всех элементов аддона
+function NSAuk.HighlightAllFrames()
+    local framesToHighlight = {}
+    local iconToPulse = nil
+    
+    -- Основное окно и его панель
+    if auctionFrame and auctionFrame:IsShown() then
+        table.insert(framesToHighlight, auctionFrame)
+        if auctionFrame.customPanel and auctionFrame.customPanel:IsShown() then
+            table.insert(framesToHighlight, auctionFrame.customPanel)
+        end
+    end
+    
+    -- Окна истории и настроек
+    if historyWindow and historyWindow:IsShown() then
+        table.insert(framesToHighlight, historyWindow)
+    end
+    
+    if settingsWindow and settingsWindow:IsShown() then
+        table.insert(framesToHighlight, settingsWindow)
+    end
+
+    -- Иконка на миникарте - для неё отдельная анимация пульсации
+    if not minimapIcon then
+        NSAuk.CreateMinimapIcon()
+    end
+    
+    if minimapIcon then
+        minimapIcon.wasShownBeforeHighlight = minimapIcon:IsShown()
+        minimapIcon:Show()
+        iconToPulse = minimapIcon
+    end
+    
+    if #framesToHighlight == 0 and not iconToPulse then
+        print("|cffff8080[NSAuk]|r Нет видимых окон аддона для подсветки.")
+        return
+    end
+    
+    local count = #framesToHighlight + (iconToPulse and 1 or 0)
+    print("|cff00ff00[NSAuk]|r Подсвечиваю " .. count .. " элемент(ов) аддона в течение 5 секунд...")
+    
+    -- Сохраняем оригинальные цвета рамок для обычных окон
+    local originalBorders = {}
+    for _, frame in ipairs(framesToHighlight) do
+        if frame and frame:GetBackdrop() then
+            local r, g, b, a = frame:GetBackdropBorderColor()
+            originalBorders[frame] = {r, g, b, a}
+        end
+    end
+    
+    -- Сохраняем оригинальный размер и цвет иконки
+    local iconOriginalScale = nil
+    local iconOriginalBorder = nil
+    if iconToPulse then
+        iconOriginalScale = iconToPulse:GetScale() or 1.0
+        if iconToPulse:GetBackdrop() then
+            local r, g, b, a = iconToPulse:GetBackdropBorderColor()
+            iconOriginalBorder = {r, g, b, a}
+        end
+        -- Убедимся что у иконки есть backdrop
+        if not iconToPulse:GetBackdrop() then
+            iconToPulse:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 16, insets = {left = 3, right = 3, top = 3, bottom = 3}})
+            iconToPulse:SetBackdropColor(0, 0, 0, 0.8)
+            iconToPulse:SetBackdropBorderColor(0.5, 0.5, 0.5, 1.0)
+            iconOriginalBorder = {0.5, 0.5, 0.5, 1.0}
+        end
+    end
+    
+    -- Создаём анимацию
+    local startTime = GetTime()
+    local duration = 5
+    local flashSpeed = 3 -- мерцаний в секунду для рамок
+    local pulseSpeed = 2.5 -- пульсаций в секунду для иконки
+    
+    local animFrame = CreateFrame("Frame")
+    animFrame:SetScript("OnUpdate", function(self, elapsed)
+        local t = GetTime() - startTime
+        
+        if t >= duration then
+            -- Возвращаем оригинальные цвета рамок
+            for frame, color in pairs(originalBorders) do
+                if frame and frame:GetBackdrop() then
+                    frame:SetBackdropBorderColor(color.r, color.g, color.b, color.a)
+                end
+            end
+            
+            -- Возвращаем иконку в исходное состояние
+            if iconToPulse then
+                iconToPulse:SetScale(iconOriginalScale)
+                if iconOriginalBorder then
+                    iconToPulse:SetBackdropBorderColor(iconOriginalBorder[1], iconOriginalBorder[2], iconOriginalBorder[3], iconOriginalBorder[4])
+                end
+                if not iconToPulse.wasShownBeforeHighlight then
+                    iconToPulse:Hide()
+                end
+            end
+            
+            self:SetScript("OnUpdate", nil)
+            print("|cff00ff00[NSAuk]|r Подсветка завершена.")
+            return
+        end
+        
+        -- Анимация для обычных окон: мерцание рамки
+        local frameIntensity = (math.sin(t * math.pi * 2 * flashSpeed) + 1) / 2
+        local frameR = 1.0
+        local frameG = 0.7 + 0.3 * frameIntensity
+        local frameB = 0.0 + 0.6 * frameIntensity
+        
+        for frame, _ in pairs(originalBorders) do
+            if frame and frame:GetBackdrop() then
+                frame:SetBackdropBorderColor(frameR, frameG, frameB, 1.0)
+            end
+        end
+        
+        -- Анимация для иконки: пульсация размера + мерцание цвета
+        if iconToPulse then
+            -- Пульсация размера: от 0.85 до 1.3
+            local pulsePhase = math.sin(t * math.pi * 2 * pulseSpeed)
+            local scaleFactor = 1.0 + pulsePhase * 0.2 -- ±20% от базового размера
+            iconToPulse:SetScale(iconOriginalScale * (0.9 + math.abs(pulsePhase) * 0.3))
+            
+            -- Мерцание цвета рамки иконки (более яркое, жёлто-оранжевое)
+            local iconIntensity = (math.sin(t * math.pi * 2 * (flashSpeed + 1)) + 1) / 2
+            local iconR = 1.0
+            local iconG = 0.9 + 0.1 * iconIntensity
+            local iconB = 0.2 + 0.5 * iconIntensity
+            
+            if iconToPulse:GetBackdrop() then
+                iconToPulse:SetBackdropBorderColor(iconR, iconG, iconB, 1.0)
+            end
+            
+            -- Дополнительно: можно менять цвет текстуры иконки
+            local tex = iconToPulse:GetNormalTexture()
+            if tex then
+                tex:SetVertexColor(1.0, 0.9 + 0.1 * iconIntensity, 0.3 + 0.3 * iconIntensity)
+            end
+        end
+    end)
 end
 
 function NSAuk.mysplit(inputstr, sep)
@@ -11830,8 +12016,9 @@ function NSAuk.CreateAuctionFrame()
     auctionFrame = CreateFrame("Frame", "NSAukAuctionFrame", UIParent)
     local frame = auctionFrame
     frame:SetSize(350, 250)
-frame:SetBackdrop({ bgFile = "Interface\\Buttons\\White8x8", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 8, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
-frame:SetBackdropColor(0, 0, 0, 0.95)    frame:SetBackdropColor(0, 0, 0, 0.9)
+    frame:SetBackdrop({ bgFile = "Interface\\Buttons\\White8x8", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 8, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
+    frame:SetBackdropColor(0, 0, 0, 0.95)
+    frame:SetBackdropBorderColor(0.5, 0.5, 0.5, 1.0)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
@@ -11969,51 +12156,53 @@ frame:SetBackdropColor(0, 0, 0, 0.95)    frame:SetBackdropColor(0, 0, 0, 0.9)
     local helpText = helpBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     helpText:SetPoint("CENTER", 0, 1)
     helpText:SetText("?")
-helpBtn:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
-    GameTooltip:ClearLines()
-    GameTooltip:AddLine("|cffFFD100NS Auction System v5.6|r", 1, 0.82, 0)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cffffff00=== КОМАНДЫ (в чат рейда) ===|r", 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff00ff00АУК [предмет]|r", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("  Запуск аукциона с параметрами по умолчанию.", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff00ff00АУК [предмет] шаг [N] время [M]|r", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("  Пример: |cffffaa00АУК Меч шаг 5 время 30|r", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine("  Запуск с кастомным шагом и временем.", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cffff8080АУК закрыть|r", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("  Принудительное завершение аукциона (только РЛ).", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff00ff00АУК показать|r", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("  Синхронизация состояния аукциона (только РЛ).", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff00ff00АУК история [N]|r", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("  Показать историю (N - номер записи, опционально).", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cffffff00=== ИГРОВЫЕ КОМАНДЫ ===|r", 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff88ff88[ЧИСЛО]|r - сделать ставку (например: |cffffaa0050|r)", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cff88ff88пас|r или |cff88ff88-|r - отказаться от торгов", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cffffff00=== УПРАВЛЕНИЕ ОКНОМ ===|r", 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff88ff88ЛКМ|r по игроку - назначить победителем (РЛ)", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cff88ff88ПКМ|r по игроку - забанить/разбанить (РЛ)", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cff88ff88Кнопка [>]|r - панель быстрых ставок", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cff88ff88Кнопка [-]|r - свернуть в иконку на миникарте", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cffffff00=== НАСТРОЙКИ ===|r", 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cff88ff88/nsauk|r - открыть окно настроек", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cff88ff88Галочка \"Авто-списание ГП\"|r - включить/выключить", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("|cffffff00=== ИНФОРМАЦИЯ ===|r", 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("  Система списывает ГП из офицерской заметки.", 0.6, 0.6, 0.6)
-    GameTooltip:Show()
-end)
+    helpBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("|cffFFD100NS Auction System v5.7|r", 1, 0.82, 0)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffffff00=== КОМАНДЫ (в чат рейда) ===|r", 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ff00АУК [предмет]|r", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("  Запуск аукциона с параметрами по умолчанию.", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ff00АУК [предмет] шаг [N] время [M]|r", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("  Пример: |cffffaa00АУК Меч шаг 5 время 30|r", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("  Запуск с кастомным шагом и временем.", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffff8080АУК закрыть|r", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("  Принудительное завершение аукциона (только РЛ).", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ff00АУК показать|r", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("  Синхронизация состояния аукциона (только РЛ).", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ff00АУК история [N]|r", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("  Показать историю (N - номер записи, опционально).", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffffff00=== ИГРОВЫЕ КОМАНДЫ ===|r", 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff88ff88[ЧИСЛО]|r - сделать ставку (например: |cffffaa0050|r)", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88пас|r или |cff88ff88-|r - отказаться от торгов", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffffff00=== УПРАВЛЕНИЕ ОКНОМ ===|r", 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff88ff88ЛКМ|r по игроку - назначить победителем (РЛ)", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88ПКМ|r по игроку - забанить/разбанить (РЛ)", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88Кнопка [>]|r - панель быстрых ставок", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88Кнопка [-]|r - свернуть в иконку на миникарте", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffffff00=== НАСТРОЙКИ ===|r", 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff88ff88/nsauk|r - открыть окно настроек", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88/nsauk reset|r - сбросить все настройки", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88/nsauk find|r - подсветить все окна аддона", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff88ff88Галочка \"Авто-списание ГП\"|r - включить/выключить", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cffffff00=== ИНФОРМАЦИЯ ===|r", 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("  Система списывает ГП из офицерской заметки.", 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
     helpBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local minBtn = CreateFrame("Button", "NSAukMinBtn", frame)
@@ -12031,8 +12220,8 @@ end)
     frame.itemTitle:SetPoint("TOPLEFT", 10, -30)
     frame.itemTitle:SetPoint("TOPRIGHT", -10, -30)
     frame.itemTitle:SetJustifyH("LEFT")
-    frame.itemTitle:SetText(db.active.item or "Предмет")
-    if db.active.itemLink then
+    frame.itemTitle:SetText(db.active and db.active.item or "Предмет")
+    if db.active and db.active.itemLink then
         local hex = db.active.itemLink:match("|cff(%x%x%x%x%x%x)")
         if hex then
             frame.itemTitle:SetTextColor(tonumber(hex:sub(1,2), 16)/255, tonumber(hex:sub(3,4), 16)/255, tonumber(hex:sub(5,6), 16)/255)
@@ -12203,6 +12392,7 @@ function NSAuk.CreateHistoryWindow(historyIndex)
     historyWindow:SetSize(350, 250)
     historyWindow:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
     historyWindow:SetBackdropColor(0,0,0,0.9)
+    historyWindow:SetBackdropBorderColor(0.5, 0.5, 0.5, 1.0)
     historyWindow:SetMovable(true)
     historyWindow:EnableMouse(true)
     historyWindow:RegisterForDrag("LeftButton")
@@ -12271,6 +12461,7 @@ function NSAuk.CreateSettingsWindow()
     settingsWindow:SetPoint("CENTER")
     settingsWindow:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
     settingsWindow:SetBackdropColor(0,0,0,0.9)
+    settingsWindow:SetBackdropBorderColor(0.5, 0.5, 0.5, 1.0)
     settingsWindow:SetMovable(true)
     settingsWindow:EnableMouse(true)
     settingsWindow:RegisterForDrag("LeftButton")
@@ -12288,7 +12479,7 @@ function NSAuk.CreateSettingsWindow()
     local st = settingsWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     st:SetPoint("TOPLEFT", 20, -50)
     st:SetText("Шаг по умолчанию:")
-    local se = CreateFrame("EditBox", "fdsfdsfsad", settingsWindow, "InputBoxTemplate")
+    local se = CreateFrame("EditBox", nil, settingsWindow, "InputBoxTemplate")
     se:SetSize(60, 25)
     se:SetPoint("LEFT", st, "RIGHT", 10, 0)
     se:SetText(tostring(db.settings.defaultStep))
@@ -12297,7 +12488,7 @@ function NSAuk.CreateSettingsWindow()
     local tt = settingsWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     tt:SetPoint("TOPLEFT", st, "BOTTOMLEFT", 0, -15)
     tt:SetText("Автозакрытие:")
-    local te = CreateFrame("EditBox", "fdsfdsfsdaff", settingsWindow, "InputBoxTemplate")
+    local te = CreateFrame("EditBox", nil, settingsWindow, "InputBoxTemplate")
     te:SetSize(60, 25)
     te:SetPoint("LEFT", tt, "RIGHT", 10, 0)
     te:SetText(tostring(db.settings.defaultTime))
@@ -12400,8 +12591,6 @@ function NSAuk.SetWinner(playerName, winAmount)
     if minimapIcon then minimapIcon:Hide() end
     checkFrame:SetScript("OnUpdate", nil)
 end
-
-
 
 function NSAuk.UpdateAuctionWindow()
     if isMinimized then return end
@@ -12648,8 +12837,18 @@ SLASH_NSAUK1 = "/nsauk"
 SlashCmdList["NSAUK"] = function(msg)
     local db = NSAuk.EnsureDB()
     local cmd = msg:lower():match("^%s*(%S+)%s*$") or ""
-    if cmd == "save" then
-        if auctionFrame then NSAuk.SaveWindowPosition(auctionFrame, db.windowPosition); print("Позиция окна сохранена") end
+    
+    if cmd == "reset" then
+        NSAuk.ResetAllSettings()
+    elseif cmd == "find" then
+        NSAuk.HighlightAllFrames()
+    elseif cmd == "save" then
+        if auctionFrame then 
+            NSAuk.SaveWindowPosition(auctionFrame, db.windowPosition)
+            print("|cff00ff00[NSAuk]|r Позиция окна сохранена") 
+        else
+            print("|cffff8080[NSAuk]|r Окно аукциона не открыто.")
+        end
     else
         NSAuk.CreateSettingsWindow()
         if settingsWindow then settingsWindow:Show() end
@@ -12940,4 +13139,4 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
-print("|cff00ff00[NS Auction System v5.6]|r Загружен. Исправления: панель быстрых ставок, реальное списание ГП.")
+print("|cff00ff00[NS Auction System v5.7]|r Загружен. Команды: /nsauk, /nsauk reset, /nsauk find")
