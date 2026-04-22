@@ -29,3 +29,4 @@ end
 function GameClient:IsActive()
     return self.active
 end
+
