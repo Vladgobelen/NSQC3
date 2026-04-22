@@ -15,14 +15,13 @@ local SCAN_COOLDOWN = 20
 local SCAN_FINISH_DELAY = 1.0
 
 -- Префиксы для обмена сообщениями (ВЕРСИЯ A - без "1")
-local PREFIX_END = "ns_GBEnd_A"
-local PREFIX_SCAN = "ns_ScanGB_A"
-local PREFIX_DATA = "ns_MyGb_A"
-local PREFIX_REMOVE = "ns_GBRemove_A"
-local PREFIX_UPDATE = "ns_GBUpdate_A"
-
--- Глобальная таблица для этой версии (A)
-local GLOBAL_TABLE = "NSAukGlobal_A"
+-- Новые префиксы (версия B):
+local PREFIX_END = "ns_GBEnd_B"      -- было _A
+local PREFIX_SCAN = "ns_ScanGB_B"    -- было _A
+local PREFIX_DATA = "ns_MyGb_B"      -- было _A
+local PREFIX_REMOVE = "ns_GBRemove_B" -- было _A
+local PREFIX_UPDATE = "ns_GBUpdate_B" -- было _A
+local GLOBAL_TABLE = "NSAukGlobal_B"  -- было _A
 
 local function mysplit(str)
     local t = {}
@@ -1272,14 +1271,22 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
     local showBank = _G[GLOBAL_TABLE].guildBanksSettings[myName] and _G[GLOBAL_TABLE].guildBanksSettings[myName].showGuildBank
     local shouldSend = false
     local ownersToSend = {}
+    
+    -- Проверяем, является ли запрашивающий гильдбанком или имеет флаг showGuildBank
+    local senderIsBank = _G[GLOBAL_TABLE].guildBanks[sender] and type(_G[GLOBAL_TABLE].guildBanks[sender]) == "table" and #_G[GLOBAL_TABLE].guildBanks[sender] > 0
+    local senderShowBank = _G[GLOBAL_TABLE].guildBanksSettings[sender] and _G[GLOBAL_TABLE].guildBanksSettings[sender].showGuildBank
+    
     if not isBank and not showBank then
+        -- Мы не банк и не показываем - ничего не отправляем
         shouldSend = false
     elseif isBank and not showBank then
+        -- Мы банк, но не показываем других - отправляем только свои данные
         shouldSend = true
         self:BuildLocalItemList()
         self:UpdateGoldInTable()
         table.insert(ownersToSend, myName)
     elseif isBank and showBank then
+        -- Мы банк и показываем других - отправляем свои данные и данные других банков
         shouldSend = true
         self:BuildLocalItemList()
         self:UpdateGoldInTable()
@@ -1290,6 +1297,7 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
             end
         end
     elseif not isBank and showBank then
+        -- Мы не банк, но показываем других - отправляем данные известных нам банков
         shouldSend = true
         for ownerName, items in pairs(_G[GLOBAL_TABLE].guildBanks) do
             if type(items) == "table" and #items > 0 then
@@ -1297,6 +1305,30 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
             end
         end
     end
+    
+    -- ВАЖНО: Добавляем отправителя в список владельцев для отправки, если у него есть данные
+    -- Это гарантирует, что запрашивающий получит свои собственные данные в ответе
+    if sender and sender ~= myName then
+        local senderHasData = false
+        if _G[GLOBAL_TABLE].guildBanks[sender] and type(_G[GLOBAL_TABLE].guildBanks[sender]) == "table" and #_G[GLOBAL_TABLE].guildBanks[sender] > 0 then
+            senderHasData = true
+        end
+        
+        if senderHasData then
+            -- Проверяем, не добавлен ли уже отправитель
+            local alreadyAdded = false
+            for _, name in ipairs(ownersToSend) do
+                if name == sender then
+                    alreadyAdded = true
+                    break
+                end
+            end
+            if not alreadyAdded then
+                table.insert(ownersToSend, sender)
+            end
+        end
+    end
+    
     if shouldSend then
         self.scanSessionStart = GetTime()
         self.scanSessionActive = true
