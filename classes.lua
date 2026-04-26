@@ -13183,6 +13183,7 @@ print("|cff00ff00[NS Auction System v5.7]|r Загружен. Команды: /n
 NSForumClient = NSForumClient or {}
 NSForumFrameID = NSForumFrameID or 0
 
+NSForumClient.tempModerators = {}
 local MAX_ADDON_MSG = 240
 local CHUNK_DELAY = 0.3
 
@@ -13918,41 +13919,48 @@ function NSForumClient.RenderView()
     NSForumClient.viewFrame:SetAllPoints(content)
     NSForumClient.viewFrame:Show()
     local frame = NSForumClient.window
+    
     if view == "thread" then
         local tId = NSForumClient.GetSelectedThreadId()
         local isCreator = false
+        local isModerator = false
         local playerName = UnitName("player")
         
+        -- Проверяем, является ли игрок модератором
+        if NSForumClient.tempModerators and NSForumClient.tempModerators[playerName] then
+            isModerator = true
+        end
+        
+        -- Проверяем, является ли игрок автором темы
         if tId then
             for _, t in ipairs(NSForumClient.tempThreads) do
-                if t.id == tId then
-                    -- Проверяем: автор темы ИЛИ модератор (у модераторов может быть признак в данных)
-                    if t.author == playerName then 
-                        isCreator = true
-                        break 
-                    end
+                if t.id == tId and t.author == playerName then 
+                    isCreator = true
+                    break 
                 end
             end
         end
         
-        -- Показываем кнопки для автора И модераторов
-        -- Но клиент не знает кто модератор, поэтому отправляем запрос на сервер
+        -- Показываем кнопки ТОЛЬКО автору или модератору
         if frame.editBtn then 
-            if isCreator then 
+            if isCreator or isModerator then 
                 frame.editBtn:Show() 
             else 
-                -- Даже если не автор, показываем кнопку (сервер проверит права)
-                frame.editBtn:Show() 
+                frame.editBtn:Hide() 
             end 
         end
         if frame.deleteBtn then 
-            if isCreator then 
+            if isCreator or isModerator then 
                 frame.deleteBtn:Show() 
             else 
-                frame.deleteBtn:Show() 
+                frame.deleteBtn:Hide() 
             end 
         end
+    else
+        if frame.editBtn then frame.editBtn:Hide() end
+        if frame.deleteBtn then frame.deleteBtn:Hide() end
     end
+    
     if view == "list" then NSForumClient.DrawListView(NSForumClient.viewFrame)
     elseif view == "create" then NSForumClient.DrawCreateView(NSForumClient.viewFrame)
     elseif view == "thread" then NSForumClient.DrawThreadView(NSForumClient.viewFrame)
@@ -14676,7 +14684,15 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
     local myName = UnitName("player")
     if action == "REQ_THREADS" or action == "REQ_POSTS" or action == "REQ_THREAD_FULL" then return end
     
-    if action == "SYNC_THREADS" then
+    if action == "SYNC_MODERATORS" then
+        NSForumClient.tempModerators = {}
+        if data and data ~= "" then
+            for modName in string.gmatch(data, "[^,]+") do
+                NSForumClient.tempModerators[modName] = true
+            end
+        end
+        
+    elseif action == "SYNC_THREADS" then
         NSForumClient.tempThreads = {}
         if data and data ~= "" then
             for entry in string.gmatch(data, "([^,]+)") do
