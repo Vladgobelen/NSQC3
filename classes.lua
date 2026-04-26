@@ -13811,7 +13811,7 @@ function NSForumClient.CreateForumWindow()
     local deleteBtn = CreateFrame("Button", nil, frame)
     deleteBtn:SetSize(24, 24)
     deleteBtn:SetPoint("LEFT", editBtn, "RIGHT", 4, 0)
-    deleteBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+    deleteBtn:SetNormalTexture("Interface\\GossipFrame\\BattlemasterGossipIcon")
     deleteBtn:SetScript("OnClick", function()
         local tId = NSForumClient.GetSelectedThreadId()
         if tId then
@@ -14058,26 +14058,27 @@ function NSForumClient.DrawListView(parent)
             rowBtn:SetPoint("TOPLEFT", rowFrame, "TOPLEFT", 45, 0)
             rowBtn:SetPoint("BOTTOMRIGHT", rowFrame, "BOTTOMRIGHT", 0, 0)
             rowBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-            
             rowBtn:SetScript("OnClick", function(self, button)
                 if button == "LeftButton" then
-                    -- Левый клик - открыть тему
                     NSForumClient.SetSelectedThreadId(threadId)
                     NSForumClient.SetCurrentView("thread")
                     NSForumClient.SetLoadingThread(true)
                     NSForumClient.RequestThreadFull(threadId)
                 else
-                    -- Правый клик - показать меню
                     if not NSForumClient.shareMenu then
                         local menu = CreateFrame("Frame", "NSForumShareMenu", UIParent, "UIDropDownMenuTemplate")
                         NSForumClient.shareMenu = menu
                     end
-                    
                     local menuFrame = NSForumClient.shareMenu
                     UIDropDownMenu_Initialize(menuFrame, function(self, level)
                         local info = UIDropDownMenu_CreateInfo()
                         info.text = "Отправить в чат"
                         info.func = function()
+                            -- Рассылаем кэш темы всем игрокам гильдии
+                            if IsInGuild() then
+                                SendAddonMessage("NSFORUM", "ftCache:" .. threadId .. " " .. (t.title or "Без названия"), "GUILD")
+                            end
+                            -- Вставляем команду в активное поле чата
                             local editBox = ChatEdit_ChooseBoxForSend()
                             if editBox then
                                 editBox:Insert("/forumtopic " .. threadId)
@@ -14093,7 +14094,6 @@ function NSForumClient.DrawListView(parent)
                         end
                         UIDropDownMenu_AddButton(info)
                     end)
-                    
                     ToggleDropDownMenu(1, nil, menuFrame, "cursor", 0, 0)
                 end
             end)
@@ -14104,7 +14104,7 @@ function NSForumClient.DrawListView(parent)
             pinBtn:SetPoint("LEFT", rowFrame, "LEFT", 8, 0)
             
             local iconTex = pinBtn:CreateTexture(nil, "OVERLAY")
-            iconTex:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+            iconTex:SetTexture("Interface\\GossipFrame\\BattlemasterGossipIcon")
             iconTex:SetAllPoints()
             
             if t.pinned then
@@ -14316,8 +14316,6 @@ function NSForumClient.DrawEditThreadView(parent)
     titleBox:SetMaxLetters(100)
     titleBox:SetFontObject("GameFontNormal")
     titleBox:SetTextInsets(8, 8, 4, 4)
-    titleBox:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-    titleBox:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
     titleBox:SetTextColor(unpack(COLORS.row_text))
     titleBox:SetText(ProcessContentForDisplay(thread.title or ""))
     titleBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -14332,8 +14330,6 @@ function NSForumClient.DrawEditThreadView(parent)
     editBox:SetMaxLetters(2000)
     editBox:SetFontObject("GameFontNormal")
     editBox:SetTextInsets(8, 8, 8, 8)
-    editBox:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-    editBox:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
     editBox:SetTextColor(unpack(COLORS.row_text))
     editBox:SetText(threadContent)
     editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -14357,8 +14353,6 @@ function NSForumClient.DrawEditThreadView(parent)
     sb:SetPoint("BOTTOMRIGHT", contentScroll, "BOTTOMRIGHT", -2, 2)
     sb:SetWidth(16)
     sb:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-    sb:SetBackdrop({bgFile = "Interface\\Buttons\\UI-ScrollBar-Background"})
-    sb:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
     sb:SetValueStep(20)
     local function UpdateScrollRange()
         sb:SetMinMaxValues(0, math.max(0, editBox:GetHeight() - contentScroll:GetHeight()))
@@ -14558,7 +14552,7 @@ function NSForumClient.DrawThreadView(parent)
     sb:SetMinMaxValues(0, scrollRange)
     sb:SetValue(0)
     postCont:SetVerticalScroll(0)
-    local replyBox = CreateFrame("EditBox", "NSForumReplyBox_" .. fid, parent, "InputBoxTemplate")
+    local replyBox = CreateFrame("EditBox", "NSForumReplyBox_" .. fid .. "_" .. tId, parent, "InputBoxTemplate")
     replyBox:SetPoint("BOTTOMLEFT", 10, 8)
     replyBox:SetPoint("BOTTOMRIGHT", -120, 8)
     replyBox:SetHeight(28)
@@ -14568,7 +14562,7 @@ function NSForumClient.DrawThreadView(parent)
     replyBox:SetTextInsets(8, 8, 4, 4)
     --replyBox:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
     --replyBox:SetBackdropColor(unpack(COLORS.reply_bg))
-    replyBox:SetTextColor(unpack(COLORS.row_text))
+    --replyBox:SetTextColor(unpack(COLORS.row_text))
     replyBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     local function SendReply()
         if not IsInGuild() then UIErrorsFrame:AddMessage("Необходимо состоять в гильдии", 1, 0, 0, 1, 5); return end
@@ -14580,7 +14574,7 @@ function NSForumClient.DrawThreadView(parent)
         end
     end
     replyBox:SetScript("OnEnterPressed", function(self) SendReply() end)
-    local replyBtn = CreateFrame("Button", "NSForumReplyBtn_" .. fid, parent, "UIPanelButtonTemplate")
+    local replyBtn = CreateFrame("Button", "NSForumReplyBtn_" .. fid .. "_" .. tId, parent, "UIPanelButtonTemplate")
     replyBtn:SetSize(90, 24)
     replyBtn:SetPoint("LEFT", replyBox, "RIGHT", 5, 0)
     replyBtn:SetText("Ответить")
@@ -15200,6 +15194,93 @@ function NSForumClient.OpenTopicById(threadId)
     return true
 end
 
+-- ============================================
+-- СИСТЕМА КЭШИРОВАНИЯ И ПОДМЕНЫ ССЫЛОК В ЧАТЕ
+-- ============================================
+NSForumClient.topicTitles = NSForumClient.topicTitles or {}
+
+-- 1. Слушаем рассылку кэша (от игроков и сервера)
+local linkCacheFrame = CreateFrame("Frame")
+linkCacheFrame:RegisterEvent("CHAT_MSG_ADDON")
+linkCacheFrame:SetScript("OnEvent", function(_, _, prefix, text, channel)
+    if prefix == "NSFORUM" and channel == "GUILD" then
+        -- ftCache: рассылка от игроков (ПКМ -> Отправить в чат)
+        if string.sub(text, 1, 7) == "ftCache" then
+            local idStr, title = strsplit(" ", text:sub(9), 2)
+            if idStr and title then
+                NSForumClient.topicTitles[tonumber(idStr)] = title
+            end
+        -- itsLink: ответ от сервера (заголовок по запросу)
+        elseif string.sub(text, 1, 8) == "itsLink:" then
+            local idStr, title = strsplit(" ", text:sub(9), 2)
+            if idStr and title then
+                NSForumClient.topicTitles[tonumber(idStr)] = title
+            end
+        end
+    end
+end)
+
+-- 2. Фильтр чата для автоматической подмены команд на гиперссылки
+local function ForumLinkFilter(_, _, msg, ...)
+    if type(msg) ~= "string" then return false end
+
+    local function ReplaceLink(id)
+        local tid = tonumber(id)
+        if not tid then return "/forumtopic " .. id end
+
+        local title = NSForumClient.topicTitles[tid]
+        if not title then
+            -- Кэша нет: запрашиваем у сервера, возвращаем плейсхолдер
+            if IsInGuild() then
+                SendAddonMessage("NSFORUM", "getMeLink:" .. tid, "GUILD")
+            end
+            return "|cffFFD700|Hforum:" .. tid .. "|h[Загрузка...]|h|r"
+        end
+
+        -- Кэш есть: рисуем ссылку с заголовком сразу
+        if #title > 80 then title = title:sub(1, 77) .. "..." end
+        return "|cffFFD700|Hforum:" .. tid .. "|h[" .. title .. "]|h|r"
+    end
+
+    local changed = false
+    msg = string.gsub(msg, "/forumtopic%s+(%d+)", function(id) changed = true; return ReplaceLink(id) end)
+    msg = string.gsub(msg, "/ft%s+(%d+)",          function(id) changed = true; return ReplaceLink(id) end)
+
+    if changed then return false, msg, ... end
+    return false
+end
+
+-- Регистрируем фильтры при логине
+local chatFilterFrame = CreateFrame("Frame")
+chatFilterFrame:RegisterEvent("PLAYER_LOGIN")
+chatFilterFrame:SetScript("OnEvent", function()
+    local channels = {
+        "CHAT_MSG_CHANNEL", "CHAT_MSG_SAY", "CHAT_MSG_YELL",
+        "CHAT_MSG_GUILD", "CHAT_MSG_PARTY", "CHAT_MSG_RAID",
+        "CHAT_MSG_WHISPER_INFORM"
+    }
+    for _, ch in ipairs(channels) do
+        ChatFrame_AddMessageEventFilter(ch, ForumLinkFilter)
+    end
+end)
+
+-- 3. Переопределение кликов по ссылкам (SetItemRef)
+local origSetItemRef = SetItemRef
+SetItemRef = function(link, text, button, chatFrame)
+    if link and button == "LeftButton" then
+        local tid = tonumber(string.match(link, "^forum:(%d+)$"))
+        if tid then
+            if NSForumClient.OpenTopicById then
+                NSForumClient.OpenTopicById(tid)
+            end
+            return -- Прерываем, чтобы не сработал стандартный обработчик
+        end
+    end
+    if origSetItemRef then
+        origSetItemRef(link, text, button, chatFrame)
+    end
+end
+
 SLASH_NSFORUMTOPIC1 = "/forumtopic"
 SLASH_NSFORUMTOPIC2 = "/ft"
 SlashCmdList["NSFORUMTOPIC"] = function(msg)
@@ -15212,3 +15293,5 @@ SlashCmdList["NSFORUMTOPIC"] = function(msg)
 end
 
 print("|cff00ff00[ForumClient v6.6 FINAL]|r Loaded. No cache - always request from server.")
+
+
