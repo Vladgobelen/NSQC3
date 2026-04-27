@@ -13252,6 +13252,29 @@ function NSForumClient.CreateTimer(delay, callback)
 end
 
 -- ============================================
+-- ДИАЛОГ ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ
+-- ============================================
+if not StaticPopupDialogs["NSFORUM_DELETE_THREAD"] then
+    StaticPopupDialogs["NSFORUM_DELETE_THREAD"] = {
+        text = "Вы действительно хотите удалить эту тему?\n|cffff0000Это действие нельзя отменить.|r",
+        button1 = "Удалить",
+        button2 = "Отмена",
+        OnAccept = function(self, data)
+            if data and data.threadId then
+                SendAddonMessage("NSFORUM", "DELETE_THREAD:" .. data.threadId, "GUILD")
+                NSForumClient.SetCurrentView("list")
+                NSForumClient.SetSelectedThreadId(nil)
+                NSForumClient.RequestThreads()
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+end
+
+-- ============================================
 -- СИСТЕМА АНИМАЦИЙ
 -- ============================================
 NSForumClient.AnimFrame = nil
@@ -13768,6 +13791,7 @@ function NSForumClient.CreateForumWindow()
         local pt, _, rel, ox, oy = self:GetPoint()
         nsDbc["форум"].windowPosition = { point = pt, relativePoint = rel, x = ox, y = oy }
     end)
+    
     local titleBar = CreateFrame("Frame", nil, frame)
     titleBar:SetSize(frame:GetWidth() - 64, 24)
     titleBar:SetPoint("TOPLEFT", 32, -8)
@@ -13777,11 +13801,13 @@ function NSForumClient.CreateForumWindow()
     titleText:SetPoint("CENTER")
     titleText:SetText("Гильдейский форум")
     titleText:SetTextColor(1, 0.9, 0.4, 1)
+    
     local p = nsDbc["форум"].windowPosition.point or "CENTER"
     local r = nsDbc["форум"].windowPosition.relativePoint or "CENTER"
     local x = nsDbc["форум"].windowPosition.x or 0
     local y = nsDbc["форум"].windowPosition.y or 0
     frame:SetPoint(p, UIParent, r, x, y)
+    
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
     closeBtn:SetScript("OnClick", function()
@@ -13789,48 +13815,86 @@ function NSForumClient.CreateForumWindow()
             NSForumClient.DestroyWindow()
         end)
     end)
+    
+    -- ============================================
+    -- КНОПКА СОЗДАТЬ
+    -- ============================================
     local createBtn = CreateFrame("Button", nil, frame)
     createBtn:SetSize(24, 24)
     createBtn:SetPoint("TOPLEFT", 5, -5)
     createBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-MOTD-Up")
     createBtn:SetScript("OnClick", function() 
-        NSForumClient.SetSelectedThreadId(nil)  -- Очищаем ID темы
+        NSForumClient.SetSelectedThreadId(nil)
         NSForumClient.SetCurrentView("create")
         NSForumClient.RenderView() 
     end)
-    createBtn:SetScript("OnEnter", function(self) GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetText("Создать тему", 1, 1, 1); GameTooltip:Show() end)
+    createBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Создать тему", 1, 0.9, 0.4, 1)
+        GameTooltip:AddLine("Открыть форму для создания новой темы", 0.9, 0.9, 0.9, 1)
+        GameTooltip:Show()
+    end)
     createBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     frame.createBtn = createBtn
+    
+    -- ============================================
+    -- КНОПКА РЕДАКТИРОВАТЬ
+    -- ============================================
     local editBtn = CreateFrame("Button", nil, frame)
     editBtn:SetSize(24, 24)
     editBtn:SetPoint("LEFT", createBtn, "RIGHT", 4, 0)
     editBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-OfficerNote-Up")
-    editBtn:SetScript("OnClick", function() NSForumClient.SetCurrentView("edit_thread"); NSForumClient.RenderView() end)
+    editBtn:SetScript("OnClick", function() 
+        NSForumClient.SetCurrentView("edit_thread")
+        NSForumClient.RenderView() 
+    end)
+    editBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Редактировать тему", 1, 0.9, 0.4, 1)
+        GameTooltip:AddLine("Изменить название и содержание темы", 0.9, 0.9, 0.9, 1)
+        GameTooltip:AddLine("Доступно только автору или модераторам", 0.7, 0.7, 0.7, 1)
+        GameTooltip:Show()
+    end)
+    editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     editBtn:Hide()
     frame.editBtn = editBtn
+    
+    -- ============================================
+    -- КНОПКА УДАЛИТЬ (с новой иконкой и подтверждением)
+    -- ============================================
     local deleteBtn = CreateFrame("Button", nil, frame)
     deleteBtn:SetSize(24, 24)
     deleteBtn:SetPoint("LEFT", editBtn, "RIGHT", 4, 0)
-    deleteBtn:SetNormalTexture("Interface\\GossipFrame\\BattlemasterGossipIcon")
+    deleteBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up") -- Стандартный красный крестик
     deleteBtn:SetScript("OnClick", function()
         local tId = NSForumClient.GetSelectedThreadId()
         if tId then
-            SendAddonMessage("NSFORUM", "DELETE_THREAD:" .. tId, "GUILD")
-            NSForumClient.SetCurrentView("list")
-            NSForumClient.SetSelectedThreadId(nil)
+            StaticPopup_Show("NSFORUM_DELETE_THREAD", nil, nil, { threadId = tId })
         end
     end)
+    deleteBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Удалить тему", 1, 0.5, 0.5, 1)
+        GameTooltip:AddLine("Полностью удалить тему и все сообщения", 0.9, 0.9, 0.9, 1)
+        GameTooltip:AddLine("Доступно только автору или модераторам", 0.7, 0.7, 0.7, 1)
+        GameTooltip:AddLine("Требует подтверждения", 0.5, 0.5, 0.5, 1)
+        GameTooltip:Show()
+    end)
+    deleteBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     deleteBtn:Hide()
     frame.deleteBtn = deleteBtn
+    
     local divider = frame:CreateTexture(nil, "ARTWORK")
     divider:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-OnlineDivider")
     divider:SetHeight(2)
     divider:SetPoint("TOPLEFT", 20, -35)
     divider:SetPoint("TOPRIGHT", -20, -35)
+    
     local content = CreateFrame("Frame", "NSForumContent_" .. fid, frame)
     content:SetPoint("TOPLEFT", 18, -42)
     content:SetPoint("BOTTOMRIGHT", -18, 5)
     frame.content = content
+    
     NSForumClient.window = frame
     NSForumClient.EnsureDBSettings()
     nsDbc["форум"].isOpen = true
@@ -14158,7 +14222,7 @@ function NSForumClient.DrawListView(parent)
             local repliesText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             repliesText:SetPoint("RIGHT", rowFrame, "RIGHT", -35, 0)
             repliesText:SetPoint("TOP", rowFrame, "TOP", 0, -12)
-            repliesText:SetText((replyCount-1) .. " отв.")
+            repliesText:SetText(math.max(0, replyCount - 1) .. " отв.")
             repliesText:SetTextColor(unpack(COLORS.meta_color))
             
             local arrow = rowFrame:CreateTexture(nil, "OVERLAY")
@@ -14654,9 +14718,10 @@ end
 -- ============================================
 
 function NSForumClient.RequestThreads()
-    if IsInGuild() then 
-        SendAddonMessage("NSFORUM", "REQ_THREADS:", "GUILD") 
-    end
+    if not IsInGuild() then return end
+    NSForumClient.tempThreads = {}
+    local myName = UnitName("player")
+    SendAddonMessage("NSFORUM", "REQ_THREADS:" .. (myName or ""), "GUILD")
 end
 
 function NSForumClient.RequestThreadFull(threadId)
@@ -14687,12 +14752,20 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
         end
         
     elseif action == "SYNC_THREADS" then
-        NSForumClient.tempThreads = {}
-        if data and data ~= "" then
-            for entry in string.gmatch(data, "([^,]+)") do
+        if not data then return end
+        local myName = UnitName("player")
+        local targetName, threadsData = strsplit("|", data, 2)
+        
+        if targetName and targetName ~= "" and targetName ~= myName then
+            return
+        end
+
+        local dataToParse = threadsData or data
+        if dataToParse and dataToParse ~= "" then
+            for entry in string.gmatch(dataToParse, "([^,]+)") do
                 local id, title, author, date, lastPostDate, postCount, pinned, pinnedBy = strsplit("|", entry, 8)
                 if id and tonumber(id) then
-                    local threadData = {
+                    table.insert(NSForumClient.tempThreads, {
                         id = tonumber(id), 
                         title = title or "", 
                         author = author or "", 
@@ -14701,11 +14774,11 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
                         postCount = tonumber(postCount) or 0,
                         pinned = (pinned == "true"),
                         pinnedBy = (pinnedBy ~= "" and pinnedBy) or nil
-                    }
-                    table.insert(NSForumClient.tempThreads, threadData)
+                    })
                 end
             end
         end
+        
         if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then 
             NSForumClient.RenderView()
         end
