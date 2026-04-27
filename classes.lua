@@ -14457,13 +14457,27 @@ end
 
 function NSForumClient.DrawThreadView(parent)
     local tId = NSForumClient.GetSelectedThreadId()
-    if not tId then NSForumClient.SetCurrentView("list"); NSForumClient.RenderView(); return end
+    if not tId then 
+        NSForumClient.SetCurrentView("list")
+        NSForumClient.RenderView()
+        return 
+    end
+    
     local thread = nil
-    for _, t in ipairs(NSForumClient.tempThreads) do if t.id == tId then thread = t; break end end
-    if not thread then NSForumClient.SetCurrentView("list"); NSForumClient.RenderView(); return end
+    for _, t in ipairs(NSForumClient.tempThreads) do 
+        if t.id == tId then thread = t; break end 
+    end
+    
+    if not thread then 
+        NSForumClient.SetCurrentView("list")
+        NSForumClient.RenderView()
+        return 
+    end
+    
     local threadPosts = {}
     for _, p in ipairs(NSForumClient.tempPosts) do if p.threadId == tId then table.insert(threadPosts, p) end end
     table.sort(threadPosts, function(a, b) return a.id < b.id end)
+    
     local fid = NSForumFrameID
     local headerBg = parent:CreateTexture(nil, "ARTWORK")
     headerBg:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-Tab-Highlight")
@@ -14471,15 +14485,18 @@ function NSForumClient.DrawThreadView(parent)
     headerBg:SetPoint("TOPLEFT", 2, -2)
     headerBg:SetPoint("TOPRIGHT", -2, -2)
     headerBg:SetGradientAlpha("HORIZONTAL", 0.2, 0.2, 0.2, 0.8, 0.3, 0.3, 0.3, 0.8)
+    
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLeftYellow")
     header:SetPoint("TOPLEFT", 10, -5)
     header:SetPoint("RIGHT", -40, 0)
     header:SetJustifyH("LEFT")
     header:SetText(ProcessContentForDisplay(thread.title))
     header:SetTextColor(unpack(COLORS.row_text))
+    
     local meta = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     meta:SetPoint("BOTTOMLEFT", 10, 2)
     meta:SetText("|cff808080Автор:|r " .. thread.author .. "  |  |cff808080Дата:|r " .. thread.date)
+    
     local backBtn = CreateFrame("Button", nil, parent)
     backBtn:SetSize(24, 24)
     backBtn:SetPoint("TOPRIGHT", -8, -8)
@@ -14487,18 +14504,21 @@ function NSForumClient.DrawThreadView(parent)
     backBtn:SetScript("OnClick", function() 
         NSForumClient.SetLoadingThread(false)
         NSForumClient.SetCurrentView("list")
-        NSForumClient.SetSelectedThreadId(nil)  -- Очищаем ID темы
+        NSForumClient.SetSelectedThreadId(nil)
         NSForumClient.tempPosts = {}
         NSForumClient.tempReactions = {}
         NSForumClient.RequestThreads()
     end)
+    
     local postCont = CreateFrame("ScrollFrame", "NSForumPostScroll_" .. fid, parent)
     postCont:SetPoint("TOPLEFT", 5, -50)
     postCont:SetPoint("BOTTOMRIGHT", -5, 55)
     postCont:EnableMouseWheel(true)
+    
     local inner = CreateFrame("Frame", "NSForumPostInner_" .. fid, postCont)
     inner:SetSize(postCont:GetWidth() or 600, 100)
     postCont:SetScrollChild(inner)
+    
     local sb = CreateFrame("Slider", "NSForumPostSlider_" .. fid, postCont)
     sb:SetOrientation("VERTICAL")
     sb:SetPoint("TOPRIGHT", postCont, "TOPRIGHT", -2, -2)
@@ -14509,6 +14529,7 @@ function NSForumClient.DrawThreadView(parent)
     sb:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
     sb:SetValueStep(20)
     postCont.scrollbar = sb
+    
     postCont:SetScript("OnMouseWheel", function(self, delta)
         local current = self:GetVerticalScroll()
         local newVal = current - (delta * 20)
@@ -14518,6 +14539,7 @@ function NSForumClient.DrawThreadView(parent)
         self:SetVerticalScroll(newVal); self.scrollbar:SetValue(newVal)
     end)
     sb:SetScript("OnValueChanged", function(self, val) postCont:SetVerticalScroll(val) end)
+    
     local totalHeightAccumulator = 5
     if #threadPosts == 0 then
         local emptyText = inner:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -14532,10 +14554,13 @@ function NSForumClient.DrawThreadView(parent)
             local postFrame = CreateFrame("Frame", "NSForumPost_" .. fid .. "_" .. p.id, inner)
             postFrame:SetWidth(inner:GetWidth() or 600)
             postFrame:SetPoint("TOPLEFT", inner, "TOPLEFT", 2, rowY)
+            postFrame.postId = p.id 
+            
             local bg = postFrame:CreateTexture(nil, "BACKGROUND")
             bg:SetTexture("Interface\\Buttons\\White8x8")
             bg:SetVertexColor(unpack(COLORS.post_bg))
             bg:SetAllPoints(postFrame)
+            
             local authorText = postFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             authorText:SetPoint("TOPLEFT", 10, -5)
             authorText:SetPoint("RIGHT", -10, 0)
@@ -14544,16 +14569,19 @@ function NSForumClient.DrawThreadView(parent)
             if i == 1 then authorLabel = authorLabel .. " |cff808080(автор)|r" end
             authorLabel = authorLabel .. "  |cff808080" .. (p.date or "") .. "|r"
             authorText:SetText(authorLabel)
+            
             local div = postFrame:CreateTexture(nil, "ARTWORK")
             div:SetTexture("Interface\\Common\\UI-TooltipDivider-Transparent")
             div:SetHeight(1)
             div:SetPoint("TOPLEFT", 10, -23)
             div:SetPoint("TOPRIGHT", -10, 0)
+            
             local contentText = postFrame:CreateFontString(nil, "OVERLAY")
             contentText:SetPoint("TOPLEFT", 15, -28)
             contentText:SetPoint("RIGHT", postFrame, "RIGHT", -15, 0)
             contentText:SetFont("Fonts\\FRIZQT__.TTF", 14)
             contentText:SetJustifyH("LEFT")
+            
             local processedContent = p.content or ""
             processedContent = string.gsub(processedContent, "!ц(%x%x%x%x%x%x%x%x)(.-)!цц", function(hex, text) return "|cff" .. hex .. text .. "|r" end)
             for tag, hex in pairs(COLOR_TAGS) do
@@ -14564,8 +14592,11 @@ function NSForumClient.DrawThreadView(parent)
             processedContent = string.gsub(processedContent, "!цц", "")
             contentText:SetText(processedContent)
             contentText:SetTextColor(unpack(COLORS.row_text))
+            
             local contentHeight = contentText:GetStringHeight()
             if not contentHeight or contentHeight < 14 then contentHeight = 14 end
+            postFrame._contentHeight = contentHeight
+            
             local reactionHeight = 0
             local reactions = NSForumClient.tempReactions
             if reactions and reactions[p.id] then
@@ -14575,13 +14606,16 @@ function NSForumClient.DrawThreadView(parent)
                     end
                 end
             end
+            
             local reactionBtn = CreateFrame("Button", "NSForumReactionBtn_" .. fid .. "_" .. p.id, postFrame)
             reactionBtn:SetSize(24, 24)
             reactionBtn:SetPoint("BOTTOMRIGHT", -8, 4)
             reactionBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-MOTD-Up")
             reactionBtn:SetScript("OnClick", function() NSForumClient.ShowReactionPanel(p.id, reactionBtn) end)
+            
             if reactionHeight > 0 then
                 local reactionBar = CreateFrame("Frame", nil, postFrame)
+                reactionBar.isReactionBar = true
                 reactionBar:SetHeight(24)
                 reactionBar:SetPoint("BOTTOMLEFT", postFrame, "BOTTOMLEFT", 10, 2)
                 reactionBar:SetPoint("BOTTOMRIGHT", reactionBtn, "LEFT", -5, 0)
@@ -14602,7 +14636,9 @@ function NSForumClient.DrawThreadView(parent)
                     end
                 end
             end
+            
             local frameHeight = contentHeight + 30 + reactionHeight
+            postFrame._baseHeight = 30 + reactionHeight
             postFrame.targetHeight = frameHeight
             postFrame:SetHeight(frameHeight)
             postFrame:Show()
@@ -14611,12 +14647,14 @@ function NSForumClient.DrawThreadView(parent)
         end
     end
     totalHeightAccumulator = totalHeightAccumulator + 10
+    
     inner:SetHeight(math.max(totalHeightAccumulator, postCont:GetHeight() or 100))
     local scrollRange = math.max(0, totalHeightAccumulator - (postCont:GetHeight() or 100))
     sb:SetMinMaxValues(0, scrollRange)
     sb:SetValue(0)
     postCont:SetVerticalScroll(0)
-    local replyBox = CreateFrame("EditBox", "NSForumReplyBox_" .. fid .. "_" .. tId, parent, "InputBoxTemplate")
+    
+    local replyBox = CreateFrame("EditBox", "NSForumReplyBox_" .. fid .. "_" .. tId, parent)
     replyBox:SetPoint("BOTTOMLEFT", 10, 8)
     replyBox:SetPoint("BOTTOMRIGHT", -120, 8)
     replyBox:SetHeight(28)
@@ -14624,10 +14662,17 @@ function NSForumClient.DrawThreadView(parent)
     replyBox:SetMaxLetters(500)
     replyBox:SetFontObject("GameFontNormal")
     replyBox:SetTextInsets(8, 8, 4, 4)
-    --replyBox:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-    --replyBox:SetBackdropColor(unpack(COLORS.reply_bg))
-    --replyBox:SetTextColor(unpack(COLORS.row_text))
+    replyBox:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 8, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    replyBox:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    replyBox:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.8)
+    replyBox:SetTextColor(unpack(COLORS.row_text))
     replyBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    
     local function SendReply()
         if not IsInGuild() then UIErrorsFrame:AddMessage("Необходимо состоять в гильдии", 1, 0, 0, 1, 5); return end
         local c = replyBox:GetText()
@@ -14638,6 +14683,7 @@ function NSForumClient.DrawThreadView(parent)
         end
     end
     replyBox:SetScript("OnEnterPressed", function(self) SendReply() end)
+    
     local replyBtn = CreateFrame("Button", "NSForumReplyBtn_" .. fid .. "_" .. tId, parent, "UIPanelButtonTemplate")
     replyBtn:SetSize(90, 24)
     replyBtn:SetPoint("LEFT", replyBox, "RIGHT", 5, 0)
@@ -14697,20 +14743,32 @@ function NSForumClient.AddReaction(postId, reactionKey)
     if not IsInGuild() then return end
     local author = UnitName("player")
     if not author then return end
+    
+    postId = tonumber(postId)
+    if not postId then print("|cff00ff00[ClientDebug]|r ❌ Неверный postId"); return end
+    
     local threadId = nil
     for _, p in ipairs(NSForumClient.tempPosts) do
-        if p.id == postId then threadId = p.threadId; break end
+        if tonumber(p.id) == postId then 
+            threadId = p.threadId
+            break 
+        end
     end
-    if not threadId then return end
+    if not threadId then print("|cff00ff00[ClientDebug]|r ❌ Тема не найдена для этого поста"); return end
+    
+    -- Локальное обновление для мгновенного отклика
     if not NSForumClient.tempReactions then NSForumClient.tempReactions = {} end
     if not NSForumClient.tempReactions[postId] then NSForumClient.tempReactions[postId] = {} end
     if not NSForumClient.tempReactions[postId][reactionKey] then NSForumClient.tempReactions[postId][reactionKey] = {} end
+    
     local alreadyReacted = false
     for i, name in ipairs(NSForumClient.tempReactions[postId][reactionKey]) do
         if name == author then table.remove(NSForumClient.tempReactions[postId][reactionKey], i); alreadyReacted = true; break end
     end
     if not alreadyReacted then table.insert(NSForumClient.tempReactions[postId][reactionKey], author) end
+    
     SendAddonMessage("NSFORUM", "REACTION:" .. threadId .. "|" .. postId .. "|" .. reactionKey, "GUILD")
+    NSForumClient.UpdateReactionsInView(postId)
 end
 
 -- ============================================
@@ -14917,15 +14975,16 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
     local postsSection, reactionsSection = nil, nil
     local postsStart = string.find(fullData, "POSTS:")
     local reactionsStart = string.find(fullData, "|REACTIONS:")
+    
     if postsStart then
         if reactionsStart then
             postsSection = string.sub(fullData, postsStart + 6, reactionsStart - 1)
-            reactionsSection = string.sub(fullData, reactionsStart + 12)
+            reactionsSection = string.sub(fullData, reactionsStart + 11)
         else
             postsSection = string.sub(fullData, postsStart + 6)
         end
     end
-    -- Очищаем старые посты этой темы из временного хранилища
+    
     local i = 1
     while i <= #NSForumClient.tempPosts do
         if NSForumClient.tempPosts[i].threadId == threadId then
@@ -14934,6 +14993,7 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
             i = i + 1
         end
     end
+    
     if postsSection and postsSection ~= "" then
         for postEntry in string.gmatch(postsSection, "([^,]+)") do
             local id, author, date, content = strsplit("|", postEntry, 4)
@@ -14946,16 +15006,20 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
             end
         end
     end
+    
     if reactionsSection and reactionsSection ~= "" then
         if not NSForumClient.tempReactions then NSForumClient.tempReactions = {} end
+        reactionsSection = reactionsSection:gsub("|+$", "")
+        
         for postReactions in string.gmatch(reactionsSection, "([^|]+)") do
             local postIdStr, rest = strsplit(":", postReactions, 2)
             local postId = tonumber(postIdStr)
+            
             if postId and rest then
-                NSForumClient.tempReactions[postId] = {}
+                NSForumClient.tempReactions[postId] = NSForumClient.tempReactions[postId] or {}
                 for reactionBlock in string.gmatch(rest, "([^;]+)") do
                     local key, namesStr = strsplit(":", reactionBlock, 2)
-                    if key and namesStr then
+                    if key and namesStr and namesStr ~= "" then
                         NSForumClient.tempReactions[postId][key] = {}
                         for name in string.gmatch(namesStr, "[^,]+") do
                             if name ~= "" then table.insert(NSForumClient.tempReactions[postId][key], name) end
@@ -14965,6 +15029,7 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
             end
         end
     end
+    
     NSForumClient.SetLoadingThread(false)
     if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "thread" and NSForumClient.GetSelectedThreadId() == threadId then
         NSForumClient.RenderView()
@@ -15093,8 +15158,7 @@ function NSForumClient.UpdateReactionsInView(postId)
     local postFrame = nil
     if innerFrame then
         for _, innerChild in ipairs({innerFrame:GetChildren()}) do
-            local name = innerChild:GetName()
-            if name and name:find("NSForumPost_") and name:find("_" .. postId .. "$") then
+            if innerChild.postId == postId then
                 postFrame = innerChild; break
             end
         end
@@ -15103,17 +15167,10 @@ function NSForumClient.UpdateReactionsInView(postId)
     if not postFrame then NSForumClient.RenderView(); return end
     
     for _, child in ipairs({postFrame:GetChildren()}) do
-        if child.GetChildren and not child:GetName() then
-            local hasIcons = false
-            for _, subchild in ipairs({child:GetChildren()}) do
-                if subchild.GetNormalTexture then hasIcons = true; break end
-            end
-            if hasIcons then
-                local cName = child:GetName()
-                child:Hide()
-                child:SetParent(nil)
-                if cName then _G[cName] = nil end
-            end
+        if child.isReactionBar then
+            child:Hide()
+            child:SetParent(nil)
+            if child:GetName() then _G[child:GetName()] = nil end
         end
     end
     
@@ -15127,33 +15184,28 @@ function NSForumClient.UpdateReactionsInView(postId)
         end
     end
     
-    local contentText = nil
-    for _, child in ipairs({postFrame:GetChildren()}) do
-        if child.GetFont and not child:GetName() then
-            contentText = child; break
-        end
-    end
-    
-    local contentHeight = 14
-    if contentText then
-        contentHeight = contentText:GetStringHeight() or 14
-    end
-    
+    local contentHeight = postFrame._contentHeight or 14
+    local baseHeight = 30 + newReactionHeight
+    local newHeight = contentHeight + baseHeight
     local oldHeight = postFrame:GetHeight() or 70
-    local newHeight = contentHeight + 30 + newReactionHeight
+    
     postFrame.targetHeight = newHeight
     postFrame:SetHeight(newHeight)
+    postFrame._baseHeight = baseHeight
     local heightDiff = newHeight - oldHeight
     
     if newReactionHeight > 0 then
         local reactionBtn = nil
         for _, child in ipairs({postFrame:GetChildren()}) do
-            if child.GetNormalTexture and child:GetWidth() == 24 then
-                reactionBtn = child; break
+            local name = child:GetName()
+            if name and name:find("NSForumReactionBtn_") then
+                reactionBtn = child
+                break
             end
         end
         
         local reactionBar = CreateFrame("Frame", nil, postFrame)
+        reactionBar.isReactionBar = true
         reactionBar:SetHeight(24)
         reactionBar:SetPoint("BOTTOMLEFT", postFrame, "BOTTOMLEFT", 10, 2)
         if reactionBtn then
@@ -15181,19 +15233,16 @@ function NSForumClient.UpdateReactionsInView(postId)
         reactionBar:Show()
     end
     
-    if innerFrame and heightDiff ~= 0 then
+    if innerFrame and math.abs(heightDiff) > 2 then
         local foundCurrent = false
         for _, child in ipairs({innerFrame:GetChildren()}) do
-            local name = child:GetName()
-            if name and name:find("NSForumPost_") then
+            if child:GetName() and child:GetName():find("NSForumPost_") then
                 if foundCurrent then
                     local pt, rel, relPt, x, y = child:GetPoint()
                     child:ClearAllPoints()
                     child:SetPoint(pt, rel, relPt, x, y - heightDiff)
                 end
-                if name:find("_" .. postId .. "$") then
-                    foundCurrent = true
-                end
+                if child.postId == postId then foundCurrent = true end
             end
         end
         
