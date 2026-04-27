@@ -13174,11 +13174,9 @@ print("|cff00ff00[NS Auction System v5.7]|r Загружен. Команды: /n
 
 
 -- ============================================
--- ФОРУМ КЛИЕНТ (РЕЛИЗ) - ВЕРСИЯ 6.6
--- Все данные только от сервера, без локального кеша
--- Один рендер = одно событие от сервера
--- Кэш убран - всегда запрашиваем данные с сервера
--- Сохраняем только настройки (положение окна, view)
+-- ФОРУМ КЛИЕНТ - ВЕРСИЯ 6.7
+-- Все данные только от сервера, без локального кэша тем
+-- Фикс гонки пакетов, поддержка ссылок в шепоте, оптимизация
 -- ============================================
 NSForumClient = NSForumClient or {}
 NSForumFrameID = NSForumFrameID or 0
@@ -13569,7 +13567,6 @@ end
 function NSForumClient.EnsureDBSettings()
     if not nsDbc then nsDbc = {} end
     if not nsDbc["форум"] then nsDbc["форум"] = {} end
-    -- Сохраняем только настройки, не данные
     if not nsDbc["форум"].windowPosition then nsDbc["форум"].windowPosition = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 } end
     if not nsDbc["форум"].view then nsDbc["форум"].view = "list" end
     if not nsDbc["форум"].selectedThreadId then nsDbc["форум"].selectedThreadId = nil end
@@ -13748,22 +13745,17 @@ end
 
 function NSForumClient.CreateForumWindow()
     NSForumClient.EnsureDBSettings()
-    
-    -- Проверяем, есть ли сохраненный ID темы для открытия
     local savedThreadId = NSForumClient.GetSelectedThreadId()
     local openSpecificTopic = (savedThreadId ~= nil)
     
     if not openSpecificTopic then
-        -- Если нет конкретной темы - всегда список
         NSForumClient.SetCurrentView("list")
     end
     
-    -- Исправляем проверку: nil тоже означает что окно не открыто
     if NSForumClient.window and NSForumClient.window:IsShown() then
         return
     end
     
-    -- Очищаем старое окно если есть
     if NSForumClient.window then
         NSForumClient.DestroyWindow()
     end
@@ -13816,9 +13808,6 @@ function NSForumClient.CreateForumWindow()
         end)
     end)
     
-    -- ============================================
-    -- КНОПКА СОЗДАТЬ
-    -- ============================================
     local createBtn = CreateFrame("Button", nil, frame)
     createBtn:SetSize(24, 24)
     createBtn:SetPoint("TOPLEFT", 5, -5)
@@ -13831,15 +13820,11 @@ function NSForumClient.CreateForumWindow()
     createBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("Создать тему", 1, 0.9, 0.4, 1)
-        GameTooltip:AddLine("Открыть форму для создания новой темы", 0.9, 0.9, 0.9, 1)
         GameTooltip:Show()
     end)
     createBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     frame.createBtn = createBtn
     
-    -- ============================================
-    -- КНОПКА РЕДАКТИРОВАТЬ
-    -- ============================================
     local editBtn = CreateFrame("Button", nil, frame)
     editBtn:SetSize(24, 24)
     editBtn:SetPoint("LEFT", createBtn, "RIGHT", 4, 0)
@@ -13851,21 +13836,16 @@ function NSForumClient.CreateForumWindow()
     editBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("Редактировать тему", 1, 0.9, 0.4, 1)
-        GameTooltip:AddLine("Изменить название и содержание темы", 0.9, 0.9, 0.9, 1)
-        GameTooltip:AddLine("Доступно только автору или модераторам", 0.7, 0.7, 0.7, 1)
         GameTooltip:Show()
     end)
     editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     editBtn:Hide()
     frame.editBtn = editBtn
     
-    -- ============================================
-    -- КНОПКА УДАЛИТЬ (с новой иконкой и подтверждением)
-    -- ============================================
     local deleteBtn = CreateFrame("Button", nil, frame)
     deleteBtn:SetSize(24, 24)
     deleteBtn:SetPoint("LEFT", editBtn, "RIGHT", 4, 0)
-    deleteBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up") -- Стандартный красный крестик
+    deleteBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
     deleteBtn:SetScript("OnClick", function()
         local tId = NSForumClient.GetSelectedThreadId()
         if tId then
@@ -13875,9 +13855,6 @@ function NSForumClient.CreateForumWindow()
     deleteBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("Удалить тему", 1, 0.5, 0.5, 1)
-        GameTooltip:AddLine("Полностью удалить тему и все сообщения", 0.9, 0.9, 0.9, 1)
-        GameTooltip:AddLine("Доступно только автору или модераторам", 0.7, 0.7, 0.7, 1)
-        GameTooltip:AddLine("Требует подтверждения", 0.5, 0.5, 0.5, 1)
         GameTooltip:Show()
     end)
     deleteBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -13901,16 +13878,12 @@ function NSForumClient.CreateForumWindow()
     
     NSForumClient.AnimateWindowOpen(frame, function()
         if openSpecificTopic then
-            -- 1) Запрашиваем список тем
             NSForumClient.tempPosts = {}
             NSForumClient.tempReactions = {}
             NSForumClient.RequestThreads()
-            
-            -- 2) Запрашиваем конкретную тему (как при клике)
             NSForumClient.SetLoadingThread(true)
             NSForumClient.RequestThreadFull(savedThreadId)
         else
-            -- Открываем список тем
             NSForumClient.SetSelectedThreadId(nil)
             NSForumClient.tempPosts = {}
             NSForumClient.tempReactions = {}
@@ -13926,7 +13899,6 @@ end
 NSForumClient.renderLocked = false
 NSForumClient.pendingRender = false
 
--- Временное хранилище данных (только для текущей сессии, очищается при закрытии)
 NSForumClient.tempThreads = {}
 NSForumClient.tempPosts = {}
 NSForumClient.tempReactions = {}
@@ -13990,12 +13962,10 @@ function NSForumClient.RenderView()
         local isModerator = false
         local playerName = UnitName("player")
         
-        -- Проверяем, является ли игрок модератором
         if NSForumClient.tempModerators and NSForumClient.tempModerators[playerName] then
             isModerator = true
         end
         
-        -- Проверяем, является ли игрок автором темы
         if tId then
             for _, t in ipairs(NSForumClient.tempThreads) do
                 if t.id == tId and t.author == playerName then 
@@ -14005,20 +13975,11 @@ function NSForumClient.RenderView()
             end
         end
         
-        -- Показываем кнопки ТОЛЬКО автору или модератору
         if frame.editBtn then 
-            if isCreator or isModerator then 
-                frame.editBtn:Show() 
-            else 
-                frame.editBtn:Hide() 
-            end 
+            if isCreator or isModerator then frame.editBtn:Show() else frame.editBtn:Hide() end 
         end
         if frame.deleteBtn then 
-            if isCreator or isModerator then 
-                frame.deleteBtn:Show() 
-            else 
-                frame.deleteBtn:Hide() 
-            end 
+            if isCreator or isModerator then frame.deleteBtn:Show() else frame.deleteBtn:Hide() end 
         end
     else
         if frame.editBtn then frame.editBtn:Hide() end
@@ -14107,11 +14068,7 @@ function NSForumClient.DrawListView(parent)
             local bg = rowFrame:CreateTexture(nil, "BACKGROUND")
             bg:SetTexture("Interface\\Buttons\\White8x8")
             local bgColor
-            if t.pinned then
-                bgColor = COLORS.pinned_bg
-            else
-                bgColor = (i % 2 == 0) and COLORS.row_bg_even or COLORS.row_bg_odd
-            end
+            if t.pinned then bgColor = COLORS.pinned_bg else bgColor = (i % 2 == 0) and COLORS.row_bg_even or COLORS.row_bg_odd end
             bg:SetVertexColor(unpack(bgColor))
             bg:SetAllPoints(rowFrame)
 
@@ -14138,15 +14095,11 @@ function NSForumClient.DrawListView(parent)
                         local info = UIDropDownMenu_CreateInfo()
                         info.text = "Отправить в чат"
                         info.func = function()
-                            -- Рассылаем кэш темы всем игрокам гильдии
                             if IsInGuild() then
                                 SendAddonMessage("NSFORUM", "ftCache:" .. threadId .. " " .. (t.title or "Без названия"), "GUILD")
                             end
-                            -- Вставляем команду в активное поле чата
                             local editBox = ChatEdit_ChooseBoxForSend()
-                            if editBox then
-                                editBox:Insert("/forumtopic " .. threadId)
-                            end
+                            if editBox then editBox:Insert("/forumtopic " .. threadId) end
                         end
                         UIDropDownMenu_AddButton(info)
                         
@@ -14162,41 +14115,21 @@ function NSForumClient.DrawListView(parent)
                 end
             end)
 
-            -- Кнопка закрепления с иконкой мечей
             local pinBtn = CreateFrame("Button", "NSForumPinBtn_" .. fid .. "_" .. i, rowFrame)
             pinBtn:SetSize(28, 28)
             pinBtn:SetPoint("LEFT", rowFrame, "LEFT", 8, 0)
-            
             local iconTex = pinBtn:CreateTexture(nil, "OVERLAY")
             iconTex:SetTexture("Interface\\GossipFrame\\BattlemasterGossipIcon")
             iconTex:SetAllPoints()
-            
-            if t.pinned then
-                iconTex:SetVertexColor(unpack(COLORS.pinned_icon))
-            else
-                iconTex:SetVertexColor(0.5, 0.5, 0.5, 1)
-            end
+            iconTex:SetVertexColor(t.pinned and unpack(COLORS.pinned_icon) or {0.5, 0.5, 0.5, 1})
 
             pinBtn:SetScript("OnClick", function()
-                if t.pinned then
-                    SendAddonMessage("NSFORUM", "UNPIN_THREAD:" .. threadId, "GUILD")
-                else
-                    SendAddonMessage("NSFORUM", "PIN_THREAD:" .. threadId, "GUILD")
-                end
+                SendAddonMessage("NSFORUM", (t.pinned and "UNPIN_THREAD:" or "PIN_THREAD:") .. threadId, "GUILD")
             end)
             pinBtn:SetScript("OnEnter", function(self)
-                if t.pinned then
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText("Открепить тему", 1, 0.84, 0)
-                    GameTooltip:AddLine("Закреплено: " .. (t.pinnedBy or "Неизвестно"), 0.8, 0.8, 0.8)
-                    GameTooltip:AddLine("Повторный клик - открепить (модератор)", 0.6, 0.6, 0.6)
-                    GameTooltip:Show()
-                else
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText("Закрепить тему", 1, 1, 1)
-                    GameTooltip:AddLine("Только для модераторов", 0.6, 0.6, 0.6)
-                    GameTooltip:Show()
-                end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(t.pinned and "Открепить тему" or "Закрепить тему", 1, 0.84, 0)
+                GameTooltip:Show()
             end)
             pinBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
@@ -14214,15 +14147,13 @@ function NSForumClient.DrawListView(parent)
             
             local dateText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             dateText:SetPoint("TOPLEFT", authorText, "BOTTOMLEFT", 0, -2)
-            local lastDate = t.lastPostDate or t.date or "Неизвестно"
-            dateText:SetText("Последнее: " .. lastDate)
+            dateText:SetText("Последнее: " .. (t.lastPostDate or t.date or "Неизвестно"))
             dateText:SetTextColor(unpack(COLORS.meta_color))
             
-            local replyCount = t.postCount or 0
             local repliesText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             repliesText:SetPoint("RIGHT", rowFrame, "RIGHT", -35, 0)
             repliesText:SetPoint("TOP", rowFrame, "TOP", 0, -12)
-            repliesText:SetText(math.max(0, replyCount - 1) .. " отв.")
+            repliesText:SetText(math.max(0, (t.postCount or 0) - 1) .. " отв.")
             repliesText:SetTextColor(unpack(COLORS.meta_color))
             
             local arrow = rowFrame:CreateTexture(nil, "OVERLAY")
@@ -14310,9 +14241,7 @@ function NSForumClient.DrawCreateView(parent)
     sb:SetBackdrop({bgFile = "Interface\\Buttons\\UI-ScrollBar-Background"})
     sb:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
     sb:SetValueStep(20)
-    local function UpdateScrollRange()
-        sb:SetMinMaxValues(0, math.max(0, editBox:GetHeight() - contentScroll:GetHeight()))
-    end
+    local function UpdateScrollRange() sb:SetMinMaxValues(0, math.max(0, editBox:GetHeight() - contentScroll:GetHeight())) end
     sb:SetScript("OnValueChanged", function(self, val) contentScroll:SetVerticalScroll(val) end)
     contentScroll:SetScript("OnMouseWheel", function(self, delta)
         local current = self:GetVerticalScroll()
@@ -14339,7 +14268,6 @@ function NSForumClient.DrawCreateView(parent)
         NSForumClient.SendChunkedMessage("NEW_THREAD:", escapedTitle .. "|" .. escapedContent)
         titleBox:SetText(""); editBox:SetText("")
         NSForumClient.SetCurrentView("list")
-        -- Запрашиваем актуальный список тем с сервера
         NSForumClient.RequestThreads()
     end)
     local cancelBtn = CreateFrame("Button", "NSForumCancelBtn_" .. fid, parent, "UIPanelButtonTemplate")
@@ -14418,9 +14346,7 @@ function NSForumClient.DrawEditThreadView(parent)
     sb:SetWidth(16)
     sb:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
     sb:SetValueStep(20)
-    local function UpdateScrollRange()
-        sb:SetMinMaxValues(0, math.max(0, editBox:GetHeight() - contentScroll:GetHeight()))
-    end
+    local function UpdateScrollRange() sb:SetMinMaxValues(0, math.max(0, editBox:GetHeight() - contentScroll:GetHeight())) end
     sb:SetScript("OnValueChanged", function(self, val) contentScroll:SetVerticalScroll(val) end)
     contentScroll:SetScript("OnMouseWheel", function(self, delta)
         local current = self:GetVerticalScroll()
@@ -14745,7 +14671,7 @@ function NSForumClient.AddReaction(postId, reactionKey)
     if not author then return end
     
     postId = tonumber(postId)
-    if not postId then print("|cff00ff00[ClientDebug]|r ❌ Неверный postId"); return end
+    if not postId then return end
     
     local threadId = nil
     for _, p in ipairs(NSForumClient.tempPosts) do
@@ -14754,9 +14680,8 @@ function NSForumClient.AddReaction(postId, reactionKey)
             break 
         end
     end
-    if not threadId then print("|cff00ff00[ClientDebug]|r ❌ Тема не найдена для этого поста"); return end
+    if not threadId then return end
     
-    -- Локальное обновление для мгновенного отклика
     if not NSForumClient.tempReactions then NSForumClient.tempReactions = {} end
     if not NSForumClient.tempReactions[postId] then NSForumClient.tempReactions[postId] = {} end
     if not NSForumClient.tempReactions[postId][reactionKey] then NSForumClient.tempReactions[postId][reactionKey] = {} end
@@ -14772,7 +14697,7 @@ function NSForumClient.AddReaction(postId, reactionKey)
 end
 
 -- ============================================
--- СЕТЕВЫЕ ЗАПРОСЫ (ВСЕГДА К СЕРВЕРУ)
+-- СЕТЕВЫЕ ЗАПРОСЫ
 -- ============================================
 
 function NSForumClient.RequestThreads()
@@ -14790,7 +14715,7 @@ function NSForumClient.RequestThreadFull(threadId)
 end
 
 -- ============================================
--- ОБРАБОТЧИК СООБЩЕНИЙ (ДАННЫЕ ТОЛЬКО ОТ СЕРВЕРА)
+-- ОБРАБОТЧИК СООБЩЕНИЙ
 -- ============================================
 
 local cFrame = CreateFrame("Frame")
@@ -14811,42 +14736,31 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
         
     elseif action == "SYNC_THREADS" then
         if not data then return end
-        local myName = UnitName("player")
         local targetName, threadsData = strsplit("|", data, 2)
-        
-        if targetName and targetName ~= "" and targetName ~= myName then
-            return
-        end
+        if targetName and targetName ~= "" and targetName ~= myName then return end
 
+        NSForumClient.tempThreads = {}
         local dataToParse = threadsData or data
         if dataToParse and dataToParse ~= "" then
             for entry in string.gmatch(dataToParse, "([^,]+)") do
                 local id, title, author, date, lastPostDate, postCount, pinned, pinnedBy = strsplit("|", entry, 8)
                 if id and tonumber(id) then
                     table.insert(NSForumClient.tempThreads, {
-                        id = tonumber(id), 
-                        title = title or "", 
-                        author = author or "", 
-                        date = date or "", 
-                        lastPostDate = lastPostDate or date or "",
-                        postCount = tonumber(postCount) or 0,
-                        pinned = (pinned == "true"),
+                        id = tonumber(id), title = title or "", author = author or "", 
+                        date = date or "", lastPostDate = lastPostDate or date or "",
+                        postCount = tonumber(postCount) or 0, pinned = (pinned == "true"),
                         pinnedBy = (pinnedBy ~= "" and pinnedBy) or nil
                     })
                 end
             end
         end
-        
         if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then 
             NSForumClient.RenderView()
         end
         
     elseif action == "NEW_THREAD_BROADCAST" then
         if not data then return end
-        -- Инкрементальное обновление - запрашиваем актуальный список
-        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then
-            NSForumClient.RequestThreads()
-        end
+        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then NSForumClient.RequestThreads() end
         
     elseif action == "PIN_THREAD_BROADCAST" then
         if not data then return end
@@ -14860,9 +14774,7 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
                 break
             end
         end
-        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then
-            NSForumClient.RenderView()
-        end
+        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then NSForumClient.RenderView() end
         
     elseif action == "UNPIN_THREAD_BROADCAST" then
         if not data then return end
@@ -14875,9 +14787,7 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
                 break
             end
         end
-        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then
-            NSForumClient.RenderView()
-        end
+        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then NSForumClient.RenderView() end
         
     elseif action == "DELETE_THREAD_BROADCAST" then
         if not data then return end
@@ -14925,7 +14835,6 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
         local threadIdNum = tonumber(tId)
         local postIdNum = tonumber(pId)
         if not threadIdNum or not postIdNum then return end
-        -- Если мы в этой теме - обновляем инкрементально
         if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "thread" and NSForumClient.GetSelectedThreadId() == threadIdNum then
             local found = false
             for i, p in ipairs(NSForumClient.tempPosts) do
@@ -14934,12 +14843,9 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
                     found = true; break
                 end
             end
-            if not found then
-                table.insert(NSForumClient.tempPosts, { id = postIdNum, threadId = threadIdNum, author = author or "", date = postDate or "", content = content or "" })
-            end
+            if not found then table.insert(NSForumClient.tempPosts, { id = postIdNum, threadId = threadIdNum, author = author or "", date = postDate or "", content = content or "" }) end
             NSForumClient.AddNewPostToView(postIdNum)
         end
-        -- Обновляем lastPostDate в списке тем если открыт список
         for i, t in ipairs(NSForumClient.tempThreads) do
             if t.id == threadIdNum then
                 NSForumClient.tempThreads[i].lastPostDate = postDate
@@ -15010,11 +14916,9 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
     if reactionsSection and reactionsSection ~= "" then
         if not NSForumClient.tempReactions then NSForumClient.tempReactions = {} end
         reactionsSection = reactionsSection:gsub("|+$", "")
-        
         for postReactions in string.gmatch(reactionsSection, "([^|]+)") do
             local postIdStr, rest = strsplit(":", postReactions, 2)
             local postId = tonumber(postIdStr)
-            
             if postId and rest then
                 NSForumClient.tempReactions[postId] = NSForumClient.tempReactions[postId] or {}
                 for reactionBlock in string.gmatch(rest, "([^;]+)") do
@@ -15030,6 +14934,18 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
         end
     end
     
+    -- Фикс гонки данных: если тема не пришла в списке, создаем временную
+    local threadExists = false
+    for _, t in ipairs(NSForumClient.tempThreads) do
+        if t.id == threadId then threadExists = true; break end
+    end
+    if not threadExists then
+        table.insert(NSForumClient.tempThreads, {
+            id = threadId, title = "Загрузка метаданных...", author = "...", 
+            date = "...", lastPostDate = "...", postCount = 0, pinned = false
+        })
+    end
+
     NSForumClient.SetLoadingThread(false)
     if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "thread" and NSForumClient.GetSelectedThreadId() == threadId then
         NSForumClient.RenderView()
@@ -15128,7 +15044,6 @@ function NSForumClient.AddNewPostToView(postId)
     reactionBtn:SetScript("OnClick", function() NSForumClient.ShowReactionPanel(postId, reactionBtn) end)
     
     postFrame:Show()
-    
     local newTotalHeight = maxBottomY + frameHeight + 5
     innerFrame:SetHeight(math.max(newTotalHeight, scrollFrame:GetHeight() or 100))
     local sb = scrollFrame.scrollbar
@@ -15138,13 +15053,11 @@ function NSForumClient.AddNewPostToView(postId)
         sb:SetValue(scrollRange)
         scrollFrame:SetVerticalScroll(scrollRange)
     end
-    
     NSForumClient.AnimateNewPostAppear(postFrame, newIndex)
 end
 
 function NSForumClient.UpdateReactionsInView(postId)
     if not NSForumClient.viewFrame then NSForumClient.RenderView(); return end
-    
     local scrollFrame = nil
     local innerFrame = nil
     for _, child in ipairs({NSForumClient.viewFrame:GetChildren()}) do
@@ -15154,22 +15067,17 @@ function NSForumClient.UpdateReactionsInView(postId)
             break
         end
     end
-    
     local postFrame = nil
     if innerFrame then
         for _, innerChild in ipairs({innerFrame:GetChildren()}) do
-            if innerChild.postId == postId then
-                postFrame = innerChild; break
-            end
+            if innerChild.postId == postId then postFrame = innerChild; break end
         end
     end
-    
     if not postFrame then NSForumClient.RenderView(); return end
     
     for _, child in ipairs({postFrame:GetChildren()}) do
         if child.isReactionBar then
-            child:Hide()
-            child:SetParent(nil)
+            child:Hide(); child:SetParent(nil)
             if child:GetName() then _G[child:GetName()] = nil end
         end
     end
@@ -15198,21 +15106,13 @@ function NSForumClient.UpdateReactionsInView(postId)
         local reactionBtn = nil
         for _, child in ipairs({postFrame:GetChildren()}) do
             local name = child:GetName()
-            if name and name:find("NSForumReactionBtn_") then
-                reactionBtn = child
-                break
-            end
+            if name and name:find("NSForumReactionBtn_") then reactionBtn = child; break end
         end
-        
         local reactionBar = CreateFrame("Frame", nil, postFrame)
         reactionBar.isReactionBar = true
         reactionBar:SetHeight(24)
         reactionBar:SetPoint("BOTTOMLEFT", postFrame, "BOTTOMLEFT", 10, 2)
-        if reactionBtn then
-            reactionBar:SetPoint("BOTTOMRIGHT", reactionBtn, "LEFT", -5, 0)
-        else
-            reactionBar:SetPoint("BOTTOMRIGHT", postFrame, "BOTTOMRIGHT", -40, 0)
-        end
+        if reactionBtn then reactionBar:SetPoint("BOTTOMRIGHT", reactionBtn, "LEFT", -5, 0) else reactionBar:SetPoint("BOTTOMRIGHT", postFrame, "BOTTOMRIGHT", -40, 0) end
         
         local xOffset = 0
         for _, reaction in ipairs(REACTIONS) do
@@ -15245,7 +15145,6 @@ function NSForumClient.UpdateReactionsInView(postId)
                 if child.postId == postId then foundCurrent = true end
             end
         end
-        
         local newTotalHeight = (innerFrame:GetHeight() or 100) + heightDiff
         innerFrame:SetHeight(math.max(newTotalHeight, scrollFrame and scrollFrame:GetHeight() or 100))
         if scrollFrame and scrollFrame.scrollbar then
@@ -15256,151 +15155,27 @@ function NSForumClient.UpdateReactionsInView(postId)
 end
 
 -- ============================================
--- СЛЕШ-КОМАНДЫ
+-- СЛЕШ-КОМАНДЫ И ССЫЛКИ
 -- ============================================
 
 SLASH_NSFORUM1 = "/forum"
 SLASH_NSFORUM2 = "/форум"
 SlashCmdList["NSFORUM"] = function() NSForumClient.CreateForumWindow() end
 
--- В конец файла клиента добавляем:
-local linkHandler = CreateFrame("Frame")
-linkHandler:RegisterEvent("CHAT_MSG_SYSTEM")
-linkHandler:SetScript("OnEvent", function(self, event, msg)
-    -- Обработка ссылок форума при клике
-end)
-
--- Перехватываем клики по ссылкам
-hooksecurefunc("ChatFrame_OnHyperlinkShow", function(chatFrame, link, text, button)
-    local forumId = string.match(link, "^forum:(%d+)$")
-    if forumId then
-        local threadId = tonumber(forumId)
-        if threadId and IsInGuild() then
-            -- Открываем форум если закрыт
-            if not NSForumClient.IsWindowOpen() then
-                NSForumClient.CreateForumWindow()
-            end
-            
-            -- Открываем нужную тему
-            NSForumClient.SetSelectedThreadId(threadId)
-            NSForumClient.SetCurrentView("thread")
-            NSForumClient.SetLoadingThread(true)
-            NSForumClient.RequestThreadFull(threadId)
-        end
-    end
-end)
-
 function NSForumClient.OpenTopicById(threadId)
-    
     if not threadId then
         print("|cffFF0000[Forum]|r Не указан ID темы!")
         return false
     end
-    
-    
     if not IsInGuild() then
         print("|cffFF0000[Forum]|r Вы должны быть в гильдии!")
         return false
     end
-    
-    -- Устанавливаем тему ДО открытия окна
     NSForumClient.SetSelectedThreadId(threadId)
     NSForumClient.SetCurrentView("thread")
     NSForumClient.SetLoadingThread(true)
-    
-    
-    -- Открываем форум
     NSForumClient.CreateForumWindow()
-    
-    
     return true
-end
-
--- ============================================
--- СИСТЕМА КЭШИРОВАНИЯ И ПОДМЕНЫ ССЫЛОК В ЧАТЕ
--- ============================================
-NSForumClient.topicTitles = NSForumClient.topicTitles or {}
-
--- 1. Слушаем рассылку кэша (от игроков и сервера)
-local linkCacheFrame = CreateFrame("Frame")
-linkCacheFrame:RegisterEvent("CHAT_MSG_ADDON")
-linkCacheFrame:SetScript("OnEvent", function(_, _, prefix, text, channel)
-    if prefix == "NSFORUM" and channel == "GUILD" then
-        -- ftCache: рассылка от игроков (ПКМ -> Отправить в чат)
-        if string.sub(text, 1, 7) == "ftCache" then
-            local idStr, title = strsplit(" ", text:sub(9), 2)
-            if idStr and title then
-                NSForumClient.topicTitles[tonumber(idStr)] = title
-            end
-        -- itsLink: ответ от сервера (заголовок по запросу)
-        elseif string.sub(text, 1, 8) == "itsLink:" then
-            local idStr, title = strsplit(" ", text:sub(9), 2)
-            if idStr and title then
-                NSForumClient.topicTitles[tonumber(idStr)] = title
-            end
-        end
-    end
-end)
-
--- 2. Фильтр чата для автоматической подмены команд на гиперссылки
-local function ForumLinkFilter(_, _, msg, ...)
-    if type(msg) ~= "string" then return false end
-
-    local function ReplaceLink(id)
-        local tid = tonumber(id)
-        if not tid then return "/forumtopic " .. id end
-
-        local title = NSForumClient.topicTitles[tid]
-        if not title then
-            -- Кэша нет: запрашиваем у сервера, возвращаем плейсхолдер
-            if IsInGuild() then
-                SendAddonMessage("NSFORUM", "getMeLink:" .. tid, "GUILD")
-            end
-            return "|cffFFD700|Hforum:" .. tid .. "|h[Загрузка...]|h|r"
-        end
-
-        -- Кэш есть: рисуем ссылку с заголовком сразу
-        if #title > 80 then title = title:sub(1, 77) .. "..." end
-        return "|cffFFD700|Hforum:" .. tid .. "|h[" .. title .. "]|h|r"
-    end
-
-    local changed = false
-    msg = string.gsub(msg, "/forumtopic%s+(%d+)", function(id) changed = true; return ReplaceLink(id) end)
-    msg = string.gsub(msg, "/ft%s+(%d+)",          function(id) changed = true; return ReplaceLink(id) end)
-
-    if changed then return false, msg, ... end
-    return false
-end
-
--- Регистрируем фильтры при логине
-local chatFilterFrame = CreateFrame("Frame")
-chatFilterFrame:RegisterEvent("PLAYER_LOGIN")
-chatFilterFrame:SetScript("OnEvent", function()
-    local channels = {
-        "CHAT_MSG_CHANNEL", "CHAT_MSG_SAY", "CHAT_MSG_YELL",
-        "CHAT_MSG_GUILD", "CHAT_MSG_PARTY", "CHAT_MSG_RAID",
-        "CHAT_MSG_WHISPER_INFORM"
-    }
-    for _, ch in ipairs(channels) do
-        ChatFrame_AddMessageEventFilter(ch, ForumLinkFilter)
-    end
-end)
-
--- 3. Переопределение кликов по ссылкам (SetItemRef)
-local origSetItemRef = SetItemRef
-SetItemRef = function(link, text, button, chatFrame)
-    if link and button == "LeftButton" then
-        local tid = tonumber(string.match(link, "^forum:(%d+)$"))
-        if tid then
-            if NSForumClient.OpenTopicById then
-                NSForumClient.OpenTopicById(tid)
-            end
-            return -- Прерываем, чтобы не сработал стандартный обработчик
-        end
-    end
-    if origSetItemRef then
-        origSetItemRef(link, text, button, chatFrame)
-    end
 end
 
 SLASH_NSFORUMTOPIC1 = "/forumtopic"
@@ -15414,6 +15189,77 @@ SlashCmdList["NSFORUMTOPIC"] = function(msg)
     NSForumClient.OpenTopicById(threadId)
 end
 
-print("|cff00ff00[ForumClient v6.6 FINAL]|r Loaded. No cache - always request from server.")
+-- Система кэширования и подмены ссылок
+NSForumClient.topicTitles = NSForumClient.topicTitles or {}
 
+local linkCacheFrame = CreateFrame("Frame")
+linkCacheFrame:RegisterEvent("CHAT_MSG_ADDON")
+linkCacheFrame:SetScript("OnEvent", function(_, _, prefix, text, channel)
+    if prefix == "NSFORUM" and channel == "GUILD" then
+        if string.sub(text, 1, 7) == "ftCache" then
+            local idStr, title = strsplit(" ", text:sub(9), 2)
+            if idStr and title then NSForumClient.topicTitles[tonumber(idStr)] = title end
+        elseif string.sub(text, 1, 8) == "itsLink:" then
+            local idStr, title = strsplit(" ", text:sub(9), 2)
+            if idStr and title then NSForumClient.topicTitles[tonumber(idStr)] = title end
+        end
+    end
+end)
 
+local function ForumLinkFilter(_, _, msg, ...)
+    if type(msg) ~= "string" then return false end
+    local function ReplaceLink(id)
+        local tid = tonumber(id)
+        if not tid then return "/forumtopic " .. id end
+        local title = NSForumClient.topicTitles[tid]
+        if not title then
+            if IsInGuild() then SendAddonMessage("NSFORUM", "getMeLink:" .. tid, "GUILD") end
+            return "|cffFFD700|Hforum:" .. tid .. "|h[Загрузка...]|h|r"
+        end
+        if #title > 80 then title = title:sub(1, 77) .. "..." end
+        return "|cffFFD700|Hforum:" .. tid .. "|h[" .. title .. "]|h|r"
+    end
+    local changed = false
+    msg = string.gsub(msg, "/forumtopic%s+(%d+)", function(id) changed = true; return ReplaceLink(id) end)
+    msg = string.gsub(msg, "/ft%s+(%d+)", function(id) changed = true; return ReplaceLink(id) end)
+    if changed then return false, msg, ... end
+    return false
+end
+
+local chatFilterFrame = CreateFrame("Frame")
+chatFilterFrame:RegisterEvent("PLAYER_LOGIN")
+chatFilterFrame:SetScript("OnEvent", function()
+    local channels = {
+        "CHAT_MSG_CHANNEL", "CHAT_MSG_SAY", "CHAT_MSG_YELL",
+        "CHAT_MSG_GUILD", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER",
+        "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER",
+        "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM",
+        "CHAT_MSG_BN_WHISPER", "CHAT_MSG_BN_WHISPER_INFORM"
+    }
+    for _, ch in ipairs(channels) do ChatFrame_AddMessageEventFilter(ch, ForumLinkFilter) end
+end)
+
+hooksecurefunc("ChatFrame_OnHyperlinkShow", function(chatFrame, link, text, button)
+    local forumId = string.match(link, "^forum:(%d+)$")
+    if forumId then
+        local threadId = tonumber(forumId)
+        if threadId and IsInGuild() then
+            if not NSForumClient.IsWindowOpen() then NSForumClient.CreateForumWindow() end
+            NSForumClient.OpenTopicById(threadId)
+        end
+    end
+end)
+
+local origSetItemRef = SetItemRef
+SetItemRef = function(link, text, button, chatFrame)
+    if link and button == "LeftButton" then
+        local tid = tonumber(string.match(link, "^forum:(%d+)$"))
+        if tid then
+            if NSForumClient.OpenTopicById then NSForumClient.OpenTopicById(tid) end
+            return
+        end
+    end
+    if origSetItemRef then origSetItemRef(link, text, button, chatFrame) end
+end
+
+print("|cff00ff00[ForumClient v6.7 RELEASE]|r Loaded. Optimized & stable.")
