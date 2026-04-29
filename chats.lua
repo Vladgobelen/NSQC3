@@ -10,6 +10,18 @@ local triggersByAddress = {
             forbiddenWords = {},
         }
     },
+    ["prefix:ns_NewGame"] = {
+        {
+            keyword = {
+                { word = "ns_NewGame", position = 1, source = "prefix" },
+            },
+            func = "ns_NewGame",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
     ["prefix:NSQC3_GAME_dice"] = {
         {
             keyword = {
@@ -1039,10 +1051,69 @@ local triggersByAddress = {
     },
 }
 
-function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
-    local ownerName, initiatorName = text:match("^(%S+)%s+(%S+)$")
+function ns_NewGame(channel, text, sender, full_prefix)
+    local playerName = UnitName("player")
+    
+    if text == playerName then
+        _G.ns_game_funcs = nil
+        _G.ns_move_st = nil
+        if _G.gameClient then _G.gameClient = nil end
+        if gameClient then gameClient = nil end
+        if adaptiveFrame and adaptiveFrame.gameClient then
+            adaptiveFrame.gameClient = nil
+        end
+        
+        local gc = GameClient:new()
+        gc.active = true
+        
+        gameClient = gc
+        _G.gameClient = gc
+        
+        if adaptiveFrame then
+            adaptiveFrame.gameClient = gc
+        end
+        
+        print("|cFF00FF00[Игра]|r Получен запрос на игру, gameClient создан")
+    end
+end
 
-    -- 1. Восстановление только игровых ячеек по сохранённому состоянию доски
+function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
+    local name1 = text:match("^(%S+)")
+    local name2 = text:match("%S+%s+(%S+)")
+    
+    local playerName = UnitName("player")
+    
+    -- Проверяем, наша ли это игра
+    if name1 ~= playerName and name2 ~= playerName then
+        return -- не наша игра, выходим
+    end
+    
+    print(string.format("|cFFFF0000[Игра]|r Завершена. Победитель: %s | Проигравший: %s", 
+        tostring(name1), tostring(name2)))
+    
+    -- 1. Очистка функций и глобальных переменных
+    _G.ns_game_funcs = nil
+    _G.ns_move_st = nil
+    
+    -- 2. Очистка gameClient
+    if _G.gameClient then
+        _G.gameClient.active = false
+        _G.gameClient.ownerName = nil
+        _G.gameClient.starterName = nil
+        _G.gameClient = nil
+    end
+    if gameClient then
+        gameClient.active = false
+        gameClient.ownerName = nil
+        gameClient.starterName = nil
+        gameClient = nil
+    end
+    if adaptiveFrame and adaptiveFrame.gameClient then
+        adaptiveFrame.gameClient.active = false
+        adaptiveFrame.gameClient = nil
+    end
+    
+    -- 3. Восстановление доски
     if ns_game_table and ns_game_table.board then
         for cellIndexStr, cellData in pairs(ns_game_table.board) do
             local idx = tonumber(cellIndexStr)
@@ -1055,43 +1126,29 @@ function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
                         oldPath = "Interface\\AddOns\\NSQC3\\libs\\" .. cellData.miniTex .. ".tga"
                     end
 
-                    -- Полный сброс состояний текстуры кнопки
                     frame:SetNormalTexture(oldPath)
                     frame:SetHighlightTexture(nil)
                     frame:SetPushedTexture(nil)
                     frame:SetDisabledTexture(nil)
 
-                    -- Сброс цвета подсветки
                     local tex = frame:GetNormalTexture()
                     if tex then tex:SetVertexColor(1, 1, 1) end
 
-                    -- Очистка миниатюры (угол 2: верх-центр)
                     if adaptiveFrame.SetCellIcon then
                         adaptiveFrame:SetCellIcon(idx, nil, 2)
                     end
 
-                    -- 🔄 ВОССТАНОВЛЕНИЕ ТУЛТИПОВ
                     if cell.SetTextT then cell:SetTextT("") end
                     if cell.SetMultiLineTooltip then cell:SetMultiLineTooltip("") end
                     
-                    -- 🎨 СКРЫТИЕ РАМКИ ВЛАДЕЛЬЦА (добавлено)
                     if frame._Border then frame._Border:Hide() end
                 end
             end
         end
-        -- Полная очистка таблицы состояния доски
         ns_game_table.board = {}
     end
 
-    -- 2. Сброс экземпляра игрового клиента
-    if adaptiveFrame and adaptiveFrame.gameClient then
-        adaptiveFrame.gameClient.active = false
-        adaptiveFrame.gameClient.ownerName = nil
-        adaptiveFrame.gameClient.starterName = nil
-        adaptiveFrame.gameClient = nil
-    end
-
-    -- 3. Возврат кнопки запуска в исходное состояние
+    -- 4. Сброс кнопки запуска
     if adaptiveFrame and adaptiveFrame.gameStartButton then
         local normTex = adaptiveFrame.gameStartButton:GetNormalTexture()
         if normTex then
@@ -1101,19 +1158,13 @@ function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
         adaptiveFrame.gameStartButton:SetAlpha(1)
     end
 
-    -- 4. Убираем подсветку возможных ходов
-    _G.ns_move_st = nil
-
-    -- 5. Очищаем метаданные текущей игровой сессии
+    -- 5. Очистка метаданных игры
     if ns_game_table then
         ns_game_table.id = nil
         ns_game_table.name1 = nil
         ns_game_table.name2 = nil
+        ns_game_table.active = false
     end
-
-    -- 6. Логирование завершения
-    print(string.format("|cFFFF0000[Игра]|r Завершена. Владелец: %s | Инициатор: %s", 
-        tostring(ownerName or sender), tostring(initiatorName or sender)))
 end
 
 function NSQC3_GAME_id(channel, text, sender, full_prefix)
@@ -1957,4 +2008,3 @@ end
 
 -- Создаем экземпляр ChatHandler с таблицей триггеров и указанием типов чатов для отслеживания
 chatHandler = ChatHandler:new(triggersByAddress, {"GUILD", "ADDON",})
-

@@ -3623,19 +3623,23 @@ function AdaptiveFrame:new(parent)
     self.gameStartButton:SetPushedTexture("Interface\\AddOns\\NSQC3\\libs\\5.tga")
     self.gameStartButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     
-     self.gameStartButton:SetScript("OnClick", function()
+    self.gameStartButton:SetScript("OnClick", function()
         if self.gameClient and self.gameClient:IsActive() then
-            -- Игра активна: завершаем её, передавая ники
+            -- Завершение игры
+            _G.ns_game_funcs = nil
+            _G.ns_move_st = nil
+            if _G.gameClient then
+                _G.gameClient.active = false
+                _G.gameClient = nil
+            end
+            
             local ownerName = self.gameClient.ownerName or UnitName("player")
             local playerName = UnitName("player")
             self.gameClient:EndGame(ownerName, playerName)
             self.gameClient = nil
             print("|cFFFF0000[Игра]|r Игра завершена")
         else
-            -- Игра не активна: создаём экземпляр и запускаем
-            self.gameClient = GameClient:new()
-            
-            -- Определяем имя владельца участка
+            -- Запуск игры
             local ownerName = self.owner
             if not ownerName and self.textField then
                 local headerText = self.textField:GetText() or ""
@@ -3648,8 +3652,14 @@ function AdaptiveFrame:new(parent)
                 ownerName = UnitName("player")
             end
             
-            local starterName = UnitName("player")
-            self.gameClient:StartGame(ownerName, starterName)
+            _G.ns_game_funcs = nil
+            _G.ns_move_st = nil
+            if _G.gameClient then _G.gameClient = nil end
+            
+            self.gameClient = GameClient:new()
+            _G.gameClient = self.gameClient
+            SendAddonMessage("ns_NewGame", ownerName, "GUILD")
+            self.gameClient:StartGame(ownerName, UnitName("player"))
             print("|cFF00FF00[Игра]|r Игра запущена")
         end
     end)
