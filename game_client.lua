@@ -250,3 +250,8 @@ function GameClient:_ClearGlow()
     end
     self._lh = nil
 end
+
+function GameClient:NotifyWatchers(ownerName, a, f, t, v, o)
+    local msg = string.format("%s %d %d %d %s", a, f or 0, t or 0, v or 0, o or "")
+    SendAddonMessage("nsWatchUpdate", ownerName .. " " .. msg, "GUILD")
+end

@@ -1049,7 +1049,76 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:nsShowMeGame_data"] = {
+        {
+            keyword = {
+                { word = "nsShowMeGame_data", position = 1, source = "prefix" },
+            },
+            func = "nsShowMeGame_data",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
+    ["prefix:nsWatchUpdate"] = {
+        {
+            keyword = {
+                { word = "nsWatchUpdate", position = 1, source = "prefix" },
+            },
+            func = "nsWatchUpdate",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
 }
+
+function nsWatchUpdate(channel, text, sender, prefix)
+    local ownerName, rest = text:match("^(%S+)%s+(.+)$")
+    if not ownerName or not rest then return end
+    
+    -- Проверяем, это поле мы сейчас смотрим?
+    if _G.ns_watching_field ~= ownerName then return end
+    
+    -- Парсим обновление
+    local a, f, t, v, o = rest:match("^(%S+) (%d+) (%d+) (%d+) (%S+)$")
+    if not a then return end
+    
+    f, t, v = tonumber(f), tonumber(t), tonumber(v)
+    
+    if gameClient and gameClient.DoAction then
+        gameClient:DoAction(a, {f=f, t=t, v=v, o=o})
+    end
+end
+
+function nsShowMeGame_data(channel, text, sender, prefix)
+    local gameId, diceData = text:match("^(%d+)|(.+)$")
+    if not gameId or not diceData then return end
+    
+    print("[Игра] Просмотр игры " .. gameId)
+    
+    -- Устанавливаем флаг просмотра
+    _G.ns_watching_game = gameId
+    
+    -- Очищаем доску
+    if ns_game_table then
+        ns_game_table.board = {}
+    end
+    
+    -- Парсим данные кубиков
+    for owner, cell, value in diceData:gmatch("([^:]+):([^:]+):([^;]+);") do
+        local cellNum = tonumber(cell)
+        local valNum = tonumber(value)
+        if cellNum and valNum and adaptiveFrame then
+            -- Отрисовываем кубик
+            if gameClient then
+                gameClient:_Set(cellNum, valNum, owner, 1, 1, 1)
+            end
+        end
+    end
+end
 
 function ns_NewGame(channel, text, sender, full_prefix)
     local playerName = UnitName("player")

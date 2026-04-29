@@ -3623,7 +3623,32 @@ function AdaptiveFrame:new(parent)
     self.gameStartButton:SetPushedTexture("Interface\\AddOns\\NSQC3\\libs\\5.tga")
     self.gameStartButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     
-    self.gameStartButton:SetScript("OnClick", function()
+    self.gameStartButton:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            -- ПКМ: запрос на просмотр чужой игры
+            local ownerName = self.owner
+            if not ownerName and self.textField then
+                local headerText = self.textField:GetText() or ""
+                local parts = mysplit(headerText)
+                if parts and parts[1] then
+                    ownerName = parts[1]
+                end
+            end
+            if not ownerName or ownerName == "" then
+                ownerName = UnitName("player")
+            end
+            
+            if ownerName == UnitName("player") and self.gameClient and self.gameClient:IsActive() then
+                print("|cFFFF0000[Игра]|r Вы уже в игре на своём поле")
+                return
+            end
+            
+            SendAddonMessage("nsShowMeGame", ownerName, "GUILD")
+            print("|cFF00FF00[Игра]|r Запрошен просмотр игры на поле: " .. ownerName)
+            return
+        end
+        
+        -- ЛКМ: запуск/завершение игры
         if self.gameClient and self.gameClient:IsActive() then
             -- Завершение игры
             _G.ns_game_funcs = nil
@@ -3663,38 +3688,39 @@ function AdaptiveFrame:new(parent)
             print("|cFF00FF00[Игра]|r Игра запущена")
         end
     end)
-    
-self.gameStartButton:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(self.gameStartButton, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Запустить игру", 1, 1, 1)
-    GameTooltip:AddLine(" ", 1, 1, 1)
-    GameTooltip:AddLine("Правила игры:", 1, 0.82, 0)
-    GameTooltip:AddLine("• У каждого игрока по 10 кубиков (d6)", 1, 1, 1)
-    GameTooltip:AddLine("• Игрок 1 стартует снизу (клетки 1-10)", 1, 1, 1)
-    GameTooltip:AddLine("• Игрок 2/ИИ стартует сверху (клетки 91-100)", 1, 1, 1)
-    GameTooltip:AddLine("• Цель: уничтожить все кубики противника", 1, 1, 1)
-    GameTooltip:AddLine(" ", 1, 1, 1)
-    GameTooltip:AddLine("Как ходить:", 1, 0.82, 0)
-    GameTooltip:AddLine("• Кликните на свой кубик (подсветятся варианты)", 1, 1, 1)
-    GameTooltip:AddLine("• Зелёные клетки — обычный ход", 0.2, 1, 0.2)
-    GameTooltip:AddLine("• Красные клетки — захват кубика врага", 1, 0.2, 0.2)
-    GameTooltip:AddLine("• Число на кубике = дальность хода", 1, 1, 1)
-    GameTooltip:AddLine("• Ходить назад нельзя (только вперёд)", 1, 0.5, 0.5)
-    GameTooltip:AddLine("• ПКМ по доске = отмена выбора", 1, 1, 1)
-    GameTooltip:AddLine(" ", 1, 1, 1)
-    GameTooltip:AddLine("Особые механики:", 1, 0.82, 0)
-    GameTooltip:AddLine("• Респаун: дойдя до края противника,", 0.5, 1, 0.5)
-    GameTooltip:AddLine("  вы получаете новый кубик в своей зоне", 0.5, 1, 0.5)
-    GameTooltip:AddLine("• Захват: ход на клетку с кубиком врага", 1, 0.5, 0)
-    GameTooltip:AddLine("  уничтожает его и занимает клетку", 1, 0.5, 0)
-    GameTooltip:AddLine(" ", 1, 1, 1)
-    GameTooltip:AddLine("Режимы игры:", 1, 0.82, 0)
-    GameTooltip:AddLine("• Одиночная игра: откройте свое поле", 1, 1, 1)
-    GameTooltip:AddLine("• Игра вдвоём: откройте поле соперника", 1, 1, 1)
-    GameTooltip:AddLine("• Первый ход определяется случайно", 1, 1, 1)
-    GameTooltip:Show()
-end)
-    
+
+    self.gameStartButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.gameStartButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Запустить игру", 1, 1, 1)
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Правила игры:", 1, 0.82, 0)
+        GameTooltip:AddLine("• У каждого игрока по 10 кубиков (d6)", 1, 1, 1)
+        GameTooltip:AddLine("• Игрок 1 стартует снизу (клетки 1-10)", 1, 1, 1)
+        GameTooltip:AddLine("• Игрок 2/ИИ стартует сверху (клетки 91-100)", 1, 1, 1)
+        GameTooltip:AddLine("• Цель: уничтожить все кубики противника", 1, 1, 1)
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Как ходить:", 1, 0.82, 0)
+        GameTooltip:AddLine("• Кликните на свой кубик (подсветятся варианты)", 1, 1, 1)
+        GameTooltip:AddLine("• Зелёные клетки — обычный ход", 0.2, 1, 0.2)
+        GameTooltip:AddLine("• Красные клетки — захват кубика врага", 1, 0.2, 0.2)
+        GameTooltip:AddLine("• Число на кубике = дальность хода", 1, 1, 1)
+        GameTooltip:AddLine("• Ходить назад нельзя (только вперёд)", 1, 0.5, 0.5)
+        GameTooltip:AddLine("• ПКМ по доске = отмена выбора", 1, 1, 1)
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Особые механики:", 1, 0.82, 0)
+        GameTooltip:AddLine("• Респаун: дойдя до края противника,", 0.5, 1, 0.5)
+        GameTooltip:AddLine("  вы получаете новый кубик в своей зоне", 0.5, 1, 0.5)
+        GameTooltip:AddLine("• Захват: ход на клетку с кубиком врага", 1, 0.5, 0)
+        GameTooltip:AddLine("  уничтожает его и занимает клетку", 1, 0.5, 0)
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Режимы игры:", 1, 0.82, 0)
+        GameTooltip:AddLine("• Одиночная игра: откройте свое поле", 1, 1, 1)
+        GameTooltip:AddLine("• Игра вдвоём: откройте поле соперника", 1, 1, 1)
+        GameTooltip:AddLine("• Просмотр игры: ПКМ по кнопке", 0.5, 0.8, 1)
+        GameTooltip:AddLine("• Первый ход определяется случайно", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+
     self.gameStartButton:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
@@ -3702,7 +3728,7 @@ end)
     -- Кнопка крафта
     self.craftButton = CreateFrame("Button", nil, self.frame)
     self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
-    self.craftButton:SetPoint("TOPRIGHT", self.gameStartButton, "BOTTOMRIGHT", 0, -5)
+    --self.craftButton:SetPoint("TOPRIGHT", self.gameStartButton, "BOTTOMRIGHT", 0, -5)
     self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
     self.craftButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
     self.craftButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
@@ -3978,7 +4004,7 @@ end
 
 -- Метод для позиционирования и размеров кнопок
 function AdaptiveFrame:AdjustSizeAndPosition()
-    local buttonsPerRow = 10  -- Фиксируем 10 столбцов
+    local buttonsPerRow = 10
     local numChildren = #self.children
     local rows = math.ceil(numChildren / buttonsPerRow)
     local frameWidth, frameHeight = self.frame:GetSize()
@@ -3986,12 +4012,14 @@ function AdaptiveFrame:AdjustSizeAndPosition()
     local buttonHeight = buttonWidth
     local requiredWidth = 2 * F_PAD + buttonsPerRow * buttonWidth + (buttonsPerRow - 1) * BUTTON_PADDING
     local requiredHeight = 2 * F_PAD + rows * buttonHeight + (rows - 1) * BUTTON_PADDING
+    
     if frameWidth < requiredWidth or frameHeight < requiredHeight then
         self.frame:SetSize(requiredWidth, requiredHeight)
         frameWidth, frameHeight = requiredWidth, requiredHeight
         buttonWidth = (frameWidth - 2 * F_PAD - (buttonsPerRow - 1) * BUTTON_PADDING) / buttonsPerRow
         buttonHeight = buttonWidth
     end
+    
     for i, child in ipairs(self.children) do
         local row = math.floor((i - 1) / buttonsPerRow)
         local col = (i - 1) % buttonsPerRow
@@ -4000,10 +4028,16 @@ function AdaptiveFrame:AdjustSizeAndPosition()
         if ButtonManager.SetSize and ButtonManager.SetPoint then
             ButtonManager.SetSize(child, buttonWidth, buttonHeight)
             ButtonManager.SetPoint(child, "BOTTOMLEFT", self.frame, "BOTTOMLEFT", x, y)
-        else
-            print("Error: Child does not support required methods")
         end
     end
+    
+    if self.craftButton then
+        self.craftButton:ClearAllPoints()
+        self.craftButton:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -F_PAD+34, F_PAD)
+        self.craftButton:SetFrameLevel(self.frame:GetFrameLevel() + 50)
+    end
+    -- ============================================================
+    
     local screenWidth, screenHeight = UIParent:GetSize()
     local x, y = self.frame:GetLeft(), self.frame:GetBottom()
     SCREEN_PADDING = ns_dbc:getKey("настройки", "SCREEN_PADDING") or SCREEN_PADDING
