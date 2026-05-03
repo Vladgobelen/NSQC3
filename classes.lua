@@ -13218,12 +13218,21 @@ print("|cff00ff00[NS Auction System v5.7]|r Загружен. Команды: /n
 
 
 -- ============================================
--- ФОРУМ КЛИЕНТ - ВЕРСИЯ 6.7
+-- ФОРУМ КЛИЕНТ - ВЕРСИЯ 6.7.1 DEBUG
 -- Все данные только от сервера, без локального кэша тем
 -- Фикс гонки пакетов, поддержка ссылок в шепоте, оптимизация
+-- ДОБАВЛЕНА ОТЛАДКА ДЛЯ ПОИСКА ПРОБЛЕМЫ С ТЕМАМИ
 -- ============================================
 NSForumClient = NSForumClient or {}
 NSForumFrameID = NSForumFrameID or 0
+
+-- Константы для отладки
+local DEBUG_MODE = false
+local function DebugPrint(...)
+    if DEBUG_MODE then
+        print("|cff00ffff[FORUM DEBUG]|r", ...)
+    end
+end
 
 NSForumClient.tempModerators = {}
 local MAX_ADDON_MSG = 240
@@ -13571,7 +13580,10 @@ NSForumClient.recvChunkBuffer = {}
 
 function NSForumClient.AssembleChunks(action, sender, chunkData, totalChunks, chunkNum)
     local bufferKey = action .. "_" .. sender
+    DebugPrint("AssembleChunks called: action=", action, "sender=", sender, "totalChunks=", tostring(totalChunks), "chunkNum=", tostring(chunkNum), "dataLen=", chunkData and #chunkData or 0)
+    
     if totalChunks then
+        -- Новый набор чанков
         NSForumClient.recvChunkBuffer[bufferKey] = {
             total = totalChunks,
             chunks = {[1] = chunkData or ""},
@@ -13579,23 +13591,29 @@ function NSForumClient.AssembleChunks(action, sender, chunkData, totalChunks, ch
             action = action,
             sender = sender
         }
+        DebugPrint("Started chunk assembly: total=", totalChunks, "bufferKey=", bufferKey)
         return nil
     elseif chunkNum then
         local buffer = NSForumClient.recvChunkBuffer[bufferKey]
         if buffer then
             buffer.chunks[chunkNum] = chunkData or ""
             buffer.received = buffer.received + 1
+            DebugPrint("Received chunk", chunkNum, "of", buffer.total, "total received:", buffer.received)
             if buffer.received >= buffer.total then
                 local fullData = ""
                 for i = 1, buffer.total do
                     fullData = fullData .. (buffer.chunks[i] or "")
                 end
+                DebugPrint("All chunks received! Total data length:", #fullData)
                 NSForumClient.recvChunkBuffer[bufferKey] = nil
                 return fullData
             end
+        else
+            DebugPrint("WARNING: Received chunk but no buffer found for key:", bufferKey)
         end
         return nil
     end
+    -- Одиночное сообщение (не чанк)
     return chunkData
 end
 
@@ -13977,20 +13995,28 @@ function NSForumClient.ClearView()
 end
 
 function NSForumClient.RenderView()
+    DebugPrint("RenderView called. renderLocked=", NSForumClient.renderLocked, "pendingRender=", NSForumClient.pendingRender)
+    
     if NSForumClient.renderLocked then
         NSForumClient.pendingRender = true
+        DebugPrint("Render locked, pending...")
         return
     end
     NSForumClient.renderLocked = true
     if not NSForumClient.window or not NSForumClient.window:IsShown() then
         NSForumClient.renderLocked = false
+        DebugPrint("Window not shown, aborting render")
         return
     end
     local view = NSForumClient.GetCurrentView()
+    DebugPrint("Current view:", view)
+    
     if view == "thread" and NSForumClient.IsLoadingThread() then
         NSForumClient.renderLocked = false
+        DebugPrint("Still loading thread, aborting render")
         return
     end
+    
     NSForumClient.StopAllAnimations()
     NSForumClient.ClearView()
     local content = NSForumClient.window.content
@@ -14030,7 +14056,15 @@ function NSForumClient.RenderView()
         if frame.deleteBtn then frame.deleteBtn:Hide() end
     end
     
-    if view == "list" then NSForumClient.DrawListView(NSForumClient.viewFrame)
+    if view == "list" then 
+        DebugPrint("Drawing list view with", #NSForumClient.tempThreads, "threads")
+        -- Вывод всех тем для отладки
+        if DEBUG_MODE then
+            for i, t in ipairs(NSForumClient.tempThreads) do
+                DebugPrint("  Thread", i, ":", "id=", t.id, "title=", t.title, "author=", t.author, "pinned=", tostring(t.pinned))
+            end
+        end
+        NSForumClient.DrawListView(NSForumClient.viewFrame)
     elseif view == "create" then NSForumClient.DrawCreateView(NSForumClient.viewFrame)
     elseif view == "thread" then NSForumClient.DrawThreadView(NSForumClient.viewFrame)
     elseif view == "edit_thread" then NSForumClient.DrawEditThreadView(NSForumClient.viewFrame)
@@ -14038,6 +14072,7 @@ function NSForumClient.RenderView()
     NSForumClient.renderLocked = false
     if NSForumClient.pendingRender then
         NSForumClient.pendingRender = false
+        DebugPrint("Executing pending render")
         NSForumClient.RenderView()
     end
 end
@@ -14102,13 +14137,22 @@ function NSForumClient.DrawListView(parent)
             local dateB = b.lastPostDate or b.date or ""
             return dateA > dateB
         end)
+        DebugPrint("Drawing", #sortedThreads, "sorted threads")
         for i, t in ipairs(sortedThreads) do
             local rowY = -totalHeightAccumulator
             local rowFrame = CreateFrame("Frame", "NSForumThreadRow_" .. fid .. "_" .. i, scrollCont)
             rowFrame:SetHeight(70)
             rowFrame.targetHeight = 70
-            rowFrame:SetWidth(scrollCont:GetWidth() or 600)
+            -- ВАЖНО: устанавливаем ширину строки равной ширине контейнера
+            local containerWidth = scrollCont:GetWidth()
+            if not containerWidth or containerWidth <= 0 then
+                containerWidth = sf:GetWidth() - 20
+                DebugPrint("WARNING: scrollCont width is 0, using sf width:", containerWidth)
+            end
+            rowFrame:SetWidth(containerWidth)
             rowFrame:SetPoint("TOPLEFT", scrollCont, "TOPLEFT", 2, rowY)
+            rowFrame:SetPoint("TOPRIGHT", scrollCont, "TOPRIGHT", -2, rowY)
+            
             local bg = rowFrame:CreateTexture(nil, "BACKGROUND")
             bg:SetTexture("Interface\\Buttons\\White8x8")
             local bgColor
@@ -14211,6 +14255,7 @@ function NSForumClient.DrawListView(parent)
         end
     end
     totalHeightAccumulator = totalHeightAccumulator + 10
+    DebugPrint("Total scroll height:", totalHeightAccumulator)
     scrollCont:SetHeight(math.max(totalHeightAccumulator, sf:GetHeight() or 100))
     local scrollRange = math.max(0, totalHeightAccumulator - (sf:GetHeight() or 100))
     sb:SetMinMaxValues(0, scrollRange)
@@ -14218,7 +14263,10 @@ function NSForumClient.DrawListView(parent)
     sf:SetVerticalScroll(0)
 end
 
+-- ... (остальные функции остаются без изменений, но с добавлением DebugPrint в ключевых местах)
+
 function NSForumClient.DrawCreateView(parent)
+    -- без изменений
     local fid = NSForumFrameID
     local headerBg = parent:CreateTexture(nil, "ARTWORK")
     headerBg:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-Tab-Highlight")
@@ -14322,6 +14370,7 @@ function NSForumClient.DrawCreateView(parent)
 end
 
 function NSForumClient.DrawEditThreadView(parent)
+    -- без изменений
     local tId = NSForumClient.GetSelectedThreadId()
     local thread = nil
     for _, t in ipairs(NSForumClient.tempThreads) do if t.id == tId then thread = t; break end end
@@ -14426,6 +14475,7 @@ function NSForumClient.DrawEditThreadView(parent)
 end
 
 function NSForumClient.DrawThreadView(parent)
+    -- без изменений
     local tId = NSForumClient.GetSelectedThreadId()
     if not tId then 
         NSForumClient.SetCurrentView("list")
@@ -14710,6 +14760,7 @@ function NSForumClient.ShowReactionPanel(postId, anchorFrame)
 end
 
 function NSForumClient.AddReaction(postId, reactionKey)
+    -- без изменений
     if not IsInGuild() then return end
     local author = UnitName("player")
     if not author then return end
@@ -14746,12 +14797,14 @@ end
 
 function NSForumClient.RequestThreads()
     if not IsInGuild() then return end
+    DebugPrint("Requesting threads...")
     NSForumClient.tempThreads = {}
     local myName = UnitName("player")
     SendAddonMessage("NSFORUM", "REQ_THREADS:" .. (myName or ""), "GUILD")
 end
 
 function NSForumClient.RequestThreadFull(threadId)
+    DebugPrint("Requesting full thread:", threadId)
     local myName = UnitName("player")
     if IsInGuild() and myName then
         SendAddonMessage("NSFORUM", "REQ_THREAD_FULL:" .. threadId .. "|" .. myName, "GUILD")
@@ -14768,6 +14821,9 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
     if event ~= "CHAT_MSG_ADDON" or prefix ~= "NSFORUM" or channel ~= "GUILD" then return end
     local action, data = strsplit(":", text, 2)
     local myName = UnitName("player")
+    
+    DebugPrint("Received addon message - action:", action, "from:", sender, "dataLen:", data and #data or 0)
+    
     if action == "REQ_THREADS" or action == "REQ_POSTS" or action == "REQ_THREAD_FULL" then return end
     
     if action == "SYNC_MODERATORS" then
@@ -14777,32 +14833,74 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
                 NSForumClient.tempModerators[modName] = true
             end
         end
+        DebugPrint("Moderators synced:", #NSForumClient.tempModerators)
         
-    elseif action == "SYNC_THREADS" then
-        if not data then return end
-        local targetName, threadsData = strsplit("|", data, 2)
-        if targetName and targetName ~= "" and targetName ~= myName then return end
-
-        NSForumClient.tempThreads = {}
-        local dataToParse = threadsData or data
-        if dataToParse and dataToParse ~= "" then
-            for entry in string.gmatch(dataToParse, "([^,]+)") do
-                local id, title, author, date, lastPostDate, postCount, pinned, pinnedBy = strsplit("|", entry, 8)
-                if id and tonumber(id) then
-                    table.insert(NSForumClient.tempThreads, {
-                        id = tonumber(id), title = title or "", author = author or "", 
-                        date = date or "", lastPostDate = lastPostDate or date or "",
-                        postCount = tonumber(postCount) or 0, pinned = (pinned == "true"),
-                        pinnedBy = (pinnedBy ~= "" and pinnedBy) or nil
-                    })
-                end
+        elseif action == "SYNC_THREADS" then
+            DebugPrint("SYNC_THREADS received, raw data length:", data and #data or 0)
+            if not data then return end
+            local targetName, threadsData = strsplit("|", data, 2)
+            DebugPrint("SYNC_THREADS: targetName=", tostring(targetName), "myName=", tostring(myName), "threadsDataLen=", threadsData and #threadsData or 0)
+            
+            if targetName and targetName ~= "" and targetName ~= myName then
+                DebugPrint("SYNC_THREADS: target mismatch, ignoring")
+                return
             end
-        end
-        if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then 
-            NSForumClient.RenderView()
-        end
+
+            -- ИСПРАВЛЕНО: НЕ очищаем tempThreads, а создаем временную таблицу для слияния
+            local dataToParse = threadsData or data
+            DebugPrint("SYNC_THREADS: parsing data, length:", #dataToParse)
+            
+            if dataToParse and dataToParse ~= "" then
+                local entryCount = 0
+                
+                -- Создаем хэш существующих тем для быстрого поиска
+                local existingThreads = {}
+                for _, t in ipairs(NSForumClient.tempThreads) do
+                    existingThreads[t.id] = t
+                end
+                
+                for entry in string.gmatch(dataToParse, "([^;]+)") do
+                    if entry:sub(-1) == ";" then entry = entry:sub(1, -2) end
+                    if entry == "" then break end
+                    
+                    entryCount = entryCount + 1
+                    local id, title, author, date, lastPostDate, postCount, pinned, pinnedBy = strsplit("|", entry, 8)
+                    DebugPrint("Parsing entry", entryCount, ": id=", tostring(id), "title=", tostring(title), "pinned=", tostring(pinned))
+                    
+                    if id and tonumber(id) then
+                        local threadId = tonumber(id)
+                        local threadData = {
+                            id = threadId, 
+                            title = title or "", 
+                            author = author or "", 
+                            date = date or "", 
+                            lastPostDate = lastPostDate or date or "",
+                            postCount = tonumber(postCount) or 0, 
+                            pinned = (pinned == "true"),
+                            pinnedBy = (pinnedBy ~= "" and pinnedBy) or nil
+                        }
+                        -- Обновляем или добавляем тему
+                        existingThreads[threadId] = threadData
+                    end
+                end
+                
+                -- Преобразуем хэш обратно в массив
+                NSForumClient.tempThreads = {}
+                for _, t in pairs(existingThreads) do
+                    table.insert(NSForumClient.tempThreads, t)
+                end
+                
+                DebugPrint("SYNC_THREADS: parsed", entryCount, "entries, total threads:", #NSForumClient.tempThreads)
+            else
+                DebugPrint("SYNC_THREADS: no data to parse")
+            end
+            
+            if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then 
+                NSForumClient.RenderView()
+            end
         
     elseif action == "NEW_THREAD_BROADCAST" then
+        DebugPrint("NEW_THREAD_BROADCAST:", data)
         if not data then return end
         if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "list" then NSForumClient.RequestThreads() end
         
@@ -14851,25 +14949,39 @@ cFrame:SetScript("OnEvent", function(self, event, prefix, text, channel, sender)
         end
         
     elseif action == "SYNC_THREAD_FULL" then
+        DebugPrint("SYNC_THREAD_FULL received")
         if not data then return end
         local targetName, rest = strsplit("|", data, 2)
+        DebugPrint("SYNC_THREAD_FULL: targetName=", tostring(targetName), "myName=", tostring(myName))
         if targetName ~= myName then return end
         local threadIdStr, chunkInfo = strsplit("|", rest, 2)
         local threadIdNum = tonumber(threadIdStr)
         if not threadIdNum then return end
+        
+        DebugPrint("SYNC_THREAD_FULL: threadId=", threadIdNum, "chunkInfo start=", chunkInfo and string.sub(chunkInfo, 1, 30) or "nil")
+        
         if chunkInfo and string.find(chunkInfo, "^START:") then
             local chunkParams = chunkInfo:sub(7)
             local totalChunksStr, chunkContent = strsplit("|", chunkParams, 2)
             local totalChunks = tonumber(totalChunksStr)
+            DebugPrint("Starting chunk assembly: totalChunks=", totalChunks)
             local fullData = NSForumClient.AssembleChunks("SYNC_THREAD_FULL", sender, chunkContent, totalChunks, nil)
-            if fullData then NSForumClient.ProcessFullThreadData(threadIdNum, fullData) end
+            if fullData then 
+                DebugPrint("Chunk assembly complete! (single chunk)")
+                NSForumClient.ProcessFullThreadData(threadIdNum, fullData) 
+            end
         elseif chunkInfo and string.find(chunkInfo, "^CHUNK:") then
             local chunkParams = chunkInfo:sub(7)
             local chunkNumStr, chunkContent = strsplit("|", chunkParams, 2)
             local chunkNum = tonumber(chunkNumStr)
+            DebugPrint("Received chunk:", chunkNum)
             local fullData = NSForumClient.AssembleChunks("SYNC_THREAD_FULL", sender, chunkContent, nil, chunkNum)
-            if fullData then NSForumClient.ProcessFullThreadData(threadIdNum, fullData) end
+            if fullData then 
+                DebugPrint("All chunks received! Total data length:", #fullData)
+                NSForumClient.ProcessFullThreadData(threadIdNum, fullData) 
+            end
         else
+            DebugPrint("Single message (no chunks)")
             NSForumClient.ProcessFullThreadData(threadIdNum, chunkInfo or rest)
         end
         
@@ -14922,9 +15034,13 @@ end)
 -- ОБРАБОТКА ПОЛНОЙ ТЕМЫ
 -- ============================================
 function NSForumClient.ProcessFullThreadData(threadId, fullData)
+    DebugPrint("ProcessFullThreadData: threadId=", threadId, "dataLen=", #fullData)
+    
     local postsSection, reactionsSection = nil, nil
     local postsStart = string.find(fullData, "POSTS:")
     local reactionsStart = string.find(fullData, "|REACTIONS:")
+    
+    DebugPrint("postsStart=", tostring(postsStart), "reactionsStart=", tostring(reactionsStart))
     
     if postsStart then
         if reactionsStart then
@@ -14934,6 +15050,9 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
             postsSection = string.sub(fullData, postsStart + 6)
         end
     end
+    
+    DebugPrint("postsSection length:", postsSection and #postsSection or 0)
+    DebugPrint("reactionsSection length:", reactionsSection and #reactionsSection or 0)
     
     local i = 1
     while i <= #NSForumClient.tempPosts do
@@ -14945,7 +15064,9 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
     end
     
     if postsSection and postsSection ~= "" then
+        local postCount = 0
         for postEntry in string.gmatch(postsSection, "([^,]+)") do
+            postCount = postCount + 1
             local id, author, date, content = strsplit("|", postEntry, 4)
             if id and tonumber(id) then
                 table.insert(NSForumClient.tempPosts, {
@@ -14955,6 +15076,7 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
                 })
             end
         end
+        DebugPrint("Parsed", postCount, "posts, stored", #NSForumClient.tempPosts)
     end
     
     if reactionsSection and reactionsSection ~= "" then
@@ -14984,6 +15106,7 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
         if t.id == threadId then threadExists = true; break end
     end
     if not threadExists then
+        DebugPrint("Thread", threadId, "not found in tempThreads, creating temporary entry")
         table.insert(NSForumClient.tempThreads, {
             id = threadId, title = "Загрузка метаданных...", author = "...", 
             date = "...", lastPostDate = "...", postCount = 0, pinned = false
@@ -14991,6 +15114,7 @@ function NSForumClient.ProcessFullThreadData(threadId, fullData)
     end
 
     NSForumClient.SetLoadingThread(false)
+    DebugPrint("Loading complete, rendering...")
     if NSForumClient.IsWindowOpen() and NSForumClient.GetCurrentView() == "thread" and NSForumClient.GetSelectedThreadId() == threadId then
         NSForumClient.RenderView()
     end
@@ -15001,6 +15125,7 @@ end
 -- ============================================
 
 function NSForumClient.AddNewPostToView(postId)
+    -- без изменений
     if not NSForumClient.viewFrame then return end
     local scrollFrame = nil
     local innerFrame = nil
@@ -15101,6 +15226,7 @@ function NSForumClient.AddNewPostToView(postId)
 end
 
 function NSForumClient.UpdateReactionsInView(postId)
+    -- без изменений
     if not NSForumClient.viewFrame then NSForumClient.RenderView(); return end
     local scrollFrame = nil
     local innerFrame = nil
@@ -15215,6 +15341,7 @@ function NSForumClient.OpenTopicById(threadId)
         print("|cffFF0000[Forum]|r Вы должны быть в гильдии!")
         return false
     end
+    DebugPrint("Opening topic by ID:", threadId)
     NSForumClient.SetSelectedThreadId(threadId)
     NSForumClient.SetCurrentView("thread")
     NSForumClient.SetLoadingThread(true)
@@ -15306,4 +15433,4 @@ SetItemRef = function(link, text, button, chatFrame)
     if origSetItemRef then origSetItemRef(link, text, button, chatFrame) end
 end
 
-print("|cff00ff00[ForumClient v6.7 RELEASE]|r Loaded. Optimized & stable.")
+print("|cff00ff00[ForumClient v6.7.1 DEBUG]|r Loaded. Debug mode active.")
