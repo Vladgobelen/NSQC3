@@ -15434,3 +15434,359 @@ SetItemRef = function(link, text, button, chatFrame)
 end
 
 print("|cff00ff00[ForumClient v6.7.1 DEBUG]|r Loaded. Debug mode active.")
+
+
+
+
+
+
+
+
+
+
+-- ============================================
+-- ЧАТ РЕАКЦИИ - ФИНАЛЬНЫЙ РЕЛИЗ v2.9.4
+-- ============================================
+
+ns_reactions = ns_reactions or {}
+NSForumClient.chatReactions = ns_reactions
+
+local function CreateMessageKey(author, message)
+    local a = tostring(author or ""):match("([^:]+)") or ""
+    a = a:gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r",""):gsub("%s",""):lower()
+    local m = tostring(message or "")
+    m = m:gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r",""):gsub("%s",""):lower()
+    if #m > 50 then m = m:sub(1, 50) end
+    return a .. "~" .. m
+end
+
+local function GetReactionsTooltipLines(msgKey)
+    local data = ns_reactions[msgKey]
+    if not data or not data.users then return nil end
+    local lines = {}
+    for _, r in ipairs(REACTIONS) do
+        if data.users[r.key] and #data.users[r.key] > 0 then
+            local names = table.concat(data.users[r.key], ", ")
+            table.insert(lines, "|T" .. r.icon .. ":14:14|t " .. (r.name or r.key) .. ": " .. names)
+        end
+    end
+    if #lines == 0 then return nil end
+    return lines
+end
+
+function NSForumClient.GetReactionsIconString(msgKey)
+    local data = ns_reactions[msgKey]
+    if not data or not data.users then return "" end
+    local parts = {}
+    for _, r in ipairs(REACTIONS) do
+        if data.users[r.key] and #data.users[r.key] > 0 then
+            table.insert(parts, string.format("|T%s:14:14|t%d", r.icon, #data.users[r.key]))
+        end
+    end
+    if #parts == 0 then return "" end
+    return " " .. table.concat(parts, " ")
+end
+
+function NSForumClient.ShowReactionPanel(msgKey, anchorButton)
+    if NSForumClient.chatReactionPanel then 
+        NSForumClient.chatReactionPanel:Hide() 
+    end
+    
+    local panel = CreateFrame("Frame", nil, UIParent)
+    panel:SetSize((#REACTIONS * 32) + 20, 40)
+    panel:SetFrameStrata("FULLSCREEN_DIALOG")
+    panel:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = {left = 3, right = 3, top = 3, bottom = 3}
+    })
+    panel:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+    panel:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    
+    -- Позиционируем панель СВЕРХУ над кнопкой
+    if anchorButton then
+        panel:SetPoint("BOTTOM", anchorButton, "TOP", 0, 5)
+    else
+        panel:SetPoint("CENTER")
+    end
+    
+    local data = ns_reactions[msgKey]
+    local myName = UnitName("player")
+    
+    for i = 1, #REACTIONS do
+        local r = REACTIONS[i]
+        local btn = CreateFrame("Button", nil, panel)
+        btn:SetSize(28, 28)
+        btn:SetPoint("LEFT", 8 + (i-1) * 32, 0)
+        btn:SetPoint("TOP", 0, -6)
+        
+        local tex = btn:CreateTexture(nil, "OVERLAY")
+        tex:SetAllPoints()
+        tex:SetTexture(r.icon)
+        
+        if data and data.users and data.users[r.key] then
+            for _, name in ipairs(data.users[r.key]) do
+                if name == myName then 
+                    tex:SetVertexColor(0.3, 0.5, 1, 1) 
+                end
+            end
+        end
+        
+        btn:SetScript("OnMouseDown", function()
+            local now = GetTime()
+            if now - (NSForumClient.lastReactionClick or 0) < 0.5 then return end
+            NSForumClient.lastReactionClick = now
+            panel:Hide()
+            NSForumClient.AddChatReaction(msgKey, r.key)
+        end)
+        
+        btn:SetScript("OnEnter", function()
+            if data and data.users and data.users[r.key] and #data.users[r.key] > 0 then
+                GameTooltip:SetOwner(btn, "ANCHOR_CURSOR")
+                GameTooltip:SetText(r.name or r.key, 1, 1, 1)
+                GameTooltip:AddLine(table.concat(data.users[r.key], ", "), 1, 1, 1, 1)
+                GameTooltip:Show()
+            end
+        end)
+        
+        btn:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    end
+    
+    -- Клик вне панели скрывает её
+    local closer = CreateFrame("Frame", nil, UIParent)
+    closer:SetAllPoints()
+    closer:SetFrameStrata("FULLSCREEN")
+    closer:SetFrameLevel(panel:GetFrameLevel() - 1)
+    closer:EnableMouse(true)
+    closer:SetScript("OnMouseDown", function()
+        panel:Hide()
+        closer:Hide()
+    end)
+    
+    panel:SetScript("OnHide", function()
+        closer:Hide()
+        NSForumClient.chatReactionPanel = nil
+    end)
+    
+    NSForumClient.chatReactionPanel = panel
+    panel:Show()
+end
+
+function NSForumClient.AddChatReaction(msgKey, reactionKey)
+    local myName = UnitName("player")
+    if not myName then return end
+    if not ns_reactions[msgKey] then ns_reactions[msgKey] = { users = {} } end
+    if not ns_reactions[msgKey].users[reactionKey] then ns_reactions[msgKey].users[reactionKey] = {} end
+    local list = ns_reactions[msgKey].users[reactionKey]
+    local found = false
+    for i = #list, 1, -1 do if list[i] == myName then table.remove(list, i); found = true; break end end
+    if not found then table.insert(list, myName) end
+    if IsInGuild() then
+        SendAddonMessage("NSCHATREACT", "REACT:" .. msgKey .. ";;" .. reactionKey, "GUILD")
+    end
+    NSForumClient.UpdateMessageByKey(msgKey)
+end
+
+function NSForumClient.UpdateMessageByKey(msgKey)
+    for i = 1, NUM_CHAT_WINDOWS do
+        local chatFrame = _G["ChatFrame" .. i]
+        if chatFrame and chatFrame:IsShown() then
+            local regions = {chatFrame:GetRegions()}
+            for _, region in ipairs(regions) do
+                if region.GetText and region:GetObjectType() == "FontString" then
+                    local text = region:GetText()
+                    local cleanText = text:gsub(" |TInterface.-|t%d+", "")
+                    if cleanText:find("Hchannel:GUILD") then
+                        local authorFull = cleanText:match("|h%[([^%]]+)%]|h: ") or cleanText:match("|h%[([^%]]+)%]|h") or ""
+                        local message = cleanText:match("]|h: (.+)$") or cleanText:match("]|h (.+)$") or ""
+                        if authorFull ~= "" and message ~= "" and CreateMessageKey(authorFull, message) == msgKey then
+                            local iconStr = NSForumClient.GetReactionsIconString(msgKey)
+                            local newText = cleanText .. iconStr
+                            if newText ~= text then pcall(function() region:SetText(newText) end) end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Приём реакций от других
+local addonFrame = CreateFrame("Frame")
+addonFrame:RegisterEvent("CHAT_MSG_ADDON")
+addonFrame:SetScript("OnEvent", function(_, _, prefix, text, channel, sender)
+    if prefix ~= "NSCHATREACT" or channel ~= "GUILD" then return end
+    local myName = UnitName("player")
+    if sender == myName then return end
+    local action, data = strsplit(":", text, 2)
+    if action ~= "REACT" or not data then return end
+    local sepPos = string.find(data, ";;", 1, true)
+    if not sepPos then return end
+    local msgKey = string.sub(data, 1, sepPos - 1)
+    local reactionKey = string.sub(data, sepPos + 2)
+    if not msgKey or not reactionKey then return end
+    if not ns_reactions[msgKey] then ns_reactions[msgKey] = { users = {} } end
+    if not ns_reactions[msgKey].users[reactionKey] then ns_reactions[msgKey].users[reactionKey] = {} end
+    local list = ns_reactions[msgKey].users[reactionKey]
+    local found = false
+    for i = #list, 1, -1 do if list[i] == sender then table.remove(list, i); found = true; break end end
+    if not found then table.insert(list, sender) end
+    NSForumClient.UpdateMessageByKey(msgKey)
+end)
+
+-- Функция для создания/обновления кнопок на конкретном chatFrame
+local function UpdateButtonsForChatFrame(chatFrame)
+    if not chatFrame or not chatFrame:IsShown() then return end
+    
+    if not chatFrame.reactionButtons then chatFrame.reactionButtons = {} end
+    if not chatFrame.originalColors then chatFrame.originalColors = {} end
+    if not chatFrame.buttonRegions then chatFrame.buttonRegions = {} end
+    if not chatFrame.activeKeys then chatFrame.activeKeys = {} end
+    
+    for key, _ in pairs(chatFrame.activeKeys) do
+        chatFrame.activeKeys[key] = false
+    end
+    
+    local regions = {chatFrame:GetRegions()}
+    for _, region in ipairs(regions) do
+        if region.GetText and region:GetObjectType() == "FontString" then
+            local text = region:GetText()
+            if not text then return end
+            local cleanText = text:gsub(" |TInterface.-|t%d+", "")
+            if cleanText:find("Hchannel:GUILD") then
+                local af = cleanText:match("|h%[([^%]]+)%]|h: ") or cleanText:match("|h%[([^%]]+)%]|h") or ""
+                local ms = cleanText:match("]|h: (.+)$") or cleanText:match("]|h (.+)$") or ""
+                if af ~= "" and ms ~= "" then
+                    local key = CreateMessageKey(af, ms)
+                    if not ns_reactions[key] then ns_reactions[key] = { users = {} } end
+                    
+                    chatFrame.activeKeys[key] = true
+                    chatFrame.buttonRegions[key] = region
+                    
+                    if not chatFrame.originalColors[key] then
+                        local r, g, b, a = region:GetTextColor()
+                        chatFrame.originalColors[key] = {r = r, g = g, b = b, a = a}
+                    end
+                    
+                    local btn = chatFrame.reactionButtons[key]
+                    if not btn then
+                        btn = CreateFrame("Button", nil, chatFrame)
+                        btn:SetSize(16, 16)
+                        btn:SetFrameStrata("DIALOG")
+                        
+                        local icon = btn:CreateTexture(nil, "OVERLAY")
+                        icon:SetAllPoints()
+                        icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\emote_smile")
+                        icon:SetVertexColor(0.5, 0.5, 0.5, 0.5)
+                        
+                        local savedKey = key
+                        
+                        btn:SetScript("OnMouseDown", function()
+                            NSForumClient.ShowReactionPanel(savedKey, btn)
+                        end)
+                        
+                        btn:SetScript("OnEnter", function()
+                            icon:SetVertexColor(1, 1, 1, 1)
+                            local savedRegion = chatFrame.buttonRegions[savedKey]
+                            if savedRegion then
+                                pcall(function() savedRegion:SetTextColor(1, 0, 0, 1) end)
+                            end
+                            
+                            local tooltipLines = GetReactionsTooltipLines(savedKey)
+                            if tooltipLines then
+                                GameTooltip:SetOwner(btn, "ANCHOR_CURSOR")
+                                GameTooltip:SetText("Реакции:", 1, 1, 1)
+                                for _, line in ipairs(tooltipLines) do
+                                    GameTooltip:AddLine(line, 1, 1, 1, 1)
+                                end
+                                GameTooltip:Show()
+                            end
+                        end)
+                        
+                        btn:SetScript("OnLeave", function()
+                            icon:SetVertexColor(0.5, 0.5, 0.5, 0.5)
+                            local savedRegion = chatFrame.buttonRegions[savedKey]
+                            if savedRegion then
+                                local origColor = chatFrame.originalColors[savedKey]
+                                if origColor then
+                                    pcall(function() savedRegion:SetTextColor(origColor.r, origColor.g, origColor.b, origColor.a) end)
+                                end
+                            end
+                            GameTooltip:Hide()
+                        end)
+                        
+                        chatFrame.reactionButtons[key] = btn
+                    end
+                    
+                    btn:ClearAllPoints()
+                    btn:SetPoint("RIGHT", region, "RIGHT", -4, 0)
+                    btn:Show()
+                    
+                    local iconStr = NSForumClient.GetReactionsIconString(key)
+                    local newText = cleanText .. iconStr
+                    if newText ~= text then
+                        pcall(function() region:SetText(newText) end)
+                    end
+                end
+            end
+        end
+    end
+    
+    for key, btn in pairs(chatFrame.reactionButtons) do
+        if not chatFrame.activeKeys[key] then
+            btn:Hide()
+        end
+    end
+end
+
+-- Событие нового сообщения
+local guildChatFrame = CreateFrame("Frame")
+guildChatFrame:RegisterEvent("CHAT_MSG_GUILD")
+guildChatFrame:SetScript("OnEvent", function(self, event, msg, author, ...)
+    local msgKey = CreateMessageKey(author, msg)
+    if not ns_reactions[msgKey] then ns_reactions[msgKey] = { users = {} } end
+    
+    local delayFrame = CreateFrame("Frame")
+    delayFrame.elapsed = 0
+    delayFrame.attempts = 0
+    delayFrame:SetScript("OnUpdate", function(df, elapsed)
+        df.elapsed = df.elapsed + elapsed
+        if df.elapsed < 0.3 then return end
+        df.elapsed = 0
+        df.attempts = df.attempts + 1
+        if df.attempts > 5 then df:SetScript("OnUpdate", nil); df:Hide(); return end
+        
+        for i = 1, NUM_CHAT_WINDOWS do
+            UpdateButtonsForChatFrame(_G["ChatFrame" .. i])
+        end
+    end)
+end)
+
+-- Автообновление
+local autoRefresh = CreateFrame("Frame")
+autoRefresh:SetScript("OnUpdate", function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    if self.timer < 0.5 then return end
+    self.timer = 0
+    
+    for i = 1, NUM_CHAT_WINDOWS do
+        UpdateButtonsForChatFrame(_G["ChatFrame" .. i])
+    end
+end)
+
+-- Очистка при скрытии
+for i = 1, NUM_CHAT_WINDOWS do
+    local chatFrame = _G["ChatFrame" .. i]
+    if chatFrame then
+        chatFrame:HookScript("OnHide", function()
+            if chatFrame.reactionButtons then
+                for _, btn in pairs(chatFrame.reactionButtons) do
+                    btn:Hide()
+                end
+            end
+        end)
+    end
+end
