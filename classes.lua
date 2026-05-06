@@ -12633,7 +12633,16 @@ end
 function NSAuk.SetWinner(playerName, winAmount)
     local db = NSAuk.EnsureDB()
     if not db.active then return end
-    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
+    
+    -- Останавливаем таймер обратного отсчёта
+    if closeTimerFrame then 
+        closeTimerFrame:SetScript("OnUpdate", nil)
+        closeTimerFrame = nil 
+    end
+    
+    -- Отправляем сигнал всем в рейде, что аукцион завершён
+    -- Это закроет окна у всех участников синхронно
+    SendAddonMessage("AUC_END", "", "RAID")
     
     -- Расчет/списание ГП ТОЛЬКО у того, кто запустил аукцион
     if db.active.startedBy == UnitName("player") then
@@ -12644,20 +12653,49 @@ function NSAuk.SetWinner(playerName, winAmount)
         end
     end
     
+    -- Сохраняем историю аукциона
     local bc = {}
-    for n, d in pairs(db.active.bids) do bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } end
-    table.insert(db.history, { item = db.active.item, endTime = GetTime(), startedBy = db.active.startedBy, winner = playerName, winAmount = winAmount or 0, bids = bc })
-    if #db.history > 10 then table.remove(db.history, 1) end
+    for n, d in pairs(db.active.bids) do 
+        bc[n] = { 
+            amount = d.amount, 
+            class = d.class, 
+            public = d.public, 
+            gp = d.gp, 
+            passed = d.passed, 
+            hasAction = d.hasAction 
+        } 
+    end
+    table.insert(db.history, { 
+        item = db.active.item, 
+        endTime = GetTime(), 
+        startedBy = db.active.startedBy, 
+        winner = playerName, 
+        winAmount = winAmount or 0, 
+        bids = bc 
+    })
+    if #db.history > 10 then 
+        table.remove(db.history, 1) 
+    end
     
+    -- Отправляем рейдовые сообщения только если мы инициатор
     if db.active.startedBy == UnitName("player") then
         SendChatMessage(playerName .. " побеждает, поставив " .. (winAmount or 0) .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
         SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. (winAmount or 0) .. " ГП!", "WHISPER", nil, playerName)
     end
     
+    -- Сбрасываем состояние аукциона
     db.active = nil
     isMinimized = false
+    
+    -- Закрываем окно аукциона
     NSAuk.DestroyAuctionWindow()
-    if minimapIcon then minimapIcon:Hide() end
+    
+    -- Скрываем иконку на миникарте
+    if minimapIcon then 
+        minimapIcon:Hide() 
+    end
+    
+    -- Отключаем периодическую проверку окон
     checkFrame:SetScript("OnUpdate", nil)
 end
 

@@ -863,7 +863,7 @@ end
 
 function set_miniButton()
     -- Создаем фрейм для иконки
-    miniMapButton = CreateFrame("Button", nil, Minimap)
+    miniMapButton = CreateFrame("Button", "NSQC3minibtn", Minimap)
     miniMapButton:SetSize(32, 32)  -- Размер иконки
     miniMapButton:SetFrameLevel(8)  -- Уровень фрейма
     miniMapButton:SetMovable(true)  -- Разрешаем перемещение
