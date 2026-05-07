@@ -12640,10 +12640,7 @@ function NSAuk.SetWinner(playerName, winAmount)
         closeTimerFrame = nil 
     end
     
-    -- Отправляем сигнал всем в рейде, что аукцион завершён
-    -- Это закроет окна у всех участников синхронно
-    SendAddonMessage("AUC_END", "", "RAID")
-    
+    -- [FIX] Сначала списываем ГП, ПОТОМ отправляем AUC_END
     -- Расчет/списание ГП ТОЛЬКО у того, кто запустил аукцион
     if db.active.startedBy == UnitName("player") then
         if db.settings.autoDeductGP then
@@ -12682,6 +12679,10 @@ function NSAuk.SetWinner(playerName, winAmount)
         SendChatMessage(playerName .. " побеждает, поставив " .. (winAmount or 0) .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
         SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. (winAmount or 0) .. " ГП!", "WHISPER", nil, playerName)
     end
+    
+    -- Отправляем сигнал всем в рейде, что аукцион завершён
+    -- [FIX] Отправляем ПОСЛЕ списания, чтобы FinishAuction у других НЕ списывал
+    SendAddonMessage("AUC_END", "", "RAID")
     
     -- Сбрасываем состояние аукциона
     db.active = nil
@@ -12848,16 +12849,11 @@ function NSAuk.FinishAuction(initiator)
         end 
     end
     
+    -- [FIX] Убираем списание ГП из FinishAuction
+    -- Списание происходит ТОЛЬКО в SetWinner (при прямом клике)
+    -- или через AUC_END → прямого списания больше нигде нет
+    
     if w and wa > 0 then
-        -- Расчет/списание ГП ТОЛЬКО у того, кто запустил аукцион
-        if db.active.startedBy == UnitName("player") then
-            if db.settings.autoDeductGP then
-                NSAuk.DeductGPFromRoster(w, wa)
-            else
-                print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", w, wa))
-            end
-        end
-        
         local bc = {}
         for n, d in pairs(db.active.bids) do 
             bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } 
@@ -12891,10 +12887,12 @@ end
 
 function NSAuk.StartCloseTimer()
     local db = NSAuk.EnsureDB()
-    if not db.active then return end  -- ← здесь была проблема
+    if not db.active then return end
     if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
     closeTimerFrame = CreateFrame("Frame")
     local lc = GetTime()
+    local finished = false  -- [FIX] Флаг для предотвращения повтора
+    
     closeTimerFrame:SetScript("OnUpdate", function(self)
         local ct = GetTime()
         if ct - lc < 1 then return end
@@ -12911,10 +12909,25 @@ function NSAuk.StartCloseTimer()
         if d.active.startedBy ~= UnitName("player") then return end
         
         if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
+            if finished then return end  -- [FIX] Защита от повторного входа
+            finished = true
             self:SetScript("OnUpdate", nil)
             closeTimerFrame = nil
-            -- [FIX] Убрал двойной вызов, теперь только отправляем сообщение
-            SendAddonMessage("AUC_END", "", "RAID")
+            
+            -- [FIX] Вызываем SetWinner для корректного списания ГП
+            local w, wa = nil, 0
+            for n, d in pairs(d.active.bids) do 
+                if d.hasAction and not d.passed and not d.banned and d.amount > wa then 
+                    w, wa = n, d.amount 
+                end 
+            end
+            
+            if w and wa > 0 then
+                NSAuk.SetWinner(w, wa)
+            else
+                SendAddonMessage("AUC_END", "", "RAID")
+                NSAuk.FinishAuction(d.active.startedBy)
+            end
         end
     end)
 end
