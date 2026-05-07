@@ -11623,9 +11623,9 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.7 - RELEASE (FINAL 3.3.5a COMPATIBLE)
+-- NS Auction System v5.8 - RELEASE (FINAL 3.3.5a COMPATIBLE)
 -- Для WoW 3.3.5a. Чтение ставок/паса из рейд-чата, адаптивная верстка, GP-расчет, быстрые ставки, тултипы.
--- Исправлено: панель быстрых ставок теперь отдельное окно слева. Исправлено реальное списание ГП.
+-- Исправлено: единый источник списания ГП через SetWinner, защита от двойного списания.
 -- Добавлено: /nsauk reset (сброс настроек), /nsauk find (подсветка окон)
 -- ============================================================================
 
@@ -11669,7 +11669,7 @@ function NSAuk.EnsureDB()
     if not db.historyPosition then db.historyPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"} end
     if not db.settings then db.settings = {defaultStep = 10, defaultTime = 20} end
     
-    -- [FIX] Явная инициализация состояния чекбокса. nil приводится к true по умолчанию.
+    -- Явная инициализация состояния чекбокса. nil приводится к true по умолчанию.
     if db.settings.autoDeductGP == nil then db.settings.autoDeductGP = true end
     db.settings.autoDeductGP = (db.settings.autoDeductGP == true)
     
@@ -11678,7 +11678,7 @@ function NSAuk.EnsureDB()
     return db
 end
 
--- [NEW] Функция полного сброса настроек
+-- Функция полного сброса настроек
 function NSAuk.ResetAllSettings()
     local db = NSAuk.EnsureDB()
     
@@ -11723,7 +11723,7 @@ function NSAuk.ResetAllSettings()
     print("|cff00ff00[NSAuk]|r Все настройки сброшены до значений по умолчанию.")
 end
 
--- [NEW] Функция подсветки всех элементов аддона
+-- Функция подсветки всех элементов аддона
 function NSAuk.HighlightAllFrames()
     local framesToHighlight = {}
     local iconToPulse = nil
@@ -11841,7 +11841,6 @@ function NSAuk.HighlightAllFrames()
         if iconToPulse then
             -- Пульсация размера: от 0.85 до 1.3
             local pulsePhase = math.sin(t * math.pi * 2 * pulseSpeed)
-            local scaleFactor = 1.0 + pulsePhase * 0.2 -- ±20% от базового размера
             iconToPulse:SetScale(iconOriginalScale * (0.9 + math.abs(pulsePhase) * 0.3))
             
             -- Мерцание цвета рамки иконки (более яркое, жёлто-оранжевое)
@@ -12051,13 +12050,13 @@ function NSAuk.RenderCustomButtons()
                 return
             end
             
-            -- [FIX] Проверка ГП перед ставкой
+            -- Проверка ГП перед ставкой
             if (myBid.gp or 0) < val then
                 print("|cffff0000[NSAuk]|r Недостаточно ГП для ставки " .. val .. ". У вас: " .. (myBid.gp or 0))
                 return
             end
             
-            -- [NEW] Проверка на лидерство (аналогично основной кнопке "Ставка")
+            -- Проверка на лидерство (аналогично основной кнопке "Ставка")
             local mx = 0
             for _, v in pairs(d.active.bids) do
                 if v.hasAction and not v.passed and v.amount > mx then
@@ -12114,7 +12113,6 @@ function NSAuk.CreateAuctionFrame()
     -- Сохранение чекбокса точно как координат (на OnHide + OnClick)
     frame:SetScript("OnHide", function(self)
         if self.autoDeductCB then 
-            -- [FIX] GetChecked() в 3.3.5a возвращает 1 или nil
             db.settings.autoDeductGP = (self.autoDeductCB:GetChecked() == 1) 
         end
         NSAuk.SaveWindowPosition(self, db.windowPosition)
@@ -12195,7 +12193,7 @@ function NSAuk.CreateAuctionFrame()
         if frame.customPanel.isExpanded then frame.customPanel:Show() else frame.customPanel:Hide() end
     end)
 
-    -- [FIX] Чекбокс: корректная работа с GetChecked() (возвращает 1, а не true)
+    -- Чекбокс: корректная работа с GetChecked() (возвращает 1, а не true)
     local autoDeductCB = CreateFrame("CheckButton", "NSAukAutoDeductCB", frame, "UICheckButtonTemplate")
     autoDeductCB:SetPoint("LEFT", togglePanelBtn, "RIGHT", 8, 0)
     autoDeductCB:SetChecked(db.settings.autoDeductGP == true)
@@ -12204,7 +12202,6 @@ function NSAuk.CreateAuctionFrame()
         autoDeductCB.Text:SetFontObject(GameFontNormalSmall)
     end
     autoDeductCB:SetScript("OnClick", function(self)
-        -- В 3.3.5a GetChecked() возвращает 1 (вкл) или nil (выкл)
         local isChecked = (self:GetChecked() == 1)
         db.settings.autoDeductGP = isChecked
         print("|cff00FF00[NSAuk]|r Авто-списание: " .. (isChecked and "ВКЛ" or "ВЫКЛ"))
@@ -12228,7 +12225,7 @@ function NSAuk.CreateAuctionFrame()
     helpBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
         GameTooltip:ClearLines()
-        GameTooltip:AddLine("|cffFFD100NS Auction System v5.7|r", 1, 0.82, 0)
+        GameTooltip:AddLine("|cffFFD100NS Auction System v5.8|r", 1, 0.82, 0)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("|cffffff00=== КОМАНДЫ (в чат рейда) ===|r", 1, 1, 1)
         GameTooltip:AddLine(" ")
@@ -12591,44 +12588,17 @@ end
 
 function NSAuk.DeductGPFromRoster(playerName, amount)
     if not playerName or not amount or amount <= 0 then return end
-    if not IsInGuild() then
-        print("|cffff0000[NSAuk]|r Вы не в гильдии. Автоматическое списание ГП невозможно.")
-        return
-    end
-
-    for i = 1, GetNumGuildMembers(true) do
-        local name = GetGuildRosterInfo(i)
-        if name == playerName or name:match("^" .. playerName) then
-            local _, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(i)
-            local parts = NSAuk.mysplit(officerNote or "", "%s+")
-
-            if #parts >= 3 then
-                local playerID = parts[2]
-                local oldGP = tonumber(parts[3]) or 0
-                local newGP = math.max(0, oldGP - amount)
-
-                parts[3] = tostring(newGP)
-                local newNote = table.concat(parts, " ")
-
-                -- pcall ловит ошибки прав гильдии или серверного лимита без вылета аддона
-                local success = pcall(function()
-                    GuildRosterSetOfficerNote(i, newNote)
-                end)
-
-                if success then
-                    SendAddonMessage("nsGP1 -" .. amount, name, "guild")
-                    SendAddonMessage("nsGPlog", "Аукцион -" .. amount .. " " .. playerID, "guild")
-                    print(string.format("|cff00ff00[NSAuk]|r Списано %d ГП с %s (ID: %s). Осталось: %d ГП.", amount, name, playerID, newGP))
-                else
-                    print("|cffff0000[NSAuk]|r Ошибка списания: недостаточно прав гильдии или превышен лимит обновлений заметок.")
-                end
-            else
-                print(string.format("|cffff0000[NSAuk]|r Ошибка: Офицерская заметка %s имеет неверный формат.", name))
-            end
-            break
-        end
-    end
+    
+    -- Отправляем только аддон-сообщения для NSAukGP/GDKP систем
+    -- Без ручного изменения офицерской заметки!
+    SendAddonMessage("nsGP1 -" .. amount, playerName, "guild")
+    SendAddonMessage("nsGPlog", "Аукцион -" .. amount .. " " .. (playerName or ""), "guild")
+    print(string.format("|cff00ff00[NSAuk]|r Отправлен запрос на списание %d ГП с %s.", amount, playerName))
 end
+
+-- ============================================================================
+-- ЕДИНАЯ ТОЧКА ЗАВЕРШЕНИЯ АУКЦИОНА И СПИСАНИЯ ГП
+-- ============================================================================
 
 function NSAuk.SetWinner(playerName, winAmount)
     local db = NSAuk.EnsureDB()
@@ -12640,13 +12610,14 @@ function NSAuk.SetWinner(playerName, winAmount)
         closeTimerFrame = nil 
     end
     
-    -- [FIX] Сначала списываем ГП, ПОТОМ отправляем AUC_END
-    -- Расчет/списание ГП ТОЛЬКО у того, кто запустил аукцион
+    -- ЕДИНСТВЕННАЯ ТОЧКА СПИСАНИЯ ГП
+    -- Списываем ДО отправки AUC_END, чтобы получатели не пытались списать повторно
     if db.active.startedBy == UnitName("player") then
-        if db.settings.autoDeductGP then
+        if db.settings.autoDeductGP and winAmount > 0 then
             NSAuk.DeductGPFromRoster(playerName, winAmount)
         else
-            print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание ГП отключено).", playerName, winAmount))
+            print(string.format("|cff00FF00[NSAuk]|r Аукцион завершён. Победитель: %s, сумма: %d ГП. (Списание %s).", 
+                playerName, winAmount, db.settings.autoDeductGP and "выполнено" or "отключено"))
         end
     end
     
@@ -12664,6 +12635,7 @@ function NSAuk.SetWinner(playerName, winAmount)
     end
     table.insert(db.history, { 
         item = db.active.item, 
+        itemLink = db.active.itemLink,
         endTime = GetTime(), 
         startedBy = db.active.startedBy, 
         winner = playerName, 
@@ -12681,7 +12653,7 @@ function NSAuk.SetWinner(playerName, winAmount)
     end
     
     -- Отправляем сигнал всем в рейде, что аукцион завершён
-    -- [FIX] Отправляем ПОСЛЕ списания, чтобы FinishAuction у других НЕ списывал
+    -- Отправляем ПОСЛЕ списания, чтобы FinishAuction у других НЕ списывал
     SendAddonMessage("AUC_END", "", "RAID")
     
     -- Сбрасываем состояние аукциона
@@ -12698,6 +12670,120 @@ function NSAuk.SetWinner(playerName, winAmount)
     
     -- Отключаем периодическую проверку окон
     checkFrame:SetScript("OnUpdate", nil)
+end
+
+function NSAuk.FinishAuction(initiator)
+    -- FinishAuction НИКОГДА не списывает ГП
+    -- Он только сохраняет историю и cleanup при получении AUC_END от другого игрока
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    
+    if closeTimerFrame then 
+        closeTimerFrame:SetScript("OnUpdate", nil)
+        closeTimerFrame = nil 
+    end
+    
+    local w, wa = nil, 0
+    for n, d in pairs(db.active.bids) do 
+        if d.hasAction and not d.passed and not d.banned and d.amount > wa then 
+            w, wa = n, d.amount 
+        end 
+    end
+    
+    -- Сохраняем историю (без списания!)
+    if w and wa > 0 then
+        local bc = {}
+        for n, d in pairs(db.active.bids) do 
+            bc[n] = { 
+                amount = d.amount, 
+                class = d.class, 
+                public = d.public, 
+                gp = d.gp, 
+                passed = d.passed, 
+                hasAction = d.hasAction 
+            } 
+        end
+        table.insert(db.history, { 
+            item = db.active.item, 
+            itemLink = db.active.itemLink,
+            endTime = GetTime(), 
+            startedBy = db.active.startedBy, 
+            winner = w, 
+            winAmount = wa, 
+            bids = bc 
+        })
+        if #db.history > 10 then 
+            table.remove(db.history, 1) 
+        end
+    end
+    
+    db.active = nil
+    isMinimized = false
+    NSAuk.DestroyAuctionWindow()
+    if minimapIcon then 
+        minimapIcon:Hide() 
+    end
+    checkFrame:SetScript("OnUpdate", nil)
+end
+
+function NSAuk.StartCloseTimer()
+    local db = NSAuk.EnsureDB()
+    if not db.active then return end
+    if closeTimerFrame then 
+        closeTimerFrame:SetScript("OnUpdate", nil)
+        closeTimerFrame = nil 
+    end
+    
+    closeTimerFrame = CreateFrame("Frame")
+    local lc = GetTime()
+    local finished = false  -- Защита от повторного входа
+    
+    closeTimerFrame:SetScript("OnUpdate", function(self)
+        local ct = GetTime()
+        if ct - lc < 1 then return end
+        lc = ct
+        
+        local d = NSAuk.EnsureDB()
+        if not d.active then 
+            self:SetScript("OnUpdate", nil)
+            closeTimerFrame = nil 
+            return 
+        end
+        
+        -- Обновляем отображение таймера
+        if auctionFrame and auctionFrame.countdownText then
+            local lastTime = d.active.lastBidTime or d.active.startTime
+            local rem = math.max(0, math.floor(d.active.closeTime - (GetTime() - lastTime)))
+            auctionFrame.countdownText:SetText(rem .. "с")
+        end
+
+        -- Только инициатор завершает аукцион по таймеру
+        if d.active.startedBy ~= UnitName("player") then return end
+        
+        if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
+            if finished then return end
+            finished = true
+            self:SetScript("OnUpdate", nil)
+            closeTimerFrame = nil
+            
+            -- Определяем победителя и вызываем SetWinner (единственная точка списания)
+            local w, wa = nil, 0
+            for n, bidData in pairs(d.active.bids) do 
+                if bidData.hasAction and not bidData.passed and not bidData.banned and bidData.amount > wa then 
+                    w, wa = n, bidData.amount 
+                end 
+            end
+            
+            if w and wa > 0 then
+                -- ЕДИНСТВЕННЫЙ ВЫЗОВ SetWinner для списания
+                NSAuk.SetWinner(w, wa)
+            else
+                -- Нет победителя - просто завершаем без списания
+                SendAddonMessage("AUC_END", "", "RAID")
+                NSAuk.FinishAuction(d.active.startedBy)
+            end
+        end
+    end)
 end
 
 function NSAuk.UpdateAuctionWindow()
@@ -12832,104 +12918,6 @@ function NSAuk.UpdateAuctionWindow()
         frame.customPanel:ClearAllPoints()
         frame.customPanel:SetPoint("TOPRIGHT", frame, "TOPLEFT", -5, 0)
     end
-end
-
-function NSAuk.FinishAuction(initiator)
-    local db = NSAuk.EnsureDB()
-    if not db.active then return end
-    if closeTimerFrame then 
-        closeTimerFrame:SetScript("OnUpdate", nil)
-        closeTimerFrame = nil 
-    end
-    
-    local w, wa = nil, 0
-    for n, d in pairs(db.active.bids) do 
-        if d.hasAction and not d.passed and not d.banned and d.amount > wa then 
-            w, wa = n, d.amount 
-        end 
-    end
-    
-    -- [FIX] Убираем списание ГП из FinishAuction
-    -- Списание происходит ТОЛЬКО в SetWinner (при прямом клике)
-    -- или через AUC_END → прямого списания больше нигде нет
-    
-    if w and wa > 0 then
-        local bc = {}
-        for n, d in pairs(db.active.bids) do 
-            bc[n] = { amount = d.amount, class = d.class, public = d.public, gp = d.gp, passed = d.passed, hasAction = d.hasAction } 
-        end
-        table.insert(db.history, { 
-            item = db.active.item, 
-            endTime = GetTime(), 
-            startedBy = db.active.startedBy, 
-            winner = w, 
-            winAmount = wa, 
-            bids = bc 
-        })
-        if #db.history > 10 then table.remove(db.history, 1) end
-        
-        if initiator == UnitName("player") then
-            SendChatMessage(w .. " побеждает, поставив " .. wa .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
-            SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. wa .. " ГП!", "WHISPER", nil, w)
-        end
-    else
-        if initiator == UnitName("player") then
-            SendChatMessage("Аукцион завершен без ставок.", "RAID_WARNING")
-        end
-    end
-    
-    db.active = nil
-    isMinimized = false
-    NSAuk.DestroyAuctionWindow()
-    if minimapIcon then minimapIcon:Hide() end
-    checkFrame:SetScript("OnUpdate", nil)
-end
-
-function NSAuk.StartCloseTimer()
-    local db = NSAuk.EnsureDB()
-    if not db.active then return end
-    if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
-    closeTimerFrame = CreateFrame("Frame")
-    local lc = GetTime()
-    local finished = false  -- [FIX] Флаг для предотвращения повтора
-    
-    closeTimerFrame:SetScript("OnUpdate", function(self)
-        local ct = GetTime()
-        if ct - lc < 1 then return end
-        lc = ct
-        local d = NSAuk.EnsureDB()
-        if not d.active then self:SetScript("OnUpdate", nil); closeTimerFrame = nil; return end
-        
-        if auctionFrame and auctionFrame.countdownText then
-            local lastTime = d.active.lastBidTime or d.active.startTime
-            local rem = math.max(0, math.floor(d.active.closeTime - (GetTime() - lastTime)))
-            auctionFrame.countdownText:SetText(rem .. "с")
-        end
-
-        if d.active.startedBy ~= UnitName("player") then return end
-        
-        if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
-            if finished then return end  -- [FIX] Защита от повторного входа
-            finished = true
-            self:SetScript("OnUpdate", nil)
-            closeTimerFrame = nil
-            
-            -- [FIX] Вызываем SetWinner для корректного списания ГП
-            local w, wa = nil, 0
-            for n, d in pairs(d.active.bids) do 
-                if d.hasAction and not d.passed and not d.banned and d.amount > wa then 
-                    w, wa = n, d.amount 
-                end 
-            end
-            
-            if w and wa > 0 then
-                NSAuk.SetWinner(w, wa)
-            else
-                SendAddonMessage("AUC_END", "", "RAID")
-                NSAuk.FinishAuction(d.active.startedBy)
-            end
-        end
-    end)
 end
 
 function NSAuk.CheckAndFixWindow()
@@ -13111,7 +13099,7 @@ local function ProcessRaidMessage(sender, msg, event)
                 end
                 local mn = mx + db.active.step
 
-                -- [FIX] ЖЁСТКАЯ ПРОВЕРКА ГП. Ставка отклоняется, если превышает баланс.
+                -- ЖЁСТКАЯ ПРОВЕРКА ГП. Ставка отклоняется, если превышает баланс.
                 local playerGP = bidData.gp or 0
                 if amount > playerGP then
                     if sender == myName then print("|cffff0000[NSAuk]|r Недостаточно ГП! У вас: " .. playerGP .. ", ставка: " .. amount) end
@@ -13215,6 +13203,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
 
         elseif prefix == "AUC_END" and db.active then
+            -- Получаем сигнал завершения - просто делаем cleanup без списания
             NSAuk.FinishAuction(db.active.startedBy)
 
         elseif prefix == "AUC_CANCEL" then
@@ -13259,7 +13248,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
-print("|cff00ff00[NS Auction System v5.7]|r Загружен. Команды: /nsauk, /nsauk reset, /nsauk find")
+print("|cff00ff00[NS Auction System v5.8]|r Загружен. Команды: /nsauk, /nsauk reset, /nsauk find")
 ---------конец
 
 
