@@ -12891,7 +12891,7 @@ end
 
 function NSAuk.StartCloseTimer()
     local db = NSAuk.EnsureDB()
-    if not db.active then return
+    if not db.active then return end  -- ← здесь была проблема
     if closeTimerFrame then closeTimerFrame:SetScript("OnUpdate", nil); closeTimerFrame = nil end
     closeTimerFrame = CreateFrame("Frame")
     local lc = GetTime()
@@ -12913,10 +12913,8 @@ function NSAuk.StartCloseTimer()
         if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
             self:SetScript("OnUpdate", nil)
             closeTimerFrame = nil
-            -- [FIX] Отправляем AUC_END, но НЕ вызываем FinishAuction локально
-            -- FinishAuction вызовется через обработчик AUC_END для всех (включая отправителя)
+            -- [FIX] Убрал двойной вызов, теперь только отправляем сообщение
             SendAddonMessage("AUC_END", "", "RAID")
-            -- УБИРАЕМ прямой вызов: NSAuk.FinishAuction(d.active.startedBy)
         end
     end)
 end
