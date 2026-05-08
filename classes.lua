@@ -1822,29 +1822,7 @@ function GpDb:_UpdateFromGuild()
             -- Режим "Только рейд" и мы в рейде
             if raidOnlyMode then
                 local numRaidMembers = GetNumGroupMembers()
-                local raidCheckPassed = true
-                local invalidPlayers = {}
-                -- Проверяем всех игроков рейда на принадлежность к гильдии
-                for i = 1, numRaidMembers do
-                    local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
-                    if raidName then
-                        -- Удаляем серверную часть имени для сравнения
-                        local plainName = raidName:match("^(.-)-") or raidName
-                        if not guildRosterInfo[plainName] then
-                            raidCheckPassed = false
-                            table.insert(invalidPlayers, raidName)
-                        end
-                    end
-                end
-                -- Если есть чужие игроки - сообщаем и выходим
-                if not raidCheckPassed then
-                    print("|cFFFF0000ГП:|r В рейде есть не члены гильдии: "..table.concat(invalidPlayers, ", "))
-                    db.window.countText:SetText("Отображается игроков: 0 (в рейде есть не члены гильдии)")
-                    db.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, totalMembers))
-                    db:UpdateWindow()
-                    return
-                end
-                -- Заполняем данные ВСЕХ игроков рейда
+                -- Заполняем данные всех игроков рейда, которые есть в гильдии
                 for i = 1, numRaidMembers do
                     local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
                     if raidName then
