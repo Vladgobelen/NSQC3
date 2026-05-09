@@ -14493,7 +14493,6 @@ function NSForumClient.DrawEditThreadView(parent)
 end
 
 function NSForumClient.DrawThreadView(parent)
-    -- без изменений
     local tId = NSForumClient.GetSelectedThreadId()
     if not tId then 
         NSForumClient.SetCurrentView("list")
@@ -14614,12 +14613,6 @@ function NSForumClient.DrawThreadView(parent)
             div:SetPoint("TOPLEFT", 10, -23)
             div:SetPoint("TOPRIGHT", -10, 0)
             
-            local contentText = postFrame:CreateFontString(nil, "OVERLAY")
-            contentText:SetPoint("TOPLEFT", 15, -28)
-            contentText:SetPoint("RIGHT", postFrame, "RIGHT", -15, 0)
-            contentText:SetFont("Fonts\\FRIZQT__.TTF", 14)
-            contentText:SetJustifyH("LEFT")
-            
             local processedContent = p.content or ""
             processedContent = string.gsub(processedContent, "!ц(%x%x%x%x%x%x%x%x)(.-)!цц", function(hex, text) return "|cff" .. hex .. text .. "|r" end)
             for tag, hex in pairs(COLOR_TAGS) do
@@ -14628,11 +14621,26 @@ function NSForumClient.DrawThreadView(parent)
             processedContent = string.gsub(processedContent, "!р%d+", "")
             processedContent = string.gsub(processedContent, "!рр", "")
             processedContent = string.gsub(processedContent, "!цц", "")
-            contentText:SetText(processedContent)
-            contentText:SetTextColor(unpack(COLORS.row_text))
             
-            local contentHeight = contentText:GetStringHeight()
-            if not contentHeight or contentHeight < 14 then contentHeight = 14 end
+            local contentBox = CreateFrame("EditBox", nil, postFrame)
+            contentBox:SetMultiLine(true)
+            contentBox:SetAutoFocus(false)
+            contentBox:SetFontObject("GameFontNormal")
+            contentBox:SetTextInsets(5, 5, 3, 3)
+            contentBox:SetPoint("TOPLEFT", 10, -28)
+            contentBox:SetPoint("RIGHT", postFrame, "RIGHT", -10, 0)
+            contentBox:SetHeight(50)
+            contentBox:SetText(processedContent)
+            contentBox:SetTextColor(unpack(COLORS.row_text))
+            contentBox:EnableMouse(true)
+            contentBox:EnableKeyboard(false)
+            
+            if contentBox.SetBackdrop then
+                contentBox:SetBackdrop(nil)
+            end
+            
+            local contentHeight = contentBox:GetHeight()
+            if not contentHeight or contentHeight < 20 then contentHeight = 20 end
             postFrame._contentHeight = contentHeight
             
             local reactionHeight = 0
@@ -14675,7 +14683,7 @@ function NSForumClient.DrawThreadView(parent)
                 end
             end
             
-            local frameHeight = contentHeight + 30 + reactionHeight
+            local frameHeight = contentHeight + 30 + reactionHeight + 10
             postFrame._baseHeight = 30 + reactionHeight
             postFrame.targetHeight = frameHeight
             postFrame:SetHeight(frameHeight)
