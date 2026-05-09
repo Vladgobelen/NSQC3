@@ -15622,6 +15622,49 @@ function NSForumClient.GetReactionsIconString(msgKey)
     return " " .. table.concat(parts, " ")
 end
 
+-- Функция проверки видимости региона в чате
+local function IsRegionVisible(chatFrame, region)
+    if not chatFrame or not region then return false end
+    if not chatFrame:IsShown() then return false end
+    if not region:IsShown() then return false end
+    
+    -- Используем GetRegions родителя для определения положения скролла
+    -- Получаем координаты через GetPoint()
+    local point, relativeTo, relativePoint, xOfs, yOfs = region:GetPoint()
+    if not point then return false end
+    
+    -- Получаем высоту родительского фрейма (области сообщений)
+    local parent = region:GetParent()
+    if not parent then return false end
+    
+    -- Получаем высоту строки текста
+    local height = region:GetHeight()
+    if not height or height <= 0 then return false end
+    
+    -- Проверяем, не находится ли регион за пределами видимой области
+    -- Используем chatFrame:GetVisibleLines() если доступен
+    if chatFrame.GetVisibleLines then
+        -- Этот метод может быть недоступен, пробуем альтернативный подход
+    end
+    
+    -- Альтернативный метод: проверяем через GetTop/GetBottom с защитой
+    local success, top = pcall(region.GetTop, region)
+    local success2, bottom = pcall(region.GetBottom, region)
+    local success3, chatTop = pcall(chatFrame.GetTop, chatFrame)
+    local success4, chatBottom = pcall(chatFrame.GetBottom, chatFrame)
+    
+    if success and success2 and success3 and success4 then
+        if top and bottom and chatTop and chatBottom then
+            local margin = 5
+            -- Проверяем, что регион видим в чате
+            return (bottom >= chatBottom - margin) and (top <= chatTop + margin)
+        end
+    end
+    
+    -- Если pcall не удался, считаем что регион видим (пропускаем проверку)
+    return true
+end
+
 -- ВАЖНО: ПЕРЕИМЕНОВАНО, ЧТОБЫ НЕ КОНФЛИКТОВАТЬ С ФОРУМОМ
 function NSForumClient.ShowChatReactionPanel(msgKey, anchorButton)
     if NSForumClient.chatReactionPanel then
@@ -15730,14 +15773,16 @@ function NSForumClient.UpdateMessageByKey(msgKey)
             for _, region in ipairs(regions) do
                 if region.GetText and region:GetObjectType() == "FontString" then
                     local text = region:GetText()
-                    local cleanText = text:gsub(" |TInterface.-|t%d+", "")
-                    if cleanText:find("Hchannel:GUILD") then
-                        local authorFull = cleanText:match("|h%[([^%]]+)%]|h: ") or cleanText:match("|h%[([^%]]+)%]|h") or ""
-                        local message = cleanText:match("]|h: (.+)$") or cleanText:match("]|h (.+)$") or ""
-                        if authorFull ~= "" and message ~= "" and CreateMessageKey(authorFull, message) == msgKey then
-                            local iconStr = NSForumClient.GetReactionsIconString(msgKey)
-                            local newText = cleanText .. iconStr
-                            if newText ~= text then pcall(function() region:SetText(newText) end) end
+                    if text then
+                        local cleanText = text:gsub(" |TInterface.-|t%d+", "")
+                        if cleanText:find("Hchannel:GUILD") then
+                            local authorFull = cleanText:match("|h%[([^%]]+)%]|h: ") or cleanText:match("|h%[([^%]]+)%]|h") or ""
+                            local message = cleanText:match("]|h: (.+)$") or cleanText:match("]|h (.+)$") or ""
+                            if authorFull ~= "" and message ~= "" and CreateMessageKey(authorFull, message) == msgKey then
+                                local iconStr = NSForumClient.GetReactionsIconString(msgKey)
+                                local newText = cleanText .. iconStr
+                                if newText ~= text then pcall(function() region:SetText(newText) end) end
+                            end
                         end
                     end
                 end
@@ -15786,90 +15831,92 @@ local function UpdateButtonsForChatFrame(chatFrame)
         chatFrame.activeKeys[key] = false
     end
     
+    -- Сначала скрываем все кнопки, потом покажем только видимые
+    for key, btn in pairs(chatFrame.reactionButtons) do
+        btn:Hide()
+    end
+    
     local regions = {chatFrame:GetRegions()}
     for _, region in ipairs(regions) do
         if region.GetText and region:GetObjectType() == "FontString" then
             local text = region:GetText()
-            if not text then return end
-            local cleanText = text:gsub(" |TInterface.-|t%d+", "")
-            if cleanText:find("Hchannel:GUILD") then
-                local af = cleanText:match("|h%[([^%]]+)%]|h: ") or cleanText:match("|h%[([^%]]+)%]|h") or ""
-                local ms = cleanText:match("]|h: (.+)$") or cleanText:match("]|h (.+)$") or ""
-                if af ~= "" and ms ~= "" then
-                    local key = CreateMessageKey(af, ms)
-                    if not ns_reactions[key] then ns_reactions[key] = { users = {} } end
-                    chatFrame.activeKeys[key] = true
-                    chatFrame.buttonRegions[key] = region
-                    
-                    if not chatFrame.originalColors[key] then
-                        local r, g, b, a = region:GetTextColor()
-                        chatFrame.originalColors[key] = {r = r, g = g, b = b, a = a}
-                    end
-                    
-                    local btn = chatFrame.reactionButtons[key]
-                    if not btn then
-                        btn = CreateFrame("Button", nil, chatFrame)
-                        btn:SetSize(16, 16)
-                        btn:SetFrameStrata("DIALOG")
-                        local icon = btn:CreateTexture(nil, "OVERLAY")
-                        icon:SetAllPoints()
-                        icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\emote_smile")
-                        icon:SetVertexColor(0.5, 0.5, 0.5, 0.5)
-                        
-                        local savedKey = key
-                        btn:SetScript("OnMouseDown", function()
-                            -- ИЗМЕНЕНО: вызываем переименованную функцию
-                            NSForumClient.ShowChatReactionPanel(savedKey, btn)
-                        end)
-                        
-                        btn:SetScript("OnEnter", function()
-                            icon:SetVertexColor(1, 1, 1, 1)
-                            local savedRegion = chatFrame.buttonRegions[savedKey]
-                            if savedRegion then
-                                pcall(function() savedRegion:SetTextColor(1, 0, 0, 1) end)
+            if text then
+                -- Проверяем, видим ли регион в чате
+                if IsRegionVisible(chatFrame, region) then
+                    local cleanText = text:gsub(" |TInterface.-|t%d+", "")
+                    if cleanText:find("Hchannel:GUILD") then
+                        local af = cleanText:match("|h%[([^%]]+)%]|h: ") or cleanText:match("|h%[([^%]]+)%]|h") or ""
+                        local ms = cleanText:match("]|h: (.+)$") or cleanText:match("]|h (.+)$") or ""
+                        if af ~= "" and ms ~= "" then
+                            local key = CreateMessageKey(af, ms)
+                            if not ns_reactions[key] then ns_reactions[key] = { users = {} } end
+                            chatFrame.activeKeys[key] = true
+                            chatFrame.buttonRegions[key] = region
+                            
+                            if not chatFrame.originalColors[key] then
+                                local r, g, b, a = region:GetTextColor()
+                                chatFrame.originalColors[key] = {r = r, g = g, b = b, a = a}
                             end
-                            local tooltipLines = GetReactionsTooltipLines(savedKey)
-                            if tooltipLines then
-                                GameTooltip:SetOwner(btn, "ANCHOR_CURSOR")
-                                GameTooltip:SetText("Реакции:", 1, 1, 1)
-                                for _, line in ipairs(tooltipLines) do
-                                    GameTooltip:AddLine(line, 1, 1, 1, 1)
-                                end
-                                GameTooltip:Show()
+                            
+                            local btn = chatFrame.reactionButtons[key]
+                            if not btn then
+                                btn = CreateFrame("Button", nil, chatFrame)
+                                btn:SetSize(16, 16)
+                                btn:SetFrameStrata("DIALOG")
+                                local icon = btn:CreateTexture(nil, "OVERLAY")
+                                icon:SetAllPoints()
+                                icon:SetTexture("Interface\\AddOns\\NSQC3\\libs\\emote_smile")
+                                icon:SetVertexColor(0.5, 0.5, 0.5, 0.5)
+                                
+                                local savedKey = key
+                                btn:SetScript("OnMouseDown", function()
+                                    NSForumClient.ShowChatReactionPanel(savedKey, btn)
+                                end)
+                                
+                                btn:SetScript("OnEnter", function()
+                                    icon:SetVertexColor(1, 1, 1, 1)
+                                    local savedRegion = chatFrame.buttonRegions[savedKey]
+                                    if savedRegion then
+                                        pcall(function() savedRegion:SetTextColor(1, 0, 0, 1) end)
+                                    end
+                                    local tooltipLines = GetReactionsTooltipLines(savedKey)
+                                    if tooltipLines then
+                                        GameTooltip:SetOwner(btn, "ANCHOR_CURSOR")
+                                        GameTooltip:SetText("Реакции:", 1, 1, 1)
+                                        for _, line in ipairs(tooltipLines) do
+                                            GameTooltip:AddLine(line, 1, 1, 1, 1)
+                                        end
+                                        GameTooltip:Show()
+                                    end
+                                end)
+                                
+                                btn:SetScript("OnLeave", function()
+                                    icon:SetVertexColor(0.5, 0.5, 0.5, 0.5)
+                                    local savedRegion = chatFrame.buttonRegions[savedKey]
+                                    if savedRegion then
+                                        local origColor = chatFrame.originalColors[savedKey]
+                                        if origColor then
+                                            pcall(function() savedRegion:SetTextColor(origColor.r, origColor.g, origColor.b, origColor.a) end)
+                                        end
+                                    end
+                                    GameTooltip:Hide()
+                                end)
+                                chatFrame.reactionButtons[key] = btn
                             end
-                        end)
-                        
-                        btn:SetScript("OnLeave", function()
-                            icon:SetVertexColor(0.5, 0.5, 0.5, 0.5)
-                            local savedRegion = chatFrame.buttonRegions[savedKey]
-                            if savedRegion then
-                                local origColor = chatFrame.originalColors[savedKey]
-                                if origColor then
-                                    pcall(function() savedRegion:SetTextColor(origColor.r, origColor.g, origColor.b, origColor.a) end)
-                                end
+                            
+                            btn:ClearAllPoints()
+                            btn:SetPoint("RIGHT", region, "RIGHT", -4, 0)
+                            btn:Show()
+                            
+                            local iconStr = NSForumClient.GetReactionsIconString(key)
+                            local newText = cleanText .. iconStr
+                            if newText ~= text then
+                                pcall(function() region:SetText(newText) end)
                             end
-                            GameTooltip:Hide()
-                        end)
-                        chatFrame.reactionButtons[key] = btn
-                    end
-                    
-                    btn:ClearAllPoints()
-                    btn:SetPoint("RIGHT", region, "RIGHT", -4, 0)
-                    btn:Show()
-                    
-                    local iconStr = NSForumClient.GetReactionsIconString(key)
-                    local newText = cleanText .. iconStr
-                    if newText ~= text then
-                        pcall(function() region:SetText(newText) end)
+                        end
                     end
                 end
             end
-        end
-    end
-    
-    for key, btn in pairs(chatFrame.reactionButtons) do
-        if not chatFrame.activeKeys[key] then
-            btn:Hide()
         end
     end
 end
