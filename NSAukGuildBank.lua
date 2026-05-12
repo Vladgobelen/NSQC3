@@ -16,12 +16,12 @@ local SCAN_FINISH_DELAY = 1.0
 
 -- Префиксы для обмена сообщениями (ВЕРСИЯ A - без "1")
 -- Новые префиксы (версия B):
-local PREFIX_END = "ns_GBEnd_B"      -- было _A
-local PREFIX_SCAN = "ns_ScanGB_B"    -- было _A
-local PREFIX_DATA = "ns_MyGb_B"      -- было _A
-local PREFIX_REMOVE = "ns_GBRemove_B" -- было _A
-local PREFIX_UPDATE = "ns_GBUpdate_B" -- было _A
-local GLOBAL_TABLE = "NSAukGlobal_B"  -- было _A
+local PREFIX_END = "ns_GBEnd_C"      -- было _A
+local PREFIX_SCAN = "ns_ScanGB_C"    -- было _A
+local PREFIX_DATA = "ns_MyGb_C"      -- было _A
+local PREFIX_REMOVE = "ns_GBRemove_C" -- было _A
+local PREFIX_UPDATE = "ns_GBUpdate_C" -- было _A
+local GLOBAL_TABLE = "NSAukGlobal_C"  -- было _A
 
 local function mysplit(str)
     local t = {}
@@ -1173,9 +1173,10 @@ function NSAukGuildBankClass_A:RefreshDisplay()
     end
 end
 
-function NSAukGuildBankClass_A:BroadcastGuildBankData(ownersList)
+function NSAukGuildBankClass_A:BroadcastGuildBankData(ownersList, requester)
     if not ownersList or #ownersList == 0 then
-        SendAddonMessage(PREFIX_END, UnitName("player") .. " 0", "GUILD")
+        -- ВАЖНО: requester в END даже если пусто
+        SendAddonMessage(PREFIX_END, string.format("%s %s %d", requester or "", UnitName("player"), 0), "GUILD")
         return
     end
     self.sendQueue = {}
@@ -1192,10 +1193,12 @@ function NSAukGuildBankClass_A:BroadcastGuildBankData(ownersList)
                 timestampToSend = _G[GLOBAL_TABLE].guildBankVersions[ownerName] or 0
             end
             for _, entry in ipairs(sortedItems) do
-                local msgStr = string.format("%s %s %d", ownerName, entry.link, entry.count)
+                -- Формат: requester ownerName link count
+                local msgStr = string.format("%s %s %s %d", requester or "", ownerName, entry.link, entry.count)
                 table.insert(self.sendQueue, { prefix = PREFIX_DATA, message = msgStr })
             end
-            table.insert(self.sendQueue, { prefix = PREFIX_END, message = ownerName .. "  " .. timestampToSend })
+            -- Формат: requester ownerName timestamp
+            table.insert(self.sendQueue, { prefix = PREFIX_END, message = string.format("%s %s %d", requester or "", ownerName, timestampToSend) })
         end
     end
     if #self.sendQueue > 0 and not self.sendFrame then
@@ -1264,7 +1267,12 @@ function NSAukGuildBankClass_A:StartCooldownTimer()
     self.cooldownFrame:Show()
 end
 
-function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
+function NSAukGuildBankClass_A:OnScanRequestReceived(sender, requester)
+    -- sender: тот, кто прислал PREFIX_SCAN (промежуточный отправитель)
+    -- requester: тот, кто изначально нажал "Сканировать"
+    
+    if not requester then requester = sender end  -- на случай обратной совместимости
+    
     if not _G[GLOBAL_TABLE] or not _G[GLOBAL_TABLE].guildBanks or not _G[GLOBAL_TABLE].guildBanksSettings then return end
     local myName = UnitName("player")
     local isBank = self:IsGuildBankCharacter()
@@ -1272,21 +1280,17 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
     local shouldSend = false
     local ownersToSend = {}
     
-    -- Проверяем, является ли запрашивающий гильдбанком или имеет флаг showGuildBank
     local senderIsBank = _G[GLOBAL_TABLE].guildBanks[sender] and type(_G[GLOBAL_TABLE].guildBanks[sender]) == "table" and #_G[GLOBAL_TABLE].guildBanks[sender] > 0
     local senderShowBank = _G[GLOBAL_TABLE].guildBanksSettings[sender] and _G[GLOBAL_TABLE].guildBanksSettings[sender].showGuildBank
     
     if not isBank and not showBank then
-        -- Мы не банк и не показываем - ничего не отправляем
         shouldSend = false
     elseif isBank and not showBank then
-        -- Мы банк, но не показываем других - отправляем только свои данные
         shouldSend = true
         self:BuildLocalItemList()
         self:UpdateGoldInTable()
         table.insert(ownersToSend, myName)
     elseif isBank and showBank then
-        -- Мы банк и показываем других - отправляем свои данные и данные других банков
         shouldSend = true
         self:BuildLocalItemList()
         self:UpdateGoldInTable()
@@ -1297,7 +1301,6 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
             end
         end
     elseif not isBank and showBank then
-        -- Мы не банк, но показываем других - отправляем данные известных нам банков
         shouldSend = true
         for ownerName, items in pairs(_G[GLOBAL_TABLE].guildBanks) do
             if type(items) == "table" and #items > 0 then
@@ -1306,25 +1309,21 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
         end
     end
     
-    -- ВАЖНО: Добавляем отправителя в список владельцев для отправки, если у него есть данные
-    -- Это гарантирует, что запрашивающий получит свои собственные данные в ответе
-    if sender and sender ~= myName then
-        local senderHasData = false
-        if _G[GLOBAL_TABLE].guildBanks[sender] and type(_G[GLOBAL_TABLE].guildBanks[sender]) == "table" and #_G[GLOBAL_TABLE].guildBanks[sender] > 0 then
-            senderHasData = true
+    if requester and requester ~= myName then
+        local requesterHasData = false
+        if _G[GLOBAL_TABLE].guildBanks[requester] and type(_G[GLOBAL_TABLE].guildBanks[requester]) == "table" and #_G[GLOBAL_TABLE].guildBanks[requester] > 0 then
+            requesterHasData = true
         end
-        
-        if senderHasData then
-            -- Проверяем, не добавлен ли уже отправитель
+        if requesterHasData then
             local alreadyAdded = false
             for _, name in ipairs(ownersToSend) do
-                if name == sender then
+                if name == requester then
                     alreadyAdded = true
                     break
                 end
             end
             if not alreadyAdded then
-                table.insert(ownersToSend, sender)
+                table.insert(ownersToSend, requester)
             end
         end
     end
@@ -1333,7 +1332,7 @@ function NSAukGuildBankClass_A:OnScanRequestReceived(sender)
         self.scanSessionStart = GetTime()
         self.scanSessionActive = true
         self.receivedOwnersThisScan = {}
-        self:BroadcastGuildBankData(ownersToSend)
+        self:BroadcastGuildBankData(ownersToSend, requester)  -- передаём requester
     end
 end
 
@@ -1366,12 +1365,13 @@ function NSAukGuildBankClass_A:ScanGuildBank()
         self.isScanning = false
         return
     end
+    -- ВАЖНО: прикладываем имя запрашивающего к запросу
     SendAddonMessage(PREFIX_SCAN, myName, "GUILD")
     if isBank then
         self:BuildLocalItemList()
         self:UpdateGoldInTable()
     end
-    self:OnScanRequestReceived(myName)
+    self:OnScanRequestReceived(myName, myName)  -- передаём запрашивающего
     self:StartCooldownTimer()
 end
 
@@ -1644,16 +1644,27 @@ function NSAukGuildBankClass_A:RegisterAddonChatHandler()
         
         -- ВАЖНО: Обрабатываем ТОЛЬКО префиксы версии A (_A)
         if prefix == PREFIX_SCAN then
-            self.owner:OnScanRequestReceived(sender)
+            -- message содержит имя того, кто нажал "Сканировать" (requester)
+            -- sender — тот, кто ретранслирует (сам requester при первом запросе)
+            self.owner:OnScanRequestReceived(sender, message)
             return
         end
+        
         if prefix == PREFIX_DATA then
             local parts = mysplit(message)
-            if #parts < 3 then return end
-            local ownerName = parts[1]
+            -- Новый формат: requester ownerName link ... count
+            if #parts < 4 then return end
+            local requester = parts[1]
+            
+            -- ВАЖНО: игнорируем сообщение, если оно адресовано не нам
+            if requester ~= myName then return end
+            
+            local ownerName = parts[2]
             local count = tonumber(parts[#parts])
-            local itemLink = table.concat(parts, " ", 2, #parts - 1)
+            local itemLink = table.concat(parts, " ", 3, #parts - 1)
+            
             if not count or count <= 0 then return end
+            
             local bufferKey = sender .. "_" .. ownerName
             if not self.owner.incomingBuffers[bufferKey] then
                 self.owner.incomingBuffers[bufferKey] = { items = {}, finalized = false, sender = sender, owner = ownerName }
@@ -1665,7 +1676,7 @@ function NSAukGuildBankClass_A:RegisterAddonChatHandler()
             end
             local _, _, itemIDStr = string.find(itemLink, "item:(%d+):")
             local itemID = itemIDStr and tonumber(itemIDStr) or 0
-            if itemID and itemID > 0 or string.find(itemLink, "|Hgold:") then
+            if (itemID and itemID > 0) or string.find(itemLink, "|Hgold:") then
                 local found = false
                 for _, entry in ipairs(buffer.items) do
                     if entry.link == itemLink then
@@ -1680,12 +1691,20 @@ function NSAukGuildBankClass_A:RegisterAddonChatHandler()
             end
             return
         end
+        
         if prefix == PREFIX_END then
             local parts = mysplit(message)
-            if #parts < 2 then return end
-            local ownerName = parts[1]
-            local timestamp = tonumber(parts[2])
+            -- Новый формат: requester ownerName timestamp
+            if #parts < 3 then return end
+            local requester = parts[1]
+            
+            -- ВАЖНО: игнорируем сообщение, если оно адресовано не нам
+            if requester ~= myName then return end
+            
+            local ownerName = parts[2]
+            local timestamp = tonumber(parts[3])
             if not ownerName or not timestamp then return end
+            
             local bestBuffer = nil
             local bestBufferKey = nil
             local bestItemCount = 0
@@ -1744,6 +1763,7 @@ function NSAukGuildBankClass_A:RegisterAddonChatHandler()
             end
             return
         end
+        
         if prefix == PREFIX_REMOVE then
             local removedName = message
             if _G[GLOBAL_TABLE].guildBanks[removedName] then
@@ -1754,9 +1774,11 @@ function NSAukGuildBankClass_A:RegisterAddonChatHandler()
             end
             return
         end
+        
         if prefix == PREFIX_UPDATE then
             return
         end
+        
         -- Игнорируем все другие префиксы (включая версию "1")
     end)
 end

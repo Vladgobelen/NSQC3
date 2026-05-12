@@ -31,32 +31,6 @@ function GameClient:IsActive()
 end
 
 -- ============================================
--- ДЕЙСТВИЯ С ДОСКОЙ
--- ============================================
-function GameClient:DoAction(a, p)
-    if not self.active then return end
-    if not adaptiveFrame or not adaptiveFrame.children or not ns_game_table then return end
-    
-    local f, t, v, o = p.f or 0, p.t or 0, p.v or 0, p.o or ""
-    
-    local r, g, b = 1, 1, 1
-    if ns_game_table.name1 and o == ns_game_table.name1 then r, g, b = 1, 0.25, 0.25
-    elseif ns_game_table.name2 and o == ns_game_table.name2 then r, g, b = 0.25, 0.55, 1 end
-    
-    if a == "M" or a == "C" then
-        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\dices.mp3")
-        if f and f ~= 0 then self:_Clear(f) end
-        if a == "C" then self:_Clear(t) end
-        self:_Set(t, v, o, r, g, b)
-        self:_Glow(f, t, r, g, b)
-    elseif a == "S" then
-        self:_Set(t, v, o, r, g, b)
-    elseif a == "R" then
-        self:_Clear(f)
-    end
-end
-
--- ============================================
 -- ПОДСВЕТКА ВОЗМОЖНЫХ ХОДОВ
 -- ============================================
 function GameClient:HighlightMoves(g, r, f)
@@ -113,6 +87,32 @@ function GameClient:HighlightMoves(g, r, f)
 end
 
 -- ============================================
+-- ДЕЙСТВИЯ С ДОСКОЙ
+-- ============================================
+function GameClient:DoAction(a, p)
+    if not self.active then return end
+    if not adaptiveFrame or not adaptiveFrame.children or not ns_game_table then return end
+    
+    local f, t, v, o = p.f or 0, p.t or 0, p.v or 0, p.o or ""
+    
+    local r, g, b = 1, 1, 1
+    if ns_game_table.name1 and o == ns_game_table.name1 then r, g, b = 1, 0.25, 0.25
+    elseif ns_game_table.name2 and o == ns_game_table.name2 then r, g, b = 0.25, 0.55, 1 end
+    
+    if a == "M" or a == "C" then
+        PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\dices.mp3")
+        if f and f ~= 0 then self:_Clear(f) end
+        if a == "C" then self:_Clear(t) end
+        self:_Set(t, v, o, r, g, b)
+        self:_Glow(f, t, r, g, b)
+    elseif a == "S" then
+        self:_Set(t, v, o, r, g, b)
+    elseif a == "R" then
+        self:_Clear(f)
+    end
+end
+
+-- ============================================
 -- ПРИВАТНЫЕ МЕТОДЫ
 -- ============================================
 function GameClient:_Clear(x)
@@ -157,6 +157,10 @@ function GameClient:_Set(x, v, o, r, g, b)
     local c = adaptiveFrame.children[x]
     if not c or not c.SetTexture then return end
     
+    -- ===== НОВОЕ: ОПРЕДЕЛЯЕМ, ЭТО ШАХМАТНАЯ ФИГУРА ИЛИ КУБИК =====
+    local isChessPiece = (type(v) == "string" and v:match("^(peshka|kon|slon|ladja|ferz|korol)[GR]$"))
+    local displayTexture = v  -- для шахмат — имя фигуры, для кубиков — число
+    
     local bgName = nil
     local nt = c.frame:GetNormalTexture()
     if nt then 
@@ -174,7 +178,14 @@ function GameClient:_Set(x, v, o, r, g, b)
         bgName = adaptiveFrame:GetCellIcon(x, 2) 
     end
     
-    c:SetTexture(tostring(v), tostring(v))
+    -- ===== НОВОЕ: УСТАНАВЛИВАЕМ ТЕКСТУРУ =====
+    if isChessPiece then
+        -- Для шахматной фигуры: используем имя фигуры как текстуру (например "ferzG")
+        c:SetTexture(v, v)
+    else
+        -- Для кубика: старое поведение (число как имя текстуры)
+        c:SetTexture(tostring(v), tostring(v))
+    end
     
     if not c.frame._Border then
         c.frame._Border = CreateFrame("Frame", nil, c.frame)
@@ -187,10 +198,34 @@ function GameClient:_Set(x, v, o, r, g, b)
     
     if adaptiveFrame.SetCellIcon then adaptiveFrame:SetCellIcon(x, bgName, 2, nil, true) end
     
-    local tt = "Кость: " .. v .. "\nВладелец: " .. o
+    -- ===== НОВОЕ: ТУЛТИП ДЛЯ ШАХМАТНЫХ ФИГУР =====
+    local tt
+    if isChessPiece then
+        local pieceNames = {
+            peshka = "Пешка", kon = "Конь", slon = "Слон",
+            ladja = "Ладья", ferz = "Ферзь", korol = "Король"
+        }
+        local pieceBase = v:match("^(%a+)")
+        local pieceColor = v:match("[GR]$") == "G" and "Зелёный" or "Красный"
+        local pieceRusName = pieceNames[pieceBase] or pieceBase
+        tt = "Фигура: " .. pieceRusName .. "\nЦвет: " .. pieceColor .. "\nВладелец: " .. o
+    else
+        tt = "Кость: " .. v .. "\nВладелец: " .. o
+    end
+    
     if c.SetTextT then c:SetTextT("") end
     if c.SetMultiLineTooltip then c:SetMultiLineTooltip({tt}) end
-    if c.SetOnClick then c:SetOnClick(function() if type(fBtnClick) == "function" then fBtnClick(x, tostring(v)) end end) end
+    if c.SetOnClick then 
+        c:SetOnClick(function() 
+            if isChessPiece then
+                SendAddonMessage("NSQC3_clcl", v, "GUILD")
+            else
+                if type(fBtnClick) == "function" then 
+                    fBtnClick(x, tostring(v)) 
+                end
+            end
+        end) 
+    end
     
     ns_game_table.board[x] = {dice = v, owner = o, miniTex = bgName, mainTex = tostring(v), lastUpdated = GetTime(), cellIndex = x}
 end
