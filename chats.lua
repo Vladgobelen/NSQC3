@@ -1152,13 +1152,15 @@ function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
     
     local playerName = UnitName("player")
     
-    -- Проверяем, наша ли это игра
     if name1 ~= playerName and name2 ~= playerName then
-        return -- не наша игра, выходим
+        return
     end
     
-    print(string.format("|cFFFF0000[Игра]|r Завершена. Победитель: %s | Проигравший: %s", 
-        tostring(name1), tostring(name2)))
+    -- СРАЗУ ставим флаг что игра окончена
+    if ns_game_table then
+        ns_game_table.active = false
+        ns_game_table.gameEnded = true
+    end
     
     -- 1. Очистка функций и глобальных переменных
     _G.ns_game_funcs = nil
@@ -1182,7 +1184,7 @@ function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
         adaptiveFrame.gameClient = nil
     end
     
-    -- 3. Восстановление доски
+    -- 3. Восстановление изначальных текстур
     if ns_game_table and ns_game_table.board then
         for cellIndexStr, cellData in pairs(ns_game_table.board) do
             local idx = tonumber(cellIndexStr)
@@ -1190,34 +1192,53 @@ function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
                 local cell = adaptiveFrame.children[idx]
                 local frame = cell.frame
                 if frame then
+                    -- Восстанавливаем изначальную текстуру клетки
                     local oldPath = nil
                     if cellData.miniTex and cellData.miniTex ~= "" then
                         oldPath = "Interface\\AddOns\\NSQC3\\libs\\" .. cellData.miniTex .. ".tga"
                     end
-
+                    
                     frame:SetNormalTexture(oldPath)
                     frame:SetHighlightTexture(nil)
                     frame:SetPushedTexture(nil)
                     frame:SetDisabledTexture(nil)
-
+                    
                     local tex = frame:GetNormalTexture()
                     if tex then tex:SetVertexColor(1, 1, 1) end
-
+                    
+                    -- Убираем иконку кубика/фигуры
                     if adaptiveFrame.SetCellIcon then
                         adaptiveFrame:SetCellIcon(idx, nil, 2)
                     end
-
+                    
+                    -- Очищаем текст
                     if cell.SetTextT then cell:SetTextT("") end
                     if cell.SetMultiLineTooltip then cell:SetMultiLineTooltip("") end
                     
+                    -- Скрываем рамку
                     if frame._Border then frame._Border:Hide() end
                 end
             end
         end
-        ns_game_table.board = {}
+        
+        -- Очищаем только игровые данные, сохраняем miniTex для восстановления
+        for cellIndexStr, cellData in pairs(ns_game_table.board) do
+            cellData.value = nil
+            cellData.owner = nil
+            cellData.isChess = nil
+        end
     end
-
-    -- 4. Сброс кнопки запуска
+    
+    -- 4. Очистка метаданных игры
+    if ns_game_table then
+        ns_game_table.id = nil
+        ns_game_table.name1 = nil
+        ns_game_table.name2 = nil
+        ns_game_table.active = false
+        ns_game_table.gameEnded = true
+    end
+    
+    -- 5. Сброс кнопки запуска
     if adaptiveFrame and adaptiveFrame.gameStartButton then
         local normTex = adaptiveFrame.gameStartButton:GetNormalTexture()
         if normTex then
@@ -1225,14 +1246,6 @@ function NSQC3_GAME_END_client(channel, text, sender, full_prefix)
             normTex:SetVertexColor(1, 1, 1)
         end
         adaptiveFrame.gameStartButton:SetAlpha(1)
-    end
-
-    -- 5. Очистка метаданных игры
-    if ns_game_table then
-        ns_game_table.id = nil
-        ns_game_table.name1 = nil
-        ns_game_table.name2 = nil
-        ns_game_table.active = false
     end
 end
 
@@ -1242,21 +1255,13 @@ function NSQC3_GAME_id(channel, text, sender, full_prefix)
     local name2 = text:match(WORD_POSITION_PATTERNS[2])
     local gameType = text:match(WORD_POSITION_PATTERNS[3]) or "dice"
     
-    print(string.format("[GAME_id] id=%s name1=%s name2=%s gameType=%s sender=%s", 
-        tostring(id), tostring(name1), tostring(name2), tostring(gameType), tostring(sender)))
-    
     if name1 == UnitName("player") or name2 == UnitName("player") then
         ns_game_table = {id = id, name1 = name1, name2 = name2, gameType = gameType}
-        print(string.format("[GAME_id] ns_game_table создана, gameType=%s", gameType))
     else
-        print(string.format("[GAME_id] Игрок не участвует: player=%s name1=%s name2=%s", 
-            UnitName("player"), tostring(name1), tostring(name2)))
     end
 end
 
 function NSQC3_GAME_dice(channel, text, sender, full_prefix)
-    print(string.format("[GAME_dice] ВХОД: channel=%s text='%s' sender=%s full_prefix='%s'", 
-        tostring(channel), tostring(text), tostring(sender), tostring(full_prefix)))
     
     -- 1. Парсинг
     local cellIndex = tonumber(text:match(WORD_POSITION_PATTERNS[1]))
@@ -1268,26 +1273,18 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
     if rawValue then
         rawValue = rawValue:match("^%s*(.-)%s*$")
     end
-    
-    print(string.format("[GAME_dice] ПАРСИНГ: cellIndex=%s rawValue='%s' owner=%s id=%s", 
-        tostring(cellIndex), tostring(rawValue), tostring(owner), tostring(id)))
 
     -- 2. Базовая валидация
     if not ns_game_table then 
-        print("[GAME_dice] ОШИБКА: ns_game_table == nil")
         return 
     end
     if ns_game_table.id ~= id then 
-        print(string.format("[GAME_dice] ОШИБКА: id не совпадает (таблица:%s сообщение:%s)", 
-            tostring(ns_game_table.id), tostring(id)))
         return 
     end
     if not cellIndex or cellIndex < 1 or cellIndex > 100 then 
-        print(string.format("[GAME_dice] ОШИБКА: неверный cellIndex=%s", tostring(cellIndex)))
         return 
     end
     if not rawValue then 
-        print("[GAME_dice] ОШИБКА: rawValue == nil")
         return 
     end
 
@@ -1307,27 +1304,20 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
             
             if validBase and validColor then
                 chessPieceName = rawValue
-                print(string.format("[GAME_dice] ШАХМАТЫ: фигура=%s (base=%s color=%s)", chessPieceName, baseName, colorLetter))
             else
-                print(string.format("[GAME_dice] ОШИБКА: невалидная фигура base='%s' color='%s' validBase=%s validColor=%s", 
-                    baseName, colorLetter, tostring(validBase), tostring(validColor)))
                 return
             end
         else
-            print(string.format("[GAME_dice] ОШИБКА: rawValue слишком короткий '%s' (длина %d)", rawValue, #rawValue))
             return
         end
     else
         diceValue = tonumber(rawValue)
         if not diceValue or diceValue < 1 or diceValue > 6 then 
-            print(string.format("[GAME_dice] ОШИБКА: невалидный diceValue=%s", tostring(diceValue)))
             return 
         end
-        print(string.format("[GAME_dice] КУБИКИ: значение=%d", diceValue))
     end
 
     if not adaptiveFrame or not adaptiveFrame.children or not adaptiveFrame.children[cellIndex] then 
-        print(string.format("[GAME_dice] ОШИБКА: adaptiveFrame не готов для cellIndex=%s", tostring(cellIndex)))
         return 
     end
 
@@ -1343,9 +1333,6 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
         miniKey = currentPath:match("([^\\]+)$")
         if miniKey then miniKey = miniKey:gsub("%.tga$", "") end
     end
-    
-    print(string.format("[GAME_dice] Текущая текстура: currentPath='%s' miniKey='%s'", 
-        tostring(currentPath), tostring(miniKey)))
 
     -- 4. Миниатюра
     if adaptiveFrame.SetCellIcon then
@@ -1363,7 +1350,6 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
         textureKey = tostring(diceValue)
     end
     
-    print(string.format("[GAME_dice] Загружаю текстуру: %s", newTexPath))
     cellFrame:SetNormalTexture(newTexPath)
     cell:SetTexture(textureKey, textureKey)
     cell:SetTextT("")
@@ -1450,9 +1436,7 @@ function NSQC3_GAME_dice(channel, text, sender, full_prefix)
         cellIndex = cellIndex,
         isChessPiece = isChess
     }
-    print(string.format("[GAME_dice] УСПЕХ: cellIndex=%s value=%s owner=%s isChess=%s", 
-        tostring(cellIndex), tostring(isChess and chessPieceName or diceValue), 
-        tostring(owner), tostring(isChess)))
+
 end
 
 -- ==========================================
