@@ -3466,3 +3466,19 @@ SlashCmdList["BUGS"] = function()
 end
 ---гитхаб
 
+
+--- котики
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+frame:SetScript("OnEvent", function()
+    if UnitName("target") == "Кошка" then
+        local guid = UnitGUID("target")
+        if guid then
+            local id = guid:match("0x%x+")
+            if id then
+                SendAddonMessage("itsCat", id, "GUILD")
+            end
+        end
+    end
+end)
+---
