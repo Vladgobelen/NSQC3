@@ -1176,7 +1176,7 @@ end
 function NSAukGuildBankClass_A:BroadcastGuildBankData(ownersList, requester)
     if not ownersList or #ownersList == 0 then
         -- ВАЖНО: requester в END даже если пусто
-        SendAddonMessage(PREFIX_END, string.format("%s %s %d", requester or "", UnitName("player"), 0), "GUILD")
+        SendAddonMessage(PREFIX_END, UnitName("player") .. " 0 " .. (requester or ""), "GUILD")
         return
     end
     self.sendQueue = {}

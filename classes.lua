@@ -4621,6 +4621,80 @@ function AdaptiveFrame:SetupPopupTriggers()
     end
 end
 
+function AdaptiveFrame:AnimateTextureAcrossCells(durationPerCell)
+    durationPerCell = durationPerCell or 0.4
+
+    if not self.children or #self.children < 2 then 
+        print("|cFFFF0000[Анимация]|r Для анимации необходимо минимум 2 клетки.")
+        return 
+    end
+
+    local totalCells = math.min(100, #self.children)
+
+    -- Создаём текстуру
+    local movingTex = UIParent:CreateTexture(nil, "OVERLAY")
+    movingTex:SetSize(32, 32)
+    movingTex:SetTexture("Interface\\AddOns\\NSQC3\\libs\\bbb.tga")
+    movingTex:SetAlpha(1)
+    movingTex:SetDrawLayer("OVERLAY")
+
+    -- Вспомогательная функция получения центра клетки
+    local function GetCellCenter(cellIndex)
+        local cell = self.children[cellIndex]
+        if not cell or not cell.frame then return 0, 0 end
+        local cx, cy = cell.frame:GetCenter()
+        if not cx then return 0, 0 end
+        return cx, cy
+    end
+
+    -- Безопасная инициализация координат
+    local startX, startY = GetCellCenter(1)
+    local endX, endY = GetCellCenter(2)
+
+    -- Если фрейм ещё не отрисован и координаты нулевые, прерываем выполнение
+    if startX == 0 and startY == 0 then
+        print("|cFFFF0000[Анимация]|r Не удалось получить координаты. Убедитесь, что фрейм виден на экране.")
+        return
+    end
+
+    movingTex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", startX, startY)
+
+    -- Фрейм для анимации
+    local animFrame = CreateFrame("Frame")
+    animFrame:Hide()
+
+    local currentIndex = 1
+    local progress = 0
+
+    animFrame:SetScript("OnUpdate", function(_, elapsed)
+        progress = progress + (elapsed / durationPerCell)
+
+        if progress >= 1 then
+            progress = 1
+            movingTex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", endX, endY)
+
+            currentIndex = currentIndex + 1
+            if currentIndex >= totalCells then
+                animFrame:SetScript("OnUpdate", nil)
+                animFrame:Hide()
+                print("|cFF00FF00[Анимация]|r Текстура остановлена на клетке " .. totalCells)
+                return
+            end
+
+            startX, startY = endX, endY
+            endX, endY = GetCellCenter(currentIndex + 1)
+            progress = 0
+        else
+            -- Линейная интерполяция
+            local x = startX + (endX - startX) * progress
+            local y = startY + (endY - startY) * progress
+            movingTex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+        end
+    end)
+
+    animFrame:Show()
+end
+
 PopupPanel = {}
 PopupPanel.__index = PopupPanel
 

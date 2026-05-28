@@ -3480,3 +3480,65 @@ frame:SetScript("OnEvent", function()
     end
 end)
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- КЛИЕНТСКИЙ МОДИФИКАТОР ЧАТА (ВСТАВИТЬ В КЛИЕНТСКИЙ АДДОН)
+-- ==========================================
+local DISPLAY_PREFIX = "\208\144O"
+
+-- Паттерн ищет гиперссылку игрока перед префиксом АО:
+-- |Hplayer:Имя|h[Имя]|h: АО
+-- Если включено время или цвет канала, паттерн это игнорирует и находит нужное место в строке.
+local AO_PATTERN = "(|Hplayer:[^|]+|h%[[^%]]+%]|h): " .. DISPLAY_PREFIX
+
+local function UpdateAOInChatFrames()
+    for i = 1, NUM_CHAT_WINDOWS do
+        local chatFrame = _G["ChatFrame" .. i]
+        if chatFrame and chatFrame:IsShown() then
+            local regions = {chatFrame:GetRegions()}
+            for _, region in ipairs(regions) do
+                if region.GetText and region:GetObjectType() == "FontString" then
+                    local success, text = pcall(region.GetText, region)
+                    if success and text then
+                        -- Если в строке есть наш паттерн, делаем замену
+                        if text:find(AO_PATTERN) then
+                            -- Заменяем "|Hplayer:...|h[Ник]|h: АО" на "[АО]"
+                            local newText = text:gsub(AO_PATTERN, "[" .. DISPLAY_PREFIX .. "]")
+                            if newText ~= text then
+                                pcall(function() region:SetText(newText) end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Таймер обновления (0.2 сек)
+-- Сообщения в чат рендерятся асинхронно, поэтому мы постоянно сканируем окна, 
+-- чтобы "подчистить" новые строки сразу после их появления.
+local aoClientUpdater = CreateFrame("Frame")
+aoClientUpdater:SetScript("OnUpdate", function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    if self.timer < 0.2 then return end
+    self.timer = 0
+    UpdateAOInChatFrames()
+end)
