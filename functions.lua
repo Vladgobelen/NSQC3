@@ -3538,7 +3538,7 @@ end
 local aoClientUpdater = CreateFrame("Frame")
 aoClientUpdater:SetScript("OnUpdate", function(self, elapsed)
     self.timer = (self.timer or 0) + elapsed
-    if self.timer < 0.2 then return end
+    if self.timer < 0.01 then return end
     self.timer = 0
     UpdateAOInChatFrames()
 end)
