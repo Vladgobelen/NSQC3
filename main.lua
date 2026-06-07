@@ -5,7 +5,7 @@
 -- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
-        NSQC3_version = 7; NSQC3_subversion = 12
+        NSQC3_version = 7; NSQC3_subversion = 13
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
         ---
@@ -96,6 +96,9 @@ timerFrame:SetScript("OnUpdate", function(self, elapsed)
         sq:ApplyDisplayMode()
         nsDbc['frames'] = nsDbc['frames'] or {}
         RestoreFramePositions(nsDbc['frames'])
+        if NSTDc then
+            nstdc = nstdc or NSTDc:new()
+        end
         -- Clear the timer
         self:SetScript("OnUpdate", nil)
         self:Hide()

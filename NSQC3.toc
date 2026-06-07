@@ -17,3 +17,4 @@ tooltips.lua
 NSAukGuildBank.lua
 game_server.lua
 game_client.lua
+nstdc.lua
