@@ -14,6 +14,7 @@
 !NSAukGuildBank.lua
 !game_client.lua
 !game_server.lua
+!nstdc.lua
 
 # Рекурсивно разрешить всё внутри libs/
 !libs/
