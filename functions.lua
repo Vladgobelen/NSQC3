@@ -2288,7 +2288,7 @@ function showAlphaDialog(frame)
     
     local slider = CreateFrame("Slider", "AlphaSlider", dialog, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", 20, -85)
-    slider:SetWidth(200)
+    slider:SetWidth(250)
     slider:SetHeight(20)
     slider:SetMinMaxValues(1, 100)
     slider:SetValueStep(1)
