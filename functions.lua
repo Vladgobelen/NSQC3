@@ -4188,42 +4188,67 @@ end)
 -- ==========================================
 local DISPLAY_PREFIX = "\208\144O"
 
--- Паттерн ищет гиперссылку игрока перед префиксом АО:
--- |Hplayer:Имя|h[Имя]|h: АО
--- Если включено время или цвет канала, паттерн это игнорирует и находит нужное место в строке.
-local AO_PATTERN = "(|Hplayer:[^|]+|h%[[^%]]+%]|h): " .. DISPLAY_PREFIX
+-- Цвет для ника (серебряный)
+local NICK_COLOR = "|cFFC0C0C0"
+local NICK_COLOR_RESET = "|r"
 
-local function UpdateAOInChatFrames()
-    for i = 1, NUM_CHAT_WINDOWS do
-        local chatFrame = _G["ChatFrame" .. i]
-        if chatFrame and chatFrame:IsShown() then
-            local regions = {chatFrame:GetRegions()}
-            for _, region in ipairs(regions) do
-                if region.GetText and region:GetObjectType() == "FontString" then
-                    local success, text = pcall(region.GetText, region)
-                    if success and text then
-                        -- Если в строке есть наш паттерн, делаем замену
-                        if text:find(AO_PATTERN) then
-                            -- Заменяем "|Hplayer:...|h[Ник]|h: АО" на "[АО]"
-                            local newText = text:gsub(AO_PATTERN, "[" .. DISPLAY_PREFIX .. "]")
-                            if newText ~= text then
-                                pcall(function() region:SetText(newText) end)
-                            end
-                        end
-                    end
+-- Имена для проверки кликов
+local aoNames = {}
+
+-- Перехватываем AddMessage у КАЖДОГО чат-фрейма
+local function HookChatFrame(chatFrame)
+    if not chatFrame or chatFrame.hookedAO then return end
+    chatFrame.hookedAO = true
+    
+    local oldAddMessage = chatFrame.AddMessage
+    chatFrame.AddMessage = function(self, msg, ...)
+        if msg and type(msg) == "string" then
+            local newMsg = msg:gsub(
+                "|Hplayer:[^|]+|h%[[^%]]+%]|h: " .. DISPLAY_PREFIX .. " (%S+):?%s",
+                function(targetName)
+                    local cleanName = targetName:gsub(":+$", "")
+                    aoNames[cleanName] = true
+                    
+                    -- Кликабельная ссылка, обёрнутая в серебряный цвет
+                    local clickableLink = "|Hplayer:" .. cleanName .. "|h" .. NICK_COLOR .. "[" .. cleanName .. "]" .. NICK_COLOR_RESET .. "|h"
+                    return "[" .. DISPLAY_PREFIX .. "] " .. clickableLink .. " "
                 end
-            end
+            )
+            
+            return oldAddMessage(self, newMsg, ...)
         end
+        
+        return oldAddMessage(self, msg, ...)
     end
 end
 
--- Таймер обновления (0.2 сек)
--- Сообщения в чат рендерятся асинхронно, поэтому мы постоянно сканируем окна, 
--- чтобы "подчистить" новые строки сразу после их появления.
-local aoClientUpdater = CreateFrame("Frame")
-aoClientUpdater:SetScript("OnUpdate", function(self, elapsed)
-    self.timer = (self.timer or 0) + elapsed
-    if self.timer < 0.01 then return end
-    self.timer = 0
-    UpdateAOInChatFrames()
-end)
+-- Вешаем хук на существующие чат-фреймы
+for i = 1, NUM_CHAT_WINDOWS do
+    HookChatFrame(_G["ChatFrame" .. i])
+end
+
+-- Перехватываем клик по гиперссылке
+local oldChatFrame_OnHyperlinkShow = ChatFrame_OnHyperlinkShow
+ChatFrame_OnHyperlinkShow = function(self, link, text, button)
+    local linkType, linkData = link:match("^(%a+):(.+)$")
+    
+    if linkType == "player" and linkData then
+        local name = linkData:match("^([^:]+)")
+        
+        if name and aoNames[name] then
+            local editBox = self.editBox
+            if not editBox then
+                editBox = ChatFrame1EditBox
+            end
+            
+            if not editBox:IsShown() then
+                editBox:Show()
+            end
+            editBox:Insert(name .. ", ")
+            editBox:SetFocus()
+            return
+        end
+    end
+    
+    return oldChatFrame_OnHyperlinkShow(self, link, text, button)
+end
