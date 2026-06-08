@@ -2069,11 +2069,20 @@ end
 local countdownTimer = nil
 local countdownValue = 0
 local currentMode = nil
-local moveSettings = {
-    countdownDuration = 10
-}
 
 local activeTimers = {}
+
+local function GetSettings()
+    if not nsDbc then
+        nsDbc = {}
+    end
+    if not nsDbc['settings'] then
+        nsDbc['settings'] = {
+            countdownDuration = 10
+        }
+    end
+    return nsDbc['settings']
+end
 
 local function CreateTimer(delay, func)
     local timer = CreateFrame("Frame")
@@ -2164,6 +2173,8 @@ local function AddCustomMenuItems()
 end
 
 function startCountdown(message)
+    local settings = GetSettings()
+    
     local textFrame = CreateFrame("Frame", "CountdownFrame", UIParent)
     textFrame:SetWidth(400)
     textFrame:SetHeight(50)
@@ -2172,9 +2183,9 @@ function startCountdown(message)
     
     local text = textFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     text:SetPoint("CENTER")
-    text:SetText(message .. ": " .. moveSettings.countdownDuration)
+    text:SetText(message .. ": " .. settings.countdownDuration)
     
-    countdownValue = moveSettings.countdownDuration
+    countdownValue = settings.countdownDuration
     if countdownTimer then
         CancelTicker(countdownTimer)
     end
@@ -2277,7 +2288,7 @@ function showAlphaDialog(frame)
     
     local slider = CreateFrame("Slider", "AlphaSlider", dialog, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", 20, -85)
-    slider:SetWidth(250)
+    slider:SetWidth(200)
     slider:SetHeight(20)
     slider:SetMinMaxValues(1, 100)
     slider:SetValueStep(1)
@@ -2320,6 +2331,8 @@ function showAlphaDialog(frame)
 end
 
 function showSettingsDialog()
+    local settings = GetSettings()
+    
     if _G["MoveSettingsDialog"] then
         _G["MoveSettingsDialog"]:Hide()
     end
@@ -2386,7 +2399,7 @@ function showSettingsDialog()
     
     local sliderText = content1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sliderText:SetPoint("TOPLEFT", 5, -10)
-    sliderText:SetText("Время до применения: " .. moveSettings.countdownDuration .. " сек")
+    sliderText:SetText("Время до применения: " .. settings.countdownDuration .. " сек")
     
     local slider = CreateFrame("Slider", "SettingsCountdownSlider", content1, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", 5, -30)
@@ -2394,7 +2407,7 @@ function showSettingsDialog()
     slider:SetHeight(20)
     slider:SetMinMaxValues(3, 15)
     slider:SetValueStep(1)
-    slider:SetValue(moveSettings.countdownDuration)
+    slider:SetValue(settings.countdownDuration)
     
     slider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value)
@@ -2412,7 +2425,7 @@ function showSettingsDialog()
     saveButton:SetPoint("TOPLEFT", 5, -80)
     saveButton:SetText("Сохранить")
     saveButton:SetScript("OnClick", function()
-        moveSettings.countdownDuration = slider:GetValue()
+        settings.countdownDuration = slider:GetValue()
         statusText1:SetText("Настройки сохранены!")
         local hideStatusTimer = CreateTimer(2, function()
             statusText1:SetText("")
