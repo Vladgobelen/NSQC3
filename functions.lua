@@ -2045,85 +2045,17 @@ function getUnixTime(_, message, _, sender, HOUR)
     end
 end
 
-function move(saveTable)
-    local frame = GetMouseFocus()
-    if not frame or not frame.GetName then return end
-    
-    local frameName = frame:GetName()
-    saveTable = saveTable or {}
-
-    if not frame.moveToggle then
-        -- Создаём невидимый фрейм-хендлер поверх целевого
-        local mover = CreateFrame("Frame", nil, frame)
-        mover:SetAllPoints(frame)
-        mover:EnableMouse(true)
-        mover:SetFrameStrata("TOOLTIP")
-        mover:SetScript("OnMouseDown", function(self, button)
-            if button == "LeftButton" then
-                frame:StartMoving()
-            end
-        end)
-        mover:SetScript("OnMouseUp", function(self, button)
-            if button == "LeftButton" then
-                frame:StopMovingOrSizing()
-                local point, _, relPoint, x, y = frame:GetPoint()
-                saveTable[frameName] = {point, relPoint, x, y}
-                print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
-                
-                -- Убираем mover
-                self:Hide()
-                frame.moveToggle = nil
-                frame.moverFrame = nil
-            end
-        end)
-        
-        frame.moverFrame = mover
-        frame.moveToggle = true
-        print("Фрейм " .. frameName .. " готов к перемещению. Зажмите ЛКМ и тяните.")
-    else
-        -- Выключение перемещения
-        if frame.moverFrame then
-            frame.moverFrame:Hide()
-            frame.moverFrame = nil
-        end
-        frame.moveToggle = nil
-    end
-    
-    return saveTable
-end
-
-function RestoreFramePositions(saveTable)
-    if not saveTable then return end
-    
-    for frameName, posData in pairs(saveTable) do
-        local frame = _G[frameName]
-        if frame and frame.ClearAllPoints then
-            frame:ClearAllPoints()
-            frame:SetPoint(posData[1], UIParent, posData[2], posData[3], posData[4])
-        end
-    end
-end
-
-function remove()
-    move(nsDbc['frames'])
-end
-
-function resetF()
-    nsDbc['frames'] = nil
-end
-
 local countdownTimer = nil
 local countdownValue = 0
-local currentMode = nil -- "move" или "alpha"
-local alphaFrame = nil
-local alphaSettings = {} -- храним настройки прозрачности для фреймов
+local currentMode = nil
+local moveSettings = {
+    countdownDuration = 10
+}
 
--- Функция для создания/обновления пунктов меню
 local function AddCustomMenuItems()
     local dropdownMenu = _G["PlayerFrameDropDown"]
     if not dropdownMenu then return end
     
-    -- Пункт 1: Сдвинуть фрейм
     local info1 = {}
     info1.text = "Сдвинуть фрейм"
     info1.func = function()
@@ -2133,7 +2065,6 @@ local function AddCustomMenuItems()
     end
     info1.notCheckable = true
     
-    -- Пункт 2: Сбросить фреймы
     local info2 = {}
     info2.text = "Сбросить фреймы"
     info2.func = function()
@@ -2143,7 +2074,6 @@ local function AddCustomMenuItems()
     end
     info2.notCheckable = true
     
-    -- Пункт 3: Прозрачность
     local info3 = {}
     info3.text = "Прозрачность"
     info3.func = function()
@@ -2153,13 +2083,20 @@ local function AddCustomMenuItems()
     end
     info3.notCheckable = true
     
-    -- Добавляем пункты в меню
+    local info4 = {}
+    info4.text = "Настройки"
+    info4.func = function()
+        CloseDropDownMenus()
+        showSettingsDialog()
+    end
+    info4.notCheckable = true
+    
     UIDropDownMenu_AddButton(info1, UIDROPDOWN_MENU_LEVEL)
     UIDropDownMenu_AddButton(info2, UIDROPDOWN_MENU_LEVEL)
     UIDropDownMenu_AddButton(info3, UIDROPDOWN_MENU_LEVEL)
+    UIDropDownMenu_AddButton(info4, UIDROPDOWN_MENU_LEVEL)
 end
 
--- Функция отсчёта
 function startCountdown(message)
     local textFrame = CreateFrame("Frame", "CountdownFrame", UIParent)
     textFrame:SetWidth(400)
@@ -2169,9 +2106,9 @@ function startCountdown(message)
     
     local text = textFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     text:SetPoint("CENTER")
-    text:SetText(message .. ": 10")
+    text:SetText(message .. ": " .. moveSettings.countdownDuration)
     
-    countdownValue = 10
+    countdownValue = moveSettings.countdownDuration
     if countdownTimer then
         countdownTimer:Cancel()
     end
@@ -2211,15 +2148,28 @@ function showAlphaDialog(frame)
     
     local frameName = frame:GetName()
     
-    -- Закрываем старый диалог если есть
     if _G["AlphaSettingsDialog"] then
         _G["AlphaSettingsDialog"]:Hide()
     end
     
-    -- Создаём окно настроек
+    if not nsDbc['frames'] then
+        nsDbc['frames'] = {}
+    end
+    
+    if not nsDbc['frames'][frameName] then
+        nsDbc['frames'][frameName] = {}
+    end
+    
+    if not nsDbc['frames'][frameName].alphaSettings then
+        nsDbc['frames'][frameName].alphaSettings = {
+            alpha = 100,
+            onlyInCombat = false
+        }
+    end
+    
     local dialog = CreateFrame("Frame", "AlphaSettingsDialog", UIParent)
     dialog:SetWidth(300)
-    dialog:SetHeight(150)
+    dialog:SetHeight(180)
     dialog:SetPoint("CENTER")
     dialog:SetFrameStrata("DIALOG")
     dialog:SetMovable(true)
@@ -2235,7 +2185,6 @@ function showAlphaDialog(frame)
         end
     end)
     
-    -- Фон
     dialog:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -2243,61 +2192,56 @@ function showAlphaDialog(frame)
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
     
-    -- Заголовок
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -15)
     title:SetText("Прозрачность: " .. frameName)
     
-    -- Инициализируем настройки если нет
-    if not alphaSettings[frameName] then
-        alphaSettings[frameName] = {
-            alpha = 100,
-            onlyInCombat = false
-        }
-    end
-    
-    -- Чекбокс "Только в бою"
     local checkbox = CreateFrame("CheckButton", "AlphaCheckbox", dialog, "ChatConfigCheckButtonTemplate")
     checkbox:SetPoint("TOPLEFT", 20, -45)
-    checkbox:SetChecked(alphaSettings[frameName].onlyInCombat)
+    checkbox:SetChecked(nsDbc['frames'][frameName].alphaSettings.onlyInCombat)
     
     local checkboxText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     checkboxText:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
     checkboxText:SetText("Только в бою")
     
-    -- Текст значения слайдера
     local sliderText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sliderText:SetPoint("TOP", 0, -65)
-    sliderText:SetText("Прозрачность: " .. (alphaSettings[frameName].alpha or 100) .. "%")
+    sliderText:SetText("Прозрачность: " .. nsDbc['frames'][frameName].alphaSettings.alpha .. "%")
     
-    -- Слайдер прозрачности
     local slider = CreateFrame("Slider", "AlphaSlider", dialog, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", 20, -85)
     slider:SetWidth(250)
     slider:SetHeight(20)
     slider:SetMinMaxValues(1, 100)
     slider:SetValueStep(1)
-    slider:SetValue(alphaSettings[frameName].alpha or 100)
+    slider:SetValue(nsDbc['frames'][frameName].alphaSettings.alpha)
     
     slider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value)
         sliderText:SetText("Прозрачность: " .. value .. "%")
     end)
     
-    -- Кнопка "Применить"
+    local statusText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    statusText:SetPoint("BOTTOM", 0, 45)
+    statusText:SetText("")
+    statusText:SetTextColor(0, 1, 0, 1)
+    
     local applyButton = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
     applyButton:SetWidth(100)
     applyButton:SetHeight(22)
     applyButton:SetPoint("BOTTOM", 0, 15)
     applyButton:SetText("Применить")
     applyButton:SetScript("OnClick", function()
-        alphaSettings[frameName].alpha = slider:GetValue()
-        alphaSettings[frameName].onlyInCombat = checkbox:GetChecked()
+        nsDbc['frames'][frameName].alphaSettings.alpha = slider:GetValue()
+        nsDbc['frames'][frameName].alphaSettings.onlyInCombat = checkbox:GetChecked()
         applyAlpha(frameName)
-        print("Прозрачность применена для " .. frameName)
+        
+        statusText:SetText("Успешно применено!")
+        C_Timer.After(2, function()
+            statusText:SetText("")
+        end)
     end)
     
-    -- Кнопка закрытия
     local closeButton = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
     closeButton:SetScript("OnClick", function()
@@ -2307,19 +2251,97 @@ function showAlphaDialog(frame)
     dialog:Show()
 end
 
--- Применение прозрачности
+function showSettingsDialog()
+    if _G["MoveSettingsDialog"] then
+        _G["MoveSettingsDialog"]:Hide()
+    end
+    
+    local dialog = CreateFrame("Frame", "MoveSettingsDialog", UIParent)
+    dialog:SetWidth(300)
+    dialog:SetHeight(160)
+    dialog:SetPoint("CENTER")
+    dialog:SetFrameStrata("DIALOG")
+    dialog:SetMovable(true)
+    dialog:EnableMouse(true)
+    dialog:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            self:StartMoving()
+        end
+    end)
+    dialog:SetScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" then
+            self:StopMovingOrSizing()
+        end
+    end)
+    
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", 0, -15)
+    title:SetText("Настройки")
+    
+    local sliderText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    sliderText:SetPoint("TOP", 0, -45)
+    sliderText:SetText("Время до применения: " .. moveSettings.countdownDuration .. " сек")
+    
+    local slider = CreateFrame("Slider", "SettingsCountdownSlider", dialog, "OptionsSliderTemplate")
+    slider:SetPoint("TOPLEFT", 20, -65)
+    slider:SetWidth(200)
+    slider:SetHeight(20)
+    slider:SetMinMaxValues(3, 15)
+    slider:SetValueStep(1)
+    slider:SetValue(moveSettings.countdownDuration)
+    
+    slider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value)
+        sliderText:SetText("Время до применения: " .. value .. " сек")
+    end)
+    
+    local statusText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    statusText:SetPoint("BOTTOM", 0, 45)
+    statusText:SetText("")
+    statusText:SetTextColor(0, 1, 0, 1)
+    
+    local saveButton = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+    saveButton:SetWidth(100)
+    saveButton:SetHeight(22)
+    saveButton:SetPoint("BOTTOM", 0, 15)
+    saveButton:SetText("Сохранить")
+    saveButton:SetScript("OnClick", function()
+        moveSettings.countdownDuration = slider:GetValue()
+        statusText:SetText("Настройки сохранены!")
+        C_Timer.After(2, function()
+            statusText:SetText("")
+        end)
+    end)
+    
+    local closeButton = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", -5, -5)
+    closeButton:SetScript("OnClick", function()
+        dialog:Hide()
+    end)
+    
+    dialog:Show()
+end
+
 function applyAlpha(frameName)
     local frame = _G[frameName]
     if not frame then return end
     
-    local settings = alphaSettings[frameName]
-    if not settings then return end
+    if not nsDbc['frames'] or not nsDbc['frames'][frameName] or not nsDbc['frames'][frameName].alphaSettings then
+        return
+    end
     
+    local settings = nsDbc['frames'][frameName].alphaSettings
     local alpha = settings.alpha or 100
     local onlyInCombat = settings.onlyInCombat or false
     
     if onlyInCombat then
-        -- В бою применяем прозрачность, вне боя восстанавливаем
         frame:SetScript("OnEvent", function(self, event)
             if event == "PLAYER_REGEN_DISABLED" then
                 self:SetAlpha(alpha / 100)
@@ -2330,22 +2352,93 @@ function applyAlpha(frameName)
         frame:RegisterEvent("PLAYER_REGEN_DISABLED")
         frame:RegisterEvent("PLAYER_REGEN_ENABLED")
         
-        -- Применяем текущее состояние
         if UnitAffectingCombat("player") then
             frame:SetAlpha(alpha / 100)
         else
             frame:SetAlpha(1.0)
         end
     else
-        -- Всегда применяем прозрачность
         frame:SetAlpha(alpha / 100)
         frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
         frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
         frame:SetScript("OnEvent", nil)
     end
+    
+    print(string.format("Прозрачность для %s: %d%% %s", frameName, alpha, onlyInCombat and "(только в бою)" or ""))
 end
 
--- Хук на функцию показа меню
+function move(saveTable)
+    local frame = GetMouseFocus()
+    if not frame or not frame.GetName then return end
+    
+    local frameName = frame:GetName()
+    saveTable = saveTable or {}
+
+    if not frame.moveToggle then
+        local mover = CreateFrame("Frame", nil, frame)
+        mover:SetAllPoints(frame)
+        mover:EnableMouse(true)
+        mover:SetFrameStrata("TOOLTIP")
+        mover:SetScript("OnMouseDown", function(self, button)
+            if button == "LeftButton" then
+                frame:StartMoving()
+            end
+        end)
+        mover:SetScript("OnMouseUp", function(self, button)
+            if button == "LeftButton" then
+                frame:StopMovingOrSizing()
+                local point, _, relPoint, x, y = frame:GetPoint()
+                if not saveTable[frameName] then
+                    saveTable[frameName] = {}
+                end
+                saveTable[frameName].position = {point, relPoint, x, y}
+                print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
+                
+                self:Hide()
+                frame.moveToggle = nil
+                frame.moverFrame = nil
+            end
+        end)
+        
+        frame.moverFrame = mover
+        frame.moveToggle = true
+        print("Фрейм " .. frameName .. " готов к перемещению. Зажмите ЛКМ и тяните.")
+    else
+        if frame.moverFrame then
+            frame.moverFrame:Hide()
+            frame.moverFrame = nil
+        end
+        frame.moveToggle = nil
+    end
+    
+    return saveTable
+end
+
+function RestoreFramePositions(saveTable)
+    if not saveTable then return end
+    
+    for frameName, data in pairs(saveTable) do
+        local frame = _G[frameName]
+        if frame and data.position and frame.ClearAllPoints then
+            local posData = data.position
+            frame:ClearAllPoints()
+            frame:SetPoint(posData[1], UIParent, posData[2], posData[3], posData[4])
+        end
+        
+        if frame and data.alphaSettings then
+            applyAlpha(frameName)
+        end
+    end
+end
+
+function remove()
+    move(nsDbc['frames'])
+end
+
+function resetF()
+    nsDbc['frames'] = nil
+end
+
 hooksecurefunc("ToggleDropDownMenu", function(level, value, dropDownFrame, anchorName, xOffset, yOffset, menuList, button)
     if dropDownFrame and dropDownFrame:GetName() == "PlayerFrameDropDown" then
         AddCustomMenuItems()
