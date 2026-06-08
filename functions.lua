@@ -2045,12 +2045,88 @@ function getUnixTime(_, message, _, sender, HOUR)
     end
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 local countdownTimer = nil
 local countdownValue = 0
 local currentMode = nil
 local moveSettings = {
     countdownDuration = 10
 }
+
+local activeTimers = {}
+
+local function CreateTimer(delay, func)
+    local timer = CreateFrame("Frame")
+    timer.startTime = GetTime()
+    timer.delay = delay
+    timer.func = func
+    timer:Hide()
+    return timer
+end
+
+local function StartTimer(timer)
+    timer.startTime = GetTime()
+    timer:SetScript("OnUpdate", function(self, elapsed)
+        if GetTime() - self.startTime >= self.delay then
+            self:Hide()
+            self:SetScript("OnUpdate", nil)
+            if self.func then
+                self.func()
+            end
+        end
+    end)
+    timer:Show()
+end
+
+local function NewTicker(interval, func)
+    local ticker = CreateFrame("Frame")
+    ticker.interval = interval
+    ticker.func = func
+    ticker.lastTick = GetTime()
+    ticker:SetScript("OnUpdate", function(self, elapsed)
+        if GetTime() - self.lastTick >= self.interval then
+            self.lastTick = GetTime()
+            if self.func then
+                self.func()
+            end
+        end
+    end)
+    table.insert(activeTimers, ticker)
+    return ticker
+end
+
+local function CancelTicker(ticker)
+    if ticker then
+        ticker:SetScript("OnUpdate", nil)
+        ticker:Hide()
+        for i, t in ipairs(activeTimers) do
+            if t == ticker then
+                table.remove(activeTimers, i)
+                break
+            end
+        end
+    end
+end
 
 local function AddCustomMenuItems()
     local dropdownMenu = _G["PlayerFrameDropDown"]
@@ -2066,35 +2142,25 @@ local function AddCustomMenuItems()
     info1.notCheckable = true
     
     local info2 = {}
-    info2.text = "Сбросить фреймы"
+    info2.text = "Прозрачность"
     info2.func = function()
-        CloseDropDownMenus()
-        resetF()
-        print("Позиции фреймов сброшены!")
-    end
-    info2.notCheckable = true
-    
-    local info3 = {}
-    info3.text = "Прозрачность"
-    info3.func = function()
         CloseDropDownMenus()
         currentMode = "alpha"
         startCountdown("Наведите мышь на нужный фрейм для настройки прозрачности")
     end
-    info3.notCheckable = true
+    info2.notCheckable = true
     
-    local info4 = {}
-    info4.text = "Настройки"
-    info4.func = function()
+    local info3 = {}
+    info3.text = "Настройки"
+    info3.func = function()
         CloseDropDownMenus()
         showSettingsDialog()
     end
-    info4.notCheckable = true
+    info3.notCheckable = true
     
     UIDropDownMenu_AddButton(info1, UIDROPDOWN_MENU_LEVEL)
     UIDropDownMenu_AddButton(info2, UIDROPDOWN_MENU_LEVEL)
     UIDropDownMenu_AddButton(info3, UIDROPDOWN_MENU_LEVEL)
-    UIDropDownMenu_AddButton(info4, UIDROPDOWN_MENU_LEVEL)
 end
 
 function startCountdown(message)
@@ -2110,15 +2176,15 @@ function startCountdown(message)
     
     countdownValue = moveSettings.countdownDuration
     if countdownTimer then
-        countdownTimer:Cancel()
+        CancelTicker(countdownTimer)
     end
     
-    countdownTimer = C_Timer.NewTicker(1, function()
+    countdownTimer = NewTicker(1, function()
         countdownValue = countdownValue - 1
         if countdownValue > 0 then
             text:SetText(message .. ": " .. countdownValue)
         else
-            countdownTimer:Cancel()
+            CancelTicker(countdownTimer)
             countdownTimer = nil
             
             local frame = GetMouseFocus()
@@ -2136,9 +2202,10 @@ function startCountdown(message)
                 text:SetText("Фрейм не найден!")
             end
             
-            C_Timer.After(2, function()
+            local hideTimer = CreateTimer(2, function()
                 textFrame:Hide()
             end)
+            StartTimer(hideTimer)
         end
     end)
 end
@@ -2237,9 +2304,10 @@ function showAlphaDialog(frame)
         applyAlpha(frameName)
         
         statusText:SetText("Успешно применено!")
-        C_Timer.After(2, function()
+        local hideStatusTimer = CreateTimer(2, function()
             statusText:SetText("")
         end)
+        StartTimer(hideStatusTimer)
     end)
     
     local closeButton = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
@@ -2257,8 +2325,8 @@ function showSettingsDialog()
     end
     
     local dialog = CreateFrame("Frame", "MoveSettingsDialog", UIParent)
-    dialog:SetWidth(300)
-    dialog:SetHeight(160)
+    dialog:SetWidth(350)
+    dialog:SetHeight(400)
     dialog:SetPoint("CENTER")
     dialog:SetFrameStrata("DIALOG")
     dialog:SetMovable(true)
@@ -2285,12 +2353,43 @@ function showSettingsDialog()
     title:SetPoint("TOP", 0, -15)
     title:SetText("Настройки")
     
-    local sliderText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    sliderText:SetPoint("TOP", 0, -45)
+    local tabContent = {}
+    
+    local tab1 = CreateFrame("Button", nil, dialog)
+    tab1:SetWidth(100)
+    tab1:SetHeight(22)
+    tab1:SetPoint("TOPLEFT", 15, -35)
+    tab1:SetText("Основные")
+    tab1:SetNormalFontObject("GameFontNormal")
+    tab1:SetHighlightFontObject("GameFontHighlight")
+    
+    local tab2 = CreateFrame("Button", nil, dialog)
+    tab2:SetWidth(100)
+    tab2:SetHeight(22)
+    tab2:SetPoint("LEFT", tab1, "RIGHT", 5, 0)
+    tab2:SetText("Фреймы")
+    tab2:SetNormalFontObject("GameFontNormal")
+    tab2:SetHighlightFontObject("GameFontHighlight")
+    
+    local function hideAllTabs()
+        for _, content in pairs(tabContent) do
+            content:Hide()
+        end
+    end
+    
+    local content1 = CreateFrame("Frame", nil, dialog)
+    content1:SetAllPoints(dialog)
+    content1:SetPoint("TOPLEFT", 15, -65)
+    content1:SetPoint("BOTTOMRIGHT", -15, 15)
+    content1:Hide()
+    tabContent[1] = content1
+    
+    local sliderText = content1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    sliderText:SetPoint("TOPLEFT", 5, -10)
     sliderText:SetText("Время до применения: " .. moveSettings.countdownDuration .. " сек")
     
-    local slider = CreateFrame("Slider", "SettingsCountdownSlider", dialog, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", 20, -65)
+    local slider = CreateFrame("Slider", "SettingsCountdownSlider", content1, "OptionsSliderTemplate")
+    slider:SetPoint("TOPLEFT", 5, -30)
     slider:SetWidth(200)
     slider:SetHeight(20)
     slider:SetMinMaxValues(3, 15)
@@ -2302,23 +2401,94 @@ function showSettingsDialog()
         sliderText:SetText("Время до применения: " .. value .. " сек")
     end)
     
-    local statusText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    statusText:SetPoint("BOTTOM", 0, 45)
-    statusText:SetText("")
-    statusText:SetTextColor(0, 1, 0, 1)
+    local statusText1 = content1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    statusText1:SetPoint("TOPLEFT", 5, -60)
+    statusText1:SetText("")
+    statusText1:SetTextColor(0, 1, 0, 1)
     
-    local saveButton = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+    local saveButton = CreateFrame("Button", nil, content1, "UIPanelButtonTemplate")
     saveButton:SetWidth(100)
     saveButton:SetHeight(22)
-    saveButton:SetPoint("BOTTOM", 0, 15)
+    saveButton:SetPoint("TOPLEFT", 5, -80)
     saveButton:SetText("Сохранить")
     saveButton:SetScript("OnClick", function()
         moveSettings.countdownDuration = slider:GetValue()
-        statusText:SetText("Настройки сохранены!")
-        C_Timer.After(2, function()
-            statusText:SetText("")
+        statusText1:SetText("Настройки сохранены!")
+        local hideStatusTimer = CreateTimer(2, function()
+            statusText1:SetText("")
         end)
+        StartTimer(hideStatusTimer)
     end)
+    
+    local content2 = CreateFrame("Frame", nil, dialog)
+    content2:SetAllPoints(dialog)
+    content2:SetPoint("TOPLEFT", 15, -65)
+    content2:SetPoint("BOTTOMRIGHT", -15, 15)
+    content2:Hide()
+    tabContent[2] = content2
+    
+    local scrollFrame = CreateFrame("ScrollFrame", "MoveSettingsScrollFrame", content2)
+    scrollFrame:SetPoint("TOPLEFT", 0, -5)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -25, 40)
+    
+    local scrollBar = CreateFrame("Slider", "MoveSettingsScrollFrameScrollBar", scrollFrame, "UIPanelScrollBarTemplate")
+    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -16)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 16)
+    scrollBar:SetMinMaxValues(0, 0)
+    scrollBar:SetValueStep(1)
+    
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(260)
+    scrollChild:SetHeight(1)
+    scrollFrame:SetScrollChild(scrollChild)
+    
+    scrollBar:SetScript("OnValueChanged", function(self, value)
+        scrollChild:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, value)
+    end)
+    
+    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+        local newValue = scrollBar:GetValue() - (delta * 20)
+        local minValue, maxValue = scrollBar:GetMinMaxValues()
+        if newValue < minValue then
+            newValue = minValue
+        elseif newValue > maxValue then
+            newValue = maxValue
+        end
+        scrollBar:SetValue(newValue)
+    end)
+    
+    local statusText2 = content2:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    statusText2:SetPoint("BOTTOMLEFT", 5, 35)
+    statusText2:SetText("")
+    statusText2:SetTextColor(0, 1, 0, 1)
+    
+    local resetAllButton = CreateFrame("Button", nil, content2, "UIPanelButtonTemplate")
+    resetAllButton:SetWidth(150)
+    resetAllButton:SetHeight(22)
+    resetAllButton:SetPoint("BOTTOM", 0, 10)
+    resetAllButton:SetText("Сбросить все фреймы")
+    resetAllButton:SetScript("OnClick", function()
+        resetAllFrames()
+        statusText2:SetText("Все фреймы сброшены!")
+        local hideStatusTimer = CreateTimer(2, function()
+            statusText2:SetText("")
+        end)
+        StartTimer(hideStatusTimer)
+        updateFramesList(scrollChild, scrollFrame, statusText2, scrollBar)
+    end)
+    
+    tab1:SetScript("OnClick", function()
+        hideAllTabs()
+        content1:Show()
+    end)
+    
+    tab2:SetScript("OnClick", function()
+        hideAllTabs()
+        content2:Show()
+        updateFramesList(scrollChild, scrollFrame, statusText2, scrollBar)
+    end)
+    
+    tab1:GetScript("OnClick")()
     
     local closeButton = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
@@ -2327,6 +2497,73 @@ function showSettingsDialog()
     end)
     
     dialog:Show()
+end
+
+function updateFramesList(scrollChild, scrollFrame, statusText, scrollBar)
+    local children = {scrollChild:GetChildren()}
+    for _, child in ipairs(children) do
+        if child then
+            child:Hide()
+        end
+    end
+    
+    if not nsDbc['frames'] then
+        nsDbc['frames'] = {}
+    end
+    
+    local yOffset = 0
+    local hasFrames = false
+    
+    for frameName, data in pairs(nsDbc['frames']) do
+        if data.defaultPosition or data.position or data.defaultAlpha or data.alphaSettings then
+            hasFrames = true
+            
+            local row = CreateFrame("Frame", nil, scrollChild)
+            row:SetWidth(260)
+            row:SetHeight(25)
+            row:SetPoint("TOPLEFT", 0, yOffset)
+            
+            local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameText:SetPoint("LEFT", 5, 0)
+            nameText:SetText(frameName)
+            
+            local resetButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            resetButton:SetWidth(25)
+            resetButton:SetHeight(20)
+            resetButton:SetPoint("RIGHT", -5, 0)
+            resetButton:SetText("X")
+            resetButton:SetScript("OnClick", function()
+                resetSingleFrame(frameName)
+                statusText:SetText(frameName .. " сброшен!")
+                local hideStatusTimer = CreateTimer(2, function()
+                    statusText:SetText("")
+                end)
+                StartTimer(hideStatusTimer)
+                updateFramesList(scrollChild, scrollFrame, statusText, scrollBar)
+            end)
+            
+            yOffset = yOffset - 25
+        end
+    end
+    
+    if not hasFrames then
+        local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        emptyText:SetPoint("TOPLEFT", 5, 0)
+        emptyText:SetText("Нет измененных фреймов")
+    end
+    
+    scrollChild:SetHeight(math.abs(yOffset) + 5)
+    
+    local scrollHeight = math.abs(yOffset)
+    local frameHeight = scrollFrame:GetHeight()
+    if scrollHeight > frameHeight then
+        scrollBar:SetMinMaxValues(0, scrollHeight - frameHeight)
+        scrollBar:Show()
+    else
+        scrollBar:SetMinMaxValues(0, 0)
+        scrollBar:Hide()
+    end
+    scrollBar:SetValue(0)
 end
 
 function applyAlpha(frameName)
@@ -2373,6 +2610,15 @@ function move(saveTable)
     
     local frameName = frame:GetName()
     saveTable = saveTable or {}
+    
+    if not saveTable[frameName] then
+        saveTable[frameName] = {}
+    end
+    
+    if not saveTable[frameName].defaultPosition then
+        local point, _, relPoint, x, y = frame:GetPoint()
+        saveTable[frameName].defaultPosition = {point, relPoint, x, y}
+    end
 
     if not frame.moveToggle then
         local mover = CreateFrame("Frame", nil, frame)
@@ -2414,6 +2660,70 @@ function move(saveTable)
     return saveTable
 end
 
+function resetSingleFrame(frameName)
+    if not nsDbc['frames'] or not nsDbc['frames'][frameName] then
+        return
+    end
+    
+    local frame = _G[frameName]
+    if not frame then
+        nsDbc['frames'][frameName] = nil
+        return
+    end
+    
+    local data = nsDbc['frames'][frameName]
+    
+    if data.defaultPosition then
+        frame:ClearAllPoints()
+        frame:SetPoint(data.defaultPosition[1], UIParent, data.defaultPosition[2], data.defaultPosition[3], data.defaultPosition[4])
+    end
+    
+    if data.defaultAlpha then
+        frame:SetAlpha(data.defaultAlpha)
+    else
+        frame:SetAlpha(1.0)
+    end
+    
+    frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
+    frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    frame:SetScript("OnEvent", nil)
+    
+    nsDbc['frames'][frameName] = nil
+    
+    print(frameName .. " сброшен до стандартных настроек")
+end
+
+function resetAllFrames()
+    if not nsDbc['frames'] then
+        nsDbc['frames'] = {}
+        return
+    end
+    
+    for frameName, data in pairs(nsDbc['frames']) do
+        local frame = _G[frameName]
+        if frame then
+            if data.defaultPosition then
+                frame:ClearAllPoints()
+                frame:SetPoint(data.defaultPosition[1], UIParent, data.defaultPosition[2], data.defaultPosition[3], data.defaultPosition[4])
+            end
+            
+            if data.defaultAlpha then
+                frame:SetAlpha(data.defaultAlpha)
+            else
+                frame:SetAlpha(1.0)
+            end
+            
+            frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
+            frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+            frame:SetScript("OnEvent", nil)
+        end
+    end
+    
+    nsDbc['frames'] = {}
+    
+    print("Все фреймы сброшены до стандартных настроек")
+end
+
 function RestoreFramePositions(saveTable)
     if not saveTable then return end
     
@@ -2435,15 +2745,29 @@ function remove()
     move(nsDbc['frames'])
 end
 
-function resetF()
-    nsDbc['frames'] = nil
-end
-
 hooksecurefunc("ToggleDropDownMenu", function(level, value, dropDownFrame, anchorName, xOffset, yOffset, menuList, button)
     if dropDownFrame and dropDownFrame:GetName() == "PlayerFrameDropDown" then
         AddCustomMenuItems()
     end
 end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- Проверяем выход фреймов за пределы экрана
 
