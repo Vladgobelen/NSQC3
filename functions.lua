@@ -2640,12 +2640,14 @@ function move(saveTable)
         mover:SetFrameStrata("TOOLTIP")
         mover:SetScript("OnMouseDown", function(self, button)
             if button == "LeftButton" then
+                frame:SetMovable(true)
                 frame:StartMoving()
             end
         end)
         mover:SetScript("OnMouseUp", function(self, button)
             if button == "LeftButton" then
                 frame:StopMovingOrSizing()
+                frame:SetMovable(false)
                 local point, _, relPoint, x, y = frame:GetPoint()
                 if not saveTable[frameName] then
                     saveTable[frameName] = {}
