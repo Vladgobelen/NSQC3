@@ -2053,26 +2053,39 @@ function move(saveTable)
     saveTable = saveTable or {}
 
     if not frame.moveToggle then
-        -- Включение перемещения
-        frame:SetMovable(true)
-        frame:EnableMouse(true)
-        frame:RegisterForDrag("LeftButton")
-        
-        frame:SetScript("OnDragStart", frame.StartMoving)
-        frame:SetScript("OnDragStop", function(self)
-            self:StopMovingOrSizing()
-            local point, _, relPoint, x, y = self:GetPoint()
-            saveTable[frameName] = {point, relPoint, x, y}
-            print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
+        -- Создаём невидимый фрейм-хендлер поверх целевого
+        local mover = CreateFrame("Frame", nil, frame)
+        mover:SetAllPoints(frame)
+        mover:EnableMouse(true)
+        mover:SetFrameStrata("TOOLTIP")
+        mover:SetScript("OnMouseDown", function(self, button)
+            if button == "LeftButton" then
+                frame:StartMoving()
+            end
+        end)
+        mover:SetScript("OnMouseUp", function(self, button)
+            if button == "LeftButton" then
+                frame:StopMovingOrSizing()
+                local point, _, relPoint, x, y = frame:GetPoint()
+                saveTable[frameName] = {point, relPoint, x, y}
+                print(string.format("Позиция сохранена: %s (%.1f, %.1f)", frameName, x, y))
+                
+                -- Убираем mover
+                self:Hide()
+                frame.moveToggle = nil
+                frame.moverFrame = nil
+            end
         end)
         
+        frame.moverFrame = mover
         frame.moveToggle = true
+        print("Фрейм " .. frameName .. " готов к перемещению. Зажмите ЛКМ и тяните.")
     else
         -- Выключение перемещения
-        frame:SetMovable(false)
-        frame:EnableMouse(false)
-        frame:SetScript("OnDragStart", nil)
-        frame:SetScript("OnDragStop", nil)
+        if frame.moverFrame then
+            frame.moverFrame:Hide()
+            frame.moverFrame = nil
+        end
         frame.moveToggle = nil
     end
     
@@ -2111,6 +2124,9 @@ local function AddCustomMenuItems()
     local info1 = {}
     info1.text = "Сдвинуть фрейм"
     info1.func = function()
+        -- Закрываем меню
+        CloseDropDownMenus()
+        
         print("Наведите мышь на нужный фрейм")
         
         -- Создаём рамку для текста по центру экрана
@@ -2151,17 +2167,16 @@ local function AddCustomMenuItems()
         end)
     end
     info1.notCheckable = true
-    info1.keepShownOnClick = true
     
     -- Пункт 2: Сбросить фреймы
     local info2 = {}
     info2.text = "Сбросить фреймы"
     info2.func = function()
+        CloseDropDownMenus()
         resetF()
         print("Позиции фреймов сброшены!")
     end
     info2.notCheckable = true
-    info2.keepShownOnClick = true
     
     -- Добавляем пункты в меню
     UIDropDownMenu_AddButton(info1, UIDROPDOWN_MENU_LEVEL)
