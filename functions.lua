@@ -2099,6 +2099,82 @@ function resetF()
     nsDbc['frames'] = nil
 end
 
+local countdownTimer = nil
+local countdownValue = 0
+
+-- Функция для создания/обновления пунктов меню
+local function AddCustomMenuItems()
+    local dropdownMenu = _G["PlayerFrameDropDown"]
+    if not dropdownMenu then return end
+    
+    -- Пункт 1: Сдвинуть фрейм
+    local info1 = {}
+    info1.text = "Сдвинуть фрейм"
+    info1.func = function()
+        print("Наведите мышь на нужный фрейм")
+        
+        -- Создаём рамку для текста по центру экрана
+        local textFrame = CreateFrame("Frame", "MoveCountdownFrame", UIParent)
+        textFrame:SetWidth(300)
+        textFrame:SetHeight(50)
+        textFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        textFrame:SetFrameStrata("TOOLTIP")
+        
+        local text = textFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        text:SetPoint("CENTER")
+        text:SetText("Наведите мышь на нужный фрейм: 10")
+        
+        -- Запускаем отсчёт
+        countdownValue = 10
+        if countdownTimer then
+            countdownTimer:Cancel()
+        end
+        
+        countdownTimer = C_Timer.NewTicker(1, function()
+            countdownValue = countdownValue - 1
+            if countdownValue > 0 then
+                text:SetText("Наведите мышь на нужный фрейм: " .. countdownValue)
+            else
+                text:SetText("Сдвиг активирован!")
+                -- Запускаем remove() через функцию move
+                if nsDbc and nsDbc['frames'] then
+                    move(nsDbc['frames'])
+                end
+                countdownTimer:Cancel()
+                countdownTimer = nil
+                
+                -- Убираем текст через 2 секунды
+                C_Timer.After(2, function()
+                    textFrame:Hide()
+                end)
+            end
+        end)
+    end
+    info1.notCheckable = true
+    info1.keepShownOnClick = true
+    
+    -- Пункт 2: Сбросить фреймы
+    local info2 = {}
+    info2.text = "Сбросить фреймы"
+    info2.func = function()
+        resetF()
+        print("Позиции фреймов сброшены!")
+    end
+    info2.notCheckable = true
+    info2.keepShownOnClick = true
+    
+    -- Добавляем пункты в меню
+    UIDropDownMenu_AddButton(info1, UIDROPDOWN_MENU_LEVEL)
+    UIDropDownMenu_AddButton(info2, UIDROPDOWN_MENU_LEVEL)
+end
+
+-- Хук на функцию показа меню
+hooksecurefunc("ToggleDropDownMenu", function(level, value, dropDownFrame, anchorName, xOffset, yOffset, menuList, button)
+    if dropDownFrame and dropDownFrame:GetName() == "PlayerFrameDropDown" then
+        AddCustomMenuItems()
+    end
+end)
+
 -- Проверяем выход фреймов за пределы экрана
 
 function eCf(frameName, ...)

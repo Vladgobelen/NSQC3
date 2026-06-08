@@ -10,6 +10,7 @@ function CreateIntervalTimer(interval, callback)
     timer.interval = interval
     timer.callback = callback
     timer:SetScript("OnUpdate", function(self, dt)
+        print(555)
         if not self:IsShown() then return end
         self.elapsed = self.elapsed + dt
         if self.elapsed >= self.interval then
