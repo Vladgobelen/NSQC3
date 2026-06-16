@@ -22,6 +22,18 @@ local triggersByAddress = {
             stopOnMatch = true,
         }
     },
+    ["prefix:enAlToGi"] = {
+        {
+            keyword = {
+                { word = "enAlToGi", position = 1, source = "prefix" },
+            },
+            func = "enAlToGi",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
     ["prefix:NSQC3_GAME_dice"] = {
         {
             keyword = {
@@ -1074,6 +1086,31 @@ local triggersByAddress = {
         }
     },
 }
+
+function enAlToGi(channel, text, sender, prefix)
+    -- Ваши переменные, которые уже успешно извлекают данные
+    local gp = prefix:match(WORD_POSITION_PATTERNS[2])
+    local nick = text:match(WORD_POSITION_PATTERNS[1])
+
+    -- 1. Базовая проверка на валидность данных
+    if not gp or not nick or type(nick) ~= "string" or nick == "" then
+        return
+    end
+
+    -- 2. Очищаем ник от суффикса сервера на всякий случай (например, "Никколо-Сервер" -> "Никколо")
+    -- Это гарантирует 100% совпадение с полем original_nick в таблице gp_data
+    local cleanNick = nick:match("^(.-)-") or nick
+
+    -- 3. Обновляем данные через экземпляр класса gpDb
+    if gpDb and type(gpDb.UpdateGpEntry) == "function" then
+        -- Встроенный метод UpdateGpEntry делает всё сам:
+        -- а) Находит игрока в self.gp_data по original_nick
+        -- б) Обновляет значение gp (внутри него уже есть tonumber)
+        -- в) Вызывает self:SortData() для правильной сортировки
+        -- г) Вызывает self:UpdateWindow() для мгновенного обновления интерфейса
+        gpDb:UpdateGpEntry(cleanNick, gp)
+    end
+end
 
 function nsWatchUpdate(channel, text, sender, prefix)
     local ownerName, rest = text:match("^(%S+)%s+(.+)$")

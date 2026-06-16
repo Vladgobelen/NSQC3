@@ -1,5 +1,6 @@
 ns_td_tooltips = {}
 ns_td_tooltips["road"] = "Объект: Дорога\nОписание: Стандартный маршрут для перемещения. Проложен вручную гильдией."
+ns_td_tooltips["bas"] = "Объект: Бассейн\nОписание: Небольшой водоём для отдыха и рыбалки. И бобров."
 
 -- ==========================================================
 -- УНИВЕРСАЛЬНЫЙ ТАЙМЕР
@@ -10,7 +11,6 @@ function CreateIntervalTimer(interval, callback)
     timer.interval = interval
     timer.callback = callback
     timer:SetScript("OnUpdate", function(self, dt)
-        print(555)
         if not self:IsShown() then return end
         self.elapsed = self.elapsed + dt
         if self.elapsed >= self.interval then
@@ -119,6 +119,9 @@ function NSTDc:CreatePanel()
         self.panel:SetPoint("BOTTOMRIGHT", WorldMapFrame, "BOTTOMRIGHT", -5, 5)
     end
 
+    -- ==========================================================
+    -- КНОПКА "ДОРОГА"
+    -- ==========================================================
     self.roadBtn = CreateFrame("Button", "NSTDc_RoadBtn", self.panel)
     self.roadBtn:SetSize(32, 32)
     self.roadBtn:SetPoint("TOP", self.panel, "TOP", 0, -10)
@@ -145,6 +148,34 @@ function NSTDc:CreatePanel()
             end
             
             SendAddonMessage("NSTD", requestMsg, "GUILD")
+        else
+            print("|cff00ff00[NSTDc]|r Невозможно определить текущую зону для постройки.")
+        end
+    end)
+
+    -- ==========================================================
+    -- КНОПКА "БАССЕЙН"
+    -- ==========================================================
+    self.basBtn = CreateFrame("Button", "NSTDc_BasBtn", self.panel)
+    self.basBtn:SetSize(32, 32)
+    self.basBtn:SetPoint("TOP", self.roadBtn, "BOTTOM", 0, -5)
+
+    local basTex = self.basBtn:CreateTexture(nil, "ARTWORK")
+    basTex:SetAllPoints(self.basBtn)
+    basTex:SetTexture("Interface\\AddOns\\NSQC3\\libs\\bas.tga")
+
+    self.basBtn:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.basBtn, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Бассейн. Стоимость: 5 камня.", 0.4, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    self.basBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    self.basBtn:SetScript("OnClick", function()
+        local cont = GetCurrentMapContinent()
+        local zone = GetCurrentMapZone()
+        if cont > 0 and zone > 0 then
+            SendAddonMessage("NSTD", "basNew:" .. cont .. ":" .. zone, "GUILD")
         else
             print("|cff00ff00[NSTDc]|r Невозможно определить текущую зону для постройки.")
         end
@@ -225,7 +256,7 @@ function NSTDc:DrawAllMarkers()
         local texturePath = string.format("Interface\\AddOns\\NSQC3\\libs\\%s.tga", data.type)
         local marker = CreateFrame("Frame", nil, WorldMapDetailFrame)
         marker:SetSize(32, 32)
-        marker:SetFrameLevel(100)
+        marker:SetFrameStrata("HIGH")   
         marker:EnableMouse(true)
         
         local tex = marker:CreateTexture(nil, "OVERLAY")
@@ -360,3 +391,38 @@ function NSTDc:PlayImpactAndShake()
         end
     end)
 end
+
+
+
+
+local frame = CreateFrame("Frame")
+local timer = 0
+local wasFalling = false
+
+frame:SetScript("OnUpdate", function(self, elapsed)
+    timer = timer + elapsed
+    if timer < 0.1 then return end
+    timer = 0
+    
+    -- Проверяем: персонаж падает?
+    local isFalling = IsFalling()
+    
+    -- Отсекаем полёт и плавание (чтобы только чистое падение)
+    local isFlying = IsFlying()
+    local isSwimming = IsSwimming()
+    
+    local pureFalling = isFalling and not isFlying and not isSwimming
+    
+    -- Только при изменении состояния
+    if pureFalling ~= wasFalling then
+        wasFalling = pureFalling
+        if pureFalling then
+            print("|cffff4444ПАДАЮ!|r")
+            -- Твой код при начале падения
+        else
+            print("|cff44ff44Приземлился|r")
+            -- Твой код при окончании падения
+        end
+    end
+end)
+

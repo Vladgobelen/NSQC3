@@ -1749,13 +1749,14 @@ function GpDb:_UpdateFromGuild()
     self.gp_data = {}
     local totalWithGP = 0
     local totalMembers = GetNumGuildMembers()
+    
     -- Синхронизируем галочку с текущим состоянием рейда
     local inRaid = IsInRaid()
     self.window.raidOnlyCheckbox:SetChecked(inRaid)
     local raidOnlyMode = inRaid and self.window.raidOnlyCheckbox:GetChecked()
     local showAllGuild = self.window.guildCheckbox:GetChecked()
     local showOfflineOnly = showAllGuild and self.window.offCheckbox:GetChecked()
-
+    
     -- Блокировка галочки "Гильдия" и "Off", если включён "Только рейд"
     if raidOnlyMode then
         self.window.guildCheckbox:SetChecked(false)
@@ -1771,26 +1772,26 @@ function GpDb:_UpdateFromGuild()
             self.window.offCheckbox:Enable()
         end
     end
-
+    
     if not IsInGuild() then
         print("|cFFFF0000ГП:|r Вы не состоите в гильдии")
         self:UpdateWindow()
         return
     end
-
+    
     -- Обновляем данные гильдии
     GuildRoster()
-
+    
     -- Сохраняем self в локальную переменную для замыкания
     local db = self
-
+    
     -- Для 3.3.5 используем простой таймер без возможности отмены
     local timerFrame = CreateFrame("Frame")
     timerFrame:SetScript("OnUpdate", function(selfFrame, elapsed)
         selfFrame.elapsed = (selfFrame.elapsed or 0) + elapsed
         if selfFrame.elapsed >= 0.01 then
             selfFrame:SetScript("OnUpdate", nil)
-
+            
             -- Собираем полный список членов гильдии для быстрой проверки
             local guildRosterInfo = {}
             for j = 1, GetNumGuildMembers() do
@@ -1818,17 +1819,19 @@ function GpDb:_UpdateFromGuild()
                     }
                 end
             end
-
+            
             -- Режим "Только рейд" и мы в рейде
             if raidOnlyMode then
                 local numRaidMembers = GetNumGroupMembers()
-                -- Заполняем данные всех игроков рейда, которые есть в гильдии
+                -- Заполняем данные всех игроков рейда
                 for i = 1, numRaidMembers do
                     local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
                     if raidName then
                         local plainName = raidName:match("^(.-)-") or raidName
                         local guildInfo = guildRosterInfo[plainName]
+                        
                         if guildInfo then
+                            -- === ИГРОК ИЗ ГИЛЬДИИ ===
                             local gp = 0
                             local publicNote = guildInfo.publicNote or ""
                             -- Парсим ГП из officerNote
@@ -1841,35 +1844,55 @@ function GpDb:_UpdateFromGuild()
                                     gp = tonumber(words[3]) or 0
                                 end
                             end
+                            
                             if gp > 0 then
                                 totalWithGP = totalWithGP + 1
                             end
+                            
                             local displayName = raidName
                             if publicNote and publicNote ~= "" then
                                 displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
                             end
+                            
                             table.insert(db.gp_data, {
                                 nick = displayName,
                                 original_nick = plainName,
                                 gp = gp,
                                 classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                                 classFileName = classFileName,
-                                playerID = guildInfo.playerID
+                                playerID = guildInfo.playerID,
+                                isGuildMember = true -- Новый флаг
                             })
+                        else
+                            -- === ИГРОК НЕ ИЗ ГИЛЬДИИ ===
+                            local gp = 0 -- По умолчанию 0, обновится при ответе на GetGPA
+                            local displayName = raidName
+                            
+                            table.insert(db.gp_data, {
+                                nick = displayName,
+                                original_nick = plainName,
+                                gp = gp,
+                                classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
+                                classFileName = classFileName,
+                                playerID = nil,
+                                isGuildMember = false -- Новый флаг
+                            })
+                            
+                            -- Запрашиваем данные об игроке через чат аддонов гильдии
+                            SendAddonMessage("GetGPA", plainName, "GUILD")
                         end
                     end
                 end
+                
             elseif showAllGuild then
                 -- Режим "Гильдия": показываем всех членов гильдии
                 for i = 1, GetNumGuildMembers() do
                     local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
                     local online = select(9, GetGuildRosterInfo(i))
                     if name then
-                        -- === ИСПРАВЛЕННАЯ ЛОГИКА ФИЛЬТРАЦИИ ===
                         if not showOfflineOnly and not online then
                             -- Пропускаем офлайн, если "Off" выключена
                         else
-                            -- Отображаем: всех, если "Off" включена; только онлайн — если выключена
                             local plainName = name:match("^(.-)-") or name
                             local gp = 0
                             local playerID = nil
@@ -1898,7 +1921,8 @@ function GpDb:_UpdateFromGuild()
                                 gp = gp,
                                 classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                                 classFileName = classFileName,
-                                playerID = playerID
+                                playerID = playerID,
+                                isGuildMember = true
                             })
                         end
                     end
@@ -1908,7 +1932,6 @@ function GpDb:_UpdateFromGuild()
                 for i = 1, GetNumGuildMembers() do
                     local name, _, _, _, _, _, publicNote, officerNote, _, _, classFileName = GetGuildRosterInfo(i)
                     if name and officerNote and officerNote ~= "" then
-                        -- Удаляем серверную часть имени
                         local plainName = name:match("^(.-)-") or name
                         local words = {}
                         for word in officerNote:gmatch("%S+") do
@@ -1929,14 +1952,15 @@ function GpDb:_UpdateFromGuild()
                                     gp = gp,
                                     classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                                     classFileName = classFileName,
-                                    playerID = playerID
+                                    playerID = playerID,
+                                    isGuildMember = true
                                 })
                             end
                         end
                     end
                 end
             end
-
+            
             -- Применяем фильтр
             if db.filterText and db.filterText ~= "" then
                 local filteredData = {}
@@ -1949,7 +1973,7 @@ function GpDb:_UpdateFromGuild()
                 end
                 db.gp_data = filteredData
             end
-
+            
             -- Обновляем UI
             db.window.countText:SetText(string.format("Отображается игроков: %d", #db.gp_data))
             db.window.totalText:SetText(string.format("Всего игроков с ГП: %d (из %d в гильдии)", totalWithGP, GetNumGuildMembers()))
@@ -1963,7 +1987,7 @@ end
 function GpDb:Show()
     self.window:Show()
     
-    -- Автоматически включаем режим "Только рейд" если мы в рейде
+    -- Автоматически включаем режим "Только рейд", если мы в рейде
     if IsInRaid() then
         self.window.raidOnlyCheckbox:SetChecked(true)
     else
@@ -1972,26 +1996,30 @@ function GpDb:Show()
     
     -- Принудительно обновляем данные гильдии перед показом
     GuildRoster()
--- Сохраняем ссылку на оригинальный объект, так как внутри OnUpdate `self` будет указывать на фрейм таймера
-local ctx = self
-local timerFrame = CreateFrame("Frame")
-timerFrame:Hide()
-
-local elapsed = 0
-local delay = 0.1
-
-timerFrame:SetScript("OnUpdate", function(frame, dt)
-    elapsed = elapsed + dt
-    if elapsed >= delay then
-        -- Полная остановка и очистка таймера
-        frame:SetScript("OnUpdate", nil)
-        frame:Hide()
-        
-        -- Выполнение отложенных методов в контексте оригинального объекта
-        ctx:_UpdateFromGuild()
-        ctx:UpdateWindow()
-    end
-end)
+    
+    -- === ВЫЗОВ НОВОЙ ФУНКЦИИ ПРИ ОТКРЫТИИ ОКНА ===
+    self:RequestNonGuildGP()
+    -- ==============================================
+    
+    -- Сохраняем ссылку на оригинальный объект, так как внутри OnUpdate `self` будет указывать на фрейм таймера
+    local ctx = self
+    local timerFrame = CreateFrame("Frame")
+    timerFrame:Hide()
+    local elapsed = 0
+    local delay = 0.1
+    
+    timerFrame:SetScript("OnUpdate", function(frame, dt)
+        elapsed = elapsed + dt
+        if elapsed >= delay then
+            -- Полная остановка и очистка таймера
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+            
+            -- Выполнение отложенных методов в контексте оригинального объекта
+            ctx:_UpdateFromGuild()
+            ctx:UpdateWindow()
+        end
+    end)
 end
 
 function GpDb:AddGpEntry(nick, gp, playerID)
@@ -2137,12 +2165,14 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow:SetSize(500, self.window:GetHeight() * 0.5)
     self.raidWindow:SetPoint("BOTTOMLEFT", self.window, "BOTTOMRIGHT", 5, 0)
     self.raidWindow:SetMovable(false)
-    -- Фон окна — ИСПРАВЛЕНО: используем CreateTexture
+    
+    -- Фон окна
     self.raidWindow.background = self.raidWindow:CreateTexture(nil, "BACKGROUND")
     self.raidWindow.background:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.raidWindow.background:SetVertexColor(0, 0, 0)
     self.raidWindow.background:SetAlpha(1)
     self.raidWindow.background:SetAllPoints(true)
+    
     -- Граница окна
     self.raidWindow.borderFrame = CreateFrame("Frame", nil, self.raidWindow)
     self.raidWindow.borderFrame:SetPoint("TOPLEFT", -3, 3)
@@ -2152,18 +2182,20 @@ function GpDb:_CreateRaidSelectionWindow()
         edgeSize = 16,
         insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
+    
     -- Кнопка закрытия
     self.raidWindow.closeButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelCloseButton")
     self.raidWindow.closeButton:SetPoint("TOPRIGHT", -5, -5)
-    self.raidWindow.closeButton:SetScript("OnClick", function() 
-        self.raidWindow:Hide() 
+    self.raidWindow.closeButton:SetScript("OnClick", function()
+        self.raidWindow:Hide()
     end)
+    
     -- Выпадающий список рейдов
     self.raidWindow.dropdown = CreateFrame("Frame", "GpDbRaidDropdown", self.raidWindow, "UIDropDownMenuTemplate")
     self.raidWindow.dropdown:SetPoint("TOPLEFT", 10, -10)
     self.raidWindow.dropdown:SetPoint("RIGHT", -260, 0)
     self.raidWindow.dropdown:SetHeight(32)
-    -- Функция обновления текста в выпадающем списке
+    
     local function UpdateDropdownText()
         if self.raidWindow.selectedRaidId then
             for i = 1, GetNumSavedInstances() do
@@ -2177,7 +2209,7 @@ function GpDb:_CreateRaidSelectionWindow()
             UIDropDownMenu_SetText(self.raidWindow.dropdown, "Выберите рейд")
         end
     end
-    -- Функция инициализации выпадающего списка
+    
     local function InitializeDropdown(frame, level, menuList)
         local info = UIDropDownMenu_CreateInfo()
         for i = 1, GetNumSavedInstances() do
@@ -2217,15 +2249,18 @@ function GpDb:_CreateRaidSelectionWindow()
         info.notCheckable = true
         UIDropDownMenu_AddButton(info)
     end
+    
     UIDropDownMenu_Initialize(self.raidWindow.dropdown, InitializeDropdown)
     UIDropDownMenu_SetWidth(self.raidWindow.dropdown, 200)
     UIDropDownMenu_SetButtonWidth(self.raidWindow.dropdown, 224)
     UIDropDownMenu_JustifyText(self.raidWindow.dropdown, "LEFT")
     UpdateDropdownText()
+    
     -- Текст "Другое"
     self.raidWindow.otherText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.raidWindow.otherText:SetPoint("TOPLEFT", self.raidWindow.dropdown, "BOTTOMLEFT", 0, -10)
     self.raidWindow.otherText:SetText("Другое:")
+    
     -- Поле ввода "Другое"
     self.raidWindow.editBox = CreateFrame("EditBox", "fdsfsda111111", self.raidWindow, "InputBoxTemplate")
     self.raidWindow.editBox:SetPoint("TOPLEFT", self.raidWindow.otherText, "BOTTOMLEFT", 0, -5)
@@ -2243,6 +2278,7 @@ function GpDb:_CreateRaidSelectionWindow()
             UpdateDropdownText()
         end
     end)
+    
     -- Галочка "Сохранить выбор"
     self.raidWindow.saveCheckbox = CreateFrame("CheckButton", nil, self.raidWindow, "UICheckButtonTemplate")
     self.raidWindow.saveCheckbox:SetPoint("TOPLEFT", self.raidWindow.editBox, "BOTTOMLEFT", 0, -10)
@@ -2255,6 +2291,7 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.saveCheckbox:SetScript("OnClick", function()
         self.saveSelectionEnabled = self.raidWindow.saveCheckbox:GetChecked()
     end)
+    
     -- Текст с выбранными игроками
     self.raidWindow.selectedPlayersText = self.raidWindow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     self.raidWindow.selectedPlayersText:SetPoint("TOPLEFT", self.raidWindow.saveCheckbox, "BOTTOMLEFT", 0, -5)
@@ -2263,6 +2300,7 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.selectedPlayersText:SetJustifyH("LEFT")
     self.raidWindow.selectedPlayersText:SetJustifyV("TOP")
     self.raidWindow.selectedPlayersText:SetWordWrap(true)
+    
     -- Кнопки быстрого ввода ГП
     local quickGPValues = {5, 10, 20, 25, 50, 100}
     local lastQuickButton
@@ -2273,7 +2311,7 @@ function GpDb:_CreateRaidSelectionWindow()
         if i == 1 then
             btn:SetPoint("BOTTOMLEFT", self.raidWindow.selectedPlayersText, "BOTTOMLEFT", 0, -20)
         else
-            btn:SetPoint("LEFT", lastQuickButton, "RIGHT", 2, 0)  -- уменьшен отступ до 2
+            btn:SetPoint("LEFT", lastQuickButton, "RIGHT", 2, 0)
         end
         btn:SetScript("OnClick", function()
             self.raidWindow.gpEditBox:SetText(tostring(value))
@@ -2281,23 +2319,24 @@ function GpDb:_CreateRaidSelectionWindow()
         end)
         lastQuickButton = btn
     end
+    
     -- Кнопка минуса
     local minusBtn = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
     minusBtn:SetSize(40, 22)
     minusBtn:SetText("-/+")
-    minusBtn:SetPoint("LEFT", lastQuickButton, "RIGHT", 2, 0)  -- уменьшен отступ до 2
+    minusBtn:SetPoint("LEFT", lastQuickButton, "RIGHT", 2, 0)
     minusBtn:SetScript("OnClick", function()
         local currentValue = tonumber(self.raidWindow.gpEditBox:GetText()) or 0
         self.raidWindow.gpEditBox:SetText(tostring(-currentValue))
         self.raidWindow.gpEditBox:HighlightText()
     end)
     lastQuickButton = minusBtn
-
+    
     -- Кнопка процента
     local percentBtn = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
     percentBtn:SetSize(27, 20)
     percentBtn:SetText("%")
-    percentBtn:SetPoint("LEFT", lastQuickButton, "RIGHT", 2, 0)  -- уменьшен отступ до 2
+    percentBtn:SetPoint("LEFT", lastQuickButton, "RIGHT", 2, 0)
     percentBtn:SetScript("OnClick", function()
         local inputText = self.raidWindow.gpEditBox:GetText()
         local percentValue = tonumber(inputText)
@@ -2305,19 +2344,17 @@ function GpDb:_CreateRaidSelectionWindow()
             print("|cFFFF0000ГП:|r Укажите положительное число для процента")
             return
         end
-
         local selected = self:GetSelectedEntries()
         if #selected ~= 1 then
             print("|cFFFF0000ГП:|r Процент можно применить только к одному игроку")
             return
         end
-
         local playerGp = selected[1].gp or 0
         local newGp = math.floor(playerGp * percentValue / 100)
         self.raidWindow.gpEditBox:SetText(tostring(newGp))
         self.raidWindow.gpEditBox:HighlightText()
     end)
-
+    
     -- Поле ввода ГП
     self.raidWindow.gpEditBox = CreateFrame("EditBox", "fdjkjfkjkj33333", self.raidWindow, "InputBoxTemplate")
     self.raidWindow.gpEditBox:SetPoint("BOTTOMLEFT", 10, 5)
@@ -2325,6 +2362,7 @@ function GpDb:_CreateRaidSelectionWindow()
     self.raidWindow.gpEditBox:SetAutoFocus(false)
     self.raidWindow.gpEditBox:SetScript("OnEscapePressed", function() self.raidWindow.gpEditBox:ClearFocus() end)
     self.raidWindow.gpEditBox:SetScript("OnEnterPressed", function() self.raidWindow.gpEditBox:ClearFocus() end)
+    
     -- Кнопка "Начислить"
     self.raidWindow.awardButton = CreateFrame("Button", nil, self.raidWindow, "UIPanelButtonTemplate")
     self.raidWindow.awardButton:SetPoint("BOTTOMRIGHT", -10, 5)
@@ -2360,41 +2398,88 @@ function GpDb:_CreateRaidSelectionWindow()
         else
             self.lastGPValue = gpValue
         end
+        
         local logStr
         if self.raidWindow.selectedRaidId then
             local cleanRaidName = (self.raidWindow.selectedRaidName or ""):gsub("%s+", "_")
-            logStr = string.format("%04d_%s_%d %d", 
-                self.raidWindow.selectedRaidId, 
-                cleanRaidName, 
+            logStr = string.format("%04d_%s_%d %d",
+                self.raidWindow.selectedRaidId,
+                cleanRaidName,
                 self.raidWindow.selectedRaidPlayers or 0,
                 gpValue)
         else
             local cleanOtherText = (self.lastOtherText or ""):gsub("%s+", "_")
             logStr = string.format("%s %d", cleanOtherText, gpValue)
         end
+        
         for index in pairs(self.selected_indices) do
             if self.gp_data[index] then
-                local nick = self.gp_data[index].original_nick
-                local playerID = self.gp_data[index].playerID or "UNKNOWN"
-                SendAddonMessage("nsGP1" .. " " .. gpValue, nick, "guild")
-                logStr = logStr .. " " .. playerID
-                self:AddLogEntry(gpValue, date("%H:%M"), UnitName("player"), 
+                local entry = self.gp_data[index]
+                local nick = entry.original_nick
+                
+                -- === ИЗМЕНЕНИЯ ЗДЕСЬ ===
+                -- Определяем префикс в зависимости от того, состоит ли игрок в гильдии
+                local prefix = entry.isGuildMember and "nsGP1" or "nsGP1A"
+                
+                -- Отправляем сообщение ВСЕГДА в гильдию, как вы указали
+                SendAddonMessage(prefix .. " " .. gpValue, nick, "GUILD")
+                
+                -- Формируем лог (если playerID нет, используем имя с префиксом N:)
+                local logIdentifier = entry.playerID or ("N:" .. nick)
+                logStr = logStr .. " " .. logIdentifier
+                
+                self:AddLogEntry(gpValue, date("%H:%M"), UnitName("player"),
                     self.raidWindow.selectedRaidName or self.raidWindow.editBox:GetText(), nick)
             end
         end
-        SendAddonMessage("nsGPlog", logStr, "guild")
+        
+        -- Отправляем общий лог (всегда в GUILD)
+        SendAddonMessage("nsGPlog", logStr, "GUILD")
+        
         for _, entry in ipairs(self:GetSelectedEntries()) do
             entry.gp = (entry.gp or 0) + gpValue
         end
         self:UpdateWindow()
         self.raidWindow:Hide()
     end)
+    
     self.raidWindow:SetScript("OnHide", function()
         if self.logWindow and self.logWindow:IsShown() then
             self.logWindow:SetHeight(self.window:GetHeight())
         end
     end)
     self.raidWindow:Hide()
+end
+
+function GpDb:RequestNonGuildGP()
+    -- Проверяем, находимся ли мы в рейде, так как запрос имеет смысл только для рейда
+    if not IsInRaid() then 
+        return 
+    end
+    
+    -- Собираем имена всех членов гильдии (без суффикса сервера) в таблицу для быстрого поиска
+    local guildNames = {}
+    for i = 1, GetNumGuildMembers() do
+        local name = GetGuildRosterInfo(i)
+        if name then
+            local plainName = name:match("^(.-)-") or name
+            guildNames[plainName] = true
+        end
+    end
+    
+    -- Проходим по всем участникам рейда
+    for i = 1, GetNumGroupMembers() do
+        local raidName = GetRaidRosterInfo(i)
+        if raidName then
+            local plainName = raidName:match("^(.-)-") or raidName
+            
+            -- Если игрока нет в списке гильдии, отправляем запрос данных
+            if not guildNames[plainName] then
+                -- Отправляем префикс "GetGPA" и ник игрока в теле сообщения в канал гильдии
+                SendAddonMessage("GetGPA", plainName, "GUILD")
+            end
+        end
+    end
 end
 
 function GpDb:_UpdatePlayerInfo()
