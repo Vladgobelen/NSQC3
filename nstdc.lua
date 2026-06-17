@@ -2,9 +2,6 @@ ns_td_tooltips = {}
 ns_td_tooltips["road"] = "Объект: Дорога\nОписание: Стандартный маршрут для перемещения. Проложен вручную гильдией."
 ns_td_tooltips["bas"] = "Объект: Бассейн\nОписание: Небольшой водоём для отдыха и рыбалки. И бобров."
 
--- ==========================================================
--- УНИВЕРСАЛЬНЫЙ ТАЙМЕР
--- ==========================================================
 function CreateIntervalTimer(interval, callback)
     local timer = CreateFrame("Frame")
     timer.elapsed = 0
@@ -21,9 +18,6 @@ function CreateIntervalTimer(interval, callback)
     return timer
 end
 
--- ==========================================================
--- ОСНОВНОЙ КЛАСС
--- ==========================================================
 NSTDc = {}
 NSTDc.__index = NSTDc
 
@@ -60,7 +54,7 @@ function NSTDc:CreateToggleButton()
     else
         self.toggleBtn:SetPoint("CENTER", WorldMapFrame, "CENTER", 0, 0)
     end
-    self.toggleBtn:SetText(" > ")
+    self.toggleBtn:SetText("   >   ")
     self.toggleBtn:SetFrameStrata("HIGH")
     self.toggleBtn:SetFrameLevel(100)
     self.toggleBtn:Show()
@@ -76,12 +70,10 @@ function NSTDc:TogglePanel()
         end
         return
     end
-
     if self.panel:IsShown() then
         self.panel:Hide()
         self.toggleBtn:SetText(">")
         self:HideAllMarkers()
-        
         if self.proximityTimer then
             self.proximityTimer:Hide()
         end
@@ -102,14 +94,25 @@ function NSTDc:CreatePanel()
     self.panel:SetWidth(42)
     local mapHeight = WorldMapFrame and WorldMapFrame:GetHeight() or 400
     self.panel:SetHeight(mapHeight)
-    self.panel:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 }
-    })
+    
+    local backdrop = {}
+    backdrop.bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background"
+    backdrop.edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border"
+    backdrop.tile = true
+    backdrop.tileSize = 16
+    backdrop.edgeSize = 16
+    
+    local insets = {}
+    insets.left = 4
+    insets.right = 4
+    insets.top = 4
+    insets.bottom = 4
+    backdrop.insets = insets
+    
+    self.panel:SetBackdrop(backdrop)
     self.panel:SetBackdropColor(0, 0, 0, 0.85)
     self.panel:SetBackdropBorderColor(1, 0, 0, 1)
+    
     if self.toggleBtn then
         self.panel:SetPoint("TOP", WorldMapFrame, "TOP", 0, -25)
         self.panel:SetPoint("LEFT", self.toggleBtn, "RIGHT", 5, 0)
@@ -118,10 +121,7 @@ function NSTDc:CreatePanel()
         self.panel:SetPoint("TOPRIGHT", WorldMapFrame, "TOPRIGHT", -5, -5)
         self.panel:SetPoint("BOTTOMRIGHT", WorldMapFrame, "BOTTOMRIGHT", -5, 5)
     end
-
-    -- ==========================================================
-    -- КНОПКА "ДОРОГА"
-    -- ==========================================================
+    
     self.roadBtn = CreateFrame("Button", "NSTDc_RoadBtn", self.panel)
     self.roadBtn:SetSize(32, 32)
     self.roadBtn:SetPoint("TOP", self.panel, "TOP", 0, -10)
@@ -153,9 +153,6 @@ function NSTDc:CreatePanel()
         end
     end)
 
-    -- ==========================================================
-    -- КНОПКА "БАССЕЙН"
-    -- ==========================================================
     self.basBtn = CreateFrame("Button", "NSTDc_BasBtn", self.panel)
     self.basBtn:SetSize(32, 32)
     self.basBtn:SetPoint("TOP", self.roadBtn, "BOTTOM", 0, -5)
@@ -183,18 +180,16 @@ function NSTDc:CreatePanel()
 
     self.panelCreated = true
     self.panel:Show()
-    self.toggleBtn:SetText(" < ")
+    self.toggleBtn:SetText("   <   ")
 end
 
 function NSTDc:RequestZoneData()
     local cont = GetCurrentMapContinent()
     local zone = GetCurrentMapZone()
-    
     if cont == 0 or zone == 0 then
         print("|cff00ff00[NSTDc]|r Невозможно определить зону.")
         return
     end
-
     self.receivedData = {}
 
     local requestMsg = string.format("getTD:%s:%s", cont, zone)
@@ -207,6 +202,8 @@ function NSTDc:RequestZoneData()
 end
 
 function NSTDc:HandleAddonMessage(text, sender)
+    print(string.format("|cff00ffff[NSTDc]|r Получено: [%s]", text))
+    
     if string.sub(text, 1, 5) == "EXEC:" then
         local _, _, chunkNum, totalChunks, code = string.find(text, "^EXEC:(%d+):(%d+):(.*)$")
         if chunkNum and totalChunks and code then
@@ -217,29 +214,50 @@ function NSTDc:HandleAddonMessage(text, sender)
         end
         return
     end
-    
-    local typeStr, xStr, yStr, statusStr, timestampStr = strsplit(" ", text)
-    if typeStr and xStr and yStr then
-        if typeStr == "EMPTY" then return end
-        local x = tonumber(xStr) / 100
-        local y = tonumber(yStr) / 100
+
+    if string.sub(text, 1, 18) == "bas_placed_success:" then
+        local _, _, bId, cStr, zStr, sXStr, sYStr = string.find(text, "^bas_placed_success:([^:]+):([^:]+):([^:]+):([^:]+):([^:]+)$")
+        if bId then
+            if not self.receivedData[bId] then
+                local newData = {}
+                newData.id = bId
+                newData.type = "bas"
+                self.receivedData[bId] = newData
+            end
+            self.receivedData[bId].x = tonumber(sXStr)
+            self.receivedData[bId].y = tonumber(sYStr)
+            self.receivedData[bId].status = "0"
+            self.receivedData[bId].timestamp = time()
+            if self.panel and self.panel:IsShown() then
+                self:DrawAllMarkers()
+            end
+            print("|cff00ff00[NSTDc]|r Бассейн успешно установлен сервером.")
+        end
+        return
+    end
+
+    if text == "EMPTY" then return end
+
+    local idStr, typeStr, xStr, yStr, statusStr, timestampStr = strsplit(" ", text)
+    if idStr and typeStr and xStr and yStr then
+        local x = tonumber(xStr)
+        local y = tonumber(yStr)
         if x and y and x > 0 and y > 0 then
-            -- ЗАЩИТА ОТ СНЭППИНГА: Если мы сейчас тащим этот тип объекта, 
-            -- и сервер присылает нам его же со статусом нашего имени, игнорируем обновление координат,
-            -- чтобы не сбрасывать локальное перетаскивание устаревшими данными с сервера.
             local myName = UnitName("player")
-            if statusStr == myName and self.attachedCargo and self.attachedCargo.type == typeStr then
+            if statusStr == myName and self.attachedCargo and self.attachedCargo.id == idStr then
                 return
             end
 
-            local key = string.format("%s_%.1f_%.1f", typeStr, x * 100, y * 100)
-            self.receivedData[key] = { 
-                type = typeStr, 
-                x = x, 
-                y = y, 
-                status = statusStr, 
-                timestamp = tonumber(timestampStr) or time() 
-            }
+            local dataEntry = {}
+            dataEntry.id = idStr
+            dataEntry.type = typeStr
+            dataEntry.x = x
+            dataEntry.y = y
+            dataEntry.status = statusStr
+            dataEntry.timestamp = tonumber(timestampStr) or time()
+            
+            self.receivedData[idStr] = dataEntry
+            
             if self.panel and self.panel:IsShown() then
                 self:DrawAllMarkers()
             end
@@ -252,29 +270,38 @@ function NSTDc:DrawAllMarkers()
     local mapWidth = WorldMapDetailFrame:GetWidth()
     local mapHeight = WorldMapDetailFrame:GetHeight()
     local uniqueID = 1
-    for key, data in pairs(self.receivedData or {}) do
+    for idStr, data in pairs(self.receivedData or {}) do
         local texturePath = string.format("Interface\\AddOns\\NSQC3\\libs\\%s.tga", data.type)
         local marker = CreateFrame("Frame", nil, WorldMapDetailFrame)
         marker:SetSize(32, 32)
-        marker:SetFrameStrata("HIGH")   
+        marker:SetFrameStrata("HIGH")
         marker:EnableMouse(true)
         
         local tex = marker:CreateTexture(nil, "OVERLAY")
         tex:SetAllPoints(marker)
         tex:SetTexture(texturePath)
         
-        if data.status == "не_активно" then
-            tex:SetAlpha(0.4)
-        else
-            tex:SetAlpha(1.0)
+        local alpha = 1.0
+        if data.type == "bas" then
+            local pct = tonumber(data.status)
+            if pct then
+                alpha = 0.4 + (pct / 100) * 0.6
+                if alpha < 0.4 then alpha = 0.4 end
+                if alpha > 1.0 then alpha = 1.0 end
+            elseif data.status == "Кербес" or data.status == "груз" then
+                alpha = 0.5
+            end
+        elseif data.status == "не_активно" then
+            alpha = 0.4
         end
+        
+        tex:SetAlpha(alpha)
         
         local pixelX = data.x * mapWidth
         local pixelY = -(data.y * mapHeight)
         marker:SetPoint("CENTER", WorldMapDetailFrame, "TOPLEFT", pixelX, pixelY)
         marker:Show()
         
-        -- ВАЖНО: Сохраняем ссылку на фрейм прямо в данные объекта!
         data.frame = marker 
         
         marker:SetScript("OnEnter", function()
@@ -283,9 +310,12 @@ function NSTDc:DrawAllMarkers()
             if ns_td_tooltips and ns_td_tooltips[data.type] then
                 GameTooltip:AddLine(ns_td_tooltips[data.type], 0.9, 0.9, 0.9)
             end
-            if data.status == "не_активно" then
+            
+            if data.type == "bas" and tonumber(data.status) then
+                GameTooltip:AddLine("Прогресс постройки: " .. tonumber(data.status) .. "%", 1, 1, 0)
+            elseif data.status == "не_активно" then
                 GameTooltip:AddLine("Статус: Не активно", 1, 0, 0)
-                GameTooltip:AddLine("  ")
+                GameTooltip:AddLine("    ")
                 GameTooltip:AddLine("Для активации протяните дорогу до этого участка", 1, 0.8, 0)
             elseif data.status == "груз" then
                 GameTooltip:AddLine("Статус: Груз", 0, 1, 1)
@@ -315,8 +345,6 @@ function NSTDc:HideAllMarkers()
         marker:SetParent(nil)
     end
     self.activeMarkers = {}
-    -- СБРОС УВЕДОМЛЕНИЙ: При закрытии панели сбрасываем таймер уведомлений,
-    -- чтобы при следующем открытии сообщение появилось снова, если игрок всё ещё рядом.
     for _, data in pairs(self.receivedData or {}) do
         if data.status == "груз" then
             data.lastNotified = nil
@@ -326,8 +354,8 @@ end
 
 function NSTDc:AnimateRoadDrop(x, y)
     local addon = self
-    x = (tonumber(x) or 0) / 100
-    y = (tonumber(y) or 0) / 100
+    x = tonumber(x) or 0
+    y = tonumber(y) or 0
     local mapWidth = WorldMapDetailFrame:GetWidth()
     local mapHeight = WorldMapDetailFrame:GetHeight()
     local pixelX = x * mapWidth
@@ -335,12 +363,14 @@ function NSTDc:AnimateRoadDrop(x, y)
     local dropFrame = CreateFrame("Frame", nil, WorldMapDetailFrame)
     dropFrame:SetSize(32, 32)
     dropFrame:SetPoint("CENTER", WorldMapDetailFrame, "TOPLEFT", pixelX, pixelY)
+    
     local tex = dropFrame:CreateTexture(nil, "OVERLAY")
     tex:SetAllPoints()
     tex:SetTexture("Interface\\AddOns\\NSQC3\\libs\\road.tga")
     dropFrame:SetScale(0.1)
     dropFrame:Show()
     PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\roadDOWN.mp3")
+    
     local elapsed = 0
     local duration = 9.0
     dropFrame:SetScript("OnUpdate", function(frame, dt)
@@ -356,14 +386,17 @@ function NSTDc:AnimateRoadDrop(x, y)
             frame:Hide()
             frame:SetParent(nil)
             addon:PlayImpactAndShake()
-            local key = string.format("road_%.1f_%.1f", x * 100, y * 100)
-            addon.receivedData[key] = {
-                type = "road",
-                x = x,
-                y = y,
-                status = "груз",
-                timestamp = time()
-            }
+            
+            local key = tostring(nsDb.td.nextId or 0)
+            local newCargo = {}
+            newCargo.id = key
+            newCargo.type = "road"
+            newCargo.x = x
+            newCargo.y = y
+            newCargo.status = "груз"
+            newCargo.timestamp = time()
+            
+            addon.receivedData[key] = newCargo
             
             if addon.panel and addon.panel:IsShown() then
                 addon:DrawAllMarkers()
@@ -392,37 +425,25 @@ function NSTDc:PlayImpactAndShake()
     end)
 end
 
-
-
-
 local frame = CreateFrame("Frame")
 local timer = 0
 local wasFalling = false
-
 frame:SetScript("OnUpdate", function(self, elapsed)
     timer = timer + elapsed
     if timer < 0.1 then return end
     timer = 0
-    
-    -- Проверяем: персонаж падает?
     local isFalling = IsFalling()
-    
-    -- Отсекаем полёт и плавание (чтобы только чистое падение)
     local isFlying = IsFlying()
     local isSwimming = IsSwimming()
-    
+
     local pureFalling = isFalling and not isFlying and not isSwimming
-    
-    -- Только при изменении состояния
+
     if pureFalling ~= wasFalling then
         wasFalling = pureFalling
         if pureFalling then
             print("|cffff4444ПАДАЮ!|r")
-            -- Твой код при начале падения
         else
             print("|cff44ff44Приземлился|r")
-            -- Твой код при окончании падения
         end
     end
 end)
-
