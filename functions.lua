@@ -1495,7 +1495,6 @@ function en85(dec)
         idx = idx + 1
         encode_buffer[idx] = _convertTable3[remainder]
     until dec == 0
-    -- Сборка строки в правильном порядке (обратном)
     local result = ""
     for i = idx, 1, -1 do
         result = result .. (encode_buffer[i] or "")
@@ -1527,7 +1526,6 @@ end
 
 local strbyte, strlen, strsub = string.byte, string.len, string.sub
 
--- Определяет количество байт, занимаемых UTF-8 символом (без изменения логики)
 local function utf8charbytes(s, i)
     local c = strbyte(s, i)
     if c > 0 and c <= 127 then

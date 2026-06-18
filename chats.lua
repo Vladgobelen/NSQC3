@@ -1087,27 +1087,29 @@ local triggersByAddress = {
     },
 }
 
+
+
 function enAlToGi(channel, text, sender, prefix)
-    -- Ваши переменные, которые уже успешно извлекают данные
+    -- Извлекаем данные
     local gp = prefix:match(WORD_POSITION_PATTERNS[2])
     local nick = text:match(WORD_POSITION_PATTERNS[1])
-
-    -- 1. Базовая проверка на валидность данных
+    
+    -- Базовая проверка
     if not gp or not nick or type(nick) ~= "string" or nick == "" then
         return
     end
 
-    -- 2. Очищаем ник от суффикса сервера на всякий случай (например, "Никколо-Сервер" -> "Никколо")
-    -- Это гарантирует 100% совпадение с полем original_nick в таблице gp_data
+    -- Очищаем ник от суффикса сервера
     local cleanNick = nick:match("^(.-)-") or nick
 
-    -- 3. Обновляем данные через экземпляр класса gpDb
+    -- === СОХРАНЯЕМ В КЭШ КЛАССА (через публичный метод) ===
+    if gpDb and type(gpDb.SetExternalGp) == "function" then
+        gpDb:SetExternalGp(cleanNick, gp)
+    end
+    -- =====================================================
+
+    -- Обновляем данные в текущем списке и перерисовываем окно
     if gpDb and type(gpDb.UpdateGpEntry) == "function" then
-        -- Встроенный метод UpdateGpEntry делает всё сам:
-        -- а) Находит игрока в self.gp_data по original_nick
-        -- б) Обновляет значение gp (внутри него уже есть tonumber)
-        -- в) Вызывает self:SortData() для правильной сортировки
-        -- г) Вызывает self:UpdateWindow() для мгновенного обновления интерфейса
         gpDb:UpdateGpEntry(cleanNick, gp)
     end
 end

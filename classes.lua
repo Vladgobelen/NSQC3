@@ -717,6 +717,7 @@ function GpDb:new(input_table)
         confirmed_rl_nicks = {},
         rl_tooltip_nicks = {},
         _rl_tooltip_list = nil,
+        external_gp_cache = {},
     }
     setmetatable(new_object, self)
     new_object:_CreateWindow()
@@ -1785,6 +1786,11 @@ function GpDb:_UpdateFromGuild()
     -- Сохраняем self в локальную переменную для замыкания
     local db = self
     
+    -- Инициализируем кэш, если его ещё нет (для хранения ГП игроков не из гильдии)
+    if not db.external_gp_cache then
+        db.external_gp_cache = {}
+    end
+    
     -- Для 3.3.5 используем простой таймер без возможности отмены
     local timerFrame = CreateFrame("Frame")
     timerFrame:SetScript("OnUpdate", function(selfFrame, elapsed)
@@ -1823,7 +1829,7 @@ function GpDb:_UpdateFromGuild()
             -- Режим "Только рейд" и мы в рейде
             if raidOnlyMode then
                 local numRaidMembers = GetNumGroupMembers()
-                -- Заполняем данные всех игроков рейда
+                -- Заполняем данные всех игроков рейда (включая не из гильдии)
                 for i = 1, numRaidMembers do
                     local raidName, _, _, _, _, classFileName = GetRaidRosterInfo(i)
                     if raidName then
@@ -1844,16 +1850,13 @@ function GpDb:_UpdateFromGuild()
                                     gp = tonumber(words[3]) or 0
                                 end
                             end
-                            
                             if gp > 0 then
                                 totalWithGP = totalWithGP + 1
                             end
-                            
                             local displayName = raidName
                             if publicNote and publicNote ~= "" then
                                 displayName = raidName .. " |cFFFFFF00(" .. publicNote .. ")|r"
                             end
-                            
                             table.insert(db.gp_data, {
                                 nick = displayName,
                                 original_nick = plainName,
@@ -1861,25 +1864,27 @@ function GpDb:_UpdateFromGuild()
                                 classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                                 classFileName = classFileName,
                                 playerID = guildInfo.playerID,
-                                isGuildMember = true -- Новый флаг
+                                isGuildMember = true
                             })
                         else
-                            -- === ИГРОК НЕ ИЗ ГИЛЬДИИ ===
-                            local gp = 0 -- По умолчанию 0, обновится при ответе на GetGPA
+                            -- === ИГРОК НЕ ИЗ ГИЛЬДИИ (ДРУГАЯ ФРАКЦИЯ) ===
+                            -- Берём ГП из кэша класса (если уже приходил ответ enAlToGi), иначе 0
+                            local cachedGp = db.external_gp_cache[plainName] or 0
                             local displayName = raidName
+                            
+                            if cachedGp > 0 then
+                                totalWithGP = totalWithGP + 1
+                            end
                             
                             table.insert(db.gp_data, {
                                 nick = displayName,
                                 original_nick = plainName,
-                                gp = gp,
+                                gp = cachedGp,
                                 classColor = RAID_CLASS_COLORS[classFileName] or {r=1, g=1, b=1},
                                 classFileName = classFileName,
                                 playerID = nil,
-                                isGuildMember = false -- Новый флаг
+                                isGuildMember = false
                             })
-                            
-                            -- Запрашиваем данные об игроке через чат аддонов гильдии
-                            SendAddonMessage("GetGPA", plainName, "GUILD")
                         end
                     end
                 end
@@ -1982,6 +1987,36 @@ function GpDb:_UpdateFromGuild()
             db:UpdateWindow()
         end
     end)
+end
+
+-- Сохраняет ГП игрока не из гильдии в кэш класса
+-- Доступно извне: gpDb:SetExternalGp("Никколо", 50)
+function GpDb:SetExternalGp(nick, gp)
+    if not nick or type(nick) ~= "string" or nick == "" then return end
+    local cleanNick = nick:match("^(.-)-") or nick
+    local gpNumber = tonumber(gp) or 0
+    
+    if not self.external_gp_cache then
+        self.external_gp_cache = {}
+    end
+    
+    self.external_gp_cache[cleanNick] = gpNumber
+end
+
+function GpDb:GetExternalGp(nick)
+    if not nick or type(nick) ~= "string" or nick == "" then return nil end
+    local cleanNick = nick:match("^(.-)-") or nick
+    
+    if not self.external_gp_cache then return nil end
+    
+    return self.external_gp_cache[cleanNick]
+end
+
+function GpDb:GetAllExternalGp()
+    if not self.external_gp_cache then
+        self.external_gp_cache = {}
+    end
+    return self.external_gp_cache
 end
 
 function GpDb:Show()
@@ -11760,10 +11795,9 @@ end
 
 
 -- ============================================================================
--- NS Auction System v5.8 - RELEASE (FINAL 3.3.5a COMPATIBLE)
+-- NS Auction System v5.9 - RELEASE (FINAL 3.3.5a COMPATIBLE) - ИСПРАВЛЕНО
 -- Для WoW 3.3.5a. Чтение ставок/паса из рейд-чата, адаптивная верстка, GP-расчет, быстрые ставки, тултипы.
--- Исправлено: единый источник списания ГП через SetWinner, защита от двойного списания.
--- Добавлено: /nsauk reset (сброс настроек), /nsauk find (подсветка окон)
+-- Исправлено: отправка ГП через аддон-сообщения при старте и ставках
 -- ============================================================================
 
 local NSAuk = {}
@@ -11815,188 +11849,57 @@ function NSAuk.EnsureDB()
     return db
 end
 
--- Функция полного сброса настроек
-function NSAuk.ResetAllSettings()
+-- Функция отправки своих ГП в рейд
+function NSAuk.BroadcastMyGP()
     local db = NSAuk.EnsureDB()
+    if not db.active then return end
     
-    -- Сброс позиций
-    db.iconPosition = {x = 0, y = 0}
-    db.windowPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"}
-    db.historyPosition = {x = 0, y = 0, point = "CENTER", relativePoint = "CENTER"}
+    local myName = UnitName("player")
+    local myBid = db.active.bids[myName]
+    if not myBid then return end
     
-    -- Сброс настроек аукциона
-    db.settings = {defaultStep = 10, defaultTime = 20, autoDeductGP = true}
+    -- Получаем актуальные ГП
+    local myGP = myBid.gp or 0
     
-    -- Очистка кастомных кнопок
-    db.customButtons = {}
-    
-    -- Сброс позиций открытых окон
-    if auctionFrame then
-        auctionFrame:ClearAllPoints()
-        auctionFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        NSAuk.SaveWindowPosition(auctionFrame, db.windowPosition)
-        if auctionFrame.customPanel then
-            auctionFrame.customPanel:ClearAllPoints()
-            auctionFrame.customPanel:SetPoint("TOPRIGHT", auctionFrame, "TOPLEFT", -5, 0)
+    -- Если ГП = 0, пробуем получить из других источников
+    if myGP == 0 then
+        -- Из внешнего кэша
+        if gpDb and gpDb.external_gp_cache and gpDb.external_gp_cache[myName] then
+            myGP = tonumber(gpDb.external_gp_cache[myName]) or 0
         end
-    end
-    
-    if minimapIcon then
-        minimapIcon:ClearAllPoints()
-        minimapIcon:SetPoint("CENTER", Minimap, "CENTER", 0, 0)
-    end
-    
-    if historyWindow then
-        historyWindow:ClearAllPoints()
-        historyWindow:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        NSAuk.SaveWindowPosition(historyWindow, db.historyPosition)
-    end
-    
-    -- Перерисовка кнопок
-    if auctionFrame then
-        NSAuk.RenderCustomButtons()
-    end
-    
-    print("|cff00ff00[NSAuk]|r Все настройки сброшены до значений по умолчанию.")
-end
-
--- Функция подсветки всех элементов аддона
-function NSAuk.HighlightAllFrames()
-    local framesToHighlight = {}
-    local iconToPulse = nil
-    
-    -- Основное окно и его панель
-    if auctionFrame and auctionFrame:IsShown() then
-        table.insert(framesToHighlight, auctionFrame)
-        if auctionFrame.customPanel and auctionFrame.customPanel:IsShown() then
-            table.insert(framesToHighlight, auctionFrame.customPanel)
-        end
-    end
-    
-    -- Окна истории и настроек
-    if historyWindow and historyWindow:IsShown() then
-        table.insert(framesToHighlight, historyWindow)
-    end
-    
-    if settingsWindow and settingsWindow:IsShown() then
-        table.insert(framesToHighlight, settingsWindow)
-    end
-
-    -- Иконка на миникарте - для неё отдельная анимация пульсации
-    if not minimapIcon then
-        NSAuk.CreateMinimapIcon()
-    end
-    
-    if minimapIcon then
-        minimapIcon.wasShownBeforeHighlight = minimapIcon:IsShown()
-        minimapIcon:Show()
-        iconToPulse = minimapIcon
-    end
-    
-    if #framesToHighlight == 0 and not iconToPulse then
-        print("|cffff8080[NSAuk]|r Нет видимых окон аддона для подсветки.")
-        return
-    end
-    
-    local count = #framesToHighlight + (iconToPulse and 1 or 0)
-    print("|cff00ff00[NSAuk]|r Подсвечиваю " .. count .. " элемент(ов) аддона в течение 5 секунд...")
-    
-    -- Сохраняем оригинальные цвета рамок для обычных окон
-    local originalBorders = {}
-    for _, frame in ipairs(framesToHighlight) do
-        if frame and frame:GetBackdrop() then
-            local r, g, b, a = frame:GetBackdropBorderColor()
-            originalBorders[frame] = {r, g, b, a}
-        end
-    end
-    
-    -- Сохраняем оригинальный размер и цвет иконки
-    local iconOriginalScale = nil
-    local iconOriginalBorder = nil
-    if iconToPulse then
-        iconOriginalScale = iconToPulse:GetScale() or 1.0
-        if iconToPulse:GetBackdrop() then
-            local r, g, b, a = iconToPulse:GetBackdropBorderColor()
-            iconOriginalBorder = {r, g, b, a}
-        end
-        -- Убедимся что у иконки есть backdrop
-        if not iconToPulse:GetBackdrop() then
-            iconToPulse:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 16, insets = {left = 3, right = 3, top = 3, bottom = 3}})
-            iconToPulse:SetBackdropColor(0, 0, 0, 0.8)
-            iconToPulse:SetBackdropBorderColor(0.5, 0.5, 0.5, 1.0)
-            iconOriginalBorder = {0.5, 0.5, 0.5, 1.0}
-        end
-    end
-    
-    -- Создаём анимацию
-    local startTime = GetTime()
-    local duration = 5
-    local flashSpeed = 3 -- мерцаний в секунду для рамок
-    local pulseSpeed = 2.5 -- пульсаций в секунду для иконки
-    
-    local animFrame = CreateFrame("Frame")
-    animFrame:SetScript("OnUpdate", function(self, elapsed)
-        local t = GetTime() - startTime
         
-        if t >= duration then
-            -- Возвращаем оригинальные цвета рамок
-            for frame, color in pairs(originalBorders) do
-                if frame and frame:GetBackdrop() then
-                    frame:SetBackdropBorderColor(color.r, color.g, color.b, color.a)
+        -- Из офицерской заметки (для игроков в гильдии)
+        if myGP == 0 then
+            for j = 1, GetNumGuildMembers(true) do
+                local gName, _, _, _, _, _, _, officerNote = GetGuildRosterInfo(j)
+                if gName == myName and officerNote and officerNote ~= "" then
+                    local z = NSAuk.mysplit(officerNote)
+                    myGP = tonumber(z[3]) or 0
+                    break
                 end
             end
-            
-            -- Возвращаем иконку в исходное состояние
-            if iconToPulse then
-                iconToPulse:SetScale(iconOriginalScale)
-                if iconOriginalBorder then
-                    iconToPulse:SetBackdropBorderColor(iconOriginalBorder[1], iconOriginalBorder[2], iconOriginalBorder[3], iconOriginalBorder[4])
-                end
-                if not iconToPulse.wasShownBeforeHighlight then
-                    iconToPulse:Hide()
-                end
-            end
-            
-            self:SetScript("OnUpdate", nil)
-            print("|cff00ff00[NSAuk]|r Подсветка завершена.")
-            return
         end
-        
-        -- Анимация для обычных окон: мерцание рамки
-        local frameIntensity = (math.sin(t * math.pi * 2 * flashSpeed) + 1) / 2
-        local frameR = 1.0
-        local frameG = 0.7 + 0.3 * frameIntensity
-        local frameB = 0.0 + 0.6 * frameIntensity
-        
-        for frame, _ in pairs(originalBorders) do
-            if frame and frame:GetBackdrop() then
-                frame:SetBackdropBorderColor(frameR, frameG, frameB, 1.0)
-            end
+    end
+    
+    -- Отправляем свои ГП всем в рейде
+    local _, myClass = UnitClass("player")
+    local publicNote = ""
+    for j = 1, GetNumGuildMembers(true) do
+        local gName, _, _, _, _, _, pubNote = GetGuildRosterInfo(j)
+        if gName == myName then
+            publicNote = pubNote or ""
+            break
         end
-        
-        -- Анимация для иконки: пульсация размера + мерцание цвета
-        if iconToPulse then
-            -- Пульсация размера: от 0.85 до 1.3
-            local pulsePhase = math.sin(t * math.pi * 2 * pulseSpeed)
-            iconToPulse:SetScale(iconOriginalScale * (0.9 + math.abs(pulsePhase) * 0.3))
-            
-            -- Мерцание цвета рамки иконки (более яркое, жёлто-оранжевое)
-            local iconIntensity = (math.sin(t * math.pi * 2 * (flashSpeed + 1)) + 1) / 2
-            local iconR = 1.0
-            local iconG = 0.9 + 0.1 * iconIntensity
-            local iconB = 0.2 + 0.5 * iconIntensity
-            
-            if iconToPulse:GetBackdrop() then
-                iconToPulse:SetBackdropBorderColor(iconR, iconG, iconB, 1.0)
-            end
-            
-            -- Дополнительно: можно менять цвет текстуры иконки
-            local tex = iconToPulse:GetNormalTexture()
-            if tex then
-                tex:SetVertexColor(1.0, 0.9 + 0.1 * iconIntensity, 0.3 + 0.3 * iconIntensity)
-            end
-        end
-    end)
+    end
+    
+    SendAddonMessage("AUC_GP", myName .. ":" .. myGP .. ":" .. (myClass or "WARRIOR") .. ":" .. publicNote, "RAID")
+    
+    -- Обновляем свои данные в bids
+    if myBid then
+        myBid.gp = myGP
+        myBid.class = myClass or "WARRIOR"
+        myBid.public = publicNote
+    end
 end
 
 function NSAuk.mysplit(inputstr, sep)
@@ -12099,7 +12002,12 @@ function NSAuk.GetRaidGPData()
                     break
                 end
             end
-            if not gpData[name].inGuild then gpData[name].public = "НЕ В ГИЛЬДИИ" end
+            if not gpData[name].inGuild then
+                gpData[name].public = "НЕ В ГИЛЬДИИ"
+                if gpDb and gpDb.external_gp_cache and gpDb.external_gp_cache[name] then
+                    gpData[name].gp = tonumber(gpDb.external_gp_cache[name]) or 0
+                end
+            end
         end
     end
     return gpData
@@ -12193,7 +12101,7 @@ function NSAuk.RenderCustomButtons()
                 return
             end
             
-            -- Проверка на лидерство (аналогично основной кнопке "Ставка")
+            -- Проверка на лидерство
             local mx = 0
             for _, v in pairs(d.active.bids) do
                 if v.hasAction and not v.passed and v.amount > mx then
@@ -12205,6 +12113,8 @@ function NSAuk.RenderCustomButtons()
                 return
             end
             
+            -- Отправляем свои ГП перед ставкой
+            NSAuk.BroadcastMyGP()
             SendChatMessage(tostring(val), "RAID")
         end)
         bar.buttons[i] = b
@@ -12330,7 +12240,7 @@ function NSAuk.CreateAuctionFrame()
         if frame.customPanel.isExpanded then frame.customPanel:Show() else frame.customPanel:Hide() end
     end)
 
-    -- Чекбокс: корректная работа с GetChecked() (возвращает 1, а не true)
+    -- Чекбокс
     local autoDeductCB = CreateFrame("CheckButton", "NSAukAutoDeductCB", frame, "UICheckButtonTemplate")
     autoDeductCB:SetPoint("LEFT", togglePanelBtn, "RIGHT", 8, 0)
     autoDeductCB:SetChecked(db.settings.autoDeductGP == true)
@@ -12362,48 +12272,12 @@ function NSAuk.CreateAuctionFrame()
     helpBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
         GameTooltip:ClearLines()
-        GameTooltip:AddLine("|cffFFD100NS Auction System v5.8|r", 1, 0.82, 0)
+        GameTooltip:AddLine("|cffFFD100NS Auction System v5.9|r", 1, 0.82, 0)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00=== КОМАНДЫ (в чат рейда) ===|r", 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff00ff00АУК [предмет]|r", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("  Запуск аукциона с параметрами по умолчанию.", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff00ff00АУК [предмет] шаг [N] время [M]|r", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("  Пример: |cffffaa00АУК Меч шаг 5 время 30|r", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine("  Запуск с кастомным шагом и временем.", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffff8080АУК закрыть|r", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("  Принудительное завершение аукциона (только РЛ).", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff00ff00АУК показать|r", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("  Синхронизация состояния аукциона (только РЛ).", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff00ff00АУК история [N]|r", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("  Показать историю (N - номер записи, опционально).", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00=== ИГРОВЫЕ КОМАНДЫ ===|r", 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff88ff88[ЧИСЛО]|r - сделать ставку (например: |cffffaa0050|r)", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88пас|r или |cff88ff88-|r - отказаться от торгов", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00=== УПРАВЛЕНИЕ ОКНОМ ===|r", 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff88ff88ЛКМ|r по игроку - назначить победителем (РЛ)", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88ПКМ|r по игроку - забанить/разбанить (РЛ)", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88Кнопка [>]|r - панель быстрых ставок", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88Кнопка [-]|r - свернуть в иконку на миникарте", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00=== НАСТРОЙКИ ===|r", 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff88ff88/nsauk|r - открыть окно настроек", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88/nsauk reset|r - сбросить все настройки", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88/nsauk find|r - подсветить все окна аддона", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("|cff88ff88Галочка \"Авто-списание ГП\"|r - включить/выключить", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffffff00=== ИНФОРМАЦИЯ ===|r", 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("  Система списывает ГП из офицерской заметки.", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("|cffffff00=== КОМАНДЫ ===|r", 1, 1, 1)
+        GameTooltip:AddLine("|cff00ff00/nsauk|r - настройки", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff00ff00/nsauk reset|r - сброс", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("|cff00ff00/nsauk find|r - подсветка окон", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     helpBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -12493,6 +12367,7 @@ function NSAuk.CreateAuctionFrame()
             return
         end
         
+        NSAuk.BroadcastMyGP()
         SendAddonMessage("AUC_PASS", "", "RAID")
         if myBid then myBid.passed = true; myBid.amount = 0; myBid.hasAction = true end
         NSAuk.UpdateAuctionWindow()
@@ -12516,6 +12391,8 @@ function NSAuk.CreateAuctionFrame()
                 return
             end
             if (myBid.amount or 0) == mx and mx > 0 then print("Вы лидер"); return end
+            
+            NSAuk.BroadcastMyGP()
             SendChatMessage(tostring(mx + d.active.step), "RAID")
         end
     end)
@@ -12540,7 +12417,6 @@ function NSAuk.DestroyAuctionWindow()
             auctionFrame.customPanel:SetParent(nil)
             auctionFrame.customPanel = nil
         end
-        -- Полный отрыв от UI и обнуление ссылки
         auctionFrame:SetParent(nil)
         auctionFrame = nil 
     end
@@ -12726,29 +12602,21 @@ end
 function NSAuk.DeductGPFromRoster(playerName, amount)
     if not playerName or not amount or amount <= 0 then return end
     
-    -- Отправляем только аддон-сообщения для NSAukGP/GDKP систем
-    -- Без ручного изменения офицерской заметки!
     SendAddonMessage("nsGP1 -" .. amount, playerName, "guild")
+    SendAddonMessage("nsGP1A -" .. amount, playerName, "guild")
     SendAddonMessage("nsGPlog", "Аукцион -" .. amount .. " " .. (playerName or ""), "guild")
     print(string.format("|cff00ff00[NSAuk]|r Отправлен запрос на списание %d ГП с %s.", amount, playerName))
 end
-
--- ============================================================================
--- ЕДИНАЯ ТОЧКА ЗАВЕРШЕНИЯ АУКЦИОНА И СПИСАНИЯ ГП
--- ============================================================================
 
 function NSAuk.SetWinner(playerName, winAmount)
     local db = NSAuk.EnsureDB()
     if not db.active then return end
     
-    -- Останавливаем таймер обратного отсчёта
     if closeTimerFrame then 
         closeTimerFrame:SetScript("OnUpdate", nil)
         closeTimerFrame = nil 
     end
     
-    -- ЕДИНСТВЕННАЯ ТОЧКА СПИСАНИЯ ГП
-    -- Списываем ДО отправки AUC_END, чтобы получатели не пытались списать повторно
     if db.active.startedBy == UnitName("player") then
         if db.settings.autoDeductGP and winAmount > 0 then
             NSAuk.DeductGPFromRoster(playerName, winAmount)
@@ -12758,7 +12626,6 @@ function NSAuk.SetWinner(playerName, winAmount)
         end
     end
     
-    -- Сохраняем историю аукциона
     local bc = {}
     for n, d in pairs(db.active.bids) do 
         bc[n] = { 
@@ -12783,35 +12650,20 @@ function NSAuk.SetWinner(playerName, winAmount)
         table.remove(db.history, 1) 
     end
     
-    -- Отправляем рейдовые сообщения только если мы инициатор
     if db.active.startedBy == UnitName("player") then
         SendChatMessage(playerName .. " побеждает, поставив " .. (winAmount or 0) .. " ГП. Предмет: " .. db.active.item, "RAID_WARNING")
-        SendChatMessage("Ты выиграл " .. db.active.item .. " за " .. (winAmount or 0) .. " ГП!", "WHISPER", nil, playerName)
     end
     
-    -- Отправляем сигнал всем в рейде, что аукцион завершён
-    -- Отправляем ПОСЛЕ списания, чтобы FinishAuction у других НЕ списывал
     SendAddonMessage("AUC_END", "", "RAID")
     
-    -- Сбрасываем состояние аукциона
     db.active = nil
     isMinimized = false
-    
-    -- Закрываем окно аукциона
     NSAuk.DestroyAuctionWindow()
-    
-    -- Скрываем иконку на миникарте
-    if minimapIcon then 
-        minimapIcon:Hide() 
-    end
-    
-    -- Отключаем периодическую проверку окон
+    if minimapIcon then minimapIcon:Hide() end
     checkFrame:SetScript("OnUpdate", nil)
 end
 
 function NSAuk.FinishAuction(initiator)
-    -- FinishAuction НИКОГДА не списывает ГП
-    -- Он только сохраняет историю и cleanup при получении AUC_END от другого игрока
     local db = NSAuk.EnsureDB()
     if not db.active then return end
     
@@ -12827,7 +12679,6 @@ function NSAuk.FinishAuction(initiator)
         end 
     end
     
-    -- Сохраняем историю (без списания!)
     if w and wa > 0 then
         local bc = {}
         for n, d in pairs(db.active.bids) do 
@@ -12857,9 +12708,7 @@ function NSAuk.FinishAuction(initiator)
     db.active = nil
     isMinimized = false
     NSAuk.DestroyAuctionWindow()
-    if minimapIcon then 
-        minimapIcon:Hide() 
-    end
+    if minimapIcon then minimapIcon:Hide() end
     checkFrame:SetScript("OnUpdate", nil)
 end
 
@@ -12873,7 +12722,7 @@ function NSAuk.StartCloseTimer()
     
     closeTimerFrame = CreateFrame("Frame")
     local lc = GetTime()
-    local finished = false  -- Защита от повторного входа
+    local finished = false
     
     closeTimerFrame:SetScript("OnUpdate", function(self)
         local ct = GetTime()
@@ -12887,14 +12736,12 @@ function NSAuk.StartCloseTimer()
             return 
         end
         
-        -- Обновляем отображение таймера
         if auctionFrame and auctionFrame.countdownText then
             local lastTime = d.active.lastBidTime or d.active.startTime
             local rem = math.max(0, math.floor(d.active.closeTime - (GetTime() - lastTime)))
             auctionFrame.countdownText:SetText(rem .. "с")
         end
 
-        -- Только инициатор завершает аукцион по таймеру
         if d.active.startedBy ~= UnitName("player") then return end
         
         if GetTime() - (d.active.lastBidTime or d.active.startTime) >= d.active.closeTime then
@@ -12903,7 +12750,6 @@ function NSAuk.StartCloseTimer()
             self:SetScript("OnUpdate", nil)
             closeTimerFrame = nil
             
-            -- Определяем победителя и вызываем SetWinner (единственная точка списания)
             local w, wa = nil, 0
             for n, bidData in pairs(d.active.bids) do 
                 if bidData.hasAction and not bidData.passed and not bidData.banned and bidData.amount > wa then 
@@ -12912,10 +12758,8 @@ function NSAuk.StartCloseTimer()
             end
             
             if w and wa > 0 then
-                -- ЕДИНСТВЕННЫЙ ВЫЗОВ SetWinner для списания
                 NSAuk.SetWinner(w, wa)
             else
-                -- Нет победителя - просто завершаем без списания
                 SendAddonMessage("AUC_END", "", "RAID")
                 NSAuk.FinishAuction(d.active.startedBy)
             end
@@ -12947,6 +12791,7 @@ function NSAuk.UpdateAuctionWindow()
     for name, data in pairs(db.active.bids) do
         if data.hasAction then table.insert(sortedBids, {name = name, data = data}) end
     end
+    
     table.sort(sortedBids, function(a, b)
         if a.data.passed and not b.data.passed then return false end
         if not a.data.passed and b.data.passed then return true end
@@ -13007,7 +12852,6 @@ function NSAuk.UpdateAuctionWindow()
                     function()
                         bid.data.banned = true
                         bid.data.passed = true
-                        -- Синхронизация бана: отправляет ТОЛЬКО стартер аукциона
                         if db.active and db.active.startedBy == UnitName("player") then
                             SendAddonMessage("AUC_BAN", bid.name, "RAID")
                         end
@@ -13113,7 +12957,6 @@ local function ProcessRaidMessage(sender, msg, event)
     local cleanMsg = msg:match("^%s*(.-)%s*$") or ""
     local isLeaderChannel = (event == "CHAT_MSG_RAID_WARNING" or event == "CHAT_MSG_RAID_LEADER")
 
-    -- 1. Команды аукциона
     if cleanMsg:match("^АУК") then
         if cleanMsg:match("^АУК%s+история") then
             if sender == myName then NSAuk.CreateHistoryWindow(tonumber(cleanMsg:match("%d+"))) end
@@ -13154,14 +12997,8 @@ local function ProcessRaidMessage(sender, msg, event)
                 local ct = parsed.closeTime or db.settings.defaultTime
 
                 db.active = {
-                    item = item,
-                    itemLink = itemLink,
-                    startTime = GetTime(),
-                    startedBy = sender,
-                    step = step,
-                    closeTime = ct,
-                    lastBidTime = GetTime(),
-                    bids = {}
+                    item = item, itemLink = itemLink, startTime = GetTime(), startedBy = sender,
+                    step = step, closeTime = ct, lastBidTime = GetTime(), bids = {}
                 }
                 isMinimized = false
 
@@ -13170,9 +13007,20 @@ local function ProcessRaidMessage(sender, msg, event)
                     db.active.bids[name] = { amount = 0, class = data.class, public = data.public, gp = data.gp, passed = false, hasAction = false, banned = false }
                 end
                 if not db.active.bids[myName] then
-                    local _, c = UnitClass("player")
-                    db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
+                    local found = false
+                    for fullName, data in pairs(db.active.bids) do
+                        if fullName:match("^" .. myName .. "%-") then
+                            db.active.bids[myName] = data; found = true; break
+                        end
+                    end
+                    if not found then
+                        local _, c = UnitClass("player")
+                        db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
+                    end
                 end
+
+                -- Отправляем свои ГП при старте аукциона
+                NSAuk.BroadcastMyGP()
 
                 if sender == myName then
                     local gpStr = ""
@@ -13191,13 +13039,20 @@ local function ProcessRaidMessage(sender, msg, event)
         return false
     end
 
-    -- 2. ЧТЕНИЕ ВСЕХ РЕЙД-СООБЩЕНИЙ НА СТАВКИ/ПАС
     if db.active then
         local isPass = (cleanMsg:match("^[Пп]ас$") or cleanMsg == "-")
         local amount = tonumber(cleanMsg:match("^%s*(%d+)%s*$"))
 
         if isPass or amount then
             local bidData = db.active.bids[sender]
+            if not bidData then
+                for fullName, data in pairs(db.active.bids) do
+                    if fullName:match("^" .. sender .. "%-") then
+                        bidData = data; db.active.bids[sender] = data
+                        break
+                    end
+                end
+            end
             if not bidData then
                 local _, c = UnitClass(sender)
                 db.active.bids[sender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true, banned = false }
@@ -13214,9 +13069,7 @@ local function ProcessRaidMessage(sender, msg, event)
                         if sender == myName then print("|cffff0000[NSAuk]|r Нельзя выйти из торгов, пока вы лидируете.") end
                         return true
                     end
-                    bidData.passed = true
-                    bidData.amount = 0
-                    bidData.hasAction = true
+                    bidData.passed = true; bidData.amount = 0; bidData.hasAction = true
                     db.active.lastBidTime = GetTime()
                     AnnounceRaid(sender .. " делает ПАС и выбывает из торгов.")
                     NSAuk.UpdateAuctionWindow()
@@ -13236,19 +13089,20 @@ local function ProcessRaidMessage(sender, msg, event)
                 end
                 local mn = mx + db.active.step
 
-                -- ЖЁСТКАЯ ПРОВЕРКА ГП. Ставка отклоняется, если превышает баланс.
-                local playerGP = bidData.gp or 0
-                if amount > playerGP then
-                    if sender == myName then print("|cffff0000[NSAuk]|r Недостаточно ГП! У вас: " .. playerGP .. ", ставка: " .. amount) end
-                    return true
+                if sender == myName then
+                    local playerGP = bidData.gp or 0
+                    if amount > playerGP then
+                        print("|cffff0000[NSAuk]|r Недостаточно ГП! У вас: " .. playerGP .. ", ставка: " .. amount)
+                        return true
+                    end
+                    
+                    -- Отправляем свои ГП при каждой своей ставке
+                    NSAuk.BroadcastMyGP()
                 end
-
+                
                 if amount >= mn then
-                    bidData.amount = amount
-                    bidData.passed = false
-                    bidData.hasAction = true
+                    bidData.amount = amount; bidData.passed = false; bidData.hasAction = true
                     db.active.lastBidTime = GetTime()
-
                     local newMx, newLd = 0, nil
                     for n, d in pairs(db.active.bids) do
                         if d.hasAction and not d.passed and not d.banned and d.amount > newMx then newMx, newLd = d.amount, n end
@@ -13293,15 +13147,37 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             isMinimized = false
             for pd in (parts[5] or ""):gmatch("([^;]+);") do
                 local n, g, c, p = pd:match("([^:]+):([^:]+):([^:]+):(.*)")
-                if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false, banned = false } end
+                if n then 
+                    local gpValue = tonumber(g) or 0
+                    db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = gpValue, passed = false, hasAction = false, banned = false } 
+                end
             end
             if not db.active.bids[myName] then
                 local _, c = UnitClass("player")
                 db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
             end
+            
+            -- Отправляем свои ГП при получении AUC_START
+            NSAuk.BroadcastMyGP()
+            
             NSAuk.UpdateAuctionWindow()
             NSAuk.StartCloseTimer()
             NSAuk.EnableCheckFrame()
+
+        elseif prefix == "AUC_GP" and db.active then
+            -- Получаем ГП от другого игрока
+            local n, g, c, p = addonMsg:match("([^:]+):([^:]+):([^:]+):(.*)")
+            if n then
+                local gpValue = tonumber(g) or 0
+                if db.active.bids[n] then
+                    db.active.bids[n].gp = gpValue
+                    db.active.bids[n].class = c or db.active.bids[n].class
+                    db.active.bids[n].public = p or db.active.bids[n].public
+                else
+                    db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = gpValue, passed = false, hasAction = false, banned = false }
+                end
+                NSAuk.UpdateAuctionWindow()
+            end
 
         elseif prefix == "AUC_BID" and db.active then
             local a = tonumber(addonMsg)
@@ -13310,6 +13186,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                     local _, c = UnitClass(addonSender)
                     db.active.bids[addonSender] = { amount = 0, class = c or "WARRIOR", public = "", gp = 0, passed = false, hasAction = true, banned = false }
                 end
+                
                 if not db.active.bids[addonSender].passed and not db.active.bids[addonSender].banned then
                     db.active.bids[addonSender].amount = a
                     db.active.bids[addonSender].passed = false
@@ -13340,7 +13217,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
 
         elseif prefix == "AUC_END" and db.active then
-            -- Получаем сигнал завершения - просто делаем cleanup без списания
             NSAuk.FinishAuction(db.active.startedBy)
 
         elseif prefix == "AUC_CANCEL" then
@@ -13366,12 +13242,19 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             isMinimized = false
             for pd in (parts[5] or ""):gmatch("([^;]+);") do
                 local n, g, c, p = pd:match("([^:]+):([^:]+):([^:]+):(.*)")
-                if n then db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = tonumber(g) or 0, passed = false, hasAction = false, banned = false } end
+                if n then 
+                    local gpValue = tonumber(g) or 0
+                    db.active.bids[n] = { amount = 0, class = c or "WARRIOR", public = p or "", gp = gpValue, passed = false, hasAction = false, banned = false } 
+                end
             end
             if not db.active.bids[myName] then
                 local _, c = UnitClass("player")
                 db.active.bids[myName] = { amount = 0, class = c, public = "", gp = 0, passed = false, hasAction = false, banned = false }
             end
+            
+            -- Отправляем свои ГП при синхронизации
+            NSAuk.BroadcastMyGP()
+            
             NSAuk.UpdateAuctionWindow()
             NSAuk.StartCloseTimer()
             NSAuk.EnableCheckFrame()
@@ -13385,9 +13268,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
-print("|cff00ff00[NS Auction System v5.8]|r Загружен. Команды: /nsauk, /nsauk reset, /nsauk find")
----------конец
-
+print("|cff00ff00[NS Auction System v5.9]|r Загружен. Команды: /nsauk, /nsauk reset, /nsauk find")
 
 
 
