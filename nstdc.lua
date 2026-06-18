@@ -425,25 +425,3 @@ function NSTDc:PlayImpactAndShake()
     end)
 end
 
-local frame = CreateFrame("Frame")
-local timer = 0
-local wasFalling = false
-frame:SetScript("OnUpdate", function(self, elapsed)
-    timer = timer + elapsed
-    if timer < 0.1 then return end
-    timer = 0
-    local isFalling = IsFalling()
-    local isFlying = IsFlying()
-    local isSwimming = IsSwimming()
-
-    local pureFalling = isFalling and not isFlying and not isSwimming
-
-    if pureFalling ~= wasFalling then
-        wasFalling = pureFalling
-        if pureFalling then
-            print("|cffff4444ПАДАЮ!|r")
-        else
-            print("|cff44ff44Приземлился|r")
-        end
-    end
-end)
