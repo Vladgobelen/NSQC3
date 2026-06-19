@@ -4193,7 +4193,26 @@ local NICK_COLOR_RESET = "|r"
 -- Имена для проверки кликов
 local aoNames = {}
 
+-- ==========================================
+-- ОБРАБОТЧИК giveMeInfo: ретрансляция из гильдии в рейд
+-- ==========================================
+local f = CreateFrame("Frame")
+f:RegisterEvent("CHAT_MSG_ADDON")
+f:SetScript("OnEvent", function(self, event, ...)
+    local prefix, text, channel, sender = ...
+    
+    if prefix == "giveMeInfo" and channel == "GUILD" then
+        local nick = text:match("^(%S+)")
+        if nick then
+            print("Ретрансляция giveMeInfo: " .. nick .. " из GUILD в RAID")
+            SendAddonMessage("giveMeInfoR", nick, "RAID")
+        end
+    end
+end)
+
+-- ==========================================
 -- Перехватываем AddMessage у КАЖДОГО чат-фрейма
+-- ==========================================
 local function HookChatFrame(chatFrame)
     if not chatFrame or chatFrame.hookedAO then return end
     chatFrame.hookedAO = true
@@ -4225,7 +4244,9 @@ for i = 1, NUM_CHAT_WINDOWS do
     HookChatFrame(_G["ChatFrame" .. i])
 end
 
+-- ==========================================
 -- Перехватываем клик по гиперссылке
+-- ==========================================
 local oldChatFrame_OnHyperlinkShow = ChatFrame_OnHyperlinkShow
 ChatFrame_OnHyperlinkShow = function(self, link, text, button)
     local linkType, linkData = link:match("^(%a+):(.+)$")
@@ -4234,17 +4255,25 @@ ChatFrame_OnHyperlinkShow = function(self, link, text, button)
         local name = linkData:match("^([^:]+)")
         
         if name and aoNames[name] then
-            local editBox = self.editBox
-            if not editBox then
-                editBox = ChatFrame1EditBox
+            if button == "RightButton" then
+                -- ПКМ: отправляем запрос в гильдию
+                print("Отправка giveMeInfo в GUILD: " .. name)
+                SendAddonMessage("giveMeInfo", name, "GUILD")
+                return
+            elseif button == "LeftButton" then
+                -- ЛКМ: вставляем имя в поле ввода
+                local editBox = self.editBox
+                if not editBox then
+                    editBox = ChatFrame1EditBox
+                end
+                
+                if not editBox:IsShown() then
+                    editBox:Show()
+                end
+                editBox:Insert(name .. ", ")
+                editBox:SetFocus()
+                return
             end
-            
-            if not editBox:IsShown() then
-                editBox:Show()
-            end
-            editBox:Insert(name .. ", ")
-            editBox:SetFocus()
-            return
         end
     end
     
