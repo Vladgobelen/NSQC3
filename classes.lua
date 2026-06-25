@@ -2447,19 +2447,21 @@ function GpDb:_CreateRaidSelectionWindow()
             logStr = string.format("%s %d", cleanOtherText, gpValue)
         end
         
+        local nonGuildNicks = {}
+        
         for index in pairs(self.selected_indices) do
             if self.gp_data[index] then
                 local entry = self.gp_data[index]
                 local nick = entry.original_nick
                 
-                -- === ИЗМЕНЕНИЯ ЗДЕСЬ ===
-                -- Определяем префикс в зависимости от того, состоит ли игрок в гильдии
                 local prefix = entry.isGuildMember and "nsGP1" or "nsGP1A"
                 
-                -- Отправляем сообщение ВСЕГДА в гильдию, как вы указали
                 SendAddonMessage(prefix .. " " .. gpValue, nick, "GUILD")
                 
-                -- Формируем лог (если playerID нет, используем имя с префиксом N:)
+                if prefix == "nsGP1A" then
+                    table.insert(nonGuildNicks, nick)
+                end
+                
                 local logIdentifier = entry.playerID or ("N:" .. nick)
                 logStr = logStr .. " " .. logIdentifier
                 
@@ -2468,7 +2470,6 @@ function GpDb:_CreateRaidSelectionWindow()
             end
         end
         
-        -- Отправляем общий лог (всегда в GUILD)
         SendAddonMessage("nsGPlog", logStr, "GUILD")
         
         for _, entry in ipairs(self:GetSelectedEntries()) do
@@ -2476,6 +2477,45 @@ function GpDb:_CreateRaidSelectionWindow()
         end
         self:UpdateWindow()
         self.raidWindow:Hide()
+        
+        if #nonGuildNicks > 0 then
+            print("|cFF00FF00[GP DEBUG]|r Список:", table.concat(nonGuildNicks, ", "))
+        end
+        
+        if #nonGuildNicks > 0 then
+            local timerFrame = CreateFrame("Frame")
+            -- УБРАЛИ timerFrame:Hide() — фрейм остаётся видимым
+            local elapsed = 0
+            local initialDelay = 1.0
+            local betweenDelay = 0.05
+            local currentIndex = 1
+            local phase = "waiting"
+            
+            timerFrame:SetScript("OnUpdate", function(frame, dt)
+                elapsed = elapsed + dt
+                
+                if phase == "waiting" then
+                    if elapsed >= initialDelay then
+                        phase = "sending"
+                        elapsed = 0
+                        SendAddonMessage("GetGPA", nonGuildNicks[currentIndex], "GUILD")
+                        currentIndex = currentIndex + 1
+                    end
+                elseif phase == "sending" then
+                    if elapsed >= betweenDelay then
+                        elapsed = 0
+                        if currentIndex <= #nonGuildNicks then
+                            SendAddonMessage("GetGPA", nonGuildNicks[currentIndex], "GUILD")
+                            currentIndex = currentIndex + 1
+                        else
+                            frame:SetScript("OnUpdate", nil)
+                            frame:Hide()
+                        end
+                    end
+                end
+            end)
+        else
+        end
     end)
     
     self.raidWindow:SetScript("OnHide", function()
