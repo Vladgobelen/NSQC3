@@ -4279,3 +4279,124 @@ ChatFrame_OnHyperlinkShow = function(self, link, text, button)
     
     return oldChatFrame_OnHyperlinkShow(self, link, text, button)
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function HookWorldMapCloseButton()
+    local btn = WorldMapFrameCloseButton
+    if not btn then
+        local f = CreateFrame("Frame")
+        f:SetScript("OnUpdate", function(self, elapsed)
+            if WorldMapFrameCloseButton then
+                self:SetScript("OnUpdate", nil)
+                HookWorldMapCloseButton()
+            end
+        end)
+        return
+    end
+
+    -- Регистрируем клики: ЛКМ, ПКМ, колесо
+    btn:RegisterForClicks("LeftButtonUp", "RightButtonDown", "MiddleButtonUp")
+
+    -- Создаём тултип (один раз)
+    local tooltip = CreateFrame("GameTooltip", "WorldMapCloseButtonTooltip", UIParent, "GameTooltipTemplate")
+
+    btn:SetScript("OnEnter", function(self)
+        tooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 10)
+        tooltip:ClearLines()
+        tooltip:AddLine("Управление картой мира:", 1, 1, 0)
+        tooltip:AddLine("• ЛКМ — закрыть карту", 1, 1, 1)
+        tooltip:AddLine("• ПКМ — активировать перемещение", 1, 1, 1)
+        tooltip:AddLine("• Колесо мыши — выбрать масштаб", 1, 1, 1)
+        tooltip:Show()
+    end)
+
+    btn:SetScript("OnLeave", function(self)
+        tooltip:Hide()
+    end)
+
+    local oldOnClick = btn:GetScript("OnClick")
+
+    -- Масштабы от 50% до 150% с шагом 10%
+    local scaleSteps = { 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0 }
+    local currentScaleIndex = 6 -- по умолчанию 100% (индекс 6)
+
+    -- Создаём выпадающее меню
+    local dropdown = CreateFrame("Frame", "WorldMapScaleDropdown", UIParent, "UIDropDownMenuTemplate")
+    dropdown.displayMode = "MENU"
+
+    local function OnScaleSelected(self)
+        local w = WorldMapFrame
+        if not w then return end
+        currentScaleIndex = self.value
+        w:SetScale(scaleSteps[currentScaleIndex])
+        CloseDropDownMenus()
+    end
+
+    local function InitializeScaleMenu(self, level)
+        for i, scale in ipairs(scaleSteps) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = math.floor(scale * 100) .. "%"
+            info.value = i
+            info.func = OnScaleSelected
+            info.checked = (i == currentScaleIndex)
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end
+
+    UIDropDownMenu_Initialize(dropdown, InitializeScaleMenu, "MENU")
+
+    btn:SetScript("OnClick", function(self, button)
+        local w = WorldMapFrame
+        if not w then return end
+
+        if button == "RightButton" then
+            w:SetMovable(true)
+            w:EnableMouse(true)
+            w:SetClampedToScreen(true)
+            w:SetScript("OnMouseDown", function(frame, btn)
+                if btn == "LeftButton" then
+                    frame:StartMoving()
+                end
+            end)
+            w:SetScript("OnMouseUp", function(frame, btn)
+                if btn == "LeftButton" then
+                    frame:StopMovingOrSizing()
+                end
+            end)
+
+        elseif button == "MiddleButton" then
+            -- Показываем выпадающее меню у курсора
+            ToggleDropDownMenu(1, nil, dropdown, "cursor", 0, 0)
+
+        else
+            if type(oldOnClick) == "function" then
+                oldOnClick(self, button)
+            else
+                HideUIPanel(w)
+            end
+        end
+    end)
+end

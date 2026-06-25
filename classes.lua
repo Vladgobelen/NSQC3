@@ -10926,7 +10926,6 @@ function string.trim(s)
     return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-------------------------------------------------
 GuildRecruiter = {}
 GuildRecruiter.__index = GuildRecruiter
 
@@ -11032,6 +11031,7 @@ function GuildRecruiter:ManualSave()
             maxLevel = self.settings.maxLevel,
             step = self.settings.step,
             autoAccept = self.settings.autoAccept,
+            recursive = self.settings.recursive,
             factions = {
                 Alliance = self.settings.factions.Alliance,
                 Horde = self.settings.factions.Horde
@@ -11054,6 +11054,7 @@ function GuildRecruiter:ManualLoad()
     if saved.settings.maxLevel then self.settings.maxLevel = saved.settings.maxLevel end
     if saved.settings.step then self.settings.step = saved.settings.step end
     if type(saved.settings.autoAccept) == "boolean" then self.settings.autoAccept = saved.settings.autoAccept end
+    if type(saved.settings.recursive) == "boolean" then self.settings.recursive = saved.settings.recursive end
 
     if saved.settings.factions then
         if saved.settings.factions.Alliance ~= nil then self.settings.factions.Alliance = saved.settings.factions.Alliance end
@@ -11086,6 +11087,7 @@ function GuildRecruiter:ManualLoad()
         if self.ui.stepDD then UIDropDownMenu_SetText(self.ui.stepDD, "Шаг: " .. tostring(self.settings.step)) end
         
         if self.ui.autoCB then self.ui.autoCB:SetChecked(self.settings.autoAccept) end
+        if self.ui.recursiveCB then self.ui.recursiveCB:SetChecked(self.settings.recursive) end
 
         if self.ui.factionChecks then
             self.ui.factionChecks.Alliance:SetChecked(self.settings.factions.Alliance)
@@ -11141,6 +11143,7 @@ function GuildRecruiter.new()
         maxLevel = type(saved.settings) == "table" and type(saved.settings.maxLevel) == "number" and saved.settings.maxLevel or 80,
         step = type(saved.settings) == "table" and type(saved.settings.step) == "number" and saved.settings.step or 5,
         autoAccept = (saved.settings and saved.settings.autoAccept) == true,
+        recursive = (saved.settings and saved.settings.recursive) == true,
         factions = {
             Alliance = (factions.Alliance == true),
             Horde = (factions.Horde == true)
@@ -11419,6 +11422,20 @@ function GuildRecruiter:BuildUI()
         GameTooltip:Show()
     end)
     autoCB:SetScript("OnLeave", GameTooltip_Hide)
+
+    local recursiveCB = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
+    recursiveCB:SetPoint("LEFT", autoCB, "RIGHT", 110, 0)
+    recursiveCB:SetChecked(self.settings.recursive)
+    recursiveCB:SetScript("OnClick", function()
+        self.settings.recursive = recursiveCB:GetChecked()
+    end)
+    recursiveCB:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(recursiveCB, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Набирать рекурсивно", 1, 1, 1)
+        GameTooltip:AddLine("При достижении максимального уровня поиск начнется заново с минимального.", 1, 0.8, 0, true)
+        GameTooltip:Show()
+    end)
+    recursiveCB:SetScript("OnLeave", GameTooltip_Hide)
     
     local searchBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
     searchBtn:SetSize(80, 22)
@@ -11444,6 +11461,7 @@ function GuildRecruiter:BuildUI()
         scroll = scrollFrame,
         slider = slider,
         autoCB = autoCB,
+        recursiveCB = recursiveCB,
         searchBtn = searchBtn,
         raceChecks = raceChecks,
         factionChecks = factionChecks,
@@ -11457,6 +11475,9 @@ function GuildRecruiter:LoadSettings()
     self.ui.maxLevelBtn:SetText(self.settings.maxLevel)
     UIDropDownMenu_SetText(self.ui.stepDD, "Шаг: " .. tostring(self.settings.step))
     self.ui.autoCB:SetChecked(self.settings.autoAccept)
+    if self.ui.recursiveCB then
+        self.ui.recursiveCB:SetChecked(self.settings.recursive)
+    end
 
     if self.ui.factionChecks then
         self.ui.factionChecks.Alliance:SetChecked(self.settings.factions.Alliance)
@@ -11518,12 +11539,15 @@ end
 
 function GuildRecruiter:SendNextWhoQuery()
     if self.currentLevel > self.settings.maxLevel then
-        self:StopSearch()
-        
-        if self.settings.autoAccept and #self.results > 0 then
-            self:StartAutoInvite()
+        if self.settings.recursive then
+            self.currentLevel = self.settings.minLevel
+        else
+            self:StopSearch()
+            if self.settings.autoAccept and #self.results > 0 then
+                self:StartAutoInvite()
+            end
+            return
         end
-        return
     end
     
     local maxL = math.min(self.currentLevel + self.settings.step - 1, self.settings.maxLevel)
@@ -11567,6 +11591,9 @@ function GuildRecruiter:ProcessWhoResults()
         end
     end
     self:UpdatePlayerList()
+    if self.settings.autoAccept and #self.results > 0 and not self.autoInviteLoop then
+        self:StartAutoInvite()
+    end
 end
 
 function GuildRecruiter:MatchesFilters(race, class)
@@ -11783,6 +11810,7 @@ function GuildRecruiter:SaveSettings()
             maxLevel = self.settings.maxLevel,
             step = self.settings.step,
             autoAccept = self.settings.autoAccept,
+            recursive = self.settings.recursive,
             factions = {
                 Alliance = self.settings.factions.Alliance,
                 Horde = self.settings.factions.Horde
