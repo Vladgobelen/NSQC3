@@ -65,14 +65,46 @@ function NSTDc:RegisterEvents()
 end
 
 function NSTDc:CheckLocationChange()
-    local cont = GetCurrentMapContinent()
-    local zone = GetCurrentMapZone()
-    if self.lastContinent and self.lastZone then
-        if cont ~= self.lastContinent or zone ~= self.lastZone then
-            print("|cff00ffff[LOC]|r Смена локации: " .. self.lastContinent .. ":" .. self.lastZone .. " -> " .. cont .. ":" .. zone)
+    local mapIsShown = WorldMapFrame and WorldMapFrame:IsShown()
+    
+    -- Отслеживаем изменение состояния карты
+    if self.lastMapState == nil then
+        self.lastMapState = mapIsShown
+    elseif self.lastMapState ~= mapIsShown then
+        self.lastMapState = mapIsShown
+        
+        if mapIsShown then
+            -- Карта открылась - сбрасываем last, чтобы при первом вызове не было ложного срабатывания
+            self.lastContinent = nil
+            self.lastZone = nil
+        else
+            -- Карта закрылась - закрываем панель
             if self.panel and self.panel:IsShown() then
                 self:TogglePanel()
             end
+            self.lastContinent = nil
+            self.lastZone = nil
+        end
+    end
+    
+    -- Если карта закрыта - не проверяем смену локации
+    if not mapIsShown then
+        return
+    end
+    
+    local cont = GetCurrentMapContinent()
+    local zone = GetCurrentMapZone()
+    
+    -- Первый вызов после открытия карты - просто запоминаем состояние
+    if not self.lastContinent or not self.lastZone then
+        self.lastContinent = cont
+        self.lastZone = zone
+        return
+    end
+    
+    if cont ~= self.lastContinent or zone ~= self.lastZone then
+        if self.panel and self.panel:IsShown() then
+            self:TogglePanel()
         end
     end
     
@@ -199,7 +231,6 @@ function NSTDc:CreatePanel()
             if type(self.InitProximityCheck) ~= "function" then
                 requestMsg = requestMsg .. ":0"
             end
-            print("|cff00ff00[NET_OUT]|r td_road -> " .. cont .. ":" .. zone)
             SendAddonMessage("NSTD", requestMsg, "GUILD")
         else
             print("|cffff0000[NSTDc]|r Невозможно определить текущую зону для постройки.")
@@ -229,7 +260,6 @@ function NSTDc:CreatePanel()
         local zone = GetCurrentMapZone()
         
         if cont > 0 and zone > 0 then
-            print("|cff00ff00[NET_OUT]|r basNew -> " .. cont .. ":" .. zone)
             SendAddonMessage("NSTD", "basNew:" .. cont .. ":" .. zone, "GUILD")
         else
             print("|cffff0000[NSTDc]|r Невозможно определить текущую зону для постройки.")
@@ -259,7 +289,6 @@ function NSTDc:RequestZoneData()
         requestMsg = requestMsg .. ":0"
     end
     
-    print("|cff00ff00[NET_OUT]|r getTD -> " .. cont .. ":" .. zone)
     SendAddonMessage("NSTD", requestMsg, "GUILD")
     
     -- Восстанавливаем attachedCargo после очистки
@@ -270,7 +299,6 @@ function NSTDc:RequestZoneData()
 end
 
 function NSTDc:HandleAddonMessage(text, sender)
-    print(string.format("|cff00ffff[NET_IN]|r [%s] %s", sender, text))
     
     -- Обработка EXEC команд
     if string.sub(text, 1, 5) == "EXEC:" then
@@ -588,7 +616,6 @@ function NSTDc:DrawAllMarkers()
                 if data.type == "bas" then
                     local pct = tonumber(data.status)
                     if pct then
-                        print("|cff00ff00[NET_OUT]|r basBuild -> " .. data.id)
                         SendAddonMessage("NSTD", "basBuild:" .. data.id, "GUILD")
                     elseif data.status == "Активен" and data.hasWaterSource then
                         self:ShowBasinExpansionIcons(data)
@@ -641,7 +668,6 @@ function NSTDc:ShowBasinExpansionIcons(basinData)
         
         icon:SetScript("OnMouseDown", function(self, button)
             if button == "LeftButton" then
-                print("|cff00ff00[NET_OUT]|r basExpand -> " .. basinData.id .. " to " .. newX .. ":" .. newY)
                 SendAddonMessage("NSTD", "basExpand:" .. basinData.id .. ":" .. newX .. ":" .. newY, "GUILD")
                 self:HideExpansionIcons()
             end
