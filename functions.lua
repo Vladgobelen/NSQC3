@@ -4525,6 +4525,38 @@ local function HandleNSQC3Loaded()
     end)
 end
 
+-- === СТРАХОВКА С ОТЛАДКОЙ ===
+if IsAddOnLoaded("NSQC3") then
+    print("|cFFFF0000[GP]|r NSQC3 уже загружен при инициализации")
+    nsqc3Handled = true
+    if IsInRaid() then
+        print("|cFFFF0000[GP]|r Мы в рейде, запускаем таймер 2с")
+        local timerFrame = CreateFrame("Frame")
+        local elapsed = 0
+        timerFrame:SetScript("OnUpdate", function(frame, dt)
+            elapsed = elapsed + dt
+            if elapsed >= 2.0 then
+                frame:SetScript("OnUpdate", nil)
+                frame:Hide()
+                print("|cFFFF0000[GP]|r Таймер 2с сработал. IsInRaid:", tostring(IsInRaid()),
+                      "IsInGuild:", tostring(IsInGuild()),
+                      "GetNumGuildMembers:", tostring(GetNumGuildMembers()))
+                if IsInRaid() and IsInGuild() and GetNumGuildMembers() > 0 then
+                    print("|cFFFF0000[GP]|r Условия выполнены, запускаем RequestGPWithRetry")
+                    RequestGPWithRetry(1)
+                else
+                    print("|cFFFF0000[GP]|r Условия НЕ выполнены")
+                end
+            end
+        end)
+    else
+        print("|cFFFF0000[GP]|r Не в рейде")
+    end
+end
+-- ============================
+
+print("|cFFFF0000[GP]|r Трекер инициализирован. wasInRaid:", tostring(wasInRaid), "nsqc3Handled:", tostring(nsqc3Handled))
+
 raidMembers = GetCurrentRaidMembers()
 
 raidTracker:SetScript("OnEvent", function(_, event, ...)
@@ -4547,6 +4579,7 @@ raidTracker:SetScript("OnEvent", function(_, event, ...)
     end
 
     if isInRaid and not wasInRaid then
+        print("|cFFFF0000[GP]|r Рейд создан")
         RequestGPWithRetry(1)
         wasInRaid = true
         return
