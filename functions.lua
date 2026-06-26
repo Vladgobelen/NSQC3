@@ -4448,21 +4448,19 @@ end
 
 local function RequestGPWithDelay(memberSet)
     local guildSet = GetGuildMemberSet()
-    
     local nicks = {}
     for plainName in pairs(memberSet) do
         if not guildSet[plainName] then
             table.insert(nicks, plainName)
         end
     end
-    
     if #nicks == 0 then return end
-    
+
     local timerFrame = CreateFrame("Frame")
     local elapsed = 0
     local delay = 0.05
     local currentIndex = 1
-    
+
     timerFrame:SetScript("OnUpdate", function(frame, dt)
         elapsed = elapsed + dt
         if elapsed >= delay then
@@ -4478,28 +4476,53 @@ local function RequestGPWithDelay(memberSet)
     end)
 end
 
-local function HandleNSQC3Loaded()
-    if nsqc3Handled then return end
-    nsqc3Handled = true
-    
-    if IsInRaid() then
+local function RequestGPWithRetry(attempt)
+    attempt = attempt or 1
+    local maxAttempts = 10
+
+    local memberSet = GetCurrentRaidMembers()
+    local memberCount = 0
+    for _ in pairs(memberSet) do memberCount = memberCount + 1 end
+
+    if memberCount == 0 and attempt < maxAttempts then
         local timerFrame = CreateFrame("Frame")
         local elapsed = 0
-        local delay = 2.0
-        
+        local delay = 1.0
+
         timerFrame:SetScript("OnUpdate", function(frame, dt)
             elapsed = elapsed + dt
             if elapsed >= delay then
                 frame:SetScript("OnUpdate", nil)
                 frame:Hide()
-                
-                if IsInRaid() and IsInGuild() and GetNumGuildMembers() > 0 then
-                    raidMembers = GetCurrentRaidMembers()
-                    RequestGPWithDelay(raidMembers)
-                end
+                RequestGPWithRetry(attempt + 1)
             end
         end)
+    elseif memberCount > 0 then
+        raidMembers = memberSet
+        RequestGPWithDelay(memberSet)
     end
+end
+
+local function HandleNSQC3Loaded()
+    if nsqc3Handled then return end
+    nsqc3Handled = true
+
+    if not IsInRaid() then return end
+
+    local timerFrame = CreateFrame("Frame")
+    local elapsed = 0
+    local delay = 2.0
+
+    timerFrame:SetScript("OnUpdate", function(frame, dt)
+        elapsed = elapsed + dt
+        if elapsed >= delay then
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+            if IsInRaid() and IsInGuild() and GetNumGuildMembers() > 0 then
+                RequestGPWithRetry(1)
+            end
+        end
+    end)
 end
 
 raidMembers = GetCurrentRaidMembers()
@@ -4514,7 +4537,7 @@ raidTracker:SetScript("OnEvent", function(_, event, ...)
         end
         return
     end
-    
+
     if event == "PLAYER_ENTERING_WORLD" and not nsqc3Handled then
         local loaded, finished = IsAddOnLoaded("NSQC3")
         if loaded and finished then
@@ -4524,8 +4547,7 @@ raidTracker:SetScript("OnEvent", function(_, event, ...)
     end
 
     if isInRaid and not wasInRaid then
-        raidMembers = GetCurrentRaidMembers()
-        RequestGPWithDelay(raidMembers)
+        RequestGPWithRetry(1)
         wasInRaid = true
         return
     end
@@ -4542,13 +4564,13 @@ raidTracker:SetScript("OnEvent", function(_, event, ...)
                 end
             end
         end
-        
+
         if #newNonGuildNicks > 0 then
             local timerFrame = CreateFrame("Frame")
             local elapsed = 0
             local delay = 0.05
             local currentIndex = 1
-            
+
             timerFrame:SetScript("OnUpdate", function(frame, dt)
                 elapsed = elapsed + dt
                 if elapsed >= delay then
