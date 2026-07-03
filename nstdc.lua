@@ -502,7 +502,6 @@ function NSTDc:DrawAllMarkers()
     local mapWidth = WorldMapDetailFrame:GetWidth()
     local mapHeight = WorldMapDetailFrame:GetHeight()
     local uniqueID = 1
-    
     for idStr, data in pairs(self.receivedData or {}) do
         local texturePath = string.format("Interface\\AddOns\\NSQC3\\libs\\%s.tga", data.type)
         local marker = CreateFrame("Frame", nil, WorldMapDetailFrame)
@@ -532,8 +531,12 @@ function NSTDc:DrawAllMarkers()
                     tex:SetTexture(texturePath)
                     alpha = 1.0
                 else
-                    tex:SetColorTexture(0, 0, 0, 1)
+                    -- ИСПРАВЛЕНО: Используем белую текстуру и SetVertexColor для черного квадрата
+                    tex:SetTexture("Interface\\Buttons\\WHITE8X8")
+                    tex:SetVertexColor(0.2, 0.2, 0.2, 1)
+                    alpha = 1.0
                     isBlackSquare = true
+                    
                 end
             elseif data.status == "Кербес" or data.status == "груз" then
                 alpha = 0.5
@@ -583,10 +586,11 @@ function NSTDc:DrawAllMarkers()
                     GameTooltip:AddLine("Кликните для расширения", 0, 1, 1)
                 else
                     GameTooltip:AddLine("Статус: Активен (нет воды)", 1, 0, 0)
+                    GameTooltip:AddLine("Нужен источник воды рядом", 1, 0.5, 0)
                 end
             elseif data.status == "не_активно" then
                 GameTooltip:AddLine("Статус: Не активно", 1, 0, 0)
-                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("  ")
                 GameTooltip:AddLine("Для активации протяните дорогу до этого участка", 1, 0.8, 0)
             elseif data.status == "груз" then
                 GameTooltip:AddLine("Статус: Груз", 0, 1, 1)

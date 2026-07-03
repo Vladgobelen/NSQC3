@@ -11618,14 +11618,24 @@ end
 
 function GuildRecruiter:ProcessWhoResults()
     local n = GetNumWhoResults()
+    local now = time()
     for i = 1, n do
         local name, guildName, lvl, raceRU, classRU, _, classENG = GetWhoInfo(i)
         if not (guildName and guildName ~= "") then
             local inviteTime = self.exceptions[name]
-            local now = time()
             if not (type(inviteTime) == "number" and now - inviteTime <= 7 * 24 * 60 * 60) then
                 if self:MatchesFilters(raceRU, classENG) then
-                    table.insert(self.results, {name = name, level = lvl, race = raceRU, class = classENG})
+                    -- Проверяем, нет ли уже такого игрока в results
+                    local alreadyInResults = false
+                    for _, r in ipairs(self.results) do
+                        if r.name == name then
+                            alreadyInResults = true
+                            break
+                        end
+                    end
+                    if not alreadyInResults then
+                        table.insert(self.results, {name = name, level = lvl, race = raceRU, class = classENG})
+                    end
                 end
             end
         end
@@ -11769,10 +11779,12 @@ function GuildRecruiter:SetCooldown()
 end
 
 function GuildRecruiter:RemoveFromList(name)
-    for i, p in ipairs(self.results) do
-        if p.name == name then
+    local i = 1
+    while i <= #self.results do
+        if self.results[i].name == name then
             table.remove(self.results, i)
-            break
+        else
+            i = i + 1
         end
     end
     self:UpdatePlayerList()
