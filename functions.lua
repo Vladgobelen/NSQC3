@@ -5444,6 +5444,7 @@ local function CreateChatMenuButton(frame)
     if not frame then return end
     if frame.menuButton then return end
     
+    -- Кнопка меню (облачко)
     local button = CreateFrame("Button", nil, frame)
     button:SetSize(20, 20)
     button:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, -2)
@@ -5456,6 +5457,18 @@ local function CreateChatMenuButton(frame)
     button:Show()
     
     frame.menuButton = button
+    
+    -- Кнопка "Вниз" (прокрутка) — всегда видна
+    local downBtn = CreateFrame("Button", nil, frame)
+    downBtn:SetSize(20, 20)
+    downBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, -24)
+    downBtn:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Up")
+    downBtn:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Down")
+    downBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    downBtn:SetScript("OnClick", function()
+        frame:ScrollToBottom()
+    end)
+    downBtn:Show()
 end
 
 for i = 1, NUM_CHAT_WINDOWS do
