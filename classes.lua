@@ -10379,6 +10379,145 @@ end
 SLASH_SPELLQUEUE_POISON1 = "/sqps"
 
 
+local PROK_PRESETS = {
+    ["Рыцарь смерти (танк)"] = {
+        ["Незыблемость льда"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            icon = "Interface\\AddOns\\NSQC\\libs\\nl",
+            profil = 4,
+            stack = 0,
+            skill = "",
+            name = "Незыблемость льда",
+        },
+        ["Кровь вампира"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            icon = "Interface\\AddOns\\NSQC\\libs\\krov_vampira",
+            profil = 4,
+            stack = 0,
+            skill = "",
+            name = "Кровь вампира",
+        },
+        ["Кровавый доспех"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            icon = "Interface\\AddOns\\NSQC\\libs\\krovootvod",
+            profil = 4,
+            stack = 0,
+            skill = "",
+            name = "Кровавый доспех",
+        },
+        ["Костяной щит"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            icon = "Interface\\AddOns\\NSQC\\libs\\kostKluch",
+            profil = 4,
+            stack = 0,
+            skill = "",
+            name = "Костяной щит",
+        },
+        ["Антимагический панцирь"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            icon = "Interface\\AddOns\\NSQC\\libs\\zelenka",
+            profil = 4,
+            stack = 0,
+            skill = "",
+            name = "Антимагический панцирь",
+        },
+    },
+    ["Паладин (танк)"] = {
+        ["Щит небес"] = {
+            name = "Щит небес",
+            spellqueue_name = "",
+            skill = "",
+            profil = 2,
+            stack = 0,
+            icon = "SpellActivationOverlays\\genericarc_03",
+            triggerType = "buff",
+        },
+        ["Молот гнева"] = {
+            name = "Молот гнева",
+            spellqueue_name = "Молот гнева",
+            skill = "",
+            profil = 3,
+            stack = 0,
+            icon = "SpellActivationOverlays\\backlash",
+            triggerType = "custom",
+        },
+        ["Священный щит"] = {
+            name = "Священный щит",
+            spellqueue_name = "",
+            skill = "",
+            profil = 1,
+            stack = 0,
+            icon = "SpellActivationOverlays\\hot_streak",
+            triggerType = "buff",
+        },
+    },
+    ["Разбойник (саб)"] = {
+        ["Танец теней"] = {
+            triggerType = "buff",
+            name = "Танец теней",
+            icon = "SpellActivationOverlays\\sudden_doom",
+            profil = 1,
+            stack = 0,
+            skill = "",
+            spellqueue_name = "",
+        },
+    },
+    ["Друид"] = {
+        ["Ясность мысли"] = {
+            name = "Ясность мысли",
+            spellqueue_name = "",
+            icon = "SpellActivationOverlays\\focus_fire",
+            profil = 1,
+            stack = 0,
+            skill = "Ясность мысли",
+            triggerType = "buff",
+        },
+        ["Жизнецвет"] = {
+            name = "Жизнецвет",
+            profil = 1,
+            stack = 3,
+            skill = "",
+            icon = "SpellActivationOverlays\\sword_and_board",
+        },
+    },
+    ["Охотник"] = {
+        ["Убийственый выстрел"] = {
+            triggerType = "custom",
+            name = "Убийственый выстрел",
+            skill = "",
+            profil = 1,
+            stack = 0,
+            icon = "SpellActivationOverlays\\focus_fire",
+            spellqueue_name = "Убийственый выстрел",
+        },
+    },
+    ["Маг (аркан)"] = {
+        ["Заградительные стрелы"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            skill = "",
+            profil = 1,
+            stack = 0,
+            icon = "SpellActivationOverlays\\arcane_missiles",
+            name = "Заградительные стрелы",
+        },
+        ["Чародейская вспышка"] = {
+            spellqueue_name = "",
+            triggerType = "buff",
+            skill = "",
+            profil = 2,
+            stack = 0,
+            icon = "SpellActivationOverlays\\sudden_death",
+            name = "Чародейская вспышка",
+        },
+    },
+}
+
 ProkIconManager = {
     icons = {},
     settings = {
@@ -10485,6 +10624,65 @@ ProkIconManager = {
         }
     }
 }
+
+function ProkIconManager:CreatePresetDropdown()
+    self.prokPresetDropdown = CreateFrame("Frame", "ProkPresetDropdown", self.configFrame, "UIDropDownMenuTemplate")
+    self.prokPresetDropdown:SetPoint("TOPLEFT", self.configFrame, "TOPLEFT", 20, -320)
+    self.prokPresetDropdown:Hide()
+    UIDropDownMenu_SetWidth(self.prokPresetDropdown, 200)
+    
+    UIDropDownMenu_Initialize(self.prokPresetDropdown, function()
+        local info = UIDropDownMenu_CreateInfo()
+        
+        -- Пункт "Очистить всё"
+        info.text = "|cffff0000Очистить всё|r"
+        info.value = "clear"
+        info.func = function()
+            _G.nsDbc.proks = {}
+            self.icons = {}
+            if self.externalIconsTable then
+                for k in pairs(self.externalIconsTable) do
+                    self.externalIconsTable[k] = nil
+                end
+            end
+            self:ForceHideAllIcons()
+            print("ProkIconManager: Все проки удалены!")
+            self.prokPresetDropdown:Hide()
+        end
+        UIDropDownMenu_AddButton(info)
+        
+        -- Разделитель
+        info.text = ""
+        info.value = "separator"
+        info.func = nil
+        info.disabled = true
+        UIDropDownMenu_AddButton(info)
+        
+        -- Пресеты
+        for presetName, icons in pairs(PROK_PRESETS) do
+            info.text = presetName
+            info.value = presetName
+            info.func = function()
+                _G.nsDbc = _G.nsDbc or {}
+                _G.nsDbc.proks = _G.nsDbc.proks or {}
+                
+                for name, iconData in pairs(icons) do
+                    _G.nsDbc.proks[name] = iconData
+                    self.icons[name] = iconData
+                    if self.externalIconsTable then
+                        self.externalIconsTable[name] = iconData
+                    end
+                end
+                
+                self:CheckInitialStates()
+                print("ProkIconManager: Загружен пресет для " .. presetName)
+                self.prokPresetDropdown:Hide()
+            end
+            info.disabled = nil
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+end
 
 function ProkIconManager:Initialize(iconsTable)
     if not iconsTable then 
@@ -10968,7 +11166,7 @@ function ProkIconManager:CreateConfigUIElements()
         end
     end)
 
-    -- Кнопка добавления (сдвинута вниз)
+    -- Кнопка добавления
     yPos = yPos + fieldHeight + 10
     local addBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
     addBtn:SetSize(120, 24)
@@ -10978,6 +11176,32 @@ function ProkIconManager:CreateConfigUIElements()
         self:AddNewIcon()
         CloseDropDownMenus()
         self:ForceHideAllIcons()
+    end)
+
+    -- Кнопка загрузки пресета проков (квадратная, справа от "Добавить")
+    local loadPresetBtn = CreateFrame("Button", nil, self.configFrame, "UIPanelButtonTemplate")
+    loadPresetBtn:SetSize(24, 24)
+    loadPresetBtn:SetPoint("LEFT", addBtn, "RIGHT", 5, 0)
+    loadPresetBtn:SetText("P")
+    loadPresetBtn:SetScript("OnClick", function()
+        if self.prokPresetDropdown and self.prokPresetDropdown:IsShown() then
+            self.prokPresetDropdown:Hide()
+        else
+            if not self.prokPresetDropdown then
+                self:CreatePresetDropdown()
+            end
+            self.prokPresetDropdown:Show()
+        end
+    end)
+    
+    -- Тултип
+    loadPresetBtn:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(loadPresetBtn, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Загрузить пресет")
+        GameTooltip:Show()
+    end)
+    loadPresetBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
     end)
 end
 
