@@ -4624,3 +4624,807 @@ raidTracker:SetScript("OnEvent", function(_, event, ...)
 
     wasInRaid = isInRaid
 end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Blackout = {}
+Blackout.__index = Blackout
+
+function Blackout:new()
+    local self = setmetatable({}, Blackout)
+    self._firstPersonFrame = nil
+    self._chairFrame = nil
+    self._blackoutFrame = nil
+    self._blackoutTexture = nil
+    self._actionPanel = nil
+    self._sanityFrame = nil
+    self._noiseValue = 0
+    self._noiseTarget = 0
+    self._noiseTimer = 0
+    self._itemTracker = nil
+    self._blackoutPoints = {}
+    self._pickupPoints = {}
+    self._inventory = {}
+    self._inventoryPanel = nil
+    return self
+end
+
+local METER = 0.0019741874693287
+
+function Blackout:FirstPerson(enable)
+    if enable then
+        if not self._firstPersonFrame then
+            self._firstPersonFrame = CreateFrame("Frame")
+            local elapsed = 0
+            self._firstPersonFrame:SetScript("OnUpdate", function(_, e)
+                elapsed = elapsed + e
+                if elapsed >= 0.1 then
+                    elapsed = 0
+                    CameraZoomIn(50)
+                end
+            end)
+        end
+    else
+        if self._firstPersonFrame then
+            self._firstPersonFrame:SetScript("OnUpdate", nil)
+            self._firstPersonFrame = nil
+        end
+    end
+end
+
+function Blackout:OnSit(callback) self._onSit = callback end
+function Blackout:OnStand(callback) self._onStand = callback end
+
+function Blackout:AddBlackoutPoint(x, y, radius, startAlpha)
+    local point = {
+        x = x,
+        y = y,
+        radius = radius * METER,
+        startAlpha = startAlpha
+    }
+    table.insert(self._blackoutPoints, point)
+    
+    if not self._blackoutFrame then
+        self._blackoutFrame = CreateFrame("Frame", nil, WorldFrame)
+        self._blackoutFrame:SetAllPoints(WorldFrame)
+        self._blackoutFrame:SetFrameStrata("BACKGROUND")
+        self._blackoutTexture = self._blackoutFrame:CreateTexture(nil, "BACKGROUND")
+        self._blackoutTexture:SetAllPoints()
+        self._blackoutTexture:SetTexture(0, 0, 0, 1.0)
+        
+        local noiseVal, noiseTarg, noiseTim = 0, 0, 0
+        
+        self._blackoutFrame:SetScript("OnUpdate", function(_, e)
+            local px, py = GetPlayerMapPosition("player")
+            local minAlpha = 1
+            
+            for _, p in ipairs(self._blackoutPoints) do
+                local dx = px - p.x
+                local dy = py - p.y
+                local d = sqrt(dx*dx + dy*dy)
+                
+                if d <= p.radius then
+                    local alpha = p.startAlpha + (1.0 - p.startAlpha) * (d / p.radius)
+                    if alpha < minAlpha then minAlpha = alpha end
+                end
+            end
+            
+            noiseTim = noiseTim + e
+            if noiseTim >= 0.2 then
+                noiseTim = 0
+                noiseTarg = (math.random() - 0.5) * 0.10
+            end
+            noiseVal = noiseVal + (noiseTarg - noiseVal) * 0.05
+            
+            minAlpha = minAlpha + noiseVal
+            if minAlpha > 1 then minAlpha = 1 elseif minAlpha < 0 then minAlpha = 0 end
+            
+            self._blackoutTexture:SetVertexColor(0, 0, 0, minAlpha)
+        end)
+    end
+    
+    self._blackoutFrame:Show()
+end
+
+function Blackout:ClearBlackoutPoints()
+    self._blackoutPoints = {}
+    if self._blackoutFrame then self._blackoutFrame:Hide() end
+end
+
+function Blackout:RemoveBlackoutPoint(x, y)
+    for i, p in ipairs(self._blackoutPoints) do
+        if p.x == x and p.y == y then
+            table.remove(self._blackoutPoints, i)
+            break
+        end
+    end
+    if #self._blackoutPoints == 0 and self._blackoutFrame then
+        self._blackoutFrame:Hide()
+    end
+end
+
+function Blackout:WaitForLocation(locationName)
+    if self._locationWaiter then
+        self._locationWaiter:SetScript("OnUpdate", nil)
+        self._locationWaiter = nil
+    end
+    
+    self._locationWaiter = CreateFrame("Frame")
+    local checkTimer = 0
+    local inLocation = false
+    local lastZone = ""
+    
+    self._locationWaiter:SetScript("OnUpdate", function(_, e)
+        checkTimer = checkTimer + e
+        
+        if checkTimer >= 0.5 then
+            checkTimer = 0
+            
+            local zone = GetZoneText()
+            
+            if zone == locationName and not inLocation then
+                inLocation = true
+                lastZone = zone
+                print("Игрок вошел в " .. locationName)
+                self:Stratholm()
+            elseif zone ~= locationName and inLocation then
+                inLocation = false
+                lastZone = zone
+                print("Игрок вышел из " .. locationName .. " (текущая: " .. zone .. ")")
+                self:StopAll()
+            end
+        end
+    end)
+    
+    print("Ожидание входа в локацию: " .. locationName)
+end
+
+function Blackout:Stratholm()
+    self:ClearBlackoutPoints()
+    self._pickupPoints = {}
+    self._inventory = {}
+    self._triggers = {}
+    self:InitItemSync()
+
+    self:TrackDeath()
+    
+    self:FirstPerson(true)
+    self:ActionPanel()
+    self:TrackMovement()
+    
+    self:TrackChair(0.85158210992813, 0.60300540924072)
+    self:TrackChair(0.84965115785599, 0.59977531433105)
+    self:TrackChair(0.84880071878433, 0.6027917265892)
+    
+    self:AddBlackoutPoint(0.85133439302444, 0.59944212436676, 10, 0.5)
+    
+    self:AddBlackoutPoint(0.86380124092102, 0.61520826816559, 10, 0.5)
+    
+    self:AddBlackoutPoint(0.8832151889801, 0.62693041563034, 8, 0.5)
+    self:AddPickupPoint(0.8832151889801, 0.62693041563034, "Факел")
+    
+    self:AddBlackoutPoint(0.88556361198425, 0.64708912372589, 8, 0.5)
+    self:AddPickupPoint(0.88556361198425, 0.64708912372589, "Факел")
+    
+    self:AddBlackoutPoint(0.8964558839798, 0.643803358078, 8, 0.5)
+    self:AddPickupPoint(0.8964558839798, 0.643803358078, "Факел")
+    
+    self:AddBlackoutPoint(0.9043670296669, 0.65844887495041, 8, 0.5)
+    self:AddPickupPoint(0.9043670296669, 0.65844887495041, "Факел")
+    
+    self:AddBlackoutPoint(0.86933445930481, 0.6240861415863, 8, 0.5)
+    self:AddPickupPoint(0.86933445930481, 0.6240861415863, "Факел")
+    
+    self:AddBlackoutPoint(0.89631587266922, 0.66581761837006, 8, 0.5)
+    self:AddPickupPoint(0.89631587266922, 0.66581761837006, "Факел")
+    
+    self:AddBlackoutPoint(0.51919728517532, 0.82976317405701, 8, 0.5)
+    self:AddPickupPoint(0.51919728517532, 0.82976317405701, "Факел")
+    
+    self:AddBlackoutPoint(0.5185215473175, 0.81354612112045, 8, 0.5)
+    self:AddPickupPoint(0.5185215473175, 0.81354612112045, "Факел")
+    
+    self:AddBlackoutPoint(0.49237456917763, 0.82973420619965, 8, 0.5)
+    self:AddPickupPoint(0.49237456917763, 0.82973420619965, "Факел")
+    
+    self:AddBlackoutPoint(0.4922738969326, 0.81366395950317, 8, 0.5)
+    self:AddPickupPoint(0.4922738969326, 0.81366395950317, "Факел")
+    
+    self:AddBlackoutPoint(0.5117124915123, 0.79917675256729, 8, 0.5)
+    self:AddPickupPoint(0.5117124915123, 0.79917675256729, "Факел")
+    
+    self:AddBlackoutPoint(0.49954354763031, 0.79881370067596, 8, 0.5)
+    self:AddPickupPoint(0.49954354763031, 0.79881370067596, "Факел")
+    
+    self:AddBlackoutPoint(0.49956959486008, 0.77171093225479, 8, 0.5)
+    self:AddPickupPoint(0.49956959486008, 0.77171093225479, "Факел")
+    
+    self:AddBlackoutPoint(0.51160389184952, 0.77071154117584, 8, 0.5)
+    self:AddPickupPoint(0.51160389184952, 0.77071154117584, "Факел")
+    
+    self:AddBlackoutPoint(0.8739253282547, 0.71314078569412, 30, 0.5)
+    
+    self:AddTrigger(0.8398625254631, 0.5938364863395, {
+        onFail = function()
+            print("Игрок ушел даже не посидев на дорожку, тут так не принято. Игрок умирает, нарушив симуляцию")
+            print("Провал миссии!")
+            self:StopAll()
+            SendAddonMessage("ns_MD", GetUnitName("player"), "guild")
+        end,
+        onSuccess = function()
+            print("Посетители таверны желают тебе удачи")
+        end
+    })
+    
+end
+
+function Blackout:AddTrigger(x, y, config)
+    local trigger = {
+        x = x,
+        y = y,
+        text = config.text,
+        state = nil,
+        onFail = config.onFail,
+        onSuccess = config.onSuccess
+    }
+    table.insert(self._triggers, trigger)
+    
+    if not self._triggerTracker then
+        self._triggerTracker = CreateFrame("Frame")
+        self._triggerTracker:SetScript("OnUpdate", function()
+            self:CheckTriggers()
+        end)
+    end
+end
+
+function Blackout:CheckTriggers()
+    local px, py = GetPlayerMapPosition("player")
+    
+    for _, trigger in ipairs(self._triggers) do
+        local dx = px - trigger.x
+        local dy = py - trigger.y
+        local distance = sqrt(dx*dx + dy*dy)
+        
+        if distance <= METER and trigger.state == nil then
+            trigger.state = 1
+            if self._chairSat then
+                if trigger.onSuccess then trigger.onSuccess() end
+            else
+                if trigger.onFail then trigger.onFail() end
+            end
+        end
+    end
+end
+
+function Blackout:TrackChair(x, y)
+    if not self._chairs then
+        self._chairs = {}
+        self._chairFrame = CreateFrame("Frame")
+        
+        self._chairFrame:SetScript("OnUpdate", function()
+            local px, py = GetPlayerMapPosition("player")
+            
+            for _, chair in ipairs(self._chairs) do
+                local d = sqrt((px - chair.x)^2 + (py - chair.y)^2)
+                if d <= METER then
+                    local pitch = GetUnitPitch("player")
+                    if pitch == 0 and not self._chairSat then
+                        self._chairSat = true
+                        print("Сел на стул!")
+                        if self._onSit then self._onSit() end
+                    end
+                    return
+                end
+            end
+        end)
+    end
+    
+    table.insert(self._chairs, {x = x, y = y})
+end
+
+function Blackout:StopAll()
+    self:FirstPerson(false)
+    self:ClearBlackoutPoints()
+    if self._actionPanel then self._actionPanel:Hide() end
+    if self._movementTracker then
+        self._movementTracker:SetScript("OnUpdate", nil)
+        self._movementTracker = nil
+    end
+    if self._sanityFrame then
+        self._sanityFrame:SetScript("OnUpdate", nil)
+        self._sanityFrame = nil
+    end
+    if self._instanceTracker then
+        self._instanceTracker:SetScript("OnUpdate", nil)
+        self._instanceTracker = nil
+    end
+    self._sanityLevel = 0
+    self._pickupPoints = {}
+    self._inventory = {}
+    if nsDbc and nsDbc['inst'] then
+        nsDbc['inst'].active = nil
+    end
+    MoveViewRightStart(0)
+end
+
+function Blackout:AddPickupPoint(x, y, itemName)
+    local point = {
+        x = x,
+        y = y,
+        itemName = itemName,
+        pickedUp = false
+    }
+    table.insert(self._pickupPoints, point)
+end
+
+function Blackout:PickupItem(itemName, x, y)
+    if self._inventory[itemName] then
+        self._inventory[itemName] = self._inventory[itemName] + 1
+    else
+        self._inventory[itemName] = 1
+    end
+    
+    print("Подобрано: " .. itemName .. " (x" .. self._inventory[itemName] .. ")")
+    SendAddonMessage("ns_Item", GetUnitName("player") .. " " .. itemName .. " " .. x .. " " .. y, "guild")
+    self:UpdateInventoryPanel()
+end
+
+function Blackout:UpdateInventoryPanel()
+    if not self._inventoryContainer then return end
+    
+    for _, icon in ipairs(self._inventoryIcons) do
+        icon:Hide()
+    end
+    self._inventoryIcons = {}
+    
+    local offsetX = 0
+    local iconSpacing = 4
+    
+    for itemName, count in pairs(self._inventory) do
+        if count > 0 then
+            local itemIcon = CreateFrame("Button", nil, self._inventoryContainer)
+            itemIcon:SetSize(24, 24)
+            itemIcon:SetPoint("LEFT", offsetX, 0)
+            
+            local tex = itemIcon:CreateTexture(nil, "ARTWORK")
+            tex:SetAllPoints()
+            
+            if itemName == "Факел" then
+                tex:SetTexture("Interface\\Icons\\INV_Torch_Lit")
+            else
+                tex:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            end
+            
+            local countText = itemIcon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            countText:SetPoint("BOTTOMRIGHT", 2, -2)
+            countText:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+            countText:SetText(tostring(count))
+            countText:SetTextColor(1, 0.8, 0, 1)
+            
+            itemIcon:SetScript("OnEnter", function(btn)
+                GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+                GameTooltip:SetText(itemName, 1, 1, 1)
+                GameTooltip:AddLine("Количество: " .. count, 0.8, 0.8, 0.8)
+                GameTooltip:AddLine("Кликните чтобы установить", 0.6, 0.6, 0.6)
+                GameTooltip:Show()
+            end)
+            itemIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            itemIcon:SetScript("OnClick", function()
+                if itemName == "Факел" and self._inventory["Факел"] and self._inventory["Факел"] > 0 then
+                    local px, py = GetPlayerMapPosition("player")
+                    self:AddBlackoutPoint(px, py, 50, 0.5)
+                    self:UseItem("Факел")
+                    SendAddonMessage("ns_TorchPlace", px .. " " .. py, "guild")
+                    print("Факел установлен!")
+                end
+            end)
+            
+            table.insert(self._inventoryIcons, itemIcon)
+            offsetX = offsetX + 24 + iconSpacing
+        end
+    end
+end
+
+function Blackout:InitItemSync()
+    if self._itemSyncFrame then return end
+    
+    self._itemSyncFrame = CreateFrame("Frame")
+    self._itemSyncFrame:RegisterEvent("CHAT_MSG_ADDON")
+    self._itemSyncFrame:SetScript("OnEvent", function(_, event, prefix, message, channel, sender)
+        if not self:IsInSameGroup(sender) then return end
+        
+        if prefix == "ns_Item" and sender ~= GetUnitName("player") then
+            local itemName, x, y = strsplit(" ", message)
+            x = tonumber(x)
+            y = tonumber(y)
+            
+            print(sender .. " подобрал " .. itemName)
+            
+            self:RemoveBlackoutPoint(x, y)
+            
+            for _, point in ipairs(self._pickupPoints) do
+                if point.x == x and point.y == y then
+                    point.pickedUp = true
+                    break
+                end
+            end
+        end
+        
+        if prefix == "ns_TorchPlace" and sender ~= GetUnitName("player") then
+            local x, y = strsplit(" ", message)
+            x = tonumber(x)
+            y = tonumber(y)
+            
+            print(sender .. " установил факел!")
+            self:AddBlackoutPoint(x, y, 50, 0.5)
+        end
+    end)
+end
+
+function Blackout:IsInSameGroup(playerName)
+    if GetNumGroupMembers() == 0 then return false end
+    
+    for i = 1, GetNumGroupMembers() do
+        local name = GetRaidRosterInfo(i)
+        if name == playerName then
+            return true
+        end
+    end
+    
+    return false
+end
+
+function Blackout:UseItem(itemName)
+    if self._inventory[itemName] and self._inventory[itemName] > 0 then
+        self._inventory[itemName] = self._inventory[itemName] - 1
+        if self._inventory[itemName] == 0 then
+            self._inventory[itemName] = nil
+        end
+        print("Использовано: " .. itemName)
+        self:UpdateInventoryPanel()
+        return true
+    else
+        print("Нет предмета: " .. itemName)
+        return false
+    end
+end
+
+function Blackout:ActionPanel()
+    if self._actionPanel then self._actionPanel:Hide() end
+    
+    self._actionPanel = CreateFrame("Frame", nil, UIParent)
+    self._actionPanel:SetFrameStrata("HIGH")
+    self._actionPanel:SetMovable(true)
+    self._actionPanel:EnableMouse(true)
+    self._actionPanel:RegisterForDrag("LeftButton")
+    
+    self._actionPanel:SetScript("OnDragStart", function() self._actionPanel:StartMoving() end)
+    self._actionPanel:SetScript("OnDragStop", function() self._actionPanel:StopMovingOrSizing() end)
+    
+    local iconSize = 24
+    local buttonSize = 36
+    local buttonSpacing = 8
+    local padding = 10
+    local totalWidth = buttonSize * 2 + buttonSpacing + padding * 4
+    
+    self._actionPanel:SetSize(totalWidth, iconSize + buttonSize + padding * 3)
+    self._actionPanel:SetPoint("CENTER")
+    
+    self._actionPanel:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 }
+    })
+    self._actionPanel:SetBackdropColor(0, 0, 0, 0.7)
+    self._actionPanel:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+    
+    local sanityIcon = CreateFrame("Button", nil, self._actionPanel)
+    sanityIcon:SetSize(iconSize, iconSize)
+    sanityIcon:SetPoint("TOPLEFT", padding, -padding)
+    
+    local iconTex = sanityIcon:CreateTexture(nil, "ARTWORK")
+    iconTex:SetAllPoints()
+    iconTex:SetTexture("Interface\\Icons\\Spell_Shadow_ShadowWordDominate")
+    
+    local border = sanityIcon:CreateTexture(nil, "OVERLAY")
+    border:SetAllPoints()
+    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    border:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    
+    local sanityText = sanityIcon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    sanityText:SetPoint("CENTER")
+    sanityText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+    
+    sanityIcon:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:SetText("Уровень безумия", 1, 1, 1)
+        local lvl = self._sanityLevel or 0
+        local status = "Спокоен"
+        if lvl > 70 then status = "Безумен"
+        elseif lvl > 40 then status = "Тревожен"
+        elseif lvl > 20 then status = "Напряжён"
+        end
+        GameTooltip:AddLine("Состояние: " .. status, 1, 0.8, 0)
+        GameTooltip:AddLine("Уровень: " .. lvl .. "/100", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Повышается, если кто-то", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("в панике бегает или умирает.", 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
+    sanityIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    self._inventoryContainer = CreateFrame("Frame", nil, self._actionPanel)
+    self._inventoryContainer:SetPoint("TOPLEFT", sanityIcon, "TOPRIGHT", 4, 0)
+    self._inventoryContainer:SetPoint("TOPRIGHT", -padding, -padding)
+    self._inventoryContainer:SetHeight(iconSize)
+    
+    self._inventoryIcons = {}
+    
+    local takeBtn = CreateFrame("Button", nil, self._actionPanel)
+    takeBtn:SetSize(buttonSize, buttonSize)
+    takeBtn:SetPoint("BOTTOM", -buttonSize/2 - buttonSpacing/2, padding)
+    takeBtn:SetNormalTexture("Interface\\Icons\\INV_Misc_Bag_08")
+    
+    local takeBorder = takeBtn:CreateTexture(nil, "OVERLAY")
+    takeBorder:SetAllPoints()
+    takeBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    
+    takeBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+    takeBtn:GetHighlightTexture():SetAllPoints()
+    
+    takeBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Взять", 1, 1, 1)
+        local px, py = GetPlayerMapPosition("player")
+        local nearby = ""
+        for _, point in ipairs(self._pickupPoints) do
+            if not point.pickedUp then
+                local dx = px - point.x
+                local dy = py - point.y
+                local distance = sqrt(dx*dx + dy*dy)
+                if distance <= METER then
+                    if nearby ~= "" then nearby = nearby .. ", " end
+                    nearby = nearby .. point.itemName
+                end
+            end
+        end
+        if nearby ~= "" then
+            GameTooltip:AddLine("Рядом: " .. nearby, 0, 1, 0)
+        end
+        GameTooltip:Show()
+    end)
+    takeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    takeBtn:SetScript("OnClick", function()
+        local px, py = GetPlayerMapPosition("player")
+        local picked = false
+        for _, point in ipairs(self._pickupPoints) do
+            if not point.pickedUp then
+                local dx = px - point.x
+                local dy = py - point.y
+                local distance = sqrt(dx*dx + dy*dy)
+                if distance <= METER then
+                    self:PickupItem(point.itemName, point.x, point.y)
+                    self:RemoveBlackoutPoint(point.x, point.y)
+                    point.pickedUp = true
+                    picked = true
+                    break
+                end
+            end
+        end
+        if not picked then
+            print("Нечего подбирать поблизости")
+        end
+    end)
+    
+    local useBtn = CreateFrame("Button", nil, self._actionPanel)
+    useBtn:SetSize(buttonSize, buttonSize)
+    useBtn:SetPoint("BOTTOM", buttonSize/2 + buttonSpacing/2, padding)
+    useBtn:SetNormalTexture("Interface\\Icons\\INV_Misc_Gear_01")
+    
+    local useBorder = useBtn:CreateTexture(nil, "OVERLAY")
+    useBorder:SetAllPoints()
+    useBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    
+    useBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+    useBtn:GetHighlightTexture():SetAllPoints()
+    
+    useBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
+        GameTooltip:SetText("Использовать", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    useBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    useBtn:SetScript("OnClick", function()
+        if self._inventory["Факел"] and self._inventory["Факел"] > 0 then
+            self:UseItem("Факел")
+        else
+            print("Нечего использовать")
+        end
+    end)
+    
+    self._actionPanel:SetScript("OnUpdate", function()
+        local lvl = self._sanityLevel or 0
+        sanityText:SetText(tostring(lvl))
+        
+        if lvl > 70 then
+            sanityText:SetTextColor(1, 0, 0, 1)
+        elseif lvl > 40 then
+            sanityText:SetTextColor(1, 0.5, 0, 1)
+        else
+            sanityText:SetTextColor(1, 1, 1, 1)
+        end
+    end)
+end
+
+function Blackout:TrackDeath()
+    if self._deathTracker then
+        self._deathTracker:SetScript("OnUpdate", nil)
+        self._deathTracker = nil
+    end
+    
+    self._deathTracker = CreateFrame("Frame")
+    local wasDead = false
+    
+    self._deathTracker:SetScript("OnUpdate", function()
+        local hp = UnitHealth("player")
+        
+        if hp <= 2 and not wasDead then
+            wasDead = true
+            print("Игрок умер! Безумие +10")
+            self._sanityLevel = (self._sanityLevel or 0) + 10
+            if self._sanityLevel > 100 then
+                self._sanityLevel = 100
+            end
+            self:Sanity(self._sanityLevel)
+            
+            if self._sanityLevel >= 100 then
+                SendAddonMessage("ns_MD", GetUnitName("player"), "guild")
+            end
+        elseif hp > 2 and wasDead then
+            wasDead = false
+        end
+    end)
+end
+
+function Blackout:TrackMovement()
+    if self._movementTracker then
+        self._movementTracker:SetScript("OnUpdate", nil)
+        self._movementTracker = nil
+    end
+    
+    self._movementTracker = CreateFrame("Frame")
+    local runThreshold = 5.5
+    local mountThreshold = 14.0
+    local runTime = 0
+    local lastBeep = 0
+    
+    self._movementTracker:SetScript("OnUpdate", function(_, e)
+        local speed = GetUnitSpeed("player")
+        
+        if speed > runThreshold and speed < mountThreshold then
+            runTime = runTime + e
+        else
+            runTime = 0
+            lastBeep = 0
+            return
+        end
+        
+        if runTime - lastBeep >= 2.0 then
+            lastBeep = lastBeep + 2.0
+            self._sanityLevel = (self._sanityLevel or 0) + 1
+            if self._sanityLevel > 100 then
+                self._sanityLevel = 100
+            end
+            self:Sanity(self._sanityLevel)
+            print("+1 безумие! Уровень: " .. self._sanityLevel)
+            
+            if self._sanityLevel >= 100 then
+                SendAddonMessage("ns_MD", GetUnitName("player"), "guild")
+            end
+        end
+    end)
+    
+    print("Отслеживание движения активировано")
+end
+
+function Blackout:Sanity(level)
+    if level <= 0 then
+        if self._sanityFrame then
+            self._sanityFrame:SetScript("OnUpdate", nil)
+            self._sanityFrame = nil
+        end
+        if self._alcoholTracker then
+            self._alcoholTracker:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+            self._alcoholTracker = nil
+        end
+        return
+    end
+    if level > 100 then level = 100 end
+    
+    self._sanityLevel = level
+    
+    if not self._alcoholTracker then
+        self._alcoholTracker = CreateFrame("Frame")
+        self._alcoholTracker:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+        self._alcoholTracker:SetScript("OnEvent", function(_, event, unit, spell)
+            if unit == "player" then
+                local reduction = 0
+                if string.find(spell, "Крепк") then
+                    reduction = 5
+                elseif string.find(spell, "Обычн") then
+                    reduction = 3
+                elseif string.find(spell, "Слаб") then
+                    reduction = 1
+                elseif string.find(spell, "Ром") or string.find(spell, "ром") then
+                    reduction = 2
+                end
+                
+                if reduction > 0 then
+                    self._sanityLevel = self._sanityLevel - reduction
+                    if self._sanityLevel < 0 then
+                        self._sanityLevel = 0
+                    end
+                end
+            end
+        end)
+    end
+    
+    if not self._sanityFrame then
+        self._sanityFrame = CreateFrame("Frame")
+    end
+    
+    local timer = 0
+    local nextSwitch = 0.5
+    local accum = 0
+    local target = 0
+    
+    self._sanityFrame:SetScript("OnUpdate", function(_, e)
+        local intensity = self._sanityLevel / 100
+        
+        if self._sanityLevel <= 0 then
+            MoveViewRightStart(0)
+            return
+        end
+        
+        timer = timer + e
+        if timer >= nextSwitch then
+            timer = 0
+            nextSwitch = 0.2 + math.random() * 0.8 * (1 - intensity * 0.7)
+            local maxAmp = 0.005 + intensity * 0.04
+            target = (math.random() - 0.5) * maxAmp * 2
+        end
+        accum = accum + (target - accum) * 0.1
+        MoveViewRightStart(accum)
+    end)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -7830,6 +7830,213 @@ end
 SpellQueue = {}
 SpellQueue.__index = SpellQueue
 
+local CLASS_PRESETS = {
+    ["Рыцарь смерти"] = {
+        ["Удар смерти"] = {
+            combo = 0,
+            priority = 3,
+            icon = "Interface\\Icons\\Spell_DeathKnight_Butcher2",
+            pos = 0,
+        },
+        ["Смерть и разложение"] = {
+            combo = 0,
+            priority = 5,
+            icon = "Interface\\Icons\\Spell_Shadow_DeathAndDecay",
+            pos = 0,
+        },
+        ["Ледяное прикосновение"] = {
+            combo = 0,
+            debuf = "Озноб",
+            priority = 1,
+            icon = "Interface\\Icons\\Spell_DeathKnight_IceTouch",
+            pos = 0,
+        },
+        ["Удар чумы"] = {
+            combo = 0,
+            debuf = "Кровавая чума",
+            priority = 2,
+            icon = "Interface\\Icons\\Spell_DeathKnight_EmpowerRuneBlade",
+            pos = 0,
+        },
+        ["Зимний горн"] = {
+            buf = 1,
+            combo = 0,
+            priority = 0,
+            icon = "Interface\\Icons\\INV_Misc_Horn_02",
+            pos = 0,
+        },
+        ["Лик смерти"] = {
+            combo = 0,
+            resource = {
+                amount = 80,
+                type = 6,
+            },
+            icon = "Interface\\Icons\\Spell_Shadow_DeathCoil",
+            pos = 5,
+        },
+        ["Кровавый удар"] = {
+            combo = 0,
+            priority = 4,
+            icon = "Interface\\Icons\\Spell_Deathknight_DeathStrike",
+            pos = 0,
+        },
+    },
+    ["Жрец (дд)"] = {
+        ["Молитва защиты от темной магии"] = {
+            combo = 0,
+            priority = 0,
+            icon = "Interface\\Icons\\Spell_Holy_PrayerofShadowProtection",
+            pos = 0,
+        },
+        ["Облик Тьмы"] = {
+            buf = 1,
+            combo = 0,
+            priority = 0,
+            icon = "Interface\\Icons\\Spell_Shadow_Shadowform",
+            pos = 0,
+        },
+        ["Молитва стойкости"] = {
+            buf = 1,
+            combo = 0,
+            priority = 0,
+            icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude",
+            pos = 0,
+        },
+        ["Всепожирающая чума"] = {
+            combo = 0,
+            debuf = 1,
+            priority = 2,
+            icon = "Interface\\Icons\\Spell_Shadow_DevouringPlague",
+            pos = 0,
+        },
+        ["Слово Тьмы: Боль"] = {
+            combo = 0,
+            debuf = 1,
+            priority = 4,
+            icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
+            pos = 0,
+        },
+        ["Взрыв разума"] = {
+            combo = 0,
+            priority = 3,
+            icon = "Interface\\Icons\\Spell_Shadow_UnholyFrenzy",
+            pos = 0,
+        },
+        ["Прикосновение вампира"] = {
+            combo = 0,
+            debuf = 1,
+            priority = 1,
+            icon = "Interface\\Icons\\Spell_Holy_Stoicism",
+            pos = 0,
+        },
+        ["Молитва духа"] = {
+            buf = 1,
+            combo = 0,
+            priority = 0,
+            icon = "Interface\\Icons\\Spell_Holy_PrayerofSpirit",
+            pos = 0,
+        },
+        ["Внутренний огонь"] = {
+            buf = 1,
+            combo = 0,
+            icon = "Interface\\Icons\\Spell_Holy_InnerFire",
+            pos = 0,
+        },
+        ["Объятия вампира"] = {
+            buf = 1,
+            combo = 0,
+            priority = 0,
+            icon = "Interface\\Icons\\Spell_Shadow_UnsummonBuilding",
+            pos = 0,
+        },
+    },
+    ["Паладин (танк)"] = {
+        ["Великое благословение неприкосновенности"] = {
+            buf = 1,
+            combo = 0,
+            icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofSanctuary",
+            pos = 0,
+        },
+        ["Молот гнева"] = {
+            texture = 1,
+            combo = 0,
+            prok = 20,
+            priority = 0,
+            icon = "Interface\\Icons\\Ability_ThunderClap",
+            pos = 0,
+        },
+        ["Щит небес"] = {
+            buf = 1,
+            combo = 0,
+            icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection",
+            pos = 0,
+        },
+        ["Праведное неистовство"] = {
+            buf = 1,
+            combo = 0,
+            icon = "Interface\\Icons\\Spell_Holy_SealOfFury",
+            pos = 0,
+        },
+        ["Молот праведника"] = {
+            combo = 0,
+            icon = "Interface\\Icons\\Ability_Paladin_HammeroftheRighteous",
+            pos = 0,
+        },
+        ["Священный щит"] = {
+            buf = 1,
+            combo = 0,
+            icon = "Interface\\Icons\\Ability_Paladin_BlessedMending",
+            pos = 0,
+        },
+        ["Правосудие света"] = {
+            combo = 0,
+            icon = "Interface\\Icons\\Spell_Holy_RighteousFury",
+            pos = 0,
+        },
+        ["Щит праведности"] = {
+            combo = 0,
+            icon = "Interface\\Icons\\Ability_Paladin_ShieldofVengeance",
+            pos = 0,
+        },
+        ["Щит мстителя"] = {
+            combo = 0,
+            priority = -1,
+            icon = "Interface\\Icons\\Spell_Holy_AvengersShield",
+            pos = 0,
+        },
+        ["Печать повиновения"] = {
+            buf = 1,
+            combo = 0,
+            icon = "Interface\\Icons\\Ability_Warrior_InnerRage",
+            pos = 0,
+        },
+    },
+    ["Друид (медведь)"] = {
+        ["Устрашающий рев"] = {
+            combo = 0,
+            debuf = 1,
+            icon = "Interface\\Icons\\Ability_Druid_DemoralizingRoar",
+            pos = 3,
+        },
+        ["Волшебный огонь (зверь)"] = {
+            combo = 0,
+            debuf = 1,
+            icon = "Interface\\Icons\\Spell_Nature_FaerieFire",
+            pos = 3,
+        },
+        ["Увечье (медведь)"] = {
+            combo = 0,
+            icon = "Interface\\Icons\\Ability_Druid_Mangle2",
+            pos = 0,
+        },
+        ["Свирепый укус"] = {
+            combo = 5,
+            icon = "Interface\\Icons\\Ability_Druid_FerociousBite",
+            pos = 2,
+        },
+    },
+}
+
 -- Константы
 local COMBO_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga"
 local POISON_TEXTURE = "Interface\\AddOns\\NSQC3\\libs\\00t.tga"
@@ -9197,22 +9404,27 @@ function SpellQueue:CreateConfigWindow()
     configFrame:SetScript("OnDragStart", configFrame.StartMoving)
     configFrame:SetScript("OnDragStop", configFrame.StopMovingOrSizing)
     configFrame:Hide()
+
     local title = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -15)
     title:SetText("Настройки SpellQueue")
+
     local closeButton = CreateFrame("Button", nil, configFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
     closeButton:SetScript("OnClick", function()
         configFrame:Hide()
     end)
+
     local nameLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameLabel:SetPoint("TOPLEFT", 15, -45)
     nameLabel:SetText("Название скилла:")
+
     local editBox = CreateFrame("EditBox", "SpellQueueEditBox", configFrame, "InputBoxTemplate")
     editBox:SetSize(180, 20)
     editBox:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -5)
     editBox:SetAutoFocus(false)
-    local deleteButton, addButton
+
+    local deleteButton, addButton, loadPresetButton, presetDropdown
     local posDropdown
     local buffCheckButton, buffNameEditBox
     local debuffCheckButton, debuffNameEditBox
@@ -9221,6 +9433,7 @@ function SpellQueue:CreateConfigWindow()
     local prokCheckButton, prokHPEditBox
     local textureCheckButton
     local priorityCheckButton, priorityEditBox
+
     deleteButton = CreateFrame("Button", "SpellQueueDeleteButton", configFrame, "UIPanelButtonTemplate")
     deleteButton:SetSize(25, 25)
     deleteButton:SetPoint("LEFT", editBox, "RIGHT", 5, 0)
@@ -9244,6 +9457,7 @@ function SpellQueue:CreateConfigWindow()
             message("Скилл " .. name .. " не найден в списке!")
         end
     end)
+
     addButton = CreateFrame("Button", "SpellQueueAddButton", configFrame, "UIPanelButtonTemplate")
     addButton:SetSize(25, 25)
     addButton:SetPoint("LEFT", deleteButton, "RIGHT", 5, 0)
@@ -9336,9 +9550,82 @@ function SpellQueue:CreateConfigWindow()
         priorityEditBox:Hide()
         message("Скилл " .. name .. " добавлен!")
     end)
+
+    -- Кнопка загрузки пресета
+    loadPresetButton = CreateFrame("Button", "SpellQueueLoadPresetButton", configFrame, "UIPanelButtonTemplate")
+    loadPresetButton:SetSize(25, 25)
+    loadPresetButton:SetPoint("LEFT", addButton, "RIGHT", 5, 0)
+    loadPresetButton:SetText("P")
+    loadPresetButton:SetScript("OnClick", function()
+        if presetDropdown:IsShown() then
+            presetDropdown:Hide()
+        else
+            presetDropdown:Show()
+        end
+    end)
+
+    -- Выпадающий список пресетов
+    presetDropdown = CreateFrame("Frame", "SpellQueuePresetDropdown", configFrame, "UIDropDownMenuTemplate")
+    presetDropdown:SetPoint("TOPLEFT", loadPresetButton, "BOTTOMLEFT", 0, -2)
+    presetDropdown:Hide()
+    UIDropDownMenu_SetWidth(presetDropdown, 150)
+
+    local function PresetDropDown_Initialize()
+        local info = UIDropDownMenu_CreateInfo()
+        
+        -- Пункт "Очистить всё"
+        info.text = "|cffff0000Очистить всё|r"
+        info.value = "clear"
+        info.func = function()
+            _G.nsDbc.skills3[PLAYER_KEY] = {}
+            _G.SpellQueueInstance:UpdateSkillTables()
+            if _G.SpellQueueInstance.inCombat then
+                _G.SpellQueueInstance:ForceUpdateAllSpells()
+            end
+            print("SpellQueue: Все скиллы удалены!")
+            presetDropdown:Hide()
+        end
+        UIDropDownMenu_AddButton(info)
+        
+        -- Разделитель
+        info.text = ""
+        info.value = "separator"
+        info.func = nil
+        info.disabled = true
+        UIDropDownMenu_AddButton(info)
+        
+        -- Пресеты классов
+        for className, spells in pairs(CLASS_PRESETS) do
+            info.text = className
+            info.value = className
+            info.func = function()
+                if not _G.nsDbc.skills3[PLAYER_KEY] then
+                    _G.nsDbc.skills3[PLAYER_KEY] = {}
+                end
+                
+                for spellName, spellData in pairs(spells) do
+                    _G.nsDbc.skills3[PLAYER_KEY][spellName] = spellData
+                end
+                
+                _G.SpellQueueInstance:UpdateSkillTables()
+                if _G.SpellQueueInstance.inCombat then
+                    _G.SpellQueueInstance:ForceUpdateAllSpells()
+                end
+                
+                print("SpellQueue: Загружен пресет для " .. className)
+                presetDropdown:Hide()
+            end
+            info.disabled = nil
+            UIDropDownMenu_AddButton(info)
+        end
+    end
+
+    UIDropDownMenu_Initialize(presetDropdown, PresetDropDown_Initialize)
+
     local posLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     posLabel:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -15)
     posLabel:SetText("Позиция:")
+
     posDropdown = CreateFrame("Frame", "SpellQueuePosDropdown", configFrame, "UIDropDownMenuTemplate")
     posDropdown:SetPoint("TOPLEFT", posLabel, "BOTTOMLEFT", -15, -5)
     UIDropDownMenu_SetWidth(posDropdown, 100)
@@ -9355,6 +9642,7 @@ function SpellQueue:CreateConfigWindow()
     end
     UIDropDownMenu_Initialize(posDropdown, PosDropDown_Initialize)
     UIDropDownMenu_SetSelectedValue(posDropdown, 0)
+
     buffCheckButton = CreateFrame("CheckButton", "SpellQueueBuffCheckButton", configFrame, "UICheckButtonTemplate")
     buffCheckButton:SetSize(24, 24)
     buffCheckButton:SetPoint("TOPLEFT", posDropdown, "BOTTOMLEFT", 15, -10)
@@ -9374,6 +9662,7 @@ function SpellQueue:CreateConfigWindow()
             buffNameEditBox:SetText("")
         end
     end)
+
     debuffCheckButton = CreateFrame("CheckButton", "SpellQueueDebuffCheckButton", configFrame, "UICheckButtonTemplate")
     debuffCheckButton:SetSize(24, 24)
     debuffCheckButton:SetPoint("TOPLEFT", buffCheckButton, "BOTTOMLEFT", 0, -10)
@@ -9393,6 +9682,7 @@ function SpellQueue:CreateConfigWindow()
             debuffNameEditBox:SetText("")
         end
     end)
+
     comboCheckButton = CreateFrame("CheckButton", "SpellQueueComboCheckButton", configFrame, "UICheckButtonTemplate")
     comboCheckButton:SetSize(24, 24)
     comboCheckButton:SetPoint("TOPLEFT", debuffCheckButton, "BOTTOMLEFT", 0, -10)
@@ -9423,6 +9713,7 @@ function SpellQueue:CreateConfigWindow()
             comboDropdown:SetAlpha(0)
         end
     end)
+
     resourceCheckButton = CreateFrame("CheckButton", "SpellQueueResourceCheckButton", configFrame, "UICheckButtonTemplate")
     resourceCheckButton:SetSize(24, 24)
     resourceCheckButton:SetPoint("TOPLEFT", comboCheckButton, "BOTTOMLEFT", 0, -10)
@@ -9469,6 +9760,7 @@ function SpellQueue:CreateConfigWindow()
             resourceAmountEditBox:SetText("0")
         end
     end)
+
     prokCheckButton = CreateFrame("CheckButton", "SpellQueueProkCheckButton", configFrame, "UICheckButtonTemplate")
     prokCheckButton:SetSize(24, 24)
     prokCheckButton:SetPoint("TOPLEFT", resourceCheckButton, "BOTTOMLEFT", 0, -10)
@@ -9489,12 +9781,14 @@ function SpellQueue:CreateConfigWindow()
             prokHPEditBox:SetText("50")
         end
     end)
+
     textureCheckButton = CreateFrame("CheckButton", "SpellQueueTextureCheckButton", configFrame, "UICheckButtonTemplate")
     textureCheckButton:SetSize(24, 24)
     textureCheckButton:SetPoint("TOPLEFT", prokCheckButton, "BOTTOMLEFT", 0, -10)
     textureCheckButton.text = textureCheckButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     textureCheckButton.text:SetText("Текстура")
     textureCheckButton.text:SetPoint("LEFT", textureCheckButton, "RIGHT", 5, 0)
+
     priorityCheckButton = CreateFrame("CheckButton", "SpellQueuePriorityCheckButton", configFrame, "UICheckButtonTemplate")
     priorityCheckButton:SetSize(24, 24)
     priorityCheckButton:SetPoint("TOPLEFT", textureCheckButton, "BOTTOMLEFT", 0, -10)
@@ -9515,6 +9809,7 @@ function SpellQueue:CreateConfigWindow()
             priorityEditBox:SetText("0")
         end
     end)
+
     self.configFrame = configFrame
 end
 
