@@ -5428,3 +5428,37 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+local function CreateChatMenuButton(frame)
+    if not frame then return end
+    if frame.menuButton then return end
+    
+    local button = CreateFrame("Button", nil, frame)
+    button:SetSize(20, 20)
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, -2)
+    button:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+    button:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Down")
+    button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    button:SetScript("OnClick", function()
+        ChatFrameMenuButton:Click()
+    end)
+    button:Show()
+    
+    frame.menuButton = button
+end
+
+for i = 1, NUM_CHAT_WINDOWS do
+    local frame = _G["ChatFrame" .. i]
+    if frame then CreateChatMenuButton(frame) end
+end
