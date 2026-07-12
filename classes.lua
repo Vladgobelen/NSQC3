@@ -8434,6 +8434,8 @@ local SHIELD_CACHE = {
     historySize = 10
 }
 
+local SHIELD_BAR_MODE = 1
+
 local PLAYER_KEY = UnitName("player")
 local RETURN_DELAY = 0.00
 local DEBUFF_UPDATE_DELAY = 0.00
@@ -8521,6 +8523,53 @@ function SpellQueue:ScheduleDebuffCheck(spellName)
         end
         self:UpdateDebuffState(spellName)
     end)
+end
+
+function SpellQueue:ToggleShieldBarMode()
+    if SHIELD_BAR_MODE == 1 then
+        SHIELD_BAR_MODE = 2
+        print("|cFF00FF00[ShieldBar]|r Режим: пропорционально полоске HP")
+    else
+        SHIELD_BAR_MODE = 1
+        print("|cFF00FF00[ShieldBar]|r Режим: фиксированная ширина")
+    end
+    self:UpdateShieldBar()
+end
+
+function SpellQueue:UpdateShieldBar()
+    if not self.shieldBar then return end
+    
+    if SHIELD_CACHE.isActive and SHIELD_CACHE.maxAbsorb > 0 then
+        local percent = SHIELD_CACHE.currentAbsorb / SHIELD_CACHE.maxAbsorb
+        percent = math.max(0, math.min(1, percent))
+        
+        if SHIELD_BAR_MODE == 2 then
+            -- Пропорционально HP
+            local maxHP = UnitHealthMax("player")
+            if maxHP > 0 then
+                local hpPercent = SHIELD_CACHE.maxAbsorb / maxHP
+                hpPercent = math.min(hpPercent, 1)  -- Не больше 100% от полоски HP
+                self.shieldBar:SetWidth(self.width * hpPercent * percent)
+            else
+                self.shieldBar:SetWidth(self.width * percent)
+            end
+        else
+            -- Фиксированная ширина
+            self.shieldBar:SetWidth(self.width * percent)
+        end
+        
+        self.shieldBar:Show()
+        
+        if percent > 0.5 then
+            self.shieldBar:SetVertexColor(1, 0.82, 0)
+        elseif percent > 0.25 then
+            self.shieldBar:SetVertexColor(1, 0.5, 0)
+        else
+            self.shieldBar:SetVertexColor(1, 0, 0)
+        end
+    else
+        self.shieldBar:Hide()
+    end
 end
 
 function SpellQueue:HasDebuff(debuffName)
@@ -8802,28 +8851,6 @@ function SpellQueue:CreateResourceBars()
     self.targetResourceBar:Hide()
 end
 
-function SpellQueue:UpdateShieldBar()
-    if not self.shieldBar then return end
-    
-    if SHIELD_CACHE.isActive and SHIELD_CACHE.maxAbsorb > 0 then
-        local percent = SHIELD_CACHE.currentAbsorb / SHIELD_CACHE.maxAbsorb
-        percent = math.max(0, math.min(1, percent))
-        
-        self.shieldBar:SetWidth(self.width * percent)
-        self.shieldBar:Show()
-        
-        if percent > 0.5 then
-            self.shieldBar:SetVertexColor(1, 0.82, 0)
-        elseif percent > 0.25 then
-            self.shieldBar:SetVertexColor(1, 0.5, 0)
-        else
-            self.shieldBar:SetVertexColor(1, 0, 0)
-        end
-    else
-        self.shieldBar:Hide()
-    end
-end
-
 function SpellQueue:CreateComboPoints()
     self.comboPoints = {}
     local comboSize = 14
@@ -9103,17 +9130,14 @@ function SpellQueue:ProcessCombatLogEvent(...)
             and destGUID == playerGUID then
             
             if SHIELD_CACHE.maxAbsorb > 0 then
-                -- Используем кэш
             else
                 SHIELD_CACHE.maxAbsorb = 5000
             end
             
             SHIELD_CACHE.currentAbsorb = SHIELD_CACHE.maxAbsorb
             SHIELD_CACHE.isActive = true
-            
             self.shieldStartTime = GetTime()
             self.shieldTotalAbsorbed = 0
-            
             self:UpdateShieldBar()
             
         elseif eventType == "SPELL_AURA_REMOVED" 
@@ -9121,11 +9145,9 @@ function SpellQueue:ProcessCombatLogEvent(...)
             
             if self.shieldTotalAbsorbed and self.shieldTotalAbsorbed > 0 then
                 table.insert(SHIELD_CACHE.history, self.shieldTotalAbsorbed)
-                
                 while #SHIELD_CACHE.history > SHIELD_CACHE.historySize do
                     table.remove(SHIELD_CACHE.history, 1)
                 end
-                
                 local sum = 0
                 for _, val in ipairs(SHIELD_CACHE.history) do
                     sum = sum + val
@@ -9135,10 +9157,8 @@ function SpellQueue:ProcessCombatLogEvent(...)
             
             SHIELD_CACHE.isActive = false
             SHIELD_CACHE.currentAbsorb = 0
-            
             self.shieldStartTime = nil
             self.shieldTotalAbsorbed = nil
-            
             self:UpdateShieldBar()
         end
     end
@@ -9146,18 +9166,21 @@ function SpellQueue:ProcessCombatLogEvent(...)
     -- Отслеживание урона под щитом
     if destGUID == playerGUID and SHIELD_CACHE.isActive then
         
+        -- SWING_MISSED с ABSORB (физическая атака)
         if eventType == "SWING_MISSED" and args[9] == "ABSORB" then
             local absorbed = args[10] or 0
             SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
             self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
             self:UpdateShieldBar()
             
-        elseif eventType == "SPELL_MISSED" and args[15] == "ABSORB" then
-            local absorbed = args[16] or 0
+        -- SPELL_MISSED с ABSORB (магическая атака)
+        elseif eventType == "SPELL_MISSED" and args[12] == "ABSORB" then
+            local absorbed = args[13] or 0
             SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
             self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
             self:UpdateShieldBar()
             
+        -- SWING_DAMAGE
         elseif eventType == "SWING_DAMAGE" then
             local absorbed = args[14] or 0
             if absorbed > 0 then
@@ -9166,8 +9189,9 @@ function SpellQueue:ProcessCombatLogEvent(...)
                 self:UpdateShieldBar()
             end
             
+        -- SPELL_DAMAGE или SPELL_PERIODIC_DAMAGE
         elseif eventType == "SPELL_DAMAGE" or eventType == "SPELL_PERIODIC_DAMAGE" then
-            local absorbed = args[17] or args[18] or 0
+            local absorbed = args[17] or args[18] or args[14] or 0
             if absorbed > 0 then
                 SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
                 self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
@@ -10681,8 +10705,15 @@ SlashCmdList["SHIELDTEST"] = function()
     print("Ожидание событий COMBAT_LOG_EVENT_UNFILTERED...")
 end
 
-
-
+-- Добавьте слэш-команду в конец файла, где другие команды:
+SLASH_SHIELDBARMODE1 = "/sqshield"
+SlashCmdList["SHIELDBARMODE"] = function()
+    if _G.SpellQueueInstance then
+        _G.SpellQueueInstance:ToggleShieldBarMode()
+    else
+        print("SpellQueue не инициализирован")
+    end
+end
 
 
 
