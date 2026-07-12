@@ -3513,6 +3513,7 @@ function AdaptiveFrame:new(parent)
     self.initialAspectRatio = self.width / self.height
     self.buttonsPerRow = 5
     self.skipSizeCheck = true
+    
     -- Создаем основной фрейм
     self.frame = CreateFrame("Frame", "AdaptiveFrame_"..math.random(10000), self.parent)
     self.frame:SetSize(self.width, self.height)
@@ -3539,16 +3540,19 @@ function AdaptiveFrame:new(parent)
     BUTTON_ALPHA = ns_dbc:getKey("настройки", "BUTTON_ALPHA") or BUTTON_ALPHA
     self.frame:SetBackdropColor(0.1, 0.1, 0.1, FRAME_ALPHA)
     self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0)
+    
     -- Текстовое поле
     self.textField = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     self.textField:SetPoint("TOP", self.frame, "TOP", 0, -5)
     self.textField:SetText("")
     self.textField:SetTextColor(1, 1, 1, 1)
+    
     -- Настройки перемещения и изменения размера
     self.frame:SetMovable(true)
     self.frame:SetResizable(true)
     self.frame:EnableMouse(true)
     self.frame:RegisterForDrag("LeftButton", "RightButton")
+    
     -- Обработчики событий мыши
     self.frame:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" then
@@ -3557,8 +3561,10 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
+    
     local startX = 0
     local isDragging = false
+    
     self.frame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
             isDragging = false
@@ -3567,6 +3573,7 @@ function AdaptiveFrame:new(parent)
             self:StopMovingOrSizing()
         end
     end)
+    
     self.frame:SetScript("OnDragStart", function(_, button)
         if button == "RightButton" then
             startX = GetCursorPosition()
@@ -3596,6 +3603,7 @@ function AdaptiveFrame:new(parent)
             self:StartMoving()
         end
     end)
+    
     self.frame:SetScript("OnDragStop", function(_, button)
         if button == "RightButton" then
             isDragging = false
@@ -3604,6 +3612,7 @@ function AdaptiveFrame:new(parent)
             self:StopMovingOrSizing()
         end
     end)
+    
     -- Кнопка закрытия
     self.closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
     self.closeButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -3620,6 +3629,7 @@ function AdaptiveFrame:new(parent)
             end
         end
     end)
+    
     -- Кнопка управления боковой панелью
     self.toggleSideButton = CreateFrame("Button", nil, self.frame)
     self.toggleSideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -3650,6 +3660,7 @@ function AdaptiveFrame:new(parent)
         GameTooltip:Show()
     end)
     self.toggleSideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
     -- Кнопка открытия интерфейса нуклеотидов
     self.nucleotideButton = CreateFrame("Button", nil, self.frame)
     self.nucleotideButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -3657,6 +3668,7 @@ function AdaptiveFrame:new(parent)
     self.nucleotideButton:SetNormalTexture("Interface\\ICONS\\inv_misc_gem_diamond_02")
     self.nucleotideButton:SetPushedTexture("Interface\\ICONS\\inv_misc_gem_diamond_02")
     self.nucleotideButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    
     local function UpdateNucleotideButtonState()
         local btn = self.nucleotideButton
         local nucBtn = _G["NucleotideMainButton"]
@@ -3670,6 +3682,7 @@ function AdaptiveFrame:new(parent)
             btn.isNucActive = false
         end
     end
+    
     self.nucleotideButton:SetScript("OnClick", function()
         if not NucleotideMainButton then
             SendAddonMessage("ns_dna " .. GetUnitName("player"), "", "GUILD")
@@ -3689,6 +3702,7 @@ function AdaptiveFrame:new(parent)
         GameTooltip:Show()
     end)
     self.nucleotideButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
     local timerFrame = CreateFrame("Frame")
     timerFrame:Hide()
     local elapsed = 0
@@ -3697,15 +3711,13 @@ function AdaptiveFrame:new(parent)
     timerFrame:SetScript("OnUpdate", function(frame, dt)
         elapsed = elapsed + dt
         if elapsed >= delay then
-            -- Полная остановка и очистка таймера
             frame:SetScript("OnUpdate", nil)
             frame:Hide()
-            
-            -- Вызов отложенной функции
             UpdateNucleotideButtonState()
         end
     end)
     self.UpdateNucleotideButtonState = UpdateNucleotideButtonState
+    
     -- === КНОПКА: переключение видимости маркера игрока ===
     self.togglePlayerMarkerButton = CreateFrame("Button", nil, self.frame)
     self.togglePlayerMarkerButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -3713,7 +3725,7 @@ function AdaptiveFrame:new(parent)
     self.togglePlayerMarkerButton:SetNormalTexture("Interface\\ICONS\\Ability_Mage_Invisibility")
     self.togglePlayerMarkerButton:SetPushedTexture("Interface\\ICONS\\Ability_Mage_Invisibility")
     self.togglePlayerMarkerButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    self.drawPlayerMarker = true  -- ✅ флаг: разрешено ли отображать маркер игрока
+    self.drawPlayerMarker = true
 
     local function UpdatePlayerMarkerButtonState()
         local btn = self.togglePlayerMarkerButton
@@ -3735,7 +3747,7 @@ function AdaptiveFrame:new(parent)
                 self.playerMarker:Show()
             else
                 self.playerMarker:Hide()
-                self.playerMarker = nil  -- удаляем, чтобы не мешался
+                self.playerMarker = nil
             end
         end
         UpdatePlayerMarkerButtonState()
@@ -3763,7 +3775,6 @@ function AdaptiveFrame:new(parent)
     
     self.gameStartButton:SetScript("OnClick", function(self, button)
         if button == "RightButton" then
-            -- ПКМ: запрос на просмотр чужой игры
             local ownerName = self.owner
             if not ownerName and self.textField then
                 local headerText = self.textField:GetText() or ""
@@ -3786,9 +3797,7 @@ function AdaptiveFrame:new(parent)
             return
         end
         
-        -- ЛКМ: запуск/завершение игры
         if self.gameClient and self.gameClient:IsActive() then
-            -- Завершение игры
             _G.ns_game_funcs = nil
             _G.ns_move_st = nil
             if _G.gameClient then
@@ -3802,7 +3811,6 @@ function AdaptiveFrame:new(parent)
             self.gameClient = nil
             print("|cFFFF0000[Игра]|r Игра завершена")
         else
-            -- Запуск игры
             local ownerName = self.owner
             if not ownerName and self.textField then
                 local headerText = self.textField:GetText() or ""
@@ -3863,10 +3871,33 @@ function AdaptiveFrame:new(parent)
         GameTooltip:Hide()
     end)
     
+    -- === КНОПКА: Основы луа ===
+    self.luaBasicsButton = CreateFrame("Button", nil, self.frame)
+    self.luaBasicsButton:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    self.luaBasicsButton:SetPoint("TOPRIGHT", self.gameStartButton, "BOTTOMRIGHT", 0, -5)
+    self.luaBasicsButton:SetNormalTexture("Interface\\ICONS\\INV_Misc_Book_09")
+    self.luaBasicsButton:SetPushedTexture("Interface\\ICONS\\INV_Misc_Book_09")
+    self.luaBasicsButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+
+    self.luaBasicsButton:SetScript("OnClick", function()
+        print("|cFF00FF00[Обучение]|r Начало обучения")
+        -- Здесь будет функционал обучения основам Lua
+    end)
+
+    self.luaBasicsButton:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(self.luaBasicsButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Основы Lua", 1, 1, 1)
+        GameTooltip:AddLine("Начало обучения", 0.5, 0.8, 1)
+        GameTooltip:Show()
+    end)
+
+    self.luaBasicsButton:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    
     -- Кнопка крафта
     self.craftButton = CreateFrame("Button", nil, self.frame)
     self.craftButton:SetSize(CRAFT_BUTTON_SIZE, CRAFT_BUTTON_SIZE)
-    --self.craftButton:SetPoint("TOPRIGHT", self.gameStartButton, "BOTTOMRIGHT", 0, -5)
     self.craftButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
     self.craftButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
     self.craftButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
@@ -3892,6 +3923,7 @@ function AdaptiveFrame:new(parent)
     self.craftButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.craftSettings.active = ns_dbc:getKey("настройки", "CRAFT_ACTIVE") or false
     self:UpdateCraftButtonState()
+    
     -- Ручка изменения размера
     self.resizeHandle = CreateFrame("Button", nil, self.frame)
     self.resizeHandle:SetSize(16, 16)
@@ -3906,6 +3938,7 @@ function AdaptiveFrame:new(parent)
         ns_dbc:modKey("настройки", "mfldRX", x)
         self:AdjustSizeAndPosition()
     end)
+    
     -- Обработчик изменения размера
     self.frame:SetScript("OnSizeChanged", function(_, width, height)
         if self.skipSizeCheck then
@@ -3916,18 +3949,11 @@ function AdaptiveFrame:new(parent)
         self.frame:SetSize(width, height)
         self:AdjustSizeAndPosition()
     end)
+    
     -- Инициализация списка дочерних элементов
     self.children = {}
     return self
 end
-
-----------------------------------------
-----------------------------------------
-----------------------------------------
-
----------------------------------------
----------------------------------------
----------------------------------------
 
 function AdaptiveFrame:UpdateCraftButtonState()
     -- Проверяем необходимые объекты
@@ -7827,6 +7853,57 @@ function AdaptiveFrame:RegisterSlashCommands()
     SaveBindings(GetCurrentBindingSet())
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 SpellQueue = {}
 SpellQueue.__index = SpellQueue
 
@@ -8348,6 +8425,15 @@ local CLASS_RESOURCE_TYPES = {
     WARLOCK = 0,
     WARRIOR = 1
 }
+
+local SHIELD_CACHE = {
+    maxAbsorb = 0,
+    currentAbsorb = 0,
+    isActive = false,
+    history = {},
+    historySize = 10
+}
+
 local PLAYER_KEY = UnitName("player")
 local RETURN_DELAY = 0.00
 local DEBUFF_UPDATE_DELAY = 0.00
@@ -8683,12 +8769,23 @@ function SpellQueue:CreateResourceBars()
     self.healthBar:SetPoint("TOP", self.frame, "TOP", 0, 10)
     self.healthBar:SetVertexColor(1, 0, 0)
     self.healthBar:Hide()
+    
+    self.shieldBar = self.frame:CreateTexture(nil, "OVERLAY")
+    self.shieldBar:SetTexture("Interface\\Buttons\\WHITE8X8")
+    self.shieldBar:SetHeight(5)
+    self.shieldBar:SetWidth(0)
+    self.shieldBar:SetPoint("BOTTOM", self.healthBar, "TOP", 0, 2)
+    self.shieldBar:SetVertexColor(1, 0.82, 0)
+    self.shieldBar:SetAlpha(0.8)
+    self.shieldBar:Hide()
+    
     self.resourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.resourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.resourceBar:SetHeight(5)
     self.resourceBar:SetWidth(self.width)
     self.resourceBar:SetPoint("TOP", self.healthBar, "BOTTOM", 0, -1)
     self.resourceBar:Hide()
+    
     self.targetHealthBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.targetHealthBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.targetHealthBar:SetHeight(5)
@@ -8696,12 +8793,35 @@ function SpellQueue:CreateResourceBars()
     self.targetHealthBar:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, -10)
     self.targetHealthBar:SetVertexColor(1, 0, 0)
     self.targetHealthBar:Hide()
+    
     self.targetResourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.targetResourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
     self.targetResourceBar:SetHeight(5)
     self.targetResourceBar:SetWidth(self.width)
     self.targetResourceBar:SetPoint("BOTTOM", self.targetHealthBar, "TOP", 0, 1)
     self.targetResourceBar:Hide()
+end
+
+function SpellQueue:UpdateShieldBar()
+    if not self.shieldBar then return end
+    
+    if SHIELD_CACHE.isActive and SHIELD_CACHE.maxAbsorb > 0 then
+        local percent = SHIELD_CACHE.currentAbsorb / SHIELD_CACHE.maxAbsorb
+        percent = math.max(0, math.min(1, percent))
+        
+        self.shieldBar:SetWidth(self.width * percent)
+        self.shieldBar:Show()
+        
+        if percent > 0.5 then
+            self.shieldBar:SetVertexColor(1, 0.82, 0)
+        elseif percent > 0.25 then
+            self.shieldBar:SetVertexColor(1, 0.5, 0)
+        else
+            self.shieldBar:SetVertexColor(1, 0, 0)
+        end
+    else
+        self.shieldBar:Hide()
+    end
 end
 
 function SpellQueue:CreateComboPoints()
@@ -8768,6 +8888,8 @@ function SpellQueue:GetTargetResourceType()
 end
 
 function SpellQueue:UpdateResourceBars()
+    self:UpdateShieldBar()
+    
     if bit.band(self.features, FEATURE_HP) ~= 0 then
         local maxHP = UnitHealthMax("player")
         local hp = maxHP > 0 and (UnitHealth("player") / maxHP) or 0
@@ -8776,6 +8898,7 @@ function SpellQueue:UpdateResourceBars()
     else
         self.healthBar:Hide()
     end
+    
     if bit.band(self.features, FEATURE_RESOURCE) ~= 0 then
         local resourceType = self:GetPlayerResourceType()
         local current = UnitPower("player", resourceType)
@@ -8791,11 +8914,13 @@ function SpellQueue:UpdateResourceBars()
     else
         self.resourceBar:Hide()
     end
+    
     if UnitExists("target") and bit.band(self.features, FEATURE_TARGET) ~= 0 then
         local maxHP = UnitHealthMax("target")
         local hp = maxHP > 0 and (UnitHealth("target") / maxHP) or 0
         self.targetHealthBar:SetWidth(self.width * hp)
         self.targetHealthBar:Show()
+        
         local powerType = UnitPowerType("target")
         local current = UnitPower("target", powerType)
         local max = UnitPowerMax("target", powerType)
@@ -8955,11 +9080,107 @@ end
 
 function SpellQueue:ProcessCombatLogEvent(...)
     local args = {...}
-    local timestamp, eventType = args[1], args[2]
+    local timestamp = args[1]
+    local eventType = args[2]
+    local sourceGUID = args[3]
+    local sourceName = args[4]
+    local sourceFlags = args[5]
+    local destGUID = args[6]
+    local destName = args[7]
+    local destFlags = args[8]
+    local spellID = args[9]
+    local spellName = args[10]
+    local spellSchool = args[11]
+    local auraType = args[12]
+    
+    local playerGUID = UnitGUID("player")
+    local playerName = UnitName("player")
+    
+    -- Отслеживание щита
+    if spellName == "Слово силы: Щит" then
+        
+        if (eventType == "SPELL_AURA_APPLIED" or eventType == "SPELL_AURA_REFRESH") 
+            and destGUID == playerGUID then
+            
+            if SHIELD_CACHE.maxAbsorb > 0 then
+                -- Используем кэш
+            else
+                SHIELD_CACHE.maxAbsorb = 5000
+            end
+            
+            SHIELD_CACHE.currentAbsorb = SHIELD_CACHE.maxAbsorb
+            SHIELD_CACHE.isActive = true
+            
+            self.shieldStartTime = GetTime()
+            self.shieldTotalAbsorbed = 0
+            
+            self:UpdateShieldBar()
+            
+        elseif eventType == "SPELL_AURA_REMOVED" 
+            and destGUID == playerGUID then
+            
+            if self.shieldTotalAbsorbed and self.shieldTotalAbsorbed > 0 then
+                table.insert(SHIELD_CACHE.history, self.shieldTotalAbsorbed)
+                
+                while #SHIELD_CACHE.history > SHIELD_CACHE.historySize do
+                    table.remove(SHIELD_CACHE.history, 1)
+                end
+                
+                local sum = 0
+                for _, val in ipairs(SHIELD_CACHE.history) do
+                    sum = sum + val
+                end
+                SHIELD_CACHE.maxAbsorb = math.floor(sum / #SHIELD_CACHE.history)
+            end
+            
+            SHIELD_CACHE.isActive = false
+            SHIELD_CACHE.currentAbsorb = 0
+            
+            self.shieldStartTime = nil
+            self.shieldTotalAbsorbed = nil
+            
+            self:UpdateShieldBar()
+        end
+    end
+    
+    -- Отслеживание урона под щитом
+    if destGUID == playerGUID and SHIELD_CACHE.isActive then
+        
+        if eventType == "SWING_MISSED" and args[9] == "ABSORB" then
+            local absorbed = args[10] or 0
+            SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
+            self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
+            self:UpdateShieldBar()
+            
+        elseif eventType == "SPELL_MISSED" and args[15] == "ABSORB" then
+            local absorbed = args[16] or 0
+            SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
+            self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
+            self:UpdateShieldBar()
+            
+        elseif eventType == "SWING_DAMAGE" then
+            local absorbed = args[14] or 0
+            if absorbed > 0 then
+                SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
+                self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
+                self:UpdateShieldBar()
+            end
+            
+        elseif eventType == "SPELL_DAMAGE" or eventType == "SPELL_PERIODIC_DAMAGE" then
+            local absorbed = args[17] or args[18] or 0
+            if absorbed > 0 then
+                SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
+                self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
+                self:UpdateShieldBar()
+            end
+        end
+    end
+    
+    -- Оригинальная логика
     if args[3] ~= UnitGUID("player") then
         return
     end
-    local spellName
+    
     if eventType == "SPELL_MISSED" then
         spellName = args[10]
         self:SpellUsed(spellName)
@@ -8982,6 +9203,50 @@ function SpellQueue:ProcessCombatLogEvent(...)
             self:SpellUsed(spellName)
         end
     end
+end
+
+-- НОВЫЙ МЕТОД: Получение актуального значения щита из баффа
+function SpellQueue:GetShieldAmountFromBuff()
+    for i = 1, 40 do
+        local name, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, shieldAbsorb = UnitBuff("player", i)
+        if not name then break end
+        if name == "Слово силы: Щит" then
+            if shieldAbsorb and shieldAbsorb > 0 then
+                return shieldAbsorb
+            end
+        end
+    end
+    return nil
+end
+
+-- Исправленный метод GetTalentRank
+function SpellQueue:GetTalentRank(talentName)
+    -- GetTalentInfo(tabIndex, talentIndex) - tabIndex: 1,2,3 (ветка), talentIndex: 1-...
+    -- Improved Power Word: Shield находится во 2-й ветке (Discipline), 2-й талант
+    local talentPositions = {
+        ["Improved Power Word: Shield"] = {tab = 2, index = 2}
+    }
+    
+    if talentPositions[talentName] then
+        local pos = talentPositions[talentName]
+        -- Проверяем, изучен ли талант (у персонажа)
+        local name, _, _, _, currentRank, _, _, _ = GetTalentInfo(pos.tab, pos.index)
+        if name and name == talentName then
+            return currentRank or 0
+        end
+    end
+    return 0
+end
+
+function SpellQueue:_HasShield()
+    for i = 1, 40 do
+        local name = UnitBuff("player", i)
+        if not name then break end
+        if name == "Слово силы: Щит" then
+            return true
+        end
+    end
+    return false
 end
 
 function SpellQueue:CheckAllDebuffs()
@@ -10107,6 +10372,7 @@ function SpellQueue:ForceUpdateAllSpells()
     self:UpdateComboPoints()
     self:UpdatePoisonStacks()
     self:UpdateResourceBars()
+    self:UpdateShieldBar()
     self.priorityDirty = true
     for spellName, spell in pairs(self.spells) do
         local remaining, fullDuration = self:GetSpellCooldown(spellName)
@@ -10209,6 +10475,16 @@ function SpellQueue:SetAppearanceSettings(options)
     end
     if options.healthBarColor then
         self.healthBar:SetVertexColor(unpack(options.healthBarColor))
+    end
+    if options.shieldBarHeight then
+        self.shieldBar:SetHeight(options.shieldBarHeight)
+    end
+    if options.shieldBarOffset then
+        self.shieldBar:ClearAllPoints()
+        self.shieldBar:SetPoint("BOTTOM", self.healthBar, "TOP", 0, options.shieldBarOffset or 2)
+    end
+    if options.shieldBarColor then
+        self.shieldBar:SetVertexColor(unpack(options.shieldBarColor))
     end
     if options.resourceBarHeight then
         self.resourceBar:SetHeight(options.resourceBarHeight)
@@ -10377,6 +10653,77 @@ SlashCmdList["SPELLQUEUE_POISON"] = function()
     end
 end
 SLASH_SPELLQUEUE_POISON1 = "/sqps"
+
+-- Добавьте слаш-команду для теста
+SLASH_SHIELDTEST1 = "/shieldtest"
+SlashCmdList["SHIELDTEST"] = function()
+    print("|cFF00FF00=== ТЕСТ ОТСЛЕЖИВАНИЯ ЩИТА ===|r")
+    print("Player GUID:", UnitGUID("player"))
+    print("Player Name:", UnitName("player"))
+    
+    -- Проверяем наличие щита
+    local hasShield = false
+    for i = 1, 40 do
+        local name = UnitBuff("player", i)
+        if not name then break end
+        print(string.format("Бафф %d: %s", i, name))
+        if name == "Слово силы: Щит" then
+            hasShield = true
+            print("|cFF00FF00НАЙДЕН ЩИТ!|r")
+        end
+    end
+    
+    if not hasShield then
+        print("|cFFFF0000Щит не найден|r")
+    end
+    
+    -- Проверяем события
+    print("Ожидание событий COMBAT_LOG_EVENT_UNFILTERED...")
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 local PROK_PRESETS = {
@@ -16912,3 +17259,245 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Таблица с модулями курса
+ns_llua = ns_llua or {}
+ns_llua['lua'] = {
+    [1] = {
+        title = "Введение в Lua",
+        content = [[
+Введение в Lua
+
+Lua — это легковесный, динамический язык программирования, основанный на таблицах. Он поддерживает разные стили программирования: императивный, объектно-ориентированный (через таблицы и метатаблицы) и функциональный. Имеет всего несколько типов данных, а основной структурой данных является таблица.
+
+Чаще всего его используют как встраиваемый скриптовый язык в играх и приложениях, но также он работает и самостоятельно — например, в консольных утилитах или веб-серверах.
+
+Переменные и область видимости
+
+В Lua 5.1 переменные могут быть глобальными или локальными.
+
+    Локальные переменные — объявляются с ключевым словом local, доступны только в пределах своего блока. Использование локальных переменных делает код быстрее.
+
+    Глобальные переменные — объявляются без local и доступны отовсюду, но их использование считается плохой практикой.
+
+Пример: локальная переменная:
+local userName = 'Высшая'
+
+Пример: глобальная переменная:
+userName = "Шеф"
+
+Пример: глобальная переменная и константа:
+MAX_USERS = 100
+
+Примечание: По соглашению, константы (значения, которые не должны меняться) записывают в ВЕРХНЕМ_РЕГИСТРЕ. Хотя язык не запрещает их изменять, хорошей практикой считается этого не делать.
+]]
+    }
+}
+
+-- Класс курса Lua
+local LuaCourse = {}
+LuaCourse.__index = LuaCourse
+
+function LuaCourse:new(parentFrame)
+    local self = setmetatable({}, LuaCourse)
+    
+    self.parentFrame = parentFrame
+    self.currentModule = 1
+    self.window = nil
+    self.contentScroll = nil
+    self.titleText = nil
+    self.contentText = nil
+    self.prevButton = nil
+    self.nextButton = nil
+    self.closeButton = nil
+    
+    return self
+end
+
+function LuaCourse:ShowModule(courseTable, moduleNumber)
+    -- Проверяем существование модуля
+    if not courseTable or not courseTable[moduleNumber] then
+        print("Модуль не найден")
+        return
+    end
+    
+    -- Сохраняем текущий курс и модуль
+    self.courseTable = courseTable
+    self.currentModule = moduleNumber
+    self.totalModules = #courseTable
+    
+    -- Если окно уже существует, обновляем содержимое
+    if self.window then
+        self:UpdateContent()
+        return
+    end
+    
+    -- Создаем основное окно
+    self.window = CreateFrame("Frame", "LuaCourseWindow", self.parentFrame or UIParent)
+    self.window:SetSize(600, 450)
+    self.window:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    self.window:EnableMouse(true)
+    self.window:SetMovable(true)
+    self.window:SetClampedToScreen(true)
+    
+    -- Создаем фон окна (текстура)
+    local bg = self.window:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(self.window)
+    bg:SetTexture(0.1, 0.1, 0.15, 0.95)
+    
+    -- Создаем рамку окна
+    local border = self.window:CreateTexture(nil, "BORDER")
+    border:SetAllPoints(self.window)
+    border:SetTexture(0.4, 0.4, 0.6, 1)
+    border:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    
+    -- Делаем окно перетаскиваемым
+    self.window:SetScript("OnMouseDown", function(frame, button)
+        if button == "LeftButton" then
+            frame:StartMoving()
+        end
+    end)
+    self.window:SetScript("OnMouseUp", function(frame, button)
+        frame:StopMovingOrSizing()
+    end)
+    
+    -- Заголовок окна
+    local titleBar = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    titleBar:SetPoint("TOP", self.window, "TOP", 0, -15)
+    titleBar:SetText("Курс Lua 5.1 для WoW 3.3.5")
+    titleBar:SetTextColor(1, 0.9, 0, 1) -- Золотой цвет
+    
+    -- Кнопка закрытия
+    self.closeButton = CreateFrame("Button", nil, self.window, "UIPanelCloseButton")
+    self.closeButton:SetPoint("TOPRIGHT", self.window, "TOPRIGHT", -5, -5)
+    self.closeButton:SetScript("OnClick", function()
+        self.window:Hide()
+    end)
+    
+    -- Заголовок модуля
+    self.titleText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    self.titleText:SetPoint("TOP", titleBar, "BOTTOM", 0, -10)
+    self.titleText:SetTextColor(1, 1, 1, 1)
+    
+    -- Создаем скролл-фрейм для содержимого
+    local scrollFrame = CreateFrame("ScrollFrame", nil, self.window, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", self.window, "TOPLEFT", 20, -80)
+    scrollFrame:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -40, 50)
+    
+    -- Содержимое модуля
+    self.contentText = scrollFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.contentText:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+    self.contentText:SetPoint("RIGHT", scrollFrame, "RIGHT", -10, 0)
+    self.contentText:SetJustifyH("LEFT")
+    self.contentText:SetJustifyV("TOP")
+    self.contentText:SetTextColor(0.9, 0.9, 0.9, 1)
+    self.contentText:SetNonSpaceWrap(true)
+    self.contentText:SetWidth(530)
+    
+    scrollFrame:SetScrollChild(self.contentText)
+    
+    -- Кнопка "Назад"
+    self.prevButton = CreateFrame("Button", nil, self.window, "UIPanelButtonTemplate")
+    self.prevButton:SetSize(100, 25)
+    self.prevButton:SetPoint("BOTTOMLEFT", self.window, "BOTTOMLEFT", 20, 15)
+    self.prevButton:SetText("◄ Назад")
+    self.prevButton:SetScript("OnClick", function()
+        if self.currentModule > 1 then
+            self.currentModule = self.currentModule - 1
+            self:UpdateContent()
+        end
+    end)
+    
+    -- Кнопка "Вперед"
+    self.nextButton = CreateFrame("Button", nil, self.window, "UIPanelButtonTemplate")
+    self.nextButton:SetSize(100, 25)
+    self.nextButton:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -20, 15)
+    self.nextButton:SetText("Вперед ►")
+    self.nextButton:SetScript("OnClick", function()
+        if self.currentModule < self.totalModules then
+            self.currentModule = self.currentModule + 1
+            self:UpdateContent()
+        end
+    end)
+    
+    -- Номер модуля
+    self.moduleNumText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.moduleNumText:SetPoint("BOTTOM", self.window, "BOTTOM", 0, 20)
+    self.moduleNumText:SetTextColor(0.7, 0.7, 0.7, 1)
+    
+    -- Обновляем содержимое
+    self:UpdateContent()
+    
+    -- Показываем окно
+    self.window:Show()
+end
+
+function LuaCourse:UpdateContent()
+    local module = self.courseTable[self.currentModule]
+    if not module then return end
+    
+    -- Обновляем заголовок
+    self.titleText:SetText(module.title or "")
+    
+    -- Обновляем содержимое
+    self.contentText:SetText(module.content or "")
+    
+    -- Обновляем номер модуля
+    self.moduleNumText:SetText(string.format("Модуль %d из %d", self.currentModule, self.totalModules))
+    
+    -- Обновляем состояние кнопок
+    if self.currentModule <= 1 then
+        self.prevButton:Disable()
+        self.prevButton:SetAlpha(0.5)
+    else
+        self.prevButton:Enable()
+        self.prevButton:SetAlpha(1)
+    end
+    
+    if self.currentModule >= self.totalModules then
+        self.nextButton:Disable()
+        self.nextButton:SetAlpha(0.5)
+    else
+        self.nextButton:Enable()
+        self.nextButton:SetAlpha(1)
+    end
+end
+
+-- Пример использования:
+course = LuaCourse:new()
