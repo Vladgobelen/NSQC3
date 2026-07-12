@@ -8431,10 +8431,10 @@ local SHIELD_CACHE = {
     currentAbsorb = 0,
     isActive = false,
     history = {},
-    historySize = 10
+    historySize = 5
 }
-
-local SHIELD_BAR_MODE = 1
+local SHIELD_BAR_MODE = 1  -- 1 = фиксированная ширина, 2 = пропорционально HP
+local SHIELD_BAR_HEIGHT = 5  -- высота полоски щита по умолчанию
 
 local PLAYER_KEY = UnitName("player")
 local RETURN_DELAY = 0.00
@@ -8525,6 +8525,29 @@ function SpellQueue:ScheduleDebuffCheck(spellName)
     end)
 end
 
+function SpellQueue:SetShieldBarHeight(height)
+    height = tonumber(height)
+    if not height or height < 1 then
+        print("|cFFFF0000[ShieldBar]|r Использование: /sqshield <высота> (1-30)")
+        print("|cFFFF0000[ShieldBar]|r Текущая высота: " .. SHIELD_BAR_HEIGHT)
+        return
+    end
+    
+    height = math.floor(height)
+    if height < 1 then height = 1 end
+    if height > 30 then height = 30 end
+    
+    SHIELD_BAR_HEIGHT = height
+    self.shieldBar:SetHeight(SHIELD_BAR_HEIGHT)
+    self:UpdateShieldBar()
+    
+    if height > 10 then
+        print(string.format("|cFF00FF00[ShieldBar]|r Высота: %dpx (текст включен)", height))
+    else
+        print(string.format("|cFF00FF00[ShieldBar]|r Высота: %dpx", height))
+    end
+end
+
 function SpellQueue:ToggleShieldBarMode()
     if SHIELD_BAR_MODE == 1 then
         SHIELD_BAR_MODE = 2
@@ -8544,17 +8567,15 @@ function SpellQueue:UpdateShieldBar()
         percent = math.max(0, math.min(1, percent))
         
         if SHIELD_BAR_MODE == 2 then
-            -- Пропорционально HP
             local maxHP = UnitHealthMax("player")
             if maxHP > 0 then
                 local hpPercent = SHIELD_CACHE.maxAbsorb / maxHP
-                hpPercent = math.min(hpPercent, 1)  -- Не больше 100% от полоски HP
+                hpPercent = math.min(hpPercent, 1)
                 self.shieldBar:SetWidth(self.width * hpPercent * percent)
             else
                 self.shieldBar:SetWidth(self.width * percent)
             end
         else
-            -- Фиксированная ширина
             self.shieldBar:SetWidth(self.width * percent)
         end
         
@@ -8567,8 +8588,28 @@ function SpellQueue:UpdateShieldBar()
         else
             self.shieldBar:SetVertexColor(1, 0, 0)
         end
+        
+        if SHIELD_BAR_HEIGHT > 10 and self.shieldBarText then
+            local text = string.format("%d/%d", SHIELD_CACHE.currentAbsorb, SHIELD_CACHE.maxAbsorb)
+            self.shieldBarText:SetText(text)
+            
+            local fontSize = math.floor(SHIELD_BAR_HEIGHT * 0.7)
+            if fontSize < 8 then fontSize = 8 end
+            if fontSize > 16 then fontSize = 16 end
+            self.shieldBarText:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+            
+            self.shieldBarText:Show()
+        else
+            if self.shieldBarText then
+                self.shieldBarText:Hide()
+            end
+        end
+        
     else
         self.shieldBar:Hide()
+        if self.shieldBarText then
+            self.shieldBarText:Hide()
+        end
     end
 end
 
@@ -8821,12 +8862,18 @@ function SpellQueue:CreateResourceBars()
     
     self.shieldBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.shieldBar:SetTexture("Interface\\Buttons\\WHITE8X8")
-    self.shieldBar:SetHeight(5)
+    self.shieldBar:SetHeight(SHIELD_BAR_HEIGHT)
     self.shieldBar:SetWidth(0)
     self.shieldBar:SetPoint("BOTTOM", self.healthBar, "TOP", 0, 2)
     self.shieldBar:SetVertexColor(1, 0.82, 0)
     self.shieldBar:SetAlpha(0.8)
     self.shieldBar:Hide()
+    
+    self.shieldBarText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    self.shieldBarText:SetPoint("CENTER", self.shieldBar, "CENTER", 0, 0)
+    self.shieldBarText:SetTextColor(1, 1, 1, 1)
+    self.shieldBarText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    self.shieldBarText:Hide()
     
     self.resourceBar = self.frame:CreateTexture(nil, "OVERLAY")
     self.resourceBar:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -9129,8 +9176,7 @@ function SpellQueue:ProcessCombatLogEvent(...)
         if (eventType == "SPELL_AURA_APPLIED" or eventType == "SPELL_AURA_REFRESH") 
             and destGUID == playerGUID then
             
-            if SHIELD_CACHE.maxAbsorb > 0 then
-            else
+            if SHIELD_CACHE.maxAbsorb == 0 then
                 SHIELD_CACHE.maxAbsorb = 5000
             end
             
@@ -9166,21 +9212,18 @@ function SpellQueue:ProcessCombatLogEvent(...)
     -- Отслеживание урона под щитом
     if destGUID == playerGUID and SHIELD_CACHE.isActive then
         
-        -- SWING_MISSED с ABSORB (физическая атака)
         if eventType == "SWING_MISSED" and args[9] == "ABSORB" then
             local absorbed = args[10] or 0
             SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
             self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
             self:UpdateShieldBar()
             
-        -- SPELL_MISSED с ABSORB (магическая атака)
         elseif eventType == "SPELL_MISSED" and args[12] == "ABSORB" then
             local absorbed = args[13] or 0
             SHIELD_CACHE.currentAbsorb = math.max(0, SHIELD_CACHE.currentAbsorb - absorbed)
             self.shieldTotalAbsorbed = (self.shieldTotalAbsorbed or 0) + absorbed
             self:UpdateShieldBar()
             
-        -- SWING_DAMAGE
         elseif eventType == "SWING_DAMAGE" then
             local absorbed = args[14] or 0
             if absorbed > 0 then
@@ -9189,7 +9232,6 @@ function SpellQueue:ProcessCombatLogEvent(...)
                 self:UpdateShieldBar()
             end
             
-        -- SPELL_DAMAGE или SPELL_PERIODIC_DAMAGE
         elseif eventType == "SPELL_DAMAGE" or eventType == "SPELL_PERIODIC_DAMAGE" then
             local absorbed = args[17] or args[18] or args[14] or 0
             if absorbed > 0 then
@@ -10501,6 +10543,7 @@ function SpellQueue:SetAppearanceSettings(options)
         self.healthBar:SetVertexColor(unpack(options.healthBarColor))
     end
     if options.shieldBarHeight then
+        SHIELD_BAR_HEIGHT = options.shieldBarHeight
         self.shieldBar:SetHeight(options.shieldBarHeight)
     end
     if options.shieldBarOffset then
@@ -10715,7 +10758,24 @@ SlashCmdList["SHIELDBARMODE"] = function()
     end
 end
 
-
+SLASH_SHIELDBAR1 = "/sqshield"
+SlashCmdList["SHIELDBAR"] = function(msg)
+    if not _G.SpellQueueInstance then
+        print("SpellQueue не инициализирован")
+        return
+    end
+    
+    if msg and msg ~= "" then
+        local num = tonumber(msg)
+        if num then
+            _G.SpellQueueInstance:SetShieldBarHeight(num)
+        else
+            _G.SpellQueueInstance:ToggleShieldBarMode()
+        end
+    else
+        _G.SpellQueueInstance:ToggleShieldBarMode()
+    end
+end
 
 
 
