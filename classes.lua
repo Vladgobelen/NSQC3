@@ -3741,16 +3741,7 @@ function AdaptiveFrame:new(parent)
     end
 
     self.togglePlayerMarkerButton:SetScript("OnClick", function()
-        self.drawPlayerMarker = not self.drawPlayerMarker
-        if self.playerMarker then
-            if self.drawPlayerMarker then
-                self.playerMarker:Show()
-            else
-                self.playerMarker:Hide()
-                self.playerMarker = nil
-            end
-        end
-        UpdatePlayerMarkerButtonState()
+        OpenLuaCourse()
     end)
 
     self.togglePlayerMarkerButton:SetScript("OnEnter", function()
@@ -3880,14 +3871,20 @@ function AdaptiveFrame:new(parent)
     self.luaBasicsButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
 
     self.luaBasicsButton:SetScript("OnClick", function()
-        print("|cFF00FF00[Обучение]|r Начало обучения")
-        -- Здесь будет функционал обучения основам Lua
+        OpenLuaCourse()
     end)
 
     self.luaBasicsButton:SetScript("OnEnter", function()
         GameTooltip:SetOwner(self.luaBasicsButton, "ANCHOR_RIGHT")
         GameTooltip:SetText("Основы Lua", 1, 1, 1)
-        GameTooltip:AddLine("Начало обучения", 0.5, 0.8, 1)
+        
+        -- Проверяем статус окна и меняем подсказку
+        if _G.activeLuaCourse and _G.activeLuaCourse.window and _G.activeLuaCourse.window:IsShown() then
+            GameTooltip:AddLine("Закрыть курс обучения", 1, 0.5, 0.5)
+        else
+            GameTooltip:AddLine("Открыть курс обучения", 0.5, 1, 0.5)
+        end
+        
         GameTooltip:Show()
     end)
 
@@ -17387,147 +17384,2263 @@ end
 
 
 
--- Таблица с модулями курса
+local COLORS = {
+    HEADER       = "|cFFFFD700",
+    KEYWORD      = "|cFF80FF80",
+    COMMENT      = "|cFF66CCFF",
+    STRING       = "|cFFFF8080",
+    NUMBER       = "|cFFFFB830",
+    OPERATOR     = "|cFFCC88FF",
+    HINT         = "|cFFB3B3B3",
+    WARNING      = "|cFFFF8080",
+    DEFAULT      = "|cFFFFFFFF",
+    CODE_COMMENT = "|cFF808080",
+    SUCCESS      = "|cFF00FF00",
+    RESET        = "|r",
+}
+
+function HighlightCodeTags(code)
+    if not code or code == "" then return "" end
+    local highlightTags = {
+        ["<kw>"] = COLORS.KEYWORD,
+        ["<cm>"] = COLORS.CODE_COMMENT,
+        ["<st>"] = COLORS.STRING,
+        ["<nu>"] = COLORS.NUMBER,
+        ["<op>"] = COLORS.OPERATOR,
+    }
+    for tag, color in pairs(highlightTags) do
+        code = code:gsub(tag, color)
+    end
+    local closeHighlightTags = {"</kw>", "</cm>", "</st>", "</nu>", "</op>"}
+    for _, tag in ipairs(closeHighlightTags) do
+        code = code:gsub(tag, COLORS.COMMENT)
+    end
+    return COLORS.COMMENT .. code .. COLORS.RESET
+end
+
+local function ParseMarkup(text)
+    if not text or text == "" then return "" end
+    text = text:gsub("<code>(.-)</code>", function(code)
+        local escaped = code:gsub("|", "||")
+        local highlighted = HighlightCodeTags(escaped)
+        return highlighted
+    end)
+    local tags = {
+        ["<h>"]  = COLORS.HEADER,
+        ["<k>"]  = COLORS.KEYWORD,
+        ["<c>"]  = COLORS.COMMENT,
+        ["<s>"]  = COLORS.STRING,
+        ["<n>"]  = COLORS.NUMBER,
+        ["<o>"]  = COLORS.OPERATOR,
+        ["<t>"]  = COLORS.HINT,
+        ["<w>"]  = COLORS.WARNING,
+        ["<ok>"] = COLORS.SUCCESS,
+    }
+    for tag, color in pairs(tags) do
+        text = text:gsub(tag, color)
+    end
+    local closeTags = {"</h>", "</k>", "</c>", "</s>", "</n>", "</o>", "</t>", "</w>", "</ok>"}
+    for _, tag in ipairs(closeTags) do
+        text = text:gsub(tag, COLORS.DEFAULT)
+    end
+    return COLORS.DEFAULT .. text .. COLORS.RESET
+end
+
+local function CreateCleanModuleState(moduleNumber, module)
+    local moduleType = module.type or "text"
+    local state = {
+        moduleNumber = moduleNumber,
+        moduleType   = moduleType,
+        completed    = false,
+        firstOpened  = time(),
+        timestamp    = time(),
+    }
+    if moduleType == "vartest" then
+        state.allTasksComplete = false
+        state.taskStatus = {}
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                state.taskStatus[task.var] = {
+                    completed    = false,
+                    currentValue = nil,
+                    currentType  = "nil",
+                }
+            end
+        end
+        if module.formatTask then
+            state.formatTaskComplete = false
+        end
+    elseif moduleType == "commenttest" then
+        state.commentTestPassed = false
+        state.currentCode = module.initialCode or ""
+    elseif moduleType == "printtest" then
+        state.allTasksComplete = false
+        state.taskStatus = {}
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                state.taskStatus[i] = {
+                    completed = false,
+                    desc      = task.desc,
+                }
+            end
+        end
+    elseif moduleType == "customtest" then
+        state.customTestPassed = false
+        state.taskStatus = {}
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                state.taskStatus[i] = {
+                    completed = false,
+                    desc      = task.desc,
+                }
+            end
+        end
+    end
+    return state
+end
+
 ns_llua = ns_llua or {}
 ns_llua['lua'] = {
     [1] = {
         title = "Введение в Lua",
-        content = [[
-Введение в Lua
+        content = [=[
+<h>Введение в Lua</h>
 
 Lua — это легковесный, динамический язык программирования, основанный на таблицах. Он поддерживает разные стили программирования: императивный, объектно-ориентированный (через таблицы и метатаблицы) и функциональный. Имеет всего несколько типов данных, а основной структурой данных является таблица.
 
 Чаще всего его используют как встраиваемый скриптовый язык в играх и приложениях, но также он работает и самостоятельно — например, в консольных утилитах или веб-серверах.
 
-Переменные и область видимости
+<h>Переменные и область видимости</h>
 
 В Lua 5.1 переменные могут быть глобальными или локальными.
 
-    Локальные переменные — объявляются с ключевым словом local, доступны только в пределах своего блока. Использование локальных переменных делает код быстрее.
+<t>Локальные переменные</t> — объявляются с ключевым словом <k>local</k>, доступны только в пределах своего блока. Использование локальных переменных делает код быстрее.
 
-    Глобальные переменные — объявляются без local и доступны отовсюду, но их использование считается плохой практикой.
+<t>Глобальные переменные</t> — объявляются без <k>local</k> и доступны отовсюду, но их использование считается плохой практикой.
 
-Пример: локальная переменная:
-local userName = 'Высшая'
+<t>Примеры кода:</t>
+<code>
+<cm>-- Объявление локальной переменной</cm>
+<kw>local</kw> userName <op>=</op> <st>'Высшая'</st>
 
-Пример: глобальная переменная:
-userName = "Шеф"
+<cm>-- Объявление глобальной переменной</cm>
+userName <op>=</op> <st>"Шеф"</st>
 
-Пример: глобальная переменная и константа:
-MAX_USERS = 100
+<cm>-- Константы принято писать заглавными</cm>
+<kw>local</kw> MAX_USERS <op>=</op> <nu>100</nu>
+</code>
 
-Примечание: По соглашению, константы (значения, которые не должны меняться) записывают в ВЕРХНЕМ_РЕГИСТРЕ. Хотя язык не запрещает их изменять, хорошей практикой считается этого не делать.
-]]
-    }
+<w>Примечание:</w> По соглашению, константы (значения, которые не должны меняться) записывают в ВЕРХНЕМ_РЕГИСТРЕ. Хотя язык не запрещает их изменять, хорошей практикой считается этого не делать.
+]=]
+    },
+    [2] = {
+        title = "Комментарии в Lua",
+        content = [=[
+<h>Комментарии в Lua</h>
+
+Комментарии — это текст в коде, который игнорируется интерпретатором. Они нужны для пояснения логики, временного отключения кода или оставления заметок для других разработчиков.
+
+<h>Однострочные комментарии</h>
+
+Однострочный комментарий начинается с двух дефисов <c>--</c>. Всё, что находится после них до конца строки, игнорируется при выполнении.
+
+<t>Примеры:</t>
+<code>
+<cm>-- Это комментарий, он не выполнится</cm>
+<kw>local</kw> x <op>=</op> <nu>10</nu>  <cm>-- А это комментарий после кода</cm>
+</code>
+
+<h>Многострочные комментарии</h>
+
+Для комментирования больших блоков кода используются многострочные комментарии. Они начинаются с <c>--[[</c> и заканчиваются <c>]]</c>. Всё, что находится между ними, будет проигнорировано.
+
+<t>Пример:</t>
+<code>
+<cm>--[[
+Этот код не выполнится:
+local a = 5
+local b = 10
+print(a + b)
+]]</cm>
+
+<cm>-- А это уже выполнится</cm>
+<kw>print</kw><op>(</op><st>"Привет, мир!"</st><op>)</op>
+</code>
+]=]
+    },
+    [3] = {
+        title = "Команда /run",
+        content = [=[
+<h>Команда /run</h>
+
+<t>Назначение:</t> выполнение Lua-кода прямо в игре без создания аддона.
+
+<t>Синтаксис:</t>
+<code>
+<kw>/run</kw> код
+</code>
+
+<t>Примеры для практики:</t>
+<code>
+<cm>-- Вывод сообщения в чат</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op><st>"Hello, World!"</st><op>)</op>
+
+<cm>-- Математические операции</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op><nu>2</nu> <op>+</op> <nu>2</nu> <op>*</op> <nu>3</nu><op>)</op>
+
+<cm>-- Создание глобальной переменной</cm>
+<kw>/run</kw> myVar <op>=</op> <st>"Привет"</st>
+
+<cm>-- Использование созданной переменной</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op>myVar<op>)</op>
+
+<cm>-- Несколько команд в одной строке</cm>
+<kw>/run</kw> <kw>local</kw> a<op>=</op><nu>5</nu><op>;</op> <kw>local</kw> b<op>=</op><nu>10</nu><op>;</op> <kw>print</kw><op>(</op>a<op>+</op>b<op>)</op>
+</code>
+
+<h>Локальные и глобальные переменные в /run</h>
+
+<t>Важное различие:</t>
+
+<code>
+<cm>-- Команда 1: создаём локальную переменную</cm>
+<kw>/run</kw> <kw>local</kw> x <op>=</op> <nu>10</nu>
+
+<cm>-- Команда 2: пытаемся вывести x</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op>x<op>)</op>  <cm>-- nil! Переменная не существует</cm>
+</code>
+
+<t>Почему x равен nil?</t> Потому что <k>local</k> создаёт переменную только внутри текущего блока. Когда команда завершается — переменная уничтожается.
+
+<code>
+<cm>-- Команда 1: создаём глобальную переменную</cm>
+<kw>/run</kw> y <op>=</op> <nu>20</nu>
+
+<cm>-- Команда 2: выводим y</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op>y<op>)</op>  <cm>-- 20! Переменная доступна</cm>
+</code>
+
+<t>Почему y доступен?</t> Без <k>local</k> переменная попадает в глобальную область и живёт до перезагрузки интерфейса.
+
+<w>Запомни:</w> Локальные переменные живут только внутри одной команды /run. Глобальные — сохраняются между командами.
+
+<h>Команда /dump</h>
+
+<t>Назначение:</t> улучшенный вывод для отладки. Показывает значение и его структуру.
+
+<t>Отличия от print:</t>
+- <k>/dump</k> показывает содержимое таблиц и функций
+- Удобен для проверки переменных
+- Выводит данные в структурированном виде
+
+<t>Примеры вывода:</t>
+<code>
+<cm>-- dump с таблицей — показывает структуру</cm>
+<kw>/dump</kw> <op>{</op><st>"меч"</st><op>,</op> <st>"щит"</st><op>}</op>
+<cm>Dump: value={</cm>
+<cm>[1]="меч",</cm>
+<cm>[2]="щит"</cm>
+<cm>}</cm>
+</code>
+
+<h>Функции WoW API</h>
+
+В игре доступно множество встроенных функций:
+
+<code>
+<cm>-- Показать имя персонажа</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op>UnitName<op>(</op><st>"player"</st><op>)</op><op>)</op>
+
+<cm>-- Показать текущее здоровье</cm>
+<kw>/run</kw> <kw>print</kw><op>(</op>UnitHealth<op>(</op><st>"player"</st><op>)</op><op>)</op>
+
+<cm>-- Показать координаты</cm>
+<kw>/run</kw> <kw>local</kw> x<op>,</op>y <op>=</op> GetPlayerMapPosition<op>(</op><st>"player"</st><op>)</op><op>;</op> <kw>print</kw><op>(</op>x<op>)</op><op>;</op> <kw>print</kw><op>(</op>y<op>)</op>
+</code>
+
+<t>Советы:</t>
+- Стрелки вверх/вниз — история команд
+- Несколько команд разделяйте <k>;</k> (точка с запятой)
+
+<w>Важно:</w> Глобальные переменные сохраняются до перезагрузки интерфейса (/reload). Это позволяет использовать их для экспериментов и тестов!
+]=]
+    },
+    [4] = {
+        title = "Типы данных в Lua",
+        content = [=[
+<h>Типы данных в Lua</h>
+
+Lua имеет 8 основных типов данных. Понимание типов — основа для работы с переменными и функциями.
+
+<h>nil — отсутствие значения</h>
+
+<t>nil</t> означает "ничего" или "отсутствие значения". Это единственное значение типа nil.
+
+<code>
+<kw>local</kw> empty <op>=</op> <kw>nil</kw>
+<kw>local</kw> another  <cm>-- если не присвоить значение, будет nil</cm>
+</code>
+
+<h>boolean — логический тип</h>
+
+Имеет всего два значения: <k>true</k> (истина) и <k>false</k> (ложь).
+
+<code>
+<kw>local</kw> isAlive <op>=</op> <kw>true</kw>
+<kw>local</kw> isDead <op>=</op> <kw>false</kw>
+</code>
+
+<w>Внимание:</w> В Lua только <k>false</k> и <k>nil</k> считаются ложными в условиях. 0 и пустая строка "" — это true!
+
+<h>number — числа</h>
+
+В Lua все числа представлены типом <k>number</k>. Это могут быть целые числа, дробные, отрицательные.
+
+<code>
+<kw>local</kw> integer <op>=</op> <nu>42</nu>
+<kw>local</kw> float <op>=</op> <nu>3.14</nu>
+<kw>local</kw> negative <op>=</op> <op>-</op><nu>10</nu>
+</code>
+
+<t>Операции с числами:</t> +, -, *, /, ^ (возведение в степень), % (остаток от деления)
+
+<h>string — строки</h>
+
+Строки — это текст. Могут быть в одинарных, двойных кавычках или двойных квадратных скобках.
+
+<code>
+<kw>local</kw> single <op>=</op> <st>'Привет'</st>
+<kw>local</kw> double <op>=</op> <st>"Мир"</st>
+
+<cm>-- Конкатенация (склеивание) строк</cm>
+<kw>local</kw> greeting <op>=</op> single <op>..</op> <st>" "</st> <op>..</op> double  <cm>-- "Привет Мир"</cm>
+</code>
+
+<h>table — таблицы</h>
+
+Таблица — основной и самый мощный тип данных в Lua. Это и массив, и словарь, и объект одновременно.
+
+<code>
+<cm>-- Как массив (индексы 1, 2, 3...)</cm>
+<kw>local</kw> items <op>=</op> <op>{</op><st>"меч"</st><op>,</op> <st>"щит"</st><op>,</op> <st>"зелье"</st><op>}</op>
+<kw>print</kw><op>(</op>items<op>[</op><nu>1</nu><op>]</op><op>)</op>  <cm>-- "меч"</cm>
+
+<cm>-- Как словарь (ключ-значение)</cm>
+<kw>local</kw> player <op>=</op> <op>{</op>
+    name <op>=</op> <st>"Герой"</st><op>,</op>
+    level <op>=</op> <nu>10</nu>
+<op>}</op>
+<kw>print</kw><op>(</op>player<op>.</op>name<op>)</op>  <cm>-- "Герой"</cm>
+</code>
+
+<h>Как узнать тип переменной?</h>
+
+Функция <k>type()</k> возвращает строку с названием типа:
+
+<code>
+<kw>print</kw><op>(</op><kw>type</kw><op>(</op><nu>42</nu><op>)</op><op>)</op>        <cm>-- "number"</cm>
+<kw>print</kw><op>(</op><kw>type</kw><op>(</op><st>"текст"</st><op>)</op><op>)</op>   <cm>-- "string"</cm>
+<kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>true</kw><op>)</op><op>)</op>      <cm>-- "boolean"</cm>
+<kw>print</kw><op>(</op><kw>type</kw><op>(</op><op>{}</op><op>)</op><op>)</op>        <cm>-- "table"</cm>
+<kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>nil</kw><op>)</op><op>)</op>       <cm>-- "nil"</cm>
+<kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>print</kw><op>)</op><op>)</op>    <cm>-- "function"</cm>
+</code>
+]=]
+    },
+    [5] = {
+        title = "Практика: Типы переменных",
+        type = "vartest",
+        helpModules = {4, 3},
+        tasks = {
+            {var = "testNumber", type = "number",  desc = "Создай глобальную переменную testNumber с любым числом"},
+            {var = "testString", type = "string",  desc = "Создай глобальную переменную testString с любой строкой"},
+            {var = "testBool",   type = "boolean", desc = "Создай глобальную переменную testBool со значением true или false"},
+            {var = "testNil",    type = "nil",     desc = "Создай глобальную переменную testNil со значением nil"},
+            {var = "testTable",  type = "table",   desc = "Создай глобальную переменную testTable с пустой таблицей {}"},
+        }
+    },
+    [6] = {
+        title = "Практика: Комментарии",
+        type = "commenttest",
+        helpModules = {2},
+        initialCode = [=[
+print("Строка 1 - должна работать")
+print("Строка 2 - закомментируй меня")
+print("Строка 3 - должна работать")
+print("Строка 4 - закомментируй меня")
+print("Строка 5 - должна работать")
+]=],
+        expectedOutput = "Строка 1 - должна работать\nСтрока 3 - должна работать\nСтрока 5 - должна работать",
+        instruction = "Закомментируй строки 2 и 4, чтобы они не выполнялись. Остальные строки должны работать.",
+    },
+    [7] = {
+        title = "Функция print и форматирование",
+        content = [=[
+<h>Функция print</h>
+
+<t>print</t> — это основная функция для вывода информации в чат. Она принимает любое количество аргументов и выводит их через табуляцию.
+
+<t>Базовое использование:</t>
+<code>
+<cm>-- Вывод одного значения</cm>
+<kw>print</kw><op>(</op><st>"Привет, мир!"</st><op>)</op>
+
+<cm>-- Вывод нескольких значений</cm>
+<kw>print</kw><op>(</op><st>"Игрок:"</st><op>,</op> <st>"Герой"</st><op>,</op> <st>"Уровень:"</st><op>,</op> <nu>10</nu><op>)</op>
+
+<cm>-- Вывод чисел и результатов вычислений</cm>
+<kw>print</kw><op>(</op><nu>5</nu> <op>+</op> <nu>3</nu><op>)</op>  <cm>-- Выведет: 8</cm>
+</code>
+
+<h>Конкатенация строк</h>
+
+<t>Оператор ..</t> (две точки) используется для склеивания (конкатенации) строк:
+
+<code>
+<kw>local</kw> name <op>=</op> <st>"Герой"</st>
+<kw>local</kw> level <op>=</op> <nu>10</nu>
+
+<cm>-- Конкатенация строк</cm>
+<kw>print</kw><op>(</op><st>"Игрок "</st> <op>..</op> name <op>..</op> <st>" достиг "</st> <op>..</op> level <op>..</op> <st>" уровня"</st><op>)</op>
+
+<cm>-- Альтернатива: print с запятыми</cm>
+<kw>print</kw><op>(</op><st>"Игрок"</st><op>,</op> name<op>,</op> <st>"достиг"</st><op>,</op> level<op>,</op> <st>"уровня"</st><op>)</op>
+</code>
+
+<h>Форматированный вывод через string.format</h>
+
+<t>string.format</t> позволяет создавать строки по шаблону:
+
+<t>Основные заполнители:</t>
+- <k>%s</k> — строка
+- <k>%d</k> — целое число
+- <k>%.2f</k> — число с 2 знаками после запятой
+
+<t>Примеры:</t>
+<code>
+<kw>local</kw> name <op>=</op> <st>"Артас"</st>
+<kw>local</kw> level <op>=</op> <nu>80</nu>
+
+<kw>local</kw> message <op>=</op> <kw>string.format</kw><op>(</op><st>"%s (ур. %d)"</st><op>,</op> name<op>,</op> level<op>)</op>
+<kw>print</kw><op>(</op>message<op>)</op>  <cm>-- Артас (ур. 80)</cm>
+
+<cm>-- Форматирование чисел</cm>
+<kw>print</kw><op>(</op><kw>string.format</kw><op>(</op><st>"Золото: %.2f"</st><op>,</op> <nu>1234.5678</nu><op>)</op><op>)</op>  <cm>-- Золото: 1234.57</cm>
+</code>
+]=]
+    },
+    [8] = {
+        title = "Практика: Простой print",
+        type = "printtest",
+        helpModules = {7},
+        tasks = {
+            {
+                desc = "Выведи фразу 'HELLO_WOW_123' через print",
+                hint = 'Используй /run print("HELLO_WOW_123")',
+                pattern = "HELLO_WOW_123",
+                expectedExpression = 'print("HELLO_WOW_123")',
+            },
+            {
+                desc = "Выведи число 777 через print",
+                hint = 'Используй /run print(777)',
+                pattern = "777",
+                expectedExpression = 'print(777)',
+            },
+            {
+                desc = "Выведи фразу 'SIMPLE_TEST_OK' через print",
+                hint = 'Используй /run print("SIMPLE_TEST_OK")',
+                pattern = "SIMPLE_TEST_OK",
+                expectedExpression = 'print("SIMPLE_TEST_OK")',
+            },
+        }
+    },
+    [9] = {
+        title = "Практика: Конкатенация",
+        type = "printtest",
+        helpModules = {7},
+        tasks = {
+            {
+                desc = "Выведи фразу 'FOX BRAVO CHARLIE' через конкатенацию трёх слов с пробелами",
+                hint = 'Используй /run print("FOX" .. " BRAVO " .. "CHARLIE")',
+                pattern = "FOX BRAVO CHARLIE",
+                requireConcat = true,
+                requiredConcatCount = 2,
+            },
+            {
+                desc = "Выведи фразу 'WOW-VERSION-335' через конкатенацию с дефисами",
+                hint = 'Используй /run print("WOW-" .. "VERSION-" .. "335")',
+                pattern = "WOW-VERSION-335",
+                requireConcat = true,
+                requiredConcatCount = 2,
+            },
+            {
+                desc = "Выведи фразу 'ALPHA BETA GAMMA' через конкатенацию трёх частей с пробелами",
+                hint = 'Используй /run print("ALPHA" .. " BETA " .. "GAMMA")',
+                pattern = "ALPHA BETA GAMMA",
+                requireConcat = true,
+                requiredConcatCount = 2,
+            },
+        }
+    },
+    [10] = {
+        title = "Практика: Числа и математика",
+        type = "printtest",
+        helpModules = {4},
+        tasks = {
+            {
+                desc = "Выведи результат умножения 6 * 7",
+                hint = 'Используй /run print(6 * 7)',
+                pattern = "42",
+                expectedExpression = {'print(6*7)', 'print(7*6)'},
+            },
+            {
+                desc = "Выведи результат выражения 100 - 25",
+                hint = 'Используй /run print(100 - 25)',
+                pattern = "75",
+                expectedExpression = 'print(100-25)',
+            },
+            {
+                desc = "Выведи результат выражения 15 + 30 * 2",
+                hint = 'Используй /run print(15 + 30 * 2)',
+                pattern = "75",
+                expectedExpression = 'print(15+30*2)',
+            },
+        }
+    },
+    [11] = {
+        title = "Практика: string.format с переменными",
+        type = "vartest",
+        helpModules = {7},
+        preloadVars = {
+            {var = "heroName",  value = "Артас",      desc = "heroName = \"Артас\" (строка - имя героя)"},
+            {var = "heroTitle", value = "Король-лич",  desc = "heroTitle = \"Король-лич\" (строка - титул)"},
+            {var = "heroLevel", value = 80,            desc = "heroLevel = 80 (число - уровень)"},
+            {var = "heroHP",    value = 25000,         desc = "heroHP = 25000 (число - здоровье)"},
+        },
+        tasks = {
+            {var = "heroName",  type = "string", desc = "Создай глобальную переменную heroName со значением \"Артас\""},
+            {var = "heroTitle", type = "string", desc = "Создай глобальную переменную heroTitle со значением \"Король-лич\""},
+            {var = "heroLevel", type = "number", desc = "Создай глобальную переменную heroLevel со значением 80"},
+            {var = "heroHP",    type = "number", desc = "Создай глобальную переменную heroHP со значением 25000"},
+        },
+        formatTask = {
+            instruction = "Используя string.format, выведи строку:\n\n\"Герой Артас (Король-лич) - Уровень: 80, HP: 25000\"\n\nШаблон команды (заполни пропуски переменными в правильном порядке):\n\n/run print(string.format(\"Герой %s (%s) - Уровень: %d, HP: %d\", ___, ___, ___, ___))",
+            hint = 'ВАЖНО: используй string.format внутри print!\n\nПолная структура:\n/run print(string.format("шаблон", переменная1, переменная2, переменная3, переменная4))\n\nШаблон: "Герой %s (%s) - Уровень: %d, HP: %d"\n\nОпредели, что должно быть на месте:\n• первого %s = ? (имя героя?)\n• второго %s = ? (титул в скобках?)\n• первого %d = ? (уровень?)\n• второго %d = ? (здоровье?)\n\nПорядок подстановки: первый %s = первая переменная, второй %s = вторая, и т.д.',
+            pattern = "Герой Артас (Король-лич) - Уровень: 80, HP: 25000",
+        },
+    },
+    [12] = {
+        title = "Практика: Комбинированный вывод",
+        type = "printtest",
+        helpModules = {7, 4},
+        tasks = {
+            {
+                desc = "Выведи фразу 'STORM WIND 888' любым способом (print, конкатенация, или format)",
+                hint = 'Например: /run print("STORM WIND 888")',
+                pattern = "STORM WIND 888",
+            },
+            {
+                desc = "Выведи результат деления 100 / 4",
+                hint = 'Используй /run print(100 / 4)',
+                pattern = "25",
+                expectedExpression = 'print(100/4)',
+            },
+            {
+                desc = "Выведи фразу 'ORC GRUNT 111' через конкатенацию с пробелами",
+                hint = 'Используй /run print("ORC" .. " GRUNT " .. "111")',
+                pattern = "ORC GRUNT 111",
+                requireConcat = true,
+                requiredConcatCount = 2,
+            },
+        }
+    },
+    [13] = {
+        title = "Условные операторы",
+        content = [=[
+<h>Условные операторы</h>
+
+Условные операторы позволяют выполнять код в зависимости от условий.
+
+<h>Оператор if</h>
+
+Базовая конструкция:
+<code>
+<kw>if</kw> условие <kw>then</kw>
+    <cm>-- код, если условие истинно</cm>
+<kw>elseif</kw> другое_условие <kw>then</kw>
+    <cm>-- код, если другое условие истинно</cm>
+<kw>else</kw>
+    <cm>-- код, если все условия ложны</cm>
+<kw>end</kw>
+</code>
+
+<t>Пример:</t>
+<code>
+<kw>local</kw> hp <op>=</op> <nu>50</nu>
+
+<kw>if</kw> hp <op>></op> <nu>80</nu> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Здоровье в порядке!"</st><op>)</op>
+<kw>elseif</kw> hp <op>></op> <nu>30</nu> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Нужно подлечиться!"</st><op>)</op>
+<kw>else</kw>
+    <kw>print</kw><op>(</op><st>"Опасно! Мало здоровья!"</st><op>)</op>
+<kw>end</kw>
+</code>
+]=]
+    },
+    [14] = {
+        title = "Циклы",
+        content = [=[
+<h>Циклы в Lua</h>
+
+Циклы используются для повторения действий несколько раз.
+
+<h>Цикл for</h>
+
+<t>Числовой for:</t>
+<code>
+<cm>-- От 1 до 5</cm>
+<kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
+    <kw>print</kw><op>(</op><st>"Итерация: "</st> <op>..</op> i<op>)</op>
+<kw>end</kw>
+
+<cm>-- От 10 до 1 с шагом -2</cm>
+<kw>for</kw> i <op>=</op> <nu>10</nu><op>,</op> <nu>1</nu><op>,</op> <op>-</op><nu>2</nu> <kw>do</kw>
+    <kw>print</kw><op>(</op>i<op>)</op>
+<kw>end</kw>
+</code>
+
+<t>For по таблице (pairs/ipairs):</t>
+<code>
+<kw>local</kw> items <op>=</op> <op>{</op><st>"меч"</st><op>,</op> <st>"щит"</st><op>,</op> <st>"зелье"</st><op>}</op>
+
+<kw>for</kw> index<op>,</op> value <kw>in</kw> <kw>ipairs</kw><op>(</op>items<op>)</op> <kw>do</kw>
+    <kw>print</kw><op>(</op>index<op>,</op> value<op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Цикл while</h>
+
+<code>
+<kw>local</kw> count <op>=</op> <nu>0</nu>
+
+<kw>while</kw> count <op><</op> <nu>5</nu> <kw>do</kw>
+    <kw>print</kw><op>(</op><st>"Счётчик: "</st> <op>..</op> count<op>)</op>
+    count <op>=</op> count <op>+</op> <nu>1</nu>
+<kw>end</kw>
+</code>
+]=]
+    },
+    [15] = {
+        title = "Тест: Переменные и присваивание",
+        type = "customtest",
+        helpModules = {4, 1},
+        content = [=[
+<h>Тест: Переменные и присваивание</h>
+
+<t>Задание:</t> Создай переменные с правильными значениями. Система автоматически проверит их!
+
+<h>Пример для изучения:</h>
+<code>
+<cm>-- Создание переменных разных типов</cm>
+<kw>local</kw> name <op>=</op> <st>"Джайна"</st>
+<kw>local</kw> age <op>=</op> <nu>25</nu>
+<kw>local</kw> isMage <op>=</op> <kw>true</kw>
+</code>
+
+<t>Твоя задача:</t> Используй <k>/run</k> чтобы создать глобальные переменные:
+<code>
+playerName <op>=</op> <st>"Тралл"</st>
+playerLevel <op>=</op> <nu>60</nu>
+playerOnline <op>=</op> <kw>true</kw>
+</code>
+
+<t>Порядок действий:</t>
+1. Введи в чат три команды /run (по одной для каждой переменной)
+2. Система автоматически проверит каждую переменную
+]=],
+        tasks = {
+            {var = "playerName",   check = function(value) return type(value) == "string"  and value == "Тралл" end, desc = 'playerName = "Тралл" (строка)'},
+            {var = "playerLevel",  check = function(value) return type(value) == "number"  and value == 60      end, desc = 'playerLevel = 60 (число)'},
+            {var = "playerOnline", check = function(value) return type(value) == "boolean" and value == true    end, desc = 'playerOnline = true (логическое)'},
+        },
+    },
+    [16] = {
+        title = "Тест: Конкатенация строк",
+        type = "customtest",
+        helpModules = {4, 7},
+        content = [=[
+<h>Тест: Конкатенация строк</h>
+
+<t>Задание:</t> Создай переменные и используй конкатенацию для создания новой строки.
+
+<h>Пример для изучения:</h>
+<code>
+<kw>local</kw> firstName <op>=</op> <st>"Артас"</st>
+<kw>local</kw> lastName <op>=</op> <st>"Менетил"</st>
+<kw>local</kw> fullName <op>=</op> firstName <op>..</op> <st>" "</st> <op>..</op> lastName
+<kw>print</kw><op>(</op>fullName<op>)</op>  <cm>-- Артас Менетил</cm>
+</code>
+
+<t>Твоя задача:</t> Создай три глобальные переменные:
+
+<code>
+itemName <op>=</op> <cm>-- любая строка, название предмета</cm>
+itemQuality <op>=</op> <cm>-- любая строка, качество предмета</cm>
+itemDescription <op>=</op> <cm>-- объедини itemQuality и itemName через пробел</cm>
+</code>
+
+<t>Подсказка:</t>
+- Первые две переменные — обычные строки в кавычках
+- Для <k>itemDescription</k> используй оператор <k>..</k> (конкатенация)
+- Объединяй именно <k>имена переменных</k>, а не строки в кавычках
+- Не забудь добавить пробел между словами
+]=],
+        tasks = {
+            {var = "itemName",        check = function(value) return type(value) == "string" and value == "Меч"          end, desc = 'itemName = "Меч"'},
+            {var = "itemQuality",     check = function(value) return type(value) == "string" and value == "Эпический"    end, desc = 'itemQuality = "Эпический"'},
+            {var = "itemDescription", check = function(value) return type(value) == "string" and value == "Эпический Меч" end, desc = 'itemDescription = "Эпический Меч" (используй переменные itemQuality и itemName)', requireCodeVars = {"itemQuality", "itemName"}},
+        },
+        requireConcatForDescription = true,
+    },
+    [17] = {
+        title = "Тест: Условия с числами",
+        type = "customtest",
+        helpModules = {13},
+        content = [=[
+<h>Тест: Условия с числами</h>
+
+<t>Задание:</t> Создай переменную здоровья и напиши условие для проверки.
+
+<h>Что делает этот пример:</h>
+Этот код определяет состояние игрока в зависимости от его здоровья. Если здоровье больше 50 — игрок "Здоров", иначе — "Ранен".
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём переменную здоровья со значением 75</cm>
+<kw>local</kw> health <op>=</op> <nu>75</nu>
+
+<cm>-- Объявляем переменную статуса (пока без значения)</cm>
+<kw>local</kw> status
+
+<cm>-- Проверяем: если здоровье больше 50, то...</cm>
+<kw>if</kw> health <op>></op> <nu>50</nu> <kw>then</kw>
+    <cm>-- Присваиваем статус "Здоров"</cm>
+    status <op>=</op> <st>"Здоров"</st>
+<cm>-- Иначе (если условие не выполнено)...</cm>
+<kw>else</kw>
+    <cm>-- Присваиваем статус "Ранен"</cm>
+    status <op>=</op> <st>"Ранен"</st>
+<cm>-- Завершаем блок условия</cm>
+<kw>end</kw>
+</code>
+
+<t>Твоя задача:</t> Создай две переменные:
+
+<code>
+playerHP <op>=</op> <cm>-- число, здоровье игрока</cm>
+playerStatus <op>=</op> <cm>-- строка, статус игрока</cm>
+</code>
+
+<t>Подсказка:</t>
+- Установи <k>playerHP</k> равным 80
+- Создай <k>playerStatus</k> с условием: если <k>playerHP</k> больше 60, то "Боеспособен", иначе "Нужен отдых"
+- Используй конструкцию <k>if</k> / <k>then</k> / <k>else</k> / <k>end</k>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> playerHP <op>=</op> ___<op>;</op> <kw>if</kw> ___ <op>></op> ___ <kw>then</kw> playerStatus <op>=</op> <st>"___"</st> <kw>else</kw> playerStatus <op>=</op> <st>"___"</st> <kw>end</kw>
+</code>
+]=],
+        tasks = {
+            {var = "playerHP",     check = function(value) return type(value) == "number" and value == 80          end, desc = 'playerHP = 80'},
+            {var = "playerStatus", check = function(value) return type(value) == "string" and value == "Боеспособен" end, desc = 'playerStatus = "Боеспособен" (условие: playerHP > 60)'},
+        },
+    },
+    [18] = {
+        title = "Тест: Условия со строками",
+        type = "customtest",
+        helpModules = {13},
+        content = [=[
+<h>Тест: Условия со строками</h>
+
+<t>Задание:</t> Сравни строки и выдай результат.
+
+<h>Что делает этот пример:</h>
+Этот код определяет, может ли персонаж лечить союзников. Если класс — "Жрец", то `canHeal = true`, иначе — `false`.
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём переменную класса со значением "Маг"</cm>
+<kw>local</kw> className <op>=</op> <st>"Маг"</st>
+
+<cm>-- Объявляем переменную canHeal (может ли лечить)</cm>
+<kw>local</kw> canHeal
+
+<cm>-- Проверяем: если класс равен "Жрец", то...</cm>
+<kw>if</kw> className <op>==</op> <st>"Жрец"</st> <kw>then</kw>
+    <cm>-- Присваиваем true (может лечить)</cm>
+    canHeal <op>=</op> <kw>true</kw>
+<cm>-- Иначе (если класс не Жрец)...</cm>
+<kw>else</kw>
+    <cm>-- Присваиваем false (не может лечить)</cm>
+    canHeal <op>=</op> <kw>false</kw>
+<cm>-- Завершаем блок условия</cm>
+<kw>end</kw>
+</code>
+
+<t>Твоя задача:</t> Создай переменные:
+<code>
+myClass <op>=</op> <st>"Воин"</st>
+<cm>-- Затем создай canWearPlate с условием:</cm>
+<cm>-- если myClass == "Воин" или myClass == "Паладин", то true</cm>
+<cm>-- иначе false</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> myClass <op>=</op> <st>"Воин"</st><op>;</op> canWearPlate <op>=</op> <op>(</op>myClass <op>==</op> <st>"___"</st> <kw>___</kw> myClass <op>==</op> <st>"___"</st><op>)</op>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Названия классов (в кавычках)
+- Логический оператор ИЛИ (вспомни из теории)
+]=],
+        tasks = {
+            {var = "myClass",      check = function(value) return type(value) == "string"  and value == "Воин" end, desc = 'myClass = "Воин"'},
+            {var = "canWearPlate", check = function(value) return type(value) == "boolean" and value == true   end, desc = 'canWearPlate = true (условие: Воин или Паладин)'},
+        },
+    },
+    [19] = {
+        title = "Тест: Цикл for (числа)",
+        type = "customtest",
+        helpModules = {14},
+        content = [=[
+<h>Тест: Цикл for с числами</h>
+
+<t>Задание:</t> Используй цикл for для создания строки с числами.
+
+<h>Что делает этот пример:</h>
+Этот код собирает строку "1 2 3 4 5 " с помощью цикла, который проходит по числам от 1 до 5 и добавляет каждое число к строке с пробелом.
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём пустую строку, куда будем собирать результат</cm>
+<kw>local</kw> result <op>=</op> <st>""</st>
+
+<cm>-- Цикл: переменная i принимает значения от 1 до 5</cm>
+<kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
+    <cm>-- Добавляем текущее число i и пробел к строке result</cm>
+    <cm>-- Оператор .. склеивает строки (конкатенация)</cm>
+    result <op>=</op> result <op>..</op> i <op>..</op> <st>" "</st>
+<cm>-- Завершаем цикл</cm>
+<kw>end</kw>
+<cm>-- result = "1 2 3 4 5 "</cm>
+</code>
+
+<t>Твоя задача:</t> Создай переменную <k>numberSequence</k>, которая содержит числа от 10 до 15 через пробел:
+<code>
+<cm>-- Ожидаемый результат: "10 11 12 13 14 15 "</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> numberSequence <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___ <kw>do</kw> numberSequence <op>=</op> numberSequence <op>___</op> i <op>___</op> <st>"___"</st> <kw>end</kw>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Начальное значение строки (пустая строка)
+- Начальное и конечное значение цикла (от какого числа до какого)
+- Операторы конкатенации (..)
+- Пробел в кавычках
+]=],
+        tasks = {
+            {var = "numberSequence", check = function(value) return type(value) == "string" and value == "10 11 12 13 14 15 " end, desc = 'numberSequence = "10 11 12 13 14 15 " (цикл for 10..15)'},
+        },
+    },
+    [20] = {
+        title = "Тест: Цикл с условием",
+        type = "customtest",
+        helpModules = {14},
+        content = [=[
+<h>Тест: Цикл с условием</h>
+
+<t>Задание:</t> Создай переменную с суммой чисел от 1 до 10.
+
+<h>Что делает этот пример:</h>
+Этот код вычисляет сумму чисел от 1 до 5 (1+2+3+4+5 = 15). Цикл проходит по каждому числу и добавляет его к переменной `sum`.
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём переменную для накопления суммы, начинаем с 0</cm>
+<kw>local</kw> sum <op>=</op> <nu>0</nu>
+
+<cm>-- Цикл: переменная i принимает значения от 1 до 5</cm>
+<kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
+    <cm>-- К текущей сумме прибавляем значение i</cm>
+    <cm>-- 1-я итерация: sum = 0 + 1 = 1</cm>
+    <cm>-- 2-я итерация: sum = 1 + 2 = 3</cm>
+    <cm>-- 3-я итерация: sum = 3 + 3 = 6</cm>
+    <cm>-- 4-я итерация: sum = 6 + 4 = 10</cm>
+    <cm>-- 5-я итерация: sum = 10 + 5 = 15</cm>
+    sum <op>=</op> sum <op>+</op> i
+<cm>-- Завершаем цикл</cm>
+<kw>end</kw>
+<cm>-- sum = 15 (1+2+3+4+5)</cm>
+</code>
+
+<t>Твоя задача:</t> Создай переменную <k>totalSum</k>, которая равна сумме чисел от 1 до 10:
+<code>
+<cm>-- Ожидаемый результат: 55</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> totalSum <op>=</op> ___<op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___ <kw>do</kw> totalSum <op>=</op> totalSum <op>___</op> i <kw>end</kw>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Начальное значение totalSum
+- Начальное и конечное значение цикла
+- Оператор сложения
+]=],
+        tasks = {
+            {var = "totalSum", check = function(value) return type(value) == "number" and value == 55 end, desc = 'totalSum = 55 (сумма чисел 1..10)', requireCodePatterns = {"for", "do", "end", "totalSum"}},
+        },
+    },
+    [21] = {
+        title = "Тест: Массивы и циклы",
+        type = "customtest",
+        helpModules = {14, 4},
+        content = [=[
+<h>Тест: Массивы и циклы</h>
+
+<t>Задание:</t> Создай массив (таблицу) предметов и посчитай их количество.
+
+<h>Что делает этот пример:</h>
+Этот код создаёт массив из трёх предметов и подсчитывает их количество с помощью цикла. Переменная `count` увеличивается на 1 для каждого элемента массива, в итоге становясь равной 3.
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём массив (таблицу) с тремя предметами</cm>
+<kw>local</kw> items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op> <st>"Щит"</st><op>,</op> <st>"Зелье"</st><op>}</op>
+
+<cm>-- Создаём переменную-счётчик, начинаем с 0</cm>
+<kw>local</kw> count <op>=</op> <nu>0</nu>
+
+<cm>-- Цикл по массиву: _ (игнорируем индекс), item = текущий элемент</cm>
+<kw>for</kw> _<op>,</op> item <kw>in</kw> <kw>ipairs</kw><op>(</op>items<op>)</op> <kw>do</kw>
+    <cm>-- Увеличиваем счётчик на 1 для каждого элемента</cm>
+    <cm>-- 1-я итерация: count = 0 + 1 = 1 (Меч)</cm>
+    <cm>-- 2-я итерация: count = 1 + 1 = 2 (Щит)</cm>
+    <cm>-- 3-я итерация: count = 2 + 1 = 3 (Зелье)</cm>
+    count <op>=</op> count <op>+</op> <nu>1</nu>
+<cm>-- Завершаем цикл</cm>
+<kw>end</kw>
+<cm>-- count = 3 (в массиве три предмета)</cm>
+</code>
+
+<t>Твоя задача:</t> Создай таблицу и посчитай её элементы:
+<code>
+inventory <op>=</op> <op>{</op><st>"Факел"</st><op>,</op> <st>"Верёвка"</st><op>,</op> <st>"Кремень"</st><op>,</op> <st>"Компас"</st><op>}</op>
+inventoryCount <op>=</op> <cm>-- количество предметов в inventory</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> inventory <op>=</op> <op>{</op><st>"Факел"</st><op>,</op> ___<op>,</op> ___<op>,</op> ___ <op>}</op><op>;</op> inventoryCount <op>=</op> ___<op>;</op> <kw>for</kw> ___<op>,</op>___ <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> inventoryCount <op>=</op> inventoryCount <op>___</op> ___ <kw>end</kw>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Остальные названия предметов (в кавычках): "Верёвка", "Кремень", "Компас"
+- Начальное значение счётчика (число)
+- Переменные для цикла (например, _ и item или _ и _)
+- Название массива для перебора
+- Оператор сложения и число для увеличения счётчика
+]=],
+        tasks = {
+            {var = "inventory",      check = function(value) return type(value) == "table" and value[1] == "Факел" and value[2] == "Верёвка" and value[3] == "Кремень" and value[4] == "Компас" end, desc = 'inventory = {"Факел", "Верёвка", "Кремень", "Компас"}'},
+            {var = "inventoryCount", check = function(value) return type(value) == "number" and value == 4 end, desc = 'inventoryCount = 4 (количество предметов)', requireCodePatterns = {"for", "do", "end", "ipairs", "inventory"}},
+        },
+    },
+    [22] = {
+        title = "Тест: Поиск в массиве",
+        type = "customtest",
+        helpModules = {14},
+        content = [=[
+<h>Тест: Поиск в массиве</h>
+
+<t>Задание:</t> Найди элемент в массиве и запиши его индекс.
+
+<h>Что делает этот пример:</h>
+Этот код ищет "Банан" в массиве фруктов и запоминает его позицию (индекс). Поскольку "Банан" находится на второй позиции, `foundIndex` станет равным 2.
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём массив (таблицу) фруктов</cm>
+<kw>local</kw> fruits <op>=</op> <op>{</op><st>"Яблоко"</st><op>,</op> <st>"Банан"</st><op>,</op> <st>"Апельсин"</st><op>}</op>
+
+<cm>-- Объявляем переменную для хранения найденного индекса</cm>
+<kw>local</kw> foundIndex
+
+<cm>-- Цикл по массиву: i = индекс, fruit = текущий элемент</cm>
+<kw>for</kw> i<op>,</op> fruit <kw>in</kw> <kw>ipairs</kw><op>(</op>fruits<op>)</op> <kw>do</kw>
+    <cm>-- Проверяем: если текущий фрукт равен "Банан"...</cm>
+    <kw>if</kw> fruit <op>==</op> <st>"Банан"</st> <kw>then</kw>
+        <cm>-- Запоминаем индекс найденного фрукта</cm>
+        foundIndex <op>=</op> i
+    <kw>end</kw>
+<cm>-- Завершаем цикл</cm>
+<kw>end</kw>
+<cm>-- foundIndex = 2 (Банан находится на второй позиции)</cm>
+</code>
+
+<t>Твоя задача:</t> Создай массив и найди индекс элемента "Эликсир":
+<code>
+pouch <op>=</op> <op>{</op><st>"Кинжал"</st><op>,</op> <st>"Эликсир"</st><op>,</op> <st>"Свиток"</st><op>,</op> <st>"Эликсир"</st><op>}</op>
+elixirIndex <op>=</op> <cm>-- индекс ПЕРВОГО "Эликсира" в pouch</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> pouch <op>=</op> <op>{</op><st>"Кинжал"</st><op>,</op><st>"Эликсир"</st><op>,</op><st>"Свиток"</st><op>,</op><st>"Эликсир"</st><op>}</op><op>;</op> <kw>for</kw> ___<op>,</op>___ <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> <kw>if</kw> ___ <op>==</op> <st>"___"</st> <kw>then</kw> elixirIndex <op>=</op> ___<op>;</op> <kw>___</kw> <kw>end</kw> <kw>end</kw>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Переменные для индекса и значения в цикле (например, i и v)
+- Название массива для перебора
+- Переменную со значением для сравнения
+- Слово для поиска (в кавычках)
+- Переменную, куда сохранить индекс
+- Ключевое слово для досрочного выхода из цикла
+]=],
+        tasks = {
+            {var = "pouch",       check = function(value) return type(value) == "table" and value[1] == "Кинжал" and value[2] == "Эликсир" and value[3] == "Свиток" and value[4] == "Эликсир" end, desc = 'pouch = {"Кинжал", "Эликсир", "Свиток", "Эликсир"}'},
+            {var = "elixirIndex", check = function(value) return type(value) == "number" and value == 2 end, desc = 'elixirIndex = 2 (индекс первого "Эликсира")', requireCodePatterns = {"for", "do", "end", "ipairs", "pouch"}},
+        },
+    },
+    [23] = {
+        title = "Тест: Обратный отсчёт",
+        type = "customtest",
+        helpModules = {14},
+        content = [=[
+<h>Тест: Обратный отсчёт</h>
+
+<t>Задание:</t> Создай строку с обратным отсчётом от 5 до 1.
+
+<h>Что делает этот пример:</h>
+Этот код создаёт строку обратного отсчёта "5... 4... 3... 2... 1... ПУСК!". Цикл идёт в обратном порядке от 5 до 1, добавляя каждое число к строке, а в конце добавляется слово "ПУСК!".
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём пустую строку для обратного отсчёта</cm>
+<kw>local</kw> countdown <op>=</op> <st>""</st>
+
+<cm>-- Цикл от 5 до 1 с шагом -1 (обратный отсчёт)</cm>
+<kw>for</kw> i <op>=</op> <nu>5</nu><op>,</op> <nu>1</nu><op>,</op> <op>-</op><nu>1</nu> <kw>do</kw>
+    <cm>-- Добавляем число и "... " к строке</cm>
+    <cm>-- 1-я итерация: countdown = "5... "</cm>
+    <cm>-- 2-я итерация: countdown = "5... 4... "</cm>
+    <cm>-- и так далее...</cm>
+    countdown <op>=</op> countdown <op>..</op> i <op>..</op> <st>"... "</st>
+<cm>-- Завершаем цикл</cm>
+<kw>end</kw>
+
+<cm>-- Добавляем финальное слово "ПУСК!"</cm>
+countdown <op>=</op> countdown <op>..</op> <st>"ПУСК!"</st>
+<cm>-- countdown = "5... 4... 3... 2... 1... ПУСК!"</cm>
+</code>
+
+<t>Твоя задача:</t> Создай переменную <k>launchSequence</k> с обратным отсчётом от 5 до 1 и словом "СТАРТ!":
+<code>
+<cm>-- Ожидаемый результат: "5... 4... 3... 2... 1... СТАРТ!"</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> launchSequence <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___<op>,</op> ___ <kw>do</kw> launchSequence <op>=</op> ___ <op>___</op> i <op>___</op> <st>"___"</st> <kw>end</kw><op>;</op> launchSequence <op>=</op> ___ <op>___</op> <st>"СТАРТ!"</st>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Начальное значение строки (пустая строка)
+- Начальное, конечное значение цикла и шаг (отрицательный!)
+- Переменную launchSequence и операторы конкатенации
+- Разделитель (точки с пробелом)
+- Добавление финального слова
+]=],
+        tasks = {
+            {var = "launchSequence", check = function(value) return type(value) == "string" and value == "5... 4... 3... 2... 1... СТАРТ!" end, desc = 'launchSequence = "5... 4... 3... 2... 1... СТАРТ!"', requireCodePatterns = {"for", "do", "end", "launchSequence"}},
+        },
+    },
+    [24] = {
+        title = "Тест: Поиск по подстроке",
+        type = "customtest",
+        helpModules = {14, 4},
+        content = [=[
+<h>Тест: Поиск по подстроке в массиве</h>
+
+<t>Задание:</t> Пройди по массиву и найди все слова, содержащие определённое сочетание букв.
+
+<h>!!! Почему не используем оператор # с кириллицей:</h>
+В WoW 3.3.5 оператор <k>#</k> считает <w>байты</w>, а не символы. Кириллица занимает 2 байта на символ, поэтому <k>#</k><s>"Лёд"</s> вернёт 6, а не 3. Для работы с длиной строк в кириллице нужны другие подходы, которые мы разберём позже.
+
+Сейчас мы научимся искать <t>подстроки</t> — это надёжно работает с любым языком!
+
+<h>Что делает этот пример:</h>
+Этот код ищет в массиве фруктов все названия, содержащие подстроку "ан". Функция <k>string.find()</k> возвращает позицию найденной подстроки, или <k>nil</k>, если подстрока не найдена.
+
+<t>Разбор по строкам:</t>
+<code>
+<cm>-- Создаём массив фруктов</cm>
+<kw>local</kw> fruits <op>=</op> <op>{</op><st>"Яблоко"</st><op>,</op> <st>"Банан"</st><op>,</op> <st>"Апельсин"</st><op>,</op> <st>"Груша"</st><op>}</op>
+
+<cm>-- Создаём пустую строку для результата</cm>
+<kw>local</kw> result <op>=</op> <st>""</st>
+
+<cm>-- Цикл по массиву: _ (игнорируем индекс), fruit = текущий элемент</cm>
+<kw>for</kw> _<op>,</op> fruit <kw>in</kw> <kw>ipairs</kw><op>(</op>fruits<op>)</op> <kw>do</kw>
+    <cm>-- string.find(строка, подстрока) ищет подстроку в строке</cm>
+    <cm>-- Если нашла — возвращает позицию (число), это true в условии</cm>
+    <cm>-- Если не нашла — возвращает nil, это false в условии</cm>
+    <cm>-- "Яблоко" — нет "ан" → nil → пропускаем</cm>
+    <cm>-- "Банан" — есть "ан" → позиция 2 → добавляем!</cm>
+    <cm>-- "Апельсин" — нет "ан" → nil → пропускаем</cm>
+    <cm>-- "Груша" — нет "ан" → nil → пропускаем</cm>
+    <kw>if</kw> string.find<op>(</op>fruit<op>,</op> <st>"ан"</st><op>)</op> <kw>then</kw>
+        <cm>-- Добавляем найденное слово и пробел к результату</cm>
+        result <op>=</op> result <op>..</op> fruit <op>..</op> <st>" "</st>
+    <kw>end</kw>
+<cm>-- Завершаем цикл</cm>
+<kw>end</kw>
+<cm>-- result = "Банан "</cm>
+</code>
+
+<h>Как работает string.find:</h>
+<code>
+<kw>print</kw><op>(</op>string.find<op>(</op><st>"Банан"</st><op>,</op> <st>"ан"</st><op>)</op><op>)</op>    <cm>-- 2 (найдено на позиции 2)</cm>
+<kw>print</kw><op>(</op>string.find<op>(</op><st>"Груша"</st><op>,</op> <st>"ан"</st><op>)</op><op>)</op>    <cm>-- nil (не найдено)</cm>
+<kw>print</kw><op>(</op>string.find<op>(</op><st>"Молот"</st><op>,</op> <st>"ол"</st><op>)</op><op>)</op>    <cm>-- 2 (найдено на позиции 2)</cm>
+</code>
+
+<t>Твоя задача:</t> Создай массив предметов и найди все, содержащие подстроку "ол":
+<code>
+items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op> <st>"Молот"</st><op>,</op> <st>"Кольцо"</st><op>,</op> <st>"Щит"</st><op>,</op> <st>"Плащ"</st><op>}</op>
+found <op>=</op> <cm>-- строка с предметами, в которых есть "ол", через пробел</cm>
+<cm>-- Ожидаемый результат: "Молот Кольцо "</cm>
+</code>
+
+<t>Шаблон команды (заполни пропуски ___):</t>
+<code>
+<kw>/run</kw> items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op><st>"Молот"</st><op>,</op><st>"Кольцо"</st><op>,</op><st>"Щит"</st><op>,</op><st>"Плащ"</st><op>}</op><op>;</op> found <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> _<op>,</op>v <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> <kw>if</kw> ___<op>(</op>___<op>,</op> <st>"___"</st><op>)</op> <kw>then</kw> found <op>=</op> ___ <op>___</op> v <op>___</op> <st>"___"</st> <kw>end</kw> <kw>end</kw>
+</code>
+
+<t>Что вставить вместо ___:</t>
+- Начальное значение строки (пустая строка)
+- Название массива для перебора
+- Функцию поиска подстроки (string.find)
+- Переменную с текущим словом
+- Подстроку для поиска (в кавычках)
+- Переменную для накопления результата и операторы конкатенации (..)
+- Пробел в кавычках
+]=],
+        tasks = {
+            {var = "items", check = function(value) return type(value) == "table" and value[1] == "Меч" and value[2] == "Молот" and value[3] == "Кольцо" and value[4] == "Щит" and value[5] == "Плащ" end, desc = 'items = {"Меч", "Молот", "Кольцо", "Щит", "Плащ"}'},
+            {var = "found", check = function(value) return type(value) == "string" and value == "Молот Кольцо " end, desc = 'found = "Молот Кольцо " (содержат "ол")', requireCodePatterns = {"for", "do", "end", "ipairs", "items", "string.find"}},
+        },
+    },
 }
 
--- Класс курса Lua
-local LuaCourse = {}
-LuaCourse.__index = LuaCourse
+nsDbc = nsDbc or {}
+nsDbc['luaTest'] = nsDbc['luaTest'] or {
+    currentModule    = 1,
+    totalModules     = 24,
+    completedModules = {},
+    taskDetails      = {},
+}
 
-function LuaCourse:new(parentFrame)
-    local self = setmetatable({}, LuaCourse)
-    
-    self.parentFrame = parentFrame
-    self.currentModule = 1
-    self.window = nil
-    self.contentScroll = nil
-    self.titleText = nil
-    self.contentText = nil
-    self.prevButton = nil
-    self.nextButton = nil
-    self.closeButton = nil
-    
+local RunScriptHook = {}
+RunScriptHook.__index = RunScriptHook
+
+function RunScriptHook:new(course)
+    local self = setmetatable({}, RunScriptHook)
+    self.course = course
+    self.originalRunScript = RunScript
+    self.active = false
     return self
 end
 
+function RunScriptHook:install()
+    if self.active then return end
+    local course = self.course
+    RunScript = function(code)
+        local hasConcat = code:find("%.%.") ~= nil
+        course.lastExecutedCode = code
+        if hasConcat then
+            local count = 0
+            for _ in code:gmatch("%.%.") do
+                count = count + 1
+            end
+            course.pendingConcatCount = count
+        else
+            course.pendingConcatCount = nil
+        end
+        if self.originalRunScript then
+            self.originalRunScript(code)
+        end
+        if course.OnCodeExecuted then
+            course:OnCodeExecuted(code)
+        end
+    end
+    self.active = true
+end
+
+function RunScriptHook:uninstall()
+    if self.originalRunScript then
+        RunScript = self.originalRunScript
+    end
+    self.active = false
+end
+
+local LuaCourse = {}
+LuaCourse.__index = LuaCourse
+
+local activeCourses = {}
+
+if not _G.NSQC3_OriginalPrint then
+    _G.NSQC3_OriginalPrint = print
+    print = function(...)
+        local args = {...}
+        local parts = {}
+        for i, v in ipairs(args) do
+            table.insert(parts, tostring(v))
+        end
+        local fullMsg = table.concat(parts, "\t")
+        for _, course in ipairs(activeCourses) do
+            if course.OnPrintMessage then
+                course:OnPrintMessage(fullMsg)
+            end
+        end
+        _G.NSQC3_OriginalPrint(...)
+    end
+end
+
+local frameCounter = 0
+local function GetUniqueName(baseName)
+    frameCounter = frameCounter + 1
+    return baseName .. frameCounter
+end
+
+function LuaCourse:new(parentFrame)
+    local self = setmetatable({}, LuaCourse)
+    self.parentFrame = parentFrame
+    self.currentModule = 1
+    self.window = nil
+    self.scrollFrame = nil
+    self.scrollBar = nil
+    self.titleText = nil
+    self.contentFrame = nil
+    self.contentText = nil
+    self.prevButton = nil
+    self.nextButton = nil
+    self.moduleNumText = nil
+    self.helpButton = nil
+    self.helpWindow = nil
+    self.uniquePrefix = GetUniqueName("LuaCourse")
+    self.varTestFrames = {}
+    self.commentTestFrame = nil
+    self.printTasks = {}
+    self.allTasksComplete = false
+    self.commentTestPassed = false
+    self.formatTaskComplete = false
+    self.customTestPassed = false
+    self.checkTimer = nil
+    self.taskWasComplete = {}
+    self.capturedMessages = {}
+    self.runScriptHook = nil
+    self.pendingConcatCount = nil
+    self.lastExecutedCode = nil
+    self.lastCodeForVar = {}
+    self.customTestFrame = nil
+    self.customTestFrames = nil
+    table.insert(activeCourses, self)
+    return self
+end
+
+function LuaCourse:OnPrintMessage(msg)
+    table.insert(self.capturedMessages, msg)
+    self:CheckPrintTasks()
+    self:CheckFormatTask()
+end
+
+function LuaCourse:OnConcatDetected(code, concatCount)
+    self.pendingConcatCount = concatCount
+end
+
+function LuaCourse:CheckPrintTasks()
+    if not self.courseTable then return end
+    local module = self.courseTable[self.currentModule]
+    if not module or module.type ~= "printtest" then return end
+    if not self.printTasks or #self.printTasks == 0 then return end
+    
+    local firstIncomplete = nil
+    for i, taskData in ipairs(self.printTasks) do
+        if not taskData.completed then
+            firstIncomplete = i
+            break
+        end
+    end
+    
+    if not firstIncomplete then
+        self.allTasksComplete = true
+        self:UpdateNextButton()
+        self:SaveProgress()
+        return
+    end
+    
+    local taskData = self.printTasks[firstIncomplete]
+    if #self.capturedMessages > 0 then
+        local lastMsg = self.capturedMessages[#self.capturedMessages]
+        local outputMatch = false
+        if taskData.pattern then
+            local normalizedOutput = lastMsg:gsub("%s+", "")
+            local normalizedPattern = taskData.pattern:gsub("%s+", "")
+            if normalizedOutput == normalizedPattern then
+                outputMatch = true
+            end
+        end
+        
+        local codeMatch = true
+        if taskData.expectedExpression and self.lastExecutedCode then
+            if taskData.requireConcat then
+                if not self.lastExecutedCode:find("print") then
+                    codeMatch = false
+                end
+            else
+                local normalizedCode = self.lastExecutedCode:gsub("%s+", "")
+                if type(taskData.expectedExpression) == "table" then
+                    codeMatch = false
+                    for _, expr in ipairs(taskData.expectedExpression) do
+                        if normalizedCode == expr:gsub("%s+", "") then
+                            codeMatch = true
+                            break
+                        end
+                    end
+                else
+                    local normalizedExpected = taskData.expectedExpression:gsub("%s+", "")
+                    if normalizedCode ~= normalizedExpected then
+                        codeMatch = false
+                    end
+                end
+            end
+        end
+        
+        local concatMatch = true
+        if taskData.requireConcat then
+            if self.pendingConcatCount ~= taskData.requiredConcatCount then
+                concatMatch = false
+            end
+        end
+        
+        if outputMatch and codeMatch and concatMatch then
+            taskData.completed = true
+            taskData.text:SetText(COLORS.SUCCESS .. "[x] " .. taskData.desc .. COLORS.RESET)
+            self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
+        end
+    end
+    
+    local allComplete = true
+    for i, td in ipairs(self.printTasks) do
+        if not td.completed then
+            allComplete = false
+            break
+        end
+    end
+    
+    if allComplete and not self.allTasksComplete then
+        self.allTasksComplete = true
+        self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+    end
+    
+    self.allTasksComplete = allComplete
+    self:UpdateNextButton()
+    self:SaveProgress()
+end
+
+function LuaCourse:CheckFormatTask()
+    if not self.courseTable then return end
+    local module = self.courseTable[self.currentModule]
+    if not module or not module.formatTask then return end
+    if self.formatTaskComplete then return end
+    
+    local allVarsCreated = true
+    if module.tasks then
+        for _, task in ipairs(module.tasks) do
+            local value = _G[task.var]
+            if task.type == "nil" then
+                if value ~= nil then allVarsCreated = false end
+            elseif task.type == "table" then
+                if type(value) ~= "table" then allVarsCreated = false end
+            else
+                if type(value) ~= task.type then allVarsCreated = false end
+            end
+        end
+    end
+    if not allVarsCreated then return end
+    
+    if #self.capturedMessages > 0 then
+        local lastMsg = self.capturedMessages[#self.capturedMessages]
+        local taskData = module.formatTask
+        if taskData.pattern then
+            local normalizedOutput = lastMsg:gsub("%s+", " "):match("^%s*(.-)%s*$")
+            local normalizedPattern = taskData.pattern:gsub("%s+", " "):match("^%s*(.-)%s*$")
+            if normalizedOutput == normalizedPattern then
+                local codeMatch = false
+                if self.lastExecutedCode then
+                    local cleanCode = self.lastExecutedCode:gsub("%s+", "")
+                    if cleanCode:find("string%.format") and
+                       cleanCode:find("heroName") and
+                       cleanCode:find("heroTitle") and
+                       cleanCode:find("heroLevel") and
+                       cleanCode:find("heroHP") then
+                        codeMatch = true
+                    end
+                else
+                    codeMatch = true
+                end
+                
+                if codeMatch then
+                    self.formatTaskComplete = true
+                    self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
+                    local allVarsComplete = true
+                    if module.tasks then
+                        for i, task in ipairs(module.tasks) do
+                            if not self.taskWasComplete[i] then
+                                allVarsComplete = false
+                                break
+                            end
+                        end
+                    end
+                    if allVarsComplete and not self.allTasksComplete then
+                        self.allTasksComplete = true
+                        self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+                    end
+                    if self.formatTaskFrame then
+                        self.formatTaskFrame.text:SetText(COLORS.SUCCESS .. "[x] " .. taskData.instruction .. COLORS.RESET)
+                    end
+                end
+            end
+        end
+    end
+    
+    self:UpdateNextButton()
+    self:SaveProgress()
+end
+
+function LuaCourse:LoadProgress()
+    local saved = nsDbc['luaTest']
+    if not saved or not saved.currentModule then
+        return 1
+    end
+    
+    self.currentModule = saved.currentModule
+    local details = saved.taskDetails[self.currentModule]
+    
+    if details then
+        if details.moduleType == "vartest" then
+            self.allTasksComplete = details.allTasksComplete or false
+            self.taskWasComplete = {}
+            if details.taskStatus then
+                local module = self.courseTable[self.currentModule]
+                if module and module.tasks then
+                    for i, task in ipairs(module.tasks) do
+                        local savedTask = details.taskStatus[task.var]
+                        if savedTask then
+                            self.taskWasComplete[i] = savedTask.completed or false
+                        else
+                            self.taskWasComplete[i] = false
+                        end
+                    end
+                end
+            end
+            self.formatTaskComplete = details.formatTaskComplete or false
+        elseif details.moduleType == "commenttest" then
+            self.commentTestPassed = details.commentTestPassed or false
+        elseif details.moduleType == "printtest" then
+            self.allTasksComplete = details.allTasksComplete or false
+            if details.taskStatus and not self.printTasks then
+                self.printTasks = {}
+                for i, status in pairs(details.taskStatus) do
+                    self.printTasks[i] = {
+                        completed = status.completed or false,
+                        desc      = status.desc or "",
+                    }
+                end
+            end
+        elseif details.moduleType == "customtest" then
+            self.customTestPassed = details.customTestPassed or false
+            self.taskWasComplete = {}
+            if details.taskStatus then
+                for i, status in pairs(details.taskStatus) do
+                    self.taskWasComplete[i] = status.completed or false
+                end
+            end
+            local allComplete = true
+            local module = self.courseTable[self.currentModule]
+            if module and module.tasks then
+                for i, task in ipairs(module.tasks) do
+                    if not self.taskWasComplete[i] then
+                        allComplete = false
+                        break
+                    end
+                end
+            end
+            if details.completed and not allComplete then
+                details.completed = false
+                details.customTestPassed = false
+                self.customTestPassed = false
+            elseif allComplete and not details.completed then
+                details.completed = true
+                details.customTestPassed = true
+                self.customTestPassed = true
+            end
+        end
+    end
+    
+    return self.currentModule
+end
+
+function LuaCourse:SaveProgress()
+    local module = self.courseTable[self.currentModule]
+    if not module then return end
+    
+    local moduleType = module.type or "text"
+    local details = nsDbc['luaTest'].taskDetails[self.currentModule]
+    if not details then
+        details = CreateCleanModuleState(self.currentModule, module)
+    end
+    
+    details.moduleNumber = self.currentModule
+    details.moduleType = moduleType
+    details.timestamp = time()
+    
+    if moduleType == "vartest" then
+        details.allTasksComplete = self.allTasksComplete
+        if not details.taskStatus then
+            details.taskStatus = {}
+        end
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                local value = _G[task.var]
+                local isComplete = self.taskWasComplete[i] or false
+                if not isComplete then
+                    if task.type == "nil" then
+                        isComplete = false
+                    elseif task.type == "table" then
+                        isComplete = (type(value) == "table")
+                    else
+                        isComplete = (type(value) == task.type)
+                    end
+                end
+                if not details.taskStatus[task.var] then
+                    details.taskStatus[task.var] = {}
+                end
+                details.taskStatus[task.var].completed = isComplete
+                details.taskStatus[task.var].currentValue = value
+                details.taskStatus[task.var].currentType = type(value)
+            end
+        end
+        if module.formatTask then
+            details.formatTaskComplete = self.formatTaskComplete
+        end
+        local allVarsComplete = true
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                local isComplete = self.taskWasComplete[i] or false
+                if not isComplete then
+                    local value = _G[task.var]
+                    if task.type == "nil" then
+                        isComplete = false
+                    elseif task.type == "table" then
+                        isComplete = (type(value) == "table")
+                    else
+                        isComplete = (type(value) == task.type)
+                    end
+                end
+                if not isComplete then
+                    allVarsComplete = false
+                    break
+                end
+            end
+        end
+        local formatComplete = true
+        if module.formatTask then
+            formatComplete = details.formatTaskComplete
+        end
+        details.completed = allVarsComplete and formatComplete
+        details.allTasksComplete = allVarsComplete
+    elseif moduleType == "commenttest" then
+        details.commentTestPassed = self.commentTestPassed
+        if self.commentTestFrame and self.commentTestFrame.editBox then
+            details.currentCode = self.commentTestFrame.editBox:GetText()
+        end
+        details.completed = self.commentTestPassed
+    elseif moduleType == "printtest" then
+        details.allTasksComplete = self.allTasksComplete
+        if not details.taskStatus then
+            details.taskStatus = {}
+        end
+        if self.printTasks then
+            for i, taskData in ipairs(self.printTasks) do
+                if not details.taskStatus[i] then
+                    details.taskStatus[i] = {}
+                end
+                details.taskStatus[i].completed = taskData.completed
+                details.taskStatus[i].desc = taskData.desc
+            end
+        end
+        local allComplete = true
+        if self.printTasks then
+            for i, taskData in ipairs(self.printTasks) do
+                if not taskData.completed then
+                    allComplete = false
+                    break
+                end
+            end
+        else
+            allComplete = false
+        end
+        details.completed = allComplete
+    elseif moduleType == "customtest" then
+        details.customTestPassed = self.customTestPassed
+        if not details.taskStatus then
+            details.taskStatus = {}
+        end
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                if not details.taskStatus[i] then
+                    details.taskStatus[i] = {}
+                end
+                details.taskStatus[i].completed = self.taskWasComplete[i] or false
+                details.taskStatus[i].desc = task.desc
+            end
+        end
+        local allComplete = true
+        if module.tasks then
+            for i, task in ipairs(module.tasks) do
+                if not (self.taskWasComplete[i] or false) then
+                    allComplete = false
+                    break
+                end
+            end
+        else
+            allComplete = false
+        end
+        
+        -- Проверяем, был ли модуль уже пройден ранее.
+        -- Если да, то не сбрасываем allComplete из-за отсутствия pendingConcatCount в текущей сессии.
+        local wasAlreadyCompleted = details.completed or false
+        if module.requireConcatForDescription and allComplete then
+            if (not self.pendingConcatCount or self.pendingConcatCount < 2) and not wasAlreadyCompleted then
+                allComplete = false
+            end
+        end
+        
+        details.completed = allComplete
+        self.customTestPassed = allComplete
+    else
+        details.completed = true
+    end
+    
+    nsDbc['luaTest'].completedModules[self.currentModule] = details.completed
+    nsDbc['luaTest'].currentModule = self.currentModule
+    nsDbc['luaTest'].taskDetails[self.currentModule] = details
+end
+
+function LuaCourse:UpdateContent()
+    local module = self.courseTable[self.currentModule]
+    if not module then return end
+    
+    if self.checkTimer then
+        self.checkTimer:Cancel()
+        self.checkTimer = nil
+    end
+    
+    self:ClearTestFrames()
+    
+    self.allTasksComplete = false
+    self.commentTestPassed = false
+    self.formatTaskComplete = false
+    self.customTestPassed = false
+    self.taskWasComplete = {}
+    self.capturedMessages = {}
+    self.pendingConcatCount = nil
+    self.lastExecutedCode = nil
+    self.lastCodeForVar = {}
+    self.printTasks = {}
+    
+    local details = nsDbc['luaTest'].taskDetails[self.currentModule]
+    if details and details.moduleNumber == self.currentModule then
+        if details.moduleType == "vartest" then
+            self.allTasksComplete = details.allTasksComplete or false
+            self.taskWasComplete = {}
+            if details.taskStatus and module.tasks then
+                for i, task in ipairs(module.tasks) do
+                    local saved = details.taskStatus[task.var]
+                    if saved then
+                        self.taskWasComplete[i] = saved.completed or false
+                    else
+                        self.taskWasComplete[i] = false
+                    end
+                end
+            end
+            self.formatTaskComplete = details.formatTaskComplete or false
+        elseif details.moduleType == "commenttest" then
+            self.commentTestPassed = details.commentTestPassed or false
+        elseif details.moduleType == "printtest" then
+            self.allTasksComplete = details.allTasksComplete or false
+            if details.taskStatus then
+                self.printTasks = {}
+                for i, status in pairs(details.taskStatus) do
+                    self.printTasks[i] = {
+                        completed = status.completed or false,
+                        desc      = status.desc or "",
+                    }
+                end
+            end
+        elseif details.moduleType == "customtest" then
+            self.customTestPassed = details.completed or false
+            if details.taskStatus then
+                for i, status in pairs(details.taskStatus) do
+                    self.taskWasComplete[i] = status.completed or false
+                end
+            end
+            local allSavedComplete = true
+            if details.taskStatus then
+                for i, status in pairs(details.taskStatus) do
+                    if not status.completed then
+                        allSavedComplete = false
+                        break
+                    end
+                end
+            else
+                allSavedComplete = false
+            end
+            if allSavedComplete then
+                self.customTestPassed = true
+            end
+        end
+    else
+        if not details then
+            nsDbc['luaTest'].taskDetails[self.currentModule] = CreateCleanModuleState(self.currentModule, module)
+        end
+    end
+    
+    self.titleText:SetText(module.title or "")
+    
+    if module.type == "vartest" then
+        self:SetupVarTest(module)
+        self.checkTimer = C_Timer.NewTicker(1, function()
+            self:CheckTasks()
+        end)
+    elseif module.type == "commenttest" then
+        self:SetupCommentTest(module)
+    elseif module.type == "printtest" then
+        self:SetupPrintTest(module)
+    elseif module.type == "customtest" then
+        self:SetupCustomTest(module)
+    else
+        self.contentText:SetText(ParseMarkup(module.content or ""))
+        local textHeight = self.contentText:GetStringHeight() or 100
+        self.contentFrame:SetHeight(textHeight + 10)
+    end
+    
+    local textHeight = self.contentFrame:GetHeight()
+    local frameHeight = self.scrollFrame:GetHeight()
+    local maxScroll = math.max(0, textHeight - frameHeight + 10)
+    self.scrollBar:SetMinMaxValues(0, maxScroll)
+    self.scrollBar:SetValue(0)
+    self.contentFrame:SetPoint("TOPLEFT", self.scrollFrame, "TOPLEFT", 0, 0)
+    
+    self.moduleNumText:SetText(string.format("Модуль %d из %d", self.currentModule, self.totalModules))
+    
+    if self.currentModule <= 1 then
+        self.prevButton:Disable()
+        self.prevButton:SetAlpha(0.4)
+    else
+        self.prevButton:Enable()
+        self.prevButton:SetAlpha(1)
+    end
+    
+    self:UpdateNextButton()
+    self:SaveProgress()
+end
+
+function LuaCourse:SetupCustomTest(module)
+    self.contentText:SetText(ParseMarkup(module.content or ""))
+    
+    -- Устанавливаем хук для customtest, если требуются проверки кода
+    local needsCodeCheck = false
+    if module.tasks then
+        for _, task in ipairs(module.tasks) do
+            if task.requireCodePatterns or task.requireCodeVars then
+                needsCodeCheck = true
+                break
+            end
+        end
+    end
+    
+    if needsCodeCheck or module.requireConcatForDescription then
+        if not self.runScriptHook then
+            self.runScriptHook = RunScriptHook:new(self)
+        end
+        self.runScriptHook:install()
+    end
+    
+    local headerHeight = self.contentText:GetStringHeight() or 100
+    local yOffset = -headerHeight - 10
+    
+    self.customTestFrames = {}
+    
+    for i, task in ipairs(module.tasks) do
+        local taskFrame = CreateFrame("Frame", self.uniquePrefix .. "CustomTask" .. i, self.contentFrame)
+        taskFrame:SetSize(540, 22)
+        taskFrame:SetPoint("TOPLEFT", self.contentFrame, "TOPLEFT", 10, yOffset)
+        
+        local taskText = taskFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        taskText:SetPoint("LEFT", taskFrame, "LEFT", 10, 0)
+        taskText:SetWidth(520)
+        taskText:SetJustifyH("LEFT")
+        
+        local isComplete = self.taskWasComplete[i] or false
+        if isComplete then
+            taskText:SetText(COLORS.SUCCESS .. "[x] " .. task.desc .. COLORS.RESET)
+        else
+            taskText:SetText(COLORS.HINT .. "[ ] " .. task.desc .. COLORS.RESET)
+        end
+        
+        taskFrame.text = taskText
+        self.customTestFrames[i] = taskFrame
+        yOffset = yOffset - 24
+    end
+    
+    local totalHeight = math.abs(yOffset) + 30
+    self.contentFrame:SetHeight(totalHeight)
+    
+    self:UpdateScrollBarDelayed()
+    
+    if not self.customTestPassed then
+        self.checkTimer = C_Timer.NewTicker(1, function()
+            self:CheckCustomTasks()
+        end)
+    end
+end
+
+function LuaCourse:CheckCustomTasks()
+    local module = self.courseTable[self.currentModule]
+    if not module or module.type ~= "customtest" or not module.tasks then return end
+    
+    local allComplete = true
+    local anyChange = false
+    
+    for i, task in ipairs(module.tasks) do
+        local value = _G[task.var]
+        local isComplete = false
+        
+        if task.check then
+            local success, result = pcall(task.check, value)
+            isComplete = success and result
+        end
+        
+        -- Проверяем требуемые переменные в коде
+        if isComplete and task.requireCodeVars then
+            local codeToCheck = self.lastCodeForVar and self.lastCodeForVar[task.var] or ""
+            if codeToCheck == "" then
+                isComplete = false
+            else
+                local startPos = codeToCheck:find(task.var .. "%s*=")
+                if startPos then
+                    local eqPos = codeToCheck:find("=", startPos)
+                    local afterEq = codeToCheck:sub(eqPos + 1)
+                    local semiPos = afterEq:find(";")
+                    if semiPos then
+                        codeToCheck = afterEq:sub(1, semiPos - 1)
+                    else
+                        codeToCheck = afterEq
+                    end
+                end
+                local cleanCode = codeToCheck:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''")
+                for _, varName in ipairs(task.requireCodeVars) do
+                    if not cleanCode:find("%f[%w]" .. varName .. "%f[%W]") then
+                        isComplete = false
+                        break
+                    end
+                end
+            end
+        end
+        
+        -- Проверяем требуемые паттерны в коде (циклы, ключевые слова)
+        if isComplete and task.requireCodePatterns then
+            local codeToCheck = self.lastExecutedCode or ""
+            if codeToCheck == "" then
+                isComplete = false
+            else
+                local cleanCode = codeToCheck:gsub("%s+", "")
+                for _, pattern in ipairs(task.requireCodePatterns) do
+                    local cleanPattern = pattern:gsub("%s+", "")
+                    if not cleanCode:find(cleanPattern, 1, true) then
+                        isComplete = false
+                        break
+                    end
+                end
+            end
+        end
+        
+        local wasComplete = self.taskWasComplete[i] or false
+        
+        if isComplete and not wasComplete then
+            self.taskWasComplete[i] = true
+            anyChange = true
+            self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
+            if self.customTestFrames and self.customTestFrames[i] then
+                self.customTestFrames[i].text:SetText(COLORS.SUCCESS .. "[x] " .. task.desc .. COLORS.RESET)
+            end
+        elseif not isComplete and wasComplete then
+            if not (self.taskWasComplete[i] and self.customTestPassed) then
+                self.taskWasComplete[i] = false
+                anyChange = true
+                if self.customTestFrames and self.customTestFrames[i] then
+                    self.customTestFrames[i].text:SetText(COLORS.HINT .. "[ ] " .. task.desc .. COLORS.RESET)
+                end
+            end
+        elseif not isComplete and not wasComplete then
+            if self.customTestFrames and self.customTestFrames[i] then
+                local currentText = self.customTestFrames[i].text:GetText() or ""
+                if not currentText:find("%[x%]") then
+                    self.customTestFrames[i].text:SetText(COLORS.HINT .. "[ ] " .. task.desc .. COLORS.RESET)
+                end
+            end
+        end
+        
+        if not isComplete then
+            allComplete = false
+        end
+    end
+    
+    if module.requireConcatForDescription then
+        if not self.customTestPassed and (not self.pendingConcatCount or self.pendingConcatCount < 2) then
+            allComplete = false
+            if self.customTestFrames and self.customTestFrames[3] then
+                local currentText = self.customTestFrames[3].text:GetText() or ""
+                if not currentText:find("конкатенацию") then
+                    self.customTestFrames[3].text:SetText(COLORS.HINT .. "[ ] " .. module.tasks[3].desc .. " (используй конкатенацию с ..)" .. COLORS.RESET)
+                end
+            end
+        end
+    end
+    
+    if allComplete and not self.customTestPassed then
+        self.customTestPassed = true
+        anyChange = true
+        self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+    elseif not allComplete and not self.customTestPassed then
+        self.customTestPassed = false
+    end
+    
+    if anyChange then
+        self:UpdateNextButton()
+        self:SaveProgress()
+    end
+end
+
+function LuaCourse:CanProceed()
+    local module = self.courseTable[self.currentModule]
+    if not module then return true end
+    local result = true
+    if module.type == "vartest" then
+        if module.formatTask then
+            result = self.allTasksComplete and self.formatTaskComplete
+        else
+            result = self.allTasksComplete
+        end
+    elseif module.type == "commenttest" then
+        result = self.commentTestPassed
+    elseif module.type == "printtest" then
+        result = self.allTasksComplete
+    elseif module.type == "customtest" then
+        result = self.customTestPassed
+    end
+    
+    return result
+end
+
+function LuaCourse:ShowHelpWindow()
+    if self.helpWindow then
+        self.helpWindow:Hide()
+        self.helpWindow:SetParent(nil)
+        self.helpWindow = nil
+    end
+    
+    local module = self.courseTable[self.currentModule]
+    if not module then return end
+    
+    self.helpWindow = CreateFrame("Frame", self.uniquePrefix .. "HelpWindow", UIParent)
+    self.helpWindow:SetSize(700, 580)
+    self.helpWindow:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    self.helpWindow:EnableMouse(true)
+    self.helpWindow:SetMovable(true)
+    self.helpWindow:SetClampedToScreen(true)
+    self.helpWindow:SetFrameStrata("DIALOG")
+    
+    local bg = self.helpWindow:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(self.helpWindow)
+    bg:SetTexture(0.08, 0.08, 0.12, 0.97)
+    
+    local titleBg = self.helpWindow:CreateTexture(nil, "BACKGROUND")
+    titleBg:SetPoint("TOPLEFT", self.helpWindow, "TOPLEFT", 0, 0)
+    titleBg:SetPoint("TOPRIGHT", self.helpWindow, "TOPRIGHT", 0, 0)
+    titleBg:SetHeight(30)
+    titleBg:SetTexture(0.15, 0.15, 0.2, 1)
+    
+    local border = self.helpWindow:CreateTexture(nil, "BORDER")
+    border:SetAllPoints(self.helpWindow)
+    border:SetTexture(0.25, 0.25, 0.35, 1)
+    
+    local closeButton = CreateFrame("Button", nil, self.helpWindow, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", self.helpWindow, "TOPRIGHT", -5, -5)
+    closeButton:SetScript("OnClick", function()
+        self.helpWindow:Hide()
+    end)
+    
+    local helpTitle = self.helpWindow:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    helpTitle:SetPoint("LEFT", self.helpWindow, "LEFT", 15, 0)
+    helpTitle:SetPoint("TOP", titleBg, "TOP", 0, -5)
+    helpTitle:SetJustifyH("LEFT")
+    helpTitle:SetText(COLORS.HEADER .. "Справка: " .. module.title .. COLORS.RESET)
+    
+    local helpScroll = CreateFrame("ScrollFrame", nil, self.helpWindow)
+    helpScroll:SetPoint("TOPLEFT", self.helpWindow, "TOPLEFT", 15, -40)
+    helpScroll:SetPoint("BOTTOMRIGHT", self.helpWindow, "BOTTOMRIGHT", -25, 15)
+    
+    local helpContent = CreateFrame("Frame", nil, helpScroll)
+    helpContent:SetWidth(650)
+    helpContent:SetHeight(100)
+    helpScroll:SetScrollChild(helpContent)
+    
+    local helpText = helpContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    helpText:SetPoint("TOPLEFT", helpContent, "TOPLEFT", 5, -5)
+    helpText:SetWidth(640)
+    helpText:SetJustifyH("LEFT")
+    helpText:SetJustifyV("TOP")
+    helpText:SetNonSpaceWrap(true)
+    helpText:SetSpacing(3)
+    
+    local helpContentText = ""
+    if module.helpModules and #module.helpModules > 0 then
+        for idx, modNum in ipairs(module.helpModules) do
+            local refModule = self.courseTable[modNum]
+            if refModule and refModule.content then
+                if idx > 1 then
+                    helpContentText = helpContentText .. "\n\n" ..
+                        COLORS.HINT .. "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" .. 
+                        COLORS.RESET .. "\n\n"
+                end
+                helpContentText = helpContentText .. refModule.content
+            end
+        end
+    else
+        helpContentText = COLORS.HINT .. "Для этого модуля нет связанной теории.\n\n" .. COLORS.RESET ..
+            COLORS.HINT .. "Если нужна справка по основам — проверь предыдущие модули." .. COLORS.RESET
+    end
+    
+    helpText:SetText(ParseMarkup(helpContentText))
+    
+    local textHeight = helpText:GetStringHeight() or 100
+    helpContent:SetHeight(textHeight + 10)
+    
+    local helpScrollBar = CreateFrame("Slider", nil, self.helpWindow)
+    helpScrollBar:SetPoint("TOPRIGHT", self.helpWindow, "TOPRIGHT", -8, -45)
+    helpScrollBar:SetPoint("BOTTOMRIGHT", self.helpWindow, "BOTTOMRIGHT", -8, 18)
+    helpScrollBar:SetWidth(16)
+    helpScrollBar:SetOrientation("VERTICAL")
+    helpScrollBar:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+    
+    local scrollAreaHeight = helpScroll:GetHeight() or 500
+    helpScrollBar:SetMinMaxValues(0, math.max(0, textHeight - scrollAreaHeight + 20))
+    helpScrollBar:SetValueStep(10)
+    helpScrollBar:SetValue(0)
+    
+    local scrollBg = helpScrollBar:CreateTexture(nil, "BACKGROUND")
+    scrollBg:SetAllPoints(helpScrollBar)
+    scrollBg:SetTexture(0.15, 0.15, 0.2, 1)
+    
+    helpScrollBar:SetScript("OnValueChanged", function(slider, value)
+        helpContent:SetPoint("TOPLEFT", helpScroll, "TOPLEFT", 0, value)
+    end)
+    
+    helpScroll:EnableMouseWheel(true)
+    helpScroll:SetScript("OnMouseWheel", function(frame, delta)
+        local currentValue = helpScrollBar:GetValue()
+        local newValue = currentValue - (delta * 25)
+        local minVal, maxVal = helpScrollBar:GetMinMaxValues()
+        if newValue < minVal then newValue = minVal
+        elseif newValue > maxVal then newValue = maxVal end
+        helpScrollBar:SetValue(newValue)
+    end)
+    
+    self.helpWindow:SetScript("OnMouseDown", function(frame, button)
+        if button == "LeftButton" then frame:StartMoving() end
+    end)
+    self.helpWindow:SetScript("OnMouseUp", function(frame, button)
+        frame:StopMovingOrSizing()
+    end)
+    
+    self.helpWindow:Show()
+end
+
 function LuaCourse:ShowModule(courseTable, moduleNumber)
-    -- Проверяем существование модуля
     if not courseTable or not courseTable[moduleNumber] then
         print("Модуль не найден")
         return
     end
-    
-    -- Сохраняем текущий курс и модуль
     self.courseTable = courseTable
     self.currentModule = moduleNumber
     self.totalModules = #courseTable
+    self:LoadProgress()
     
-    -- Если окно уже существует, обновляем содержимое
     if self.window then
         self:UpdateContent()
+        self.window:Show()
         return
     end
     
-    -- Создаем основное окно
-    self.window = CreateFrame("Frame", "LuaCourseWindow", self.parentFrame or UIParent)
-    self.window:SetSize(600, 450)
+    self.window = CreateFrame("Frame", self.uniquePrefix .. "Window", self.parentFrame or UIParent)
+    self.window:SetSize(620, 450)
     self.window:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     self.window:EnableMouse(true)
     self.window:SetMovable(true)
     self.window:SetClampedToScreen(true)
+    self.window:SetFrameStrata("HIGH")
     
-    -- Создаем фон окна (текстура)
-    local bg = self.window:CreateTexture(nil, "BACKGROUND")
+    local bg = self.window:CreateTexture(self.uniquePrefix .. "Bg", "BACKGROUND")
     bg:SetAllPoints(self.window)
-    bg:SetTexture(0.1, 0.1, 0.15, 0.95)
+    bg:SetTexture(0.08, 0.08, 0.12, 0.97)
     
-    -- Создаем рамку окна
-    local border = self.window:CreateTexture(nil, "BORDER")
+    local titleBg = self.window:CreateTexture(self.uniquePrefix .. "TitleBg", "BACKGROUND")
+    titleBg:SetPoint("TOPLEFT", self.window, "TOPLEFT", 0, 0)
+    titleBg:SetPoint("TOPRIGHT", self.window, "TOPRIGHT", 0, 0)
+    titleBg:SetHeight(35)
+    titleBg:SetTexture(0.15, 0.15, 0.2, 1)
+    
+    local border = self.window:CreateTexture(self.uniquePrefix .. "Border", "BORDER")
     border:SetAllPoints(self.window)
-    border:SetTexture(0.4, 0.4, 0.6, 1)
-    border:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    border:SetTexture(0.25, 0.25, 0.35, 1)
     
-    -- Делаем окно перетаскиваемым
-    self.window:SetScript("OnMouseDown", function(frame, button)
-        if button == "LeftButton" then
-            frame:StartMoving()
+    local separator = self.window:CreateTexture(self.uniquePrefix .. "Separator", "ARTWORK")
+    separator:SetPoint("TOPLEFT", titleBg, "BOTTOMLEFT", 0, 0)
+    separator:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, 0)
+    separator:SetHeight(2)
+    separator:SetTexture(0.3, 0.3, 0.5, 1)
+    
+    self.helpButton = CreateFrame("Button", self.uniquePrefix .. "HelpButton", self.window)
+    self.helpButton:SetSize(24, 24)
+    self.helpButton:SetPoint("TOPRIGHT", self.window, "TOPRIGHT", -30, -5)
+    
+    local helpText = self.helpButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    helpText:SetAllPoints(self.helpButton)
+    helpText:SetText("?")
+    helpText:SetTextColor(0.8, 0.8, 0.2, 1)
+    
+    self.helpButton:SetScript("OnEnter", function()
+        helpText:SetTextColor(1, 1, 0.5, 1)
+    end)
+    self.helpButton:SetScript("OnLeave", function()
+        helpText:SetTextColor(0.8, 0.8, 0.2, 1)
+    end)
+    self.helpButton:SetScript("OnClick", function()
+        self:ShowHelpWindow()
+    end)
+    
+    local closeButton = CreateFrame("Button", self.uniquePrefix .. "CloseButton", self.window, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", self.window, "TOPRIGHT", -5, -5)
+    closeButton:SetScript("OnClick", function()
+        if self.checkTimer then
+            self.checkTimer:Cancel()
+            self.checkTimer = nil
         end
-    end)
-    self.window:SetScript("OnMouseUp", function(frame, button)
-        frame:StopMovingOrSizing()
-    end)
-    
-    -- Заголовок окна
-    local titleBar = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    titleBar:SetPoint("TOP", self.window, "TOP", 0, -15)
-    titleBar:SetText("Курс Lua 5.1 для WoW 3.3.5")
-    titleBar:SetTextColor(1, 0.9, 0, 1) -- Золотой цвет
-    
-    -- Кнопка закрытия
-    self.closeButton = CreateFrame("Button", nil, self.window, "UIPanelCloseButton")
-    self.closeButton:SetPoint("TOPRIGHT", self.window, "TOPRIGHT", -5, -5)
-    self.closeButton:SetScript("OnClick", function()
+        self:ClearTestFrames()
+        self:SaveProgress()
+        if self.helpWindow then
+            self.helpWindow:Hide()
+        end
         self.window:Hide()
     end)
     
-    -- Заголовок модуля
-    self.titleText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    self.titleText:SetPoint("TOP", titleBar, "BOTTOM", 0, -10)
-    self.titleText:SetTextColor(1, 1, 1, 1)
+    self.titleText = self.window:CreateFontString(self.uniquePrefix .. "ModuleTitle", "OVERLAY", "GameFontNormalLarge")
+    self.titleText:SetPoint("LEFT", self.window, "LEFT", 15, 0)
+    self.titleText:SetPoint("TOP", titleBg, "TOP", 0, -8)
+    self.titleText:SetJustifyH("LEFT")
     
-    -- Создаем скролл-фрейм для содержимого
-    local scrollFrame = CreateFrame("ScrollFrame", nil, self.window, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", self.window, "TOPLEFT", 20, -80)
-    scrollFrame:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -40, 50)
+    self.scrollFrame = CreateFrame("ScrollFrame", self.uniquePrefix .. "ScrollFrame", self.window)
+    self.scrollFrame:SetPoint("TOPLEFT", self.window, "TOPLEFT", 18, -45)
+    self.scrollFrame:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -28, 45)
     
-    -- Содержимое модуля
-    self.contentText = scrollFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.contentText:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
-    self.contentText:SetPoint("RIGHT", scrollFrame, "RIGHT", -10, 0)
+    self.contentFrame = CreateFrame("Frame", self.uniquePrefix .. "ContentFrame", self.scrollFrame)
+    self.contentFrame:SetWidth(560)
+    self.contentFrame:SetHeight(100)
+    self.scrollFrame:SetScrollChild(self.contentFrame)
+    
+    self.contentText = self.contentFrame:CreateFontString(self.uniquePrefix .. "ContentText", "OVERLAY", "GameFontNormal")
+    self.contentText:SetPoint("TOPLEFT", self.contentFrame, "TOPLEFT", 5, -5)
+    self.contentText:SetWidth(550)
     self.contentText:SetJustifyH("LEFT")
     self.contentText:SetJustifyV("TOP")
-    self.contentText:SetTextColor(0.9, 0.9, 0.9, 1)
     self.contentText:SetNonSpaceWrap(true)
-    self.contentText:SetWidth(530)
+    self.contentText:SetSpacing(3)
     
-    scrollFrame:SetScrollChild(self.contentText)
+    self.scrollBar = CreateFrame("Slider", self.uniquePrefix .. "ScrollBar", self.window)
+    self.scrollBar:SetPoint("TOPRIGHT", self.window, "TOPRIGHT", -8, -50)
+    self.scrollBar:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -8, 48)
+    self.scrollBar:SetWidth(16)
+    self.scrollBar:SetOrientation("VERTICAL")
+    self.scrollBar:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+    self.scrollBar:SetMinMaxValues(0, 0)
+    self.scrollBar:SetValueStep(10)
+    self.scrollBar:SetValue(0)
     
-    -- Кнопка "Назад"
-    self.prevButton = CreateFrame("Button", nil, self.window, "UIPanelButtonTemplate")
-    self.prevButton:SetSize(100, 25)
-    self.prevButton:SetPoint("BOTTOMLEFT", self.window, "BOTTOMLEFT", 20, 15)
-    self.prevButton:SetText("◄ Назад")
+    local scrollBg = self.scrollBar:CreateTexture(self.uniquePrefix .. "ScrollBarBg", "BACKGROUND")
+    scrollBg:SetAllPoints(self.scrollBar)
+    scrollBg:SetTexture(0.15, 0.15, 0.2, 1)
+    
+    self.scrollBar:SetScript("OnValueChanged", function(slider, value)
+        self.contentFrame:SetPoint("TOPLEFT", self.scrollFrame, "TOPLEFT", 0, value)
+    end)
+    
+    self.scrollFrame:EnableMouseWheel(true)
+    self.scrollFrame:SetScript("OnMouseWheel", function(frame, delta)
+        local currentValue = self.scrollBar:GetValue()
+        local newValue = currentValue - (delta * 25)
+        local minVal, maxVal = self.scrollBar:GetMinMaxValues()
+        if newValue < minVal then newValue = minVal
+        elseif newValue > maxVal then newValue = maxVal end
+        self.scrollBar:SetValue(newValue)
+    end)
+    
+    local bottomBg = self.window:CreateTexture(self.uniquePrefix .. "BottomBg", "BACKGROUND")
+    bottomBg:SetPoint("BOTTOMLEFT", self.window, "BOTTOMLEFT", 0, 0)
+    bottomBg:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", 0, 0)
+    bottomBg:SetHeight(38)
+    bottomBg:SetTexture(0.12, 0.12, 0.18, 1)
+    
+    local bottomSeparator = self.window:CreateTexture(self.uniquePrefix .. "BottomSeparator", "ARTWORK")
+    bottomSeparator:SetPoint("BOTTOMLEFT", bottomBg, "TOPLEFT", 0, 0)
+    bottomSeparator:SetPoint("BOTTOMRIGHT", bottomBg, "TOPRIGHT", 0, 0)
+    bottomSeparator:SetHeight(2)
+    bottomSeparator:SetTexture(0.3, 0.3, 0.5, 1)
+    
+    self.prevButton = CreateFrame("Button", self.uniquePrefix .. "PrevButton", self.window, "UIPanelButtonTemplate")
+    self.prevButton:SetSize(110, 24)
+    self.prevButton:SetPoint("BOTTOMLEFT", self.window, "BOTTOMLEFT", 15, 8)
+    self.prevButton:SetText("<  Назад")
     self.prevButton:SetScript("OnClick", function()
         if self.currentModule > 1 then
             self.currentModule = self.currentModule - 1
@@ -17535,60 +19648,652 @@ function LuaCourse:ShowModule(courseTable, moduleNumber)
         end
     end)
     
-    -- Кнопка "Вперед"
-    self.nextButton = CreateFrame("Button", nil, self.window, "UIPanelButtonTemplate")
-    self.nextButton:SetSize(100, 25)
-    self.nextButton:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -20, 15)
-    self.nextButton:SetText("Вперед ►")
+    self.nextButton = CreateFrame("Button", self.uniquePrefix .. "NextButton", self.window, "UIPanelButtonTemplate")
+    self.nextButton:SetSize(110, 24)
+    self.nextButton:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -15, 8)
+    self.nextButton:SetText("Вперед  >")
     self.nextButton:SetScript("OnClick", function()
-        if self.currentModule < self.totalModules then
+        if self.currentModule < self.totalModules and self:CanProceed() then
             self.currentModule = self.currentModule + 1
             self:UpdateContent()
         end
     end)
     
-    -- Номер модуля
-    self.moduleNumText = self.window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.moduleNumText:SetPoint("BOTTOM", self.window, "BOTTOM", 0, 20)
-    self.moduleNumText:SetTextColor(0.7, 0.7, 0.7, 1)
+    self.moduleNumText = self.window:CreateFontString(self.uniquePrefix .. "ModuleNum", "OVERLAY", "GameFontNormal")
+    self.moduleNumText:SetPoint("BOTTOM", self.window, "BOTTOM", 0, 14)
+    self.moduleNumText:SetTextColor(0.6, 0.6, 0.7, 1)
     
-    -- Обновляем содержимое
+    self.window:SetScript("OnMouseDown", function(frame, button)
+        if button == "LeftButton" then frame:StartMoving() end
+    end)
+    self.window:SetScript("OnMouseUp", function(frame, button)
+        frame:StopMovingOrSizing()
+    end)
+    
     self:UpdateContent()
-    
-    -- Показываем окно
     self.window:Show()
 end
 
-function LuaCourse:UpdateContent()
-    local module = self.courseTable[self.currentModule]
-    if not module then return end
-    
-    -- Обновляем заголовок
-    self.titleText:SetText(module.title or "")
-    
-    -- Обновляем содержимое
-    self.contentText:SetText(module.content or "")
-    
-    -- Обновляем номер модуля
-    self.moduleNumText:SetText(string.format("Модуль %d из %d", self.currentModule, self.totalModules))
-    
-    -- Обновляем состояние кнопок
-    if self.currentModule <= 1 then
-        self.prevButton:Disable()
-        self.prevButton:SetAlpha(0.5)
-    else
-        self.prevButton:Enable()
-        self.prevButton:SetAlpha(1)
-    end
-    
-    if self.currentModule >= self.totalModules then
-        self.nextButton:Disable()
-        self.nextButton:SetAlpha(0.5)
-    else
-        self.nextButton:Enable()
-        self.nextButton:SetAlpha(1)
+function LuaCourse:PlaySound(soundPath)
+    if PlaySoundFile then
+        PlaySoundFile(soundPath)
     end
 end
 
--- Пример использования:
+function LuaCourse:CheckTasks()
+    local module = self.courseTable[self.currentModule]
+    if not module then return end
+    if module.type == "vartest" then
+        self:CheckVarTasks()
+    end
+end
+
+function LuaCourse:UpdateNextButton()
+    if self:CanProceed() then
+        self.nextButton:Enable()
+        self.nextButton:SetAlpha(1)
+    else
+        self.nextButton:Disable()
+        self.nextButton:SetAlpha(0.4)
+    end
+end
+
+function LuaCourse:ClearTestFrames()
+    if self.runScriptHook then
+        self.runScriptHook:uninstall()
+        self.runScriptHook = nil
+    end
+    
+    local prevModule = self.courseTable and self.courseTable[self.currentModule]
+    if prevModule and prevModule.preloadVars then
+        for _, varData in ipairs(prevModule.preloadVars) do
+            _G[varData.var] = nil
+        end
+    end
+    
+    if self.contentFrame then
+        local children = {self.contentFrame:GetChildren()}
+        for _, child in ipairs(children) do
+            if child and child ~= self.contentText then
+                child:Hide()
+                child:SetParent(nil)
+            end
+        end
+        local regions = {self.contentFrame:GetRegions()}
+        for _, region in ipairs(regions) do
+            if region and region ~= self.contentText then
+                region:Hide()
+            end
+        end
+    end
+    
+    if self.contentText then
+        self.contentText:SetText("")
+    end
+    
+    self.varTestFrames = {}
+    self.commentTestFrame = nil
+    self.printTasks = {}
+    self.formatTaskFrame = nil
+    self.customTestFrame = nil
+    self.customTestFrames = nil
+    self.capturedMessages = {}
+    self.pendingConcatCount = nil
+    self.lastExecutedCode = nil
+    self.lastCodeForVar = {}
+end
+
+function LuaCourse:OnCodeExecuted(code)
+    if not self.lastCodeForVar then
+        self.lastCodeForVar = {}
+    end
+    for varName in code:gmatch("([%w_]+)%s*=") do
+        local startPos = code:find(varName .. "%s*=")
+        if startPos then
+            local eqPos = code:find("=", startPos)
+            local afterEq = code:sub(eqPos + 1)
+            local semiPos = afterEq:find(";")
+            if semiPos then
+                self.lastCodeForVar[varName] = afterEq:sub(1, semiPos - 1)
+            else
+                self.lastCodeForVar[varName] = afterEq
+            end
+        end
+    end
+    
+    local module = self.courseTable[self.currentModule]
+    if module and module.tasks then
+        for i, task in ipairs(module.tasks) do
+            if task.type == "nil" and code:find(task.var .. "%s*=") then
+                local value = _G[task.var]
+                if type(value) == "nil" then
+                    self.taskWasComplete[i] = true
+                    self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
+                    if self.varTestFrames[i] then
+                        self.varTestFrames[i].text:SetText(COLORS.SUCCESS .. "[x] " .. task.desc .. COLORS.RESET)
+                    end
+                    self:SaveProgress()
+                end
+            end
+        end
+    end
+end
+
+function LuaCourse:CheckVarTasks()
+    local module = self.courseTable[self.currentModule]
+    if not module or not module.tasks then return end
+    
+    local allVarsComplete = true
+    
+    for i, task in ipairs(module.tasks) do
+        local wasCompleted = self.taskWasComplete[i] or false
+        local isComplete = wasCompleted
+        
+        if not isComplete then
+            local value = _G[task.var]
+            if task.type == "nil" then
+                isComplete = false
+            elseif task.type == "table" then
+                isComplete = (type(value) == "table")
+            else
+                isComplete = (type(value) == task.type)
+            end
+        end
+        
+        if isComplete then
+            if not self.taskWasComplete[i] then
+                self.taskWasComplete[i] = true
+                self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
+            end
+            if self.varTestFrames[i] then
+                self.varTestFrames[i].text:SetText(COLORS.SUCCESS .. "[x] " .. task.desc .. COLORS.RESET)
+            end
+        else
+            self.taskWasComplete[i] = false
+            if self.varTestFrames[i] then
+                self.varTestFrames[i].text:SetText(COLORS.HINT .. "[ ] " .. task.desc .. COLORS.RESET)
+            end
+        end
+        
+        if not isComplete then
+            allVarsComplete = false
+        end
+    end
+    
+    local moduleComplete = allVarsComplete
+    if module.formatTask then
+        moduleComplete = allVarsComplete and self.formatTaskComplete
+    end
+    
+    if moduleComplete and not self.allTasksComplete then
+        self.allTasksComplete = true
+        self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+    elseif not moduleComplete then
+        self.allTasksComplete = false
+    end
+    
+    self:UpdateNextButton()
+    self:SaveProgress()
+end
+
+function LuaCourse:SetupVarTest(module)
+    local hasNilTask = false
+    if module.tasks then
+        for _, task in ipairs(module.tasks) do
+            if task.type == "nil" then
+                hasNilTask = true
+                break
+            end
+        end
+    end
+    
+    if hasNilTask or module.formatTask then
+        if not self.runScriptHook then
+            self.runScriptHook = RunScriptHook:new(self)
+        end
+        self.runScriptHook:install()
+    end
+    
+    if module.preloadVars then
+        for _, varData in ipairs(module.preloadVars) do
+            _G[varData.var] = varData.value
+        end
+    end
+    
+    local headerText = COLORS.HEADER .. "Задание: типы переменных" .. COLORS.RESET .. "\n\n" ..
+        "Используй команду " .. COLORS.KEYWORD .. "/run" .. COLORS.RESET .. " чтобы создать глобальные переменные " ..
+        "с указанными типами. После создания переменной правильного типа, задание отметится как выполненное.\n\n" ..
+        COLORS.WARNING .. "Важно: " .. COLORS.RESET .. "переменные должны быть глобальными (без " .. COLORS.KEYWORD .. "local" .. COLORS.RESET .. ")!"
+    
+    if module.preloadVars then
+        headerText = headerText .. "\n\n" .. COLORS.HINT .. "Переменные уже созданы для тебя! Проверь их значения и выполни задание на форматирование." .. COLORS.RESET
+    else
+        headerText = headerText .. "\n\n" .. COLORS.HINT .. "Пример: /run testNumber = 42" .. COLORS.RESET
+    end
+    
+    self.contentText:SetText(headerText)
+    
+    local headerHeight = self.contentText:GetStringHeight() or 100
+    local yOffset = -headerHeight - 10
+    
+    if module.preloadVars then
+        for i, varData in ipairs(module.preloadVars) do
+            local infoFrame = CreateFrame("Frame", self.uniquePrefix .. "VarInfo" .. i, self.contentFrame)
+            infoFrame:SetSize(540, 20)
+            infoFrame:SetPoint("TOPLEFT", self.contentFrame, "TOPLEFT", 10, yOffset)
+            
+            local infoText = infoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            infoText:SetPoint("LEFT", infoFrame, "LEFT", 10, 0)
+            infoText:SetWidth(520)
+            infoText:SetJustifyH("LEFT")
+            infoText:SetText(COLORS.COMMENT .. "[i] " .. varData.desc .. COLORS.RESET)
+            
+            yOffset = yOffset - 22
+        end
+        yOffset = yOffset - 8
+    end
+    
+    if module.tasks then
+        for i, task in ipairs(module.tasks) do
+            local taskFrame = CreateFrame("Frame", self.uniquePrefix .. "Task" .. i, self.contentFrame)
+            taskFrame:SetSize(540, 22)
+            taskFrame:SetPoint("TOPLEFT", self.contentFrame, "TOPLEFT", 10, yOffset)
+            
+            local taskText = taskFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            taskText:SetPoint("LEFT", taskFrame, "LEFT", 10, 0)
+            taskText:SetWidth(520)
+            taskText:SetJustifyH("LEFT")
+            
+            local statusText = "[ ] "
+            if self.taskWasComplete[i] then
+                statusText = "[x] "
+                taskText:SetText(COLORS.SUCCESS .. statusText .. task.desc .. COLORS.RESET)
+            else
+                taskText:SetText(COLORS.HINT .. statusText .. task.desc .. COLORS.RESET)
+            end
+            
+            taskFrame.text = taskText
+            self.varTestFrames[i] = taskFrame
+            yOffset = yOffset - 24
+        end
+    end
+    
+    if module.formatTask then
+        yOffset = yOffset - 10
+        
+        local formatHeader = CreateFrame("Frame", nil, self.contentFrame)
+        formatHeader:SetSize(540, 20)
+        formatHeader:SetPoint("TOPLEFT", self.contentFrame, "TOPLEFT", 10, yOffset)
+        
+        local formatHeaderText = formatHeader:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        formatHeaderText:SetPoint("LEFT", formatHeader, "LEFT", 10, 0)
+        formatHeaderText:SetWidth(520)
+        formatHeaderText:SetJustifyH("LEFT")
+        formatHeaderText:SetText(COLORS.HEADER .. "Задание на форматирование:" .. COLORS.RESET)
+        
+        yOffset = yOffset - 22
+        
+        local formatFrame = CreateFrame("Frame", self.uniquePrefix .. "FormatTask", self.contentFrame)
+        formatFrame:SetSize(540, 100)
+        formatFrame:SetPoint("TOPLEFT", self.contentFrame, "TOPLEFT", 10, yOffset)
+        
+        local formatText = formatFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        formatText:SetPoint("TOPLEFT", formatFrame, "TOPLEFT", 10, 0)
+        formatText:SetWidth(520)
+        formatText:SetJustifyH("LEFT")
+        formatText:SetJustifyV("TOP")
+        formatText:SetNonSpaceWrap(true)
+        formatText:SetSpacing(2)
+        
+        if self.formatTaskComplete then
+            formatText:SetText(COLORS.SUCCESS .. "[x] " .. module.formatTask.instruction .. COLORS.RESET)
+        else
+            formatText:SetText(COLORS.HINT .. "[ ] " .. module.formatTask.instruction .. COLORS.RESET)
+        end
+        
+        formatFrame.text = formatText
+        self.formatTaskFrame = formatFrame
+        
+        local course = self
+        local updateFrame = CreateFrame("Frame")
+        local elapsed = 0
+        updateFrame:SetScript("OnUpdate", function(frame, dt)
+            elapsed = elapsed + dt
+            if elapsed >= 0.05 then
+                frame:Hide()
+                if formatText and formatFrame and course.contentFrame then
+                    local formatTextHeight = formatText:GetStringHeight() or 60
+                    formatFrame:SetHeight(formatTextHeight + 5)
+                    course:RecalculateContentHeight()
+                end
+            end
+        end)
+        
+        yOffset = yOffset - 105
+    end
+    
+    local totalHeight = math.abs(yOffset) + 20
+    self.contentFrame:SetHeight(totalHeight)
+    self:UpdateScrollBarDelayed()
+    
+    if self.allTasksComplete then
+        self:CheckTasks()
+    end
+end
+
+function LuaCourse:RecalculateContentHeight()
+    if not self.contentFrame then return end
+    local lowestY = 0
+    local children = {self.contentFrame:GetChildren()}
+    for _, child in ipairs(children) do
+        if child:IsVisible() and child ~= self.contentText then
+            local point, relativeTo, relativePoint, x, y = child:GetPoint(1)
+            if relativeTo == self.contentFrame then
+                local childHeight = child:GetHeight() or 0
+                local childBottom = y - childHeight
+                if childBottom < lowestY then
+                    lowestY = childBottom
+                end
+            end
+        end
+    end
+    local totalHeight = math.abs(lowestY) + 15
+    self.contentFrame:SetHeight(totalHeight)
+    self:UpdateScrollBarDelayed()
+end
+
+function LuaCourse:UpdateScrollBarDelayed()
+    if not self.scrollFrame or not self.contentFrame or not self.scrollBar then
+        return
+    end
+    local course = self
+    local updateFrame = CreateFrame("Frame")
+    local elapsed = 0
+    updateFrame:SetScript("OnUpdate", function(frame, dt)
+        elapsed = elapsed + dt
+        if elapsed >= 0.15 then
+            frame:Hide()
+            if not course.contentFrame or not course.scrollFrame or not course.scrollBar then return end
+            local textHeight = course.contentFrame:GetHeight()
+            local frameHeight = course.scrollFrame:GetHeight()
+            local maxScroll = math.max(0, textHeight - frameHeight)
+            course.scrollBar:SetMinMaxValues(0, maxScroll)
+            course.scrollBar:SetValue(0)
+            course.contentFrame:SetPoint("TOPLEFT", course.scrollFrame, "TOPLEFT", 0, 0)
+        end
+    end)
+end
+
+function LuaCourse:SetupCommentTest(module)
+    self.contentText:SetText(COLORS.HEADER .. "Задание: комментарии" .. COLORS.RESET .. "\n\n" ..
+        module.instruction .. "\n\n" ..
+        COLORS.HINT .. "Подсказка: " .. COLORS.RESET .. "используй " .. COLORS.COMMENT .. "--" .. COLORS.RESET ..
+        " в начале строки, которую нужно закомментировать.")
+    
+    local editBox = CreateFrame("EditBox", self.uniquePrefix .. "EditBox", self.contentFrame)
+    editBox:SetPoint("TOPLEFT", self.contentText, "BOTTOMLEFT", 0, -20)
+    editBox:SetSize(540, 150)
+    editBox:SetMultiLine(true)
+    editBox:SetFontObject("GameFontNormal")
+    editBox:SetText(module.initialCode)
+    editBox:SetAutoFocus(false)
+    
+    local details = nsDbc['luaTest'].taskDetails[self.currentModule]
+    if details and details.currentCode then
+        editBox:SetText(details.currentCode)
+    end
+    
+    local editBg = editBox:CreateTexture(nil, "BACKGROUND")
+    editBg:SetAllPoints(editBox)
+    editBg:SetTexture(0.05, 0.05, 0.1, 1)
+    
+    local checkButton = CreateFrame("Button", self.uniquePrefix .. "CheckButton", self.contentFrame, "UIPanelButtonTemplate")
+    checkButton:SetSize(120, 24)
+    checkButton:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -10)
+    checkButton:SetText("Проверить")
+    
+    local resultText = self.contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    resultText:SetPoint("TOPLEFT", checkButton, "BOTTOMLEFT", 0, -10)
+    resultText:SetWidth(540)
+    resultText:SetJustifyH("LEFT")
+    
+    checkButton:SetScript("OnClick", function()
+        self:CheckCommentTest(module, resultText)
+    end)
+    
+    self.commentTestFrame = {
+        editBox = editBox,
+        checkButton = checkButton,
+        resultText = resultText,
+    }
+    
+    self.contentFrame:SetHeight(320)
+    
+    if self.commentTestPassed then
+        resultText:SetText(COLORS.SUCCESS .. "[x] Задание уже выполнено!" .. COLORS.RESET)
+    end
+end
+
+function LuaCourse:CheckCommentTest(module, resultText)
+    if not self.commentTestFrame or not self.commentTestFrame.editBox then return end
+    local code = self.commentTestFrame.editBox:GetText()
+    resultText:SetText("")
+    
+    local output = {}
+    local originalPrint = print
+    print = function(...)
+        local args = {...}
+        for i, v in ipairs(args) do
+            table.insert(output, tostring(v))
+        end
+    end
+    
+    local success, err = pcall(loadstring(code))
+    print = originalPrint
+    
+    if not success then
+        resultText:SetText(COLORS.WARNING .. "Ошибка в коде: " .. tostring(err) .. COLORS.RESET)
+        self.commentTestPassed = false
+    else
+        local result = table.concat(output, "\n")
+        if result == module.expectedOutput then
+            resultText:SetText(COLORS.SUCCESS .. "[x] Отлично! Задание выполнено верно!" .. COLORS.RESET)
+            if not self.commentTestPassed then
+                self.commentTestPassed = true
+                self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
+                self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+            end
+        else
+            resultText:SetText(COLORS.WARNING .. "[ ] Неверно. Ожидаемый вывод:\n" .. module.expectedOutput .. "\n\nТекущий вывод:\n" .. result .. COLORS.RESET)
+            self.commentTestPassed = false
+        end
+    end
+    
+    self:UpdateNextButton()
+    self:SaveProgress()
+end
+
+function LuaCourse:SetupPrintTest(module)
+    self.contentText:SetText(COLORS.HEADER .. "Задание: практика с print" .. COLORS.RESET .. "\n\n" ..
+        "Выполни задания, используя команду " .. COLORS.KEYWORD .. "/run" .. COLORS.RESET ..
+        " и функцию " .. COLORS.KEYWORD .. "print" .. COLORS.RESET .. ". " ..
+        "Система автоматически отследит вывод в чат.\n\n" ..
+        COLORS.HINT .. "Для заданий на конкатенацию используй оператор .. (две точки)" .. COLORS.RESET)
+    
+    local needsRunScriptHook = false
+    for _, task in ipairs(module.tasks) do
+        if task.requireConcat or task.expectedExpression then
+            needsRunScriptHook = true
+            break
+        end
+    end
+    
+    if needsRunScriptHook then
+        if not self.runScriptHook then
+            self.runScriptHook = RunScriptHook:new(self)
+        end
+        self.runScriptHook:install()
+    end
+    
+    local yOffset = -10
+    if not self.printTasks then
+        self.printTasks = {}
+    end
+    
+    local savedDetails = nsDbc['luaTest'].taskDetails[self.currentModule]
+    
+    for i, task in ipairs(module.tasks) do
+        local taskFrame = CreateFrame("Frame", self.uniquePrefix .. "PrintTask" .. i, self.contentFrame)
+        taskFrame:SetSize(540, 40)
+        taskFrame:SetPoint("TOPLEFT", self.contentText, "BOTTOMLEFT", 0, yOffset)
+        
+        local taskBg = taskFrame:CreateTexture(nil, "BACKGROUND")
+        taskBg:SetAllPoints(taskFrame)
+        taskBg:SetTexture(0.1, 0.1, 0.15, 0.5)
+        
+        local taskText = taskFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        taskText:SetPoint("LEFT", taskFrame, "LEFT", 10, 0)
+        taskText:SetWidth(520)
+        taskText:SetJustifyH("LEFT")
+        
+        local taskDesc = task.desc
+        if task.requireConcat then
+            taskDesc = taskDesc .. " " .. COLORS.COMMENT .. "(требуется " .. task.requiredConcatCount .. " оператора(ов) ..)" .. COLORS.RESET
+        end
+        
+        local isCompleted = false
+        if savedDetails and savedDetails.completed and savedDetails.taskStatus and savedDetails.taskStatus[i] then
+            isCompleted = savedDetails.taskStatus[i].completed or false
+        end
+        
+        if isCompleted then
+            taskText:SetText(COLORS.SUCCESS .. "[x] " .. taskDesc .. COLORS.RESET)
+        else
+            taskText:SetText(COLORS.HINT .. "[ ] " .. taskDesc .. COLORS.RESET)
+        end
+        
+        taskFrame:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(taskFrame, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Подсказка", 1, 1, 1)
+            local hint = task.hint or "Используй /run print(...)"
+            if task.requireConcat then
+                hint = hint .. "\n\n" .. COLORS.COMMENT .. "Нужно использовать ровно " .. task.requiredConcatCount .. " оператора(ов) .." .. COLORS.RESET
+            end
+            if task.expectedExpression then
+                if type(task.expectedExpression) == "table" then
+                    hint = hint .. "\n\n" .. COLORS.HINT .. "Допустимые варианты кода:" .. COLORS.RESET
+                    for _, expr in ipairs(task.expectedExpression) do
+                        hint = hint .. "\n  " .. expr
+                    end
+                else
+                    hint = hint .. "\n\n" .. COLORS.HINT .. "Ожидаемый код: " .. task.expectedExpression .. COLORS.RESET
+                end
+            end
+            GameTooltip:AddLine(hint, 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+        end)
+        
+        taskFrame:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        
+        self.printTasks[i] = {
+            frame = taskFrame,
+            text = taskText,
+            desc = task.desc,
+            pattern = task.pattern,
+            requireConcat = task.requireConcat or false,
+            requiredConcatCount = task.requiredConcatCount or 0,
+            expectedExpression = task.expectedExpression,
+            completed = isCompleted,
+        }
+        
+        yOffset = yOffset - 45
+    end
+    
+    local allComplete = true
+    for i, taskData in ipairs(self.printTasks) do
+        if not taskData.completed then
+            allComplete = false
+            break
+        end
+    end
+    
+    self.allTasksComplete = allComplete
+    self.contentFrame:SetHeight(math.abs(yOffset) + 50)
+end
+
+function OpenLuaCourse()
+    if not nsDbc then
+        nsDbc = {}
+    end
+    if not nsDbc['luaTest'] then
+        nsDbc['luaTest'] = {
+            currentModule    = 1,
+            totalModules     = 24,
+            completedModules = {},
+            taskDetails      = {},
+        }
+    end
+    local savedModule = nsDbc['luaTest'].currentModule or 1
+    if savedModule < 1 then savedModule = 1 end
+    if savedModule > (nsDbc['luaTest'].totalModules or 24) then
+        savedModule = nsDbc['luaTest'].totalModules or 24
+    end
+    
+    -- Проверяем, есть ли уже открытое окно
+    if _G.activeLuaCourse and _G.activeLuaCourse.window and _G.activeLuaCourse.window:IsShown() then
+        _G.activeLuaCourse.window:Hide()
+        return
+    end
+    
+    local course = LuaCourse:new(UIParent)
+    _G.activeLuaCourse = course  -- Сохраняем ссылку глобально
+    course:ShowModule(ns_llua['lua'], savedModule)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 course = LuaCourse:new()
+--                   /run course:ShowModule(ns_llua['lua'], 1)
+
+
+
+
+
+
+
+
+
+
+
+
