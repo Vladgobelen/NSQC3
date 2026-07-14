@@ -18759,6 +18759,7 @@ function LuaCourse:CheckPrintTasks()
     if allComplete and not self.allTasksComplete then
         self.allTasksComplete = true
         self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+        SendAddonMessage("ns_Win", "", "GUILD")
     end
     
     self.allTasksComplete = allComplete
@@ -18823,6 +18824,7 @@ function LuaCourse:CheckFormatTask()
                     if allVarsComplete and not self.allTasksComplete then
                         self.allTasksComplete = true
                         self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+                        SendAddonMessage("ns_Win", "", "GUILD")
                     end
                     if self.formatTaskFrame then
                         self.formatTaskFrame.text:SetText(COLORS.SUCCESS .. "[x] " .. taskData.instruction .. COLORS.RESET)
@@ -19342,6 +19344,7 @@ function LuaCourse:CheckCustomTasks()
         self.customTestPassed = true
         anyChange = true
         self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+        SendAddonMessage("ns_Win", "", "GUILD")
     elseif not allComplete and not self.customTestPassed then
         self.customTestPassed = false
     end
@@ -19828,6 +19831,7 @@ function LuaCourse:CheckVarTasks()
     if moduleComplete and not self.allTasksComplete then
         self.allTasksComplete = true
         self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+        SendAddonMessage("ns_Win", "", "GUILD")
     elseif not moduleComplete then
         self.allTasksComplete = false
     end
@@ -20102,6 +20106,7 @@ function LuaCourse:CheckCommentTest(module, resultText)
                 self.commentTestPassed = true
                 self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\punto.ogg")
                 self:PlaySound("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
+                SendAddonMessage("ns_Win", "", "GUILD")
             end
         else
             resultText:SetText(COLORS.WARNING .. "[ ] Неверно. Ожидаемый вывод:\n" .. module.expectedOutput .. "\n\nТекущий вывод:\n" .. result .. COLORS.RESET)
