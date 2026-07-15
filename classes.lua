@@ -17333,6 +17333,851 @@ end
 
 
 
+-- ========================================================================
+-- NSReminder — Напоминалка о прохождении курса Lua (WoW 3.3.5)
+-- ========================================================================
+
+local NSReminder = {}
+NSReminder.__index = NSReminder
+
+local REMINDER_MESSAGES = {
+    "Твои переменные скучают по тебе...",
+    "Код сам себя не напишет!",
+    "Lua ждёт тебя!",
+    "Пора покормить мозг знаниями",
+    "Таблицы плачут без тебя",
+    "Принц Артас ждёт твоего кода",
+    "Прокрастинируешь? Или учишь Lua?",
+    "Один цикл и ты уже разработчик!",
+    "string.format зовёт тебя домой",
+    "Кто не учит Lua — тот не гильдмастер!",
+    "Ещё один модуль и ты почти программист",
+    "print('С возвращением!')",
+    "Босс гильдии уже спрашивает про твой прогресс",
+    "Фарм подождёт, знания — нет",
+    "Метатаблицы сами себя не объяснят",
+    "local ты = 'ленивец' — исправь это!",
+    "Твой персонаж уже выучил бы пару заклинаний",
+    "while true do print('учи Lua') end",
+    "Нажми на меня, чтобы продолжить обучение",
+    "Ты не забыл про курс, правда?",
+    "Где-то в Стальгорне плачет один учитель Lua",
+    "Твои навыки кодинга ржавеют",
+    "Сделай перерыв от фарма — учи Lua",
+    "Таблица без данных — это просто {}",
+    "Ты ближе к мастерству, чем думаешь",
+    "Осталось совсем немного модулей!",
+    "Хватит фармить золото, фарми знания",
+    "Паладин бы уже давно прошёл этот курс",
+    "nil — это то, что будет от твоих навыков",
+    "return 'к курсу'",
+    "Твоя гильдия гордится тобой... пока",
+    "Сделай for i = 1, 10 do study() end",
+    "У тебя есть незаконченные дела с Lua",
+    "Твой print() молчит уже час",
+    "Курс не убежит, но и сам себя не пройдёт",
+}
+
+local ASSET_PAIRS = {
+    {
+        texture = "Interface\\AddOns\\NSQC3\\libs\\bbb.tga",
+        sound   = "Interface\\AddOns\\NSQC3\\libs\\bbb.ogg"
+    },
+    {
+        texture = "Interface\\AddOns\\NSQC3\\libs\\gob.tga",
+        sound   = "Interface\\AddOns\\NSQC3\\libs\\gob.ogg"
+    },
+    {
+        texture = "Interface\\AddOns\\NSQC3\\libs\\gom.tga",
+        sound   = "Interface\\AddOns\\NSQC3\\libs\\gom.ogg"
+    },
+}
+
+local HOUR_INTERVAL = 3600
+local ADDON_LOAD_DELAY = 5
+local SAVED_VARS_DELAY = 3
+local AUTO_HIDE_TIME = 300
+local MIN_ICON_SIZE = 64
+local MAX_ICON_SIZE = 256
+local POSITION_OFFSET = 400
+
+function NSReminder:New()
+    local self = setmetatable({}, NSReminder)
+    self.lastModule = nil
+    self.reminderCount = 0
+    self.iconSize = MIN_ICON_SIZE
+    self.frame = nil
+    self.timerFrame = nil
+    self.fadeFrame = nil
+    self.hourElapsed = 0
+    self.isHourTimerRunning = false
+    self.savedVarsDelayElapsed = 0
+    self.isWaitingSavedVars = false
+    self.autoHideElapsed = 0
+    self.isAutoHideRunning = false
+    self.currentAsset = nil
+    return self
+end
+
+function NSReminder:Init()
+    self.frame = CreateFrame("Button", "NSReminderFrame", UIParent)
+    if not self.frame then return end
+    
+    self.frame:SetFrameStrata("TOOLTIP")
+    self.frame:SetFrameLevel(100)
+    self.frame:SetSize(MIN_ICON_SIZE, MIN_ICON_SIZE)
+    self.frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    self.frame:SetMovable(true)
+    self.frame:EnableMouse(true)
+    self.frame:SetClampedToScreen(true)
+    self.frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    self.frame:Hide()
+    
+    self.icon = self.frame:CreateTexture(nil, "ARTWORK")
+    self.icon:SetAllPoints(self.frame)
+    self.icon:SetTexture(ASSET_PAIRS[1].texture)
+    
+    self.label = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    self.label:SetPoint("BOTTOM", self.frame, "TOP", 0, 5)
+    self.label:SetJustifyH("CENTER")
+    self.label:SetWidth(400)
+    self.label:SetTextColor(1, 0.84, 0, 1)
+    self.label:SetShadowOffset(1, -1)
+    self.label:SetShadowColor(0, 0, 0, 1)
+    
+    self.frame:SetScript("OnEnter", function(frame)
+        GameTooltip:SetOwner(frame, "ANCHOR_TOP")
+        GameTooltip:SetText("Напоминание о курсе Lua", 1, 0.84, 0)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cFFFFFFFFЛКМ:|r Открыть курс", 1, 1, 1)
+        GameTooltip:AddLine("|cFFFFFFFFПКМ:|r Скрыть на час", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    self.frame:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    
+    self.frame:SetScript("OnMouseDown", function(frame, button)
+        if button == "MiddleButton" or (button == "LeftButton" and IsShiftKeyDown()) then
+            frame:StartMoving()
+        end
+    end)
+    self.frame:SetScript("OnMouseUp", function(frame, button)
+        if button == "MiddleButton" or (button == "LeftButton" and IsShiftKeyDown()) then
+            frame:StopMovingOrSizing()
+        end
+    end)
+    
+    self.frame:SetScript("OnClick", function(frame, button)
+        if button == "LeftButton" then
+            if OpenLuaCourse then
+                OpenLuaCourse()
+            end
+            self:Hide()
+            self:StartHourTimer()
+        elseif button == "RightButton" then
+            self:Hide()
+            self:StartHourTimer()
+        end
+    end)
+    
+    self.frame:SetAlpha(0)
+    
+    self.timerFrame = CreateFrame("Frame")
+    self.timerFrame:Show()
+    self.timerFrame:SetScript("OnUpdate", function(_, elapsed)
+        self:OnTimerUpdate(elapsed)
+    end)
+    
+    self:StartSavedVarsDelay()
+end
+
+function NSReminder:StartSavedVarsDelay()
+    self.savedVarsDelayElapsed = 0
+    self.isWaitingSavedVars = true
+    self.isHourTimerRunning = false
+    self.isAutoHideRunning = false
+end
+
+function NSReminder:StartHourTimer()
+    self.hourElapsed = 0
+    self.isHourTimerRunning = true
+    self.isWaitingSavedVars = false
+    self.isAutoHideRunning = false
+end
+
+function NSReminder:OnTimerUpdate(elapsed)
+    if self.isWaitingSavedVars then
+        self.savedVarsDelayElapsed = self.savedVarsDelayElapsed + elapsed
+        if self.savedVarsDelayElapsed >= SAVED_VARS_DELAY then
+            self.isWaitingSavedVars = false
+            self:Check()
+        end
+        return
+    end
+    
+    if self.isHourTimerRunning then
+        self.hourElapsed = self.hourElapsed + elapsed
+        if self.hourElapsed >= HOUR_INTERVAL then
+            self.isHourTimerRunning = false
+            self:Check()
+        end
+        return
+    end
+    
+    if self.isAutoHideRunning then
+        self.autoHideElapsed = self.autoHideElapsed + elapsed
+        if self.autoHideElapsed >= AUTO_HIDE_TIME then
+            self.isAutoHideRunning = false
+            if self.frame and self.frame:IsShown() then
+                self:Hide()
+                self:StartHourTimer()
+            end
+        end
+    end
+end
+
+function NSReminder:Check()
+    if not nsDbc or not nsDbc['luaTest'] then
+        self:StartHourTimer()
+        return
+    end
+    
+    local currentModule = nsDbc['luaTest'].currentModule
+    if not currentModule then
+        self:StartHourTimer()
+        return
+    end
+    
+    if _G.activeLuaCourse and _G.activeLuaCourse.window 
+       and _G.activeLuaCourse.window:IsShown() then
+        self:StartHourTimer()
+        return
+    end
+    
+    if nsDbc['luaTest'].completedModules then
+        local totalModules = nsDbc['luaTest'].totalModules or 24
+        local allDone = true
+        for i = 1, totalModules do
+            if not nsDbc['luaTest'].completedModules[i] then
+                allDone = false
+                break
+            end
+        end
+        if allDone then
+            return
+        end
+    end
+    
+    if self.lastModule ~= currentModule then
+        self.lastModule = currentModule
+        self.reminderCount = 0
+        self.iconSize = MIN_ICON_SIZE
+    end
+    
+    self:Show()
+end
+
+function NSReminder:Show()
+    if not self.frame then return end
+    
+    local message = REMINDER_MESSAGES[math.random(#REMINDER_MESSAGES)]
+    self.label:SetText(message)
+    
+    self.currentAsset = ASSET_PAIRS[math.random(#ASSET_PAIRS)]
+    self.icon:SetTexture(self.currentAsset.texture)
+    
+    self.frame:SetSize(self.iconSize, self.iconSize)
+    
+    local offsetX = math.random(-POSITION_OFFSET, POSITION_OFFSET)
+    local offsetY = math.random(-POSITION_OFFSET, POSITION_OFFSET)
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    
+    self.frame:Show()
+    self:StartFade(0, 1, 0.5)
+    
+    if PlaySoundFile and self.currentAsset then
+        PlaySoundFile(self.currentAsset.sound)
+    end
+    
+    self.reminderCount = self.reminderCount + 1
+    
+    if self.iconSize < MAX_ICON_SIZE then
+        self.iconSize = self.iconSize * 2
+        if self.iconSize > MAX_ICON_SIZE then
+            self.iconSize = MAX_ICON_SIZE
+        end
+    end
+    
+    self.autoHideElapsed = 0
+    self.isAutoHideRunning = true
+end
+
+function NSReminder:Hide()
+    if not self.frame then return end
+    self:StartFade(self.frame:GetAlpha(), 0, 0.5)
+    self.isAutoHideRunning = false
+end
+
+function NSReminder:StartFade(fromAlpha, toAlpha, duration)
+    if self.fadeFrame then
+        self.fadeFrame:SetScript("OnUpdate", nil)
+        self.fadeFrame:Hide()
+    end
+    
+    self.fadeFrame = CreateFrame("Frame")
+    self.fadeFrame:Show()
+    local elapsed = 0
+    
+    self.fadeFrame:SetScript("OnUpdate", function(frame, dt)
+        elapsed = elapsed + dt
+        local progress = elapsed / duration
+        
+        if progress >= 1 then
+            self.frame:SetAlpha(toAlpha)
+            if toAlpha == 0 then
+                self.frame:Hide()
+            end
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+        else
+            local currentAlpha = fromAlpha + (toAlpha - fromAlpha) * progress
+            self.frame:SetAlpha(currentAlpha)
+        end
+    end)
+end
+
+-- ========================================================================
+-- Инициализация при входе в игру
+-- ========================================================================
+
+local function InitNSReminder()
+    if not UIParent or not OpenLuaCourse then return end
+    
+    local reminder = NSReminder:New()
+    reminder:Init()
+    _G.NSReminderInstance = reminder
+end
+
+local reminderLoader = CreateFrame("Frame")
+reminderLoader:Show()
+reminderLoader:RegisterEvent("PLAYER_LOGIN")
+reminderLoader:SetScript("OnEvent", function(self, event)
+    local initFrame = CreateFrame("Frame")
+    initFrame:Show()
+    local initElapsed = 0
+    
+    initFrame:SetScript("OnUpdate", function(frame, elapsed)
+        initElapsed = initElapsed + elapsed
+        if initElapsed >= ADDON_LOAD_DELAY then
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+            InitNSReminder()
+        end
+    end)
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ========================================================================
+-- NSReminder — Напоминалка о прохождении курса Lua (WoW 3.3.5) + ОТЛАДКА
+-- ========================================================================
+
+local PREFIX = "|cFFFFD700[NSReminder]|r "
+
+local NSReminder = {}
+NSReminder.__index = NSReminder
+
+local REMINDER_MESSAGES = {
+    "Твои переменные скучают по тебе...",
+    "Код сам себя не напишет!",
+    "Lua ждёт тебя!",
+    "Пора покормить мозг знаниями",
+    "Таблицы плачут без тебя",
+    "Принц Артас ждёт твоего кода",
+    "Прокрастинируешь? Или учишь Lua?",
+    "Один цикл и ты уже разработчик!",
+    "string.format зовёт тебя домой",
+    "Кто не учит Lua — тот не гильдмастер!",
+    "Ещё один модуль и ты почти программист",
+    "print('С возвращением!')",
+    "Босс гильдии уже спрашивает про твой прогресс",
+    "Фарм подождёт, знания — нет",
+    "Метатаблицы сами себя не объяснят",
+    "local ты = 'ленивец' — исправь это!",
+    "Твой персонаж уже выучил бы пару заклинаний",
+    "while true do print('учи Lua') end",
+    "Нажми на меня, чтобы продолжить обучение",
+    "Ты не забыл про курс, правда?",
+    "Где-то в Стальгорне плачет один учитель Lua",
+    "Твои навыки кодинга ржавеют",
+    "Сделай перерыв от фарма — учи Lua",
+    "Таблица без данных — это просто {}",
+    "Ты ближе к мастерству, чем думаешь",
+    "Осталось совсем немного модулей!",
+    "Хватит фармить золото, фарми знания",
+    "Паладин бы уже давно прошёл этот курс",
+    "nil — это то, что будет от твоих навыков",
+    "return 'к курсу'",
+    "Твоя гильдия гордится тобой... пока",
+    "Сделай for i = 1, 10 do study() end",
+    "У тебя есть незаконченные дела с Lua",
+    "Твой print() молчит уже час",
+    "Курс не убежит, но и сам себя не пройдёт",
+}
+
+local ASSET_PAIRS = {
+    {
+        texture = "Interface\\AddOns\\NSQC3\\libs\\bbb.tga",
+        sound   = "Interface\\AddOns\\NSQC3\\libs\\bbb.ogg"
+    },
+    {
+        texture = "Interface\\AddOns\\NSQC3\\libs\\gob.tga",
+        sound   = "Interface\\AddOns\\NSQC3\\libs\\gob.ogg"
+    },
+    {
+        texture = "Interface\\AddOns\\NSQC3\\libs\\gom.tga",
+        sound   = "Interface\\AddOns\\NSQC3\\libs\\gom.ogg"
+    },
+}
+
+local HOUR_INTERVAL = 3600
+local INITIAL_DELAY = 3
+local AUTO_HIDE_TIME = 30
+local MIN_ICON_SIZE = 64
+local MAX_ICON_SIZE = 256
+local POSITION_OFFSET = 400
+
+-- ========================================================================
+-- Отладочный принт
+-- ========================================================================
+local function Debug(msg)
+    if DEFAULT_CHAT_FRAME then
+        DEFAULT_CHAT_FRAME:AddMessage(PREFIX .. msg)
+    end
+end
+
+function NSReminder:New()
+    local self = setmetatable({}, NSReminder)
+    self.lastModule = nil
+    self.reminderCount = 0
+    self.iconSize = MIN_ICON_SIZE
+    self.frame = nil
+    self.timerFrame = nil
+    self.fadeFrame = nil
+    self.hourElapsed = 0
+    self.isHourTimerRunning = false
+    self.initialDelayElapsed = 0
+    self.isWaitingInitialDelay = false
+    self.autoHideElapsed = 0
+    self.isAutoHideRunning = false
+    self.currentAsset = nil
+    return self
+end
+
+function NSReminder:Init()
+    Debug("Init() начался")
+    
+    self.frame = CreateFrame("Button", "NSReminderFrame", UIParent)
+    if not self.frame then
+        Debug("|cFFFF0000ОШИБКА: не удалось создать frame!|r")
+        return
+    end
+    Debug("Frame создан: " .. tostring(self.frame))
+    
+    self.frame:SetFrameStrata("TOOLTIP")
+    self.frame:SetFrameLevel(100)
+    self.frame:SetSize(MIN_ICON_SIZE, MIN_ICON_SIZE)
+    self.frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    self.frame:SetMovable(true)
+    self.frame:EnableMouse(true)
+    self.frame:SetClampedToScreen(true)
+    self.frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    self.frame:Hide()
+    
+    self.icon = self.frame:CreateTexture(nil, "ARTWORK")
+    self.icon:SetAllPoints(self.frame)
+    self.icon:SetTexture(ASSET_PAIRS[1].texture)
+    
+    self.label = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    self.label:SetPoint("BOTTOM", self.frame, "TOP", 0, 5)
+    self.label:SetJustifyH("CENTER")
+    self.label:SetWidth(400)
+    self.label:SetTextColor(1, 0.84, 0, 1)
+    self.label:SetShadowOffset(1, -1)
+    self.label:SetShadowColor(0, 0, 0, 1)
+    
+    self.frame:SetScript("OnEnter", function(frame)
+        GameTooltip:SetOwner(frame, "ANCHOR_TOP")
+        GameTooltip:SetText("Напоминание о курсе Lua", 1, 0.84, 0)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cFFFFFFFFЛКМ:|r Открыть курс", 1, 1, 1)
+        GameTooltip:AddLine("|cFFFFFFFFПКМ:|r Скрыть на час", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    self.frame:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    
+    self.frame:SetScript("OnMouseDown", function(frame, button)
+        if button == "MiddleButton" or (button == "LeftButton" and IsShiftKeyDown()) then
+            frame:StartMoving()
+        end
+    end)
+    self.frame:SetScript("OnMouseUp", function(frame, button)
+        if button == "MiddleButton" or (button == "LeftButton" and IsShiftKeyDown()) then
+            frame:StopMovingOrSizing()
+        end
+    end)
+    
+    self.frame:SetScript("OnClick", function(frame, button)
+        Debug("Клик: " .. tostring(button))
+        if button == "LeftButton" then
+            Debug("Открываю курс...")
+            if OpenLuaCourse then
+                OpenLuaCourse()
+            else
+                Debug("|cFFFF0000Функция OpenLuaCourse не найдена!|r")
+            end
+            self:Hide()
+            self:StartHourTimer()
+        elseif button == "RightButton" then
+            Debug("Скрываю на час")
+            self:Hide()
+            self:StartHourTimer()
+        end
+    end)
+    
+    self.frame:SetAlpha(0)
+    
+    -- Таймер-фрейм
+    self.timerFrame = CreateFrame("Frame")
+    if not self.timerFrame then
+        Debug("|cFFFF0000ОШИБКА: не удалось создать timerFrame!|r")
+        return
+    end
+    self.timerFrame:Show()
+    Debug("timerFrame создан и Show() вызван")
+    
+    local timerTicks = 0
+    self.timerFrame:SetScript("OnUpdate", function(_, elapsed)
+        -- Считаем тики для отладки (первые 10 тиков)
+        timerTicks = timerTicks + 1
+        if timerTicks <= 10 then
+            Debug("Timer tick #" .. timerTicks .. " elapsed=" .. string.format("%.3f", elapsed))
+        end
+        
+        self:OnTimerUpdate(elapsed)
+    end)
+    
+    self:StartHourTimer()
+    Debug("Init() завершён, часовой таймер запущен")
+    Debug("HOUR_INTERVAL = " .. HOUR_INTERVAL .. " сек")
+end
+
+function NSReminder:StartHourTimer()
+    self.hourElapsed = 0
+    self.isHourTimerRunning = true
+    self.isWaitingInitialDelay = false
+    self.isAutoHideRunning = false
+    Debug("Часовой таймер запущен (ждём " .. HOUR_INTERVAL .. " сек)")
+end
+
+function NSReminder:OnTimerUpdate(elapsed)
+    -- Часовой таймер
+    if self.isHourTimerRunning then
+        self.hourElapsed = self.hourElapsed + elapsed
+        -- Отладка: каждые 60 секунд пишем сколько осталось
+        local prevMinute = math.floor((self.hourElapsed - elapsed) / 60)
+        local currMinute = math.floor(self.hourElapsed / 60)
+        if currMinute > prevMinute and currMinute % 5 == 0 then
+            local remaining = HOUR_INTERVAL - self.hourElapsed
+            Debug("Прошло " .. currMinute .. " мин, осталось " .. math.floor(remaining / 60) .. " мин " .. math.floor(remaining % 60) .. " сек")
+        end
+        
+        if self.hourElapsed >= HOUR_INTERVAL then
+            Debug("Час прошёл! Начинаю 3-сек задержку...")
+            self.isHourTimerRunning = false
+            self.initialDelayElapsed = 0
+            self.isWaitingInitialDelay = true
+        end
+        return
+    end
+    
+    -- Задержка 3 секунды
+    if self.isWaitingInitialDelay then
+        self.initialDelayElapsed = self.initialDelayElapsed + elapsed
+        if self.initialDelayElapsed >= INITIAL_DELAY then
+            Debug("Задержка прошла, вызываю Check()")
+            self.isWaitingInitialDelay = false
+            self:Check()
+        end
+        return
+    end
+    
+    -- Авто-скрытие
+    if self.isAutoHideRunning then
+        self.autoHideElapsed = self.autoHideElapsed + elapsed
+        if self.autoHideElapsed >= AUTO_HIDE_TIME then
+            Debug("Авто-скрытие: " .. AUTO_HIDE_TIME .. " сек прошло")
+            self.isAutoHideRunning = false
+            if self.frame and self.frame:IsShown() then
+                self:Hide()
+                self:StartHourTimer()
+            end
+        end
+    end
+end
+
+function NSReminder:Check()
+    Debug("Check() вызван")
+    
+    -- Проверка 1: nsDbc существует?
+    if not nsDbc then
+        Debug("ПРЕРВАНО: nsDbc = nil (аддон не загружен?)")
+        self:StartHourTimer()
+        return
+    end
+    Debug("nsDbc существует")
+    
+    -- Проверка 2: luaTest существует?
+    if not nsDbc['luaTest'] then
+        Debug("ПРЕРВАНО: nsDbc['luaTest'] = nil (курс не открывался)")
+        self:StartHourTimer()
+        return
+    end
+    Debug("nsDbc['luaTest'] существует")
+    
+    -- Проверка 3: currentModule
+    local currentModule = nsDbc['luaTest'].currentModule
+    Debug("currentModule = " .. tostring(currentModule))
+    
+    if not currentModule then
+        Debug("ПРЕРВАНО: currentModule = nil")
+        self:StartHourTimer()
+        return
+    end
+    
+    -- Проверка 4: окно курса уже открыто?
+    if _G.activeLuaCourse and _G.activeLuaCourse.window 
+       and _G.activeLuaCourse.window:IsShown() then
+        Debug("ПРЕРВАНО: окно курса уже открыто")
+        self:StartHourTimer()
+        return
+    end
+    
+    -- Проверка 5: курс полностью пройден?
+    if nsDbc['luaTest'].completedModules then
+        local totalModules = nsDbc['luaTest'].totalModules or 24
+        local allDone = true
+        local completedCount = 0
+        for i = 1, totalModules do
+            if nsDbc['luaTest'].completedModules[i] then
+                completedCount = completedCount + 1
+            else
+                allDone = false
+            end
+        end
+        Debug("Пройдено модулей: " .. completedCount .. " из " .. totalModules)
+        
+        if allDone then
+            Debug("ПРЕРВАНО: курс полностью пройден!")
+            return
+        end
+    else
+        Debug("completedModules = nil (пока ничего не пройдено)")
+    end
+    
+    -- Проверка 6: модуль изменился?
+    if self.lastModule ~= currentModule then
+        Debug("Модуль изменился: " .. tostring(self.lastModule) .. " -> " .. currentModule .. " (сброс размера)")
+        self.lastModule = currentModule
+        self.reminderCount = 0
+        self.iconSize = MIN_ICON_SIZE
+    end
+    
+    Debug("Все проверки пройдены! Показываю напоминание...")
+    self:Show()
+end
+
+function NSReminder:Show()
+    if not self.frame then
+        Debug("|cFFFF0000ОШИБКА: Show() вызван, но frame = nil|r")
+        return
+    end
+    
+    local message = REMINDER_MESSAGES[math.random(#REMINDER_MESSAGES)]
+    self.label:SetText(message)
+    
+    self.currentAsset = ASSET_PAIRS[math.random(#ASSET_PAIRS)]
+    self.icon:SetTexture(self.currentAsset.texture)
+    
+    self.frame:SetSize(self.iconSize, self.iconSize)
+    
+    local offsetX = math.random(-POSITION_OFFSET, POSITION_OFFSET)
+    local offsetY = math.random(-POSITION_OFFSET, POSITION_OFFSET)
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    
+    self.frame:Show()
+    Debug("Frame Show() вызван, размер=" .. self.iconSize .. ", позиция=(" .. offsetX .. "," .. offsetY .. ")")
+    
+    self:StartFade(0, 1, 0.5)
+    
+    if PlaySoundFile and self.currentAsset then
+        PlaySoundFile(self.currentAsset.sound)
+        Debug("Звук проигран: " .. self.currentAsset.sound)
+    end
+    
+    self.reminderCount = self.reminderCount + 1
+    
+    if self.iconSize < MAX_ICON_SIZE then
+        self.iconSize = self.iconSize * 2
+        if self.iconSize > MAX_ICON_SIZE then
+            self.iconSize = MAX_ICON_SIZE
+        end
+    end
+    Debug("Напоминание #" .. self.reminderCount .. ", след. размер=" .. self.iconSize)
+    
+    self.autoHideElapsed = 0
+    self.isAutoHideRunning = true
+end
+
+function NSReminder:Hide()
+    if not self.frame then return end
+    Debug("Hide() вызван")
+    self:StartFade(self.frame:GetAlpha(), 0, 0.5)
+    self.isAutoHideRunning = false
+end
+
+function NSReminder:StartFade(fromAlpha, toAlpha, duration)
+    if self.fadeFrame then
+        self.fadeFrame:SetScript("OnUpdate", nil)
+        self.fadeFrame:Hide()
+    end
+    
+    self.fadeFrame = CreateFrame("Frame")
+    self.fadeFrame:Show()
+    local elapsed = 0
+    
+    self.fadeFrame:SetScript("OnUpdate", function(frame, dt)
+        elapsed = elapsed + dt
+        local progress = elapsed / duration
+        
+        if progress >= 1 then
+            self.frame:SetAlpha(toAlpha)
+            if toAlpha == 0 then
+                self.frame:Hide()
+            end
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+        else
+            local currentAlpha = fromAlpha + (toAlpha - fromAlpha) * progress
+            self.frame:SetAlpha(currentAlpha)
+        end
+    end)
+end
+
+-- ========================================================================
+-- Инициализация при входе в игру
+-- ========================================================================
+
+local function InitNSReminder()
+    Debug("InitNSReminder() вызван")
+    
+    -- Проверяем, что всё на месте
+    if UIParent then
+        Debug("UIParent: OK")
+    else
+        Debug("|cFFFF0000UIParent = nil!|r")
+    end
+    
+    if nsDbc then
+        Debug("nsDbc: OK")
+        if nsDbc['luaTest'] then
+            Debug("nsDbc['luaTest'].currentModule = " .. tostring(nsDbc['luaTest'].currentModule))
+        else
+            Debug("nsDbc['luaTest'] = nil")
+        end
+    else
+        Debug("nsDbc = nil")
+    end
+    
+    if OpenLuaCourse then
+        Debug("OpenLuaCourse: OK")
+    else
+        Debug("|cFFFF0000OpenLuaCourse не найдена!|r")
+    end
+    
+    local reminder = NSReminder:New()
+    reminder:Init()
+    _G.NSReminderInstance = reminder
+    Debug("NSReminderInstance сохранён в _G")
+end
+
+Debug("Файл загружен, регистрирую PLAYER_LOGIN...")
+
+local reminderLoader = CreateFrame("Frame")
+reminderLoader:Show()
+reminderLoader:RegisterEvent("PLAYER_LOGIN")
+reminderLoader:SetScript("OnEvent", function(self, event, ...)
+    Debug("Событие получено: " .. tostring(event))
+    
+    local initFrame = CreateFrame("Frame")
+    initFrame:Show()
+    local initElapsed = 0
+    Debug("Запуск 5-сек задержки перед инициализацией...")
+    
+    initFrame:SetScript("OnUpdate", function(frame, elapsed)
+        initElapsed = initElapsed + elapsed
+        if initElapsed >= 5 then
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+            Debug("5 сек прошло, запускаю InitNSReminder...")
+            InitNSReminder()
+        end
+    end)
+end)
+
+Debug("PLAYER_LOGIN зарегистрирован, жду входа в игру...")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
