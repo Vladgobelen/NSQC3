@@ -17668,84 +17668,106 @@ print(a + b)
     [4] = {
         title = "Типы данных в Lua",
         content = [=[
-<h>Типы данных в Lua</h>
+    <h>Типы данных в Lua</h>
 
-Lua имеет 8 основных типов данных. Понимание типов — основа для работы с переменными и функциями.
+    Lua имеет 8 основных типов данных. Понимание типов — основа работы с переменными.
 
-<h>nil — отсутствие значения</h>
+    <h>nil — отсутствие значения</h>
+    <t>nil</t> означает "ничего". Единственное значение типа nil.
 
-<t>nil</t> означает "ничего" или "отсутствие значения". Это единственное значение типа nil.
+    <code>
+    <kw>local</kw> empty <op>=</op> <kw>nil</kw>
+    <kw>local</kw> another  <cm>-- без значения будет nil</cm>
+    </code>
 
-<code>
-<kw>local</kw> empty <op>=</op> <kw>nil</kw>
-<kw>local</kw> another  <cm>-- если не присвоить значение, будет nil</cm>
-</code>
+    <h>boolean — логический тип</h>
+    Два значения: <k>true</k> (истина) и <k>false</k> (ложь).
 
-<h>boolean — логический тип</h>
+    <code>
+    <kw>local</kw> isAlive <op>=</op> <kw>true</kw>
+    <kw>local</kw> isDead <op>=</op> <kw>false</kw>
+    </code>
 
-Имеет всего два значения: <k>true</k> (истина) и <k>false</k> (ложь).
+    <w>Внимание:</w> Только <k>false</k> и <k>nil</k> считаются ложными. 0 и "" — это true!
 
-<code>
-<kw>local</kw> isAlive <op>=</op> <kw>true</kw>
-<kw>local</kw> isDead <op>=</op> <kw>false</kw>
-</code>
+    <h>number — числа (БЕЗ кавычек!)</h>
+    <t> Золотое правило:</t> Числа пишутся <w>БЕЗ</w> кавычек.
 
-<w>Внимание:</w> В Lua только <k>false</k> и <k>nil</k> считаются ложными в условиях. 0 и пустая строка "" — это true!
+    <code>
+    <kw>local</kw> integer <op>=</op> <nu>42</nu>
+    <kw>local</kw> float <op>=</op> <nu>3.14</nu>
+    <kw>local</kw> negative <op>=</op> <op>-</op><nu>10</nu>
+    </code>
 
-<h>number — числа</h>
+    <h>string — строки (В КАВЫЧКАХ!)</h>
+    <t>Золотое правило:</t> Строки пишутся <w>СТРОГО В</w> кавычках.
 
-В Lua все числа представлены типом <k>number</k>. Это могут быть целые числа, дробные, отрицательные.
+    <code>
+    <kw>local</kw> single <op>=</op> <st>'Привет'</st>
+    <kw>local</kw> double <op>=</op> <st>"Мир"</st>
+    </code>
 
-<code>
-<kw>local</kw> integer <op>=</op> <nu>42</nu>
-<kw>local</kw> float <op>=</op> <nu>3.14</nu>
-<kw>local</kw> negative <op>=</op> <op>-</op><nu>10</nu>
-</code>
+    <h>Число vs Строка</h>
+    Даже если <k>print</k> выводит их одинаково, для Lua это РАЗНЫЕ вещи:
 
-<t>Операции с числами:</t> +, -, *, /, ^ (возведение в степень), % (остаток от деления)
+    <code>
+    <cm>-- ЧИСЛО 777</cm>
+    <kw>local</kw> num <op>=</op> <nu>777</nu>
+    <kw>print</kw><op>(</op>num<op>)</op>           <cm>-- 777</cm>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op>num<op>)</op><op>)</op>      <cm>-- "number"</cm>
 
-<h>string — строки</h>
+    <cm>-- СТРОКА "777"</cm>
+    <kw>local</kw> str <op>=</op> <st>"777"</st>
+    <kw>print</kw><op>(</op>str<op>)</op>           <cm>-- 777</cm>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op>str<op>)</op><op>)</op>      <cm>-- "string"</cm>
+    </code>
 
-Строки — это текст. Могут быть в одинарных, двойных кавычках или двойных квадратных скобках.
+    <h>Фишка Lua: Автоприведение</h>
+    Lua умная — сама превращает строки в числа и наоборот, смотря по оператору:
 
-<code>
-<kw>local</kw> single <op>=</op> <st>'Привет'</st>
-<kw>local</kw> double <op>=</op> <st>"Мир"</st>
+    <code>
+    <cm>-- Сложение: строка -> число</cm>
+    <kw>print</kw><op>(</op><st>"777"</st> <op>+</op> <nu>1</nu><op>)</op>    <cm>-- 778 верно</cm>
 
-<cm>-- Конкатенация (склеивание) строк</cm>
-<kw>local</kw> greeting <op>=</op> single <op>..</op> <st>" "</st> <op>..</op> double  <cm>-- "Привет Мир"</cm>
-</code>
+    <cm>-- Конкатенация: число -> строка</cm>
+    <kw>print</kw><op>(</op><nu>777</nu> <op>..</op> <nu>1</nu><op>)</op>     <cm>-- "7771" верно</cm>
+    </code>
 
-<h>table — таблицы</h>
+    <h>Когда будет ОШИБКА?</h>
+    Автоприведение работает только если строка похожа на число:
 
-Таблица — основной и самый мощный тип данных в Lua. Это и массив, и словарь, и объект одновременно.
+    <code>
+    <kw>print</kw><op>(</op><st>"5"</st> <op>+</op> <nu>10</nu><op>)</op>      <cm>-- 15 верно</cm>
+    <kw>print</kw><op>(</op><st>"Привет"</st> <op>+</op> <nu>10</nu><op>)</op>  <cm>-- ОШИБКА!</cm>
+    </code>
 
-<code>
-<cm>-- Как массив (индексы 1, 2, 3...)</cm>
-<kw>local</kw> items <op>=</op> <op>{</op><st>"меч"</st><op>,</op> <st>"щит"</st><op>,</op> <st>"зелье"</st><op>}</op>
-<kw>print</kw><op>(</op>items<op>[</op><nu>1</nu><op>]</op><op>)</op>  <cm>-- "меч"</cm>
+    <h>table — таблицы</h>
+    Самый мощный тип данных. И массив, и словарь одновременно.
 
-<cm>-- Как словарь (ключ-значение)</cm>
-<kw>local</kw> player <op>=</op> <op>{</op>
-    name <op>=</op> <st>"Герой"</st><op>,</op>
-    level <op>=</op> <nu>10</nu>
-<op>}</op>
-<kw>print</kw><op>(</op>player<op>.</op>name<op>)</op>  <cm>-- "Герой"</cm>
-</code>
+    <code>
+    <cm>-- Как массив</cm>
+    <kw>local</kw> items <op>=</op> <op>{</op><st>"меч"</st><op>,</op> <st>"щит"</st><op>,</op> <st>"зелье"</st><op>}</op>
+    <kw>print</kw><op>(</op>items<op>[</op><nu>1</nu><op>]</op><op>)</op>  <cm>-- "меч"</cm>
 
-<h>Как узнать тип переменной?</h>
+    <cm>-- Как словарь</cm>
+    <kw>local</kw> player <op>=</op> <op>{</op>
+        name <op>=</op> <st>"Герой"</st><op>,</op>
+        level <op>=</op> <nu>10</nu>
+    <op>}</op>
+    <kw>print</kw><op>(</op>player<op>.</op>name<op>)</op>  <cm>-- "Герой"</cm>
+    </code>
 
-Функция <k>type()</k> возвращает строку с названием типа:
+    <h>Функция type()</h>
+    Возвращает строку с названием типа переменной:
 
-<code>
-<kw>print</kw><op>(</op><kw>type</kw><op>(</op><nu>42</nu><op>)</op><op>)</op>        <cm>-- "number"</cm>
-<kw>print</kw><op>(</op><kw>type</kw><op>(</op><st>"текст"</st><op>)</op><op>)</op>   <cm>-- "string"</cm>
-<kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>true</kw><op>)</op><op>)</op>      <cm>-- "boolean"</cm>
-<kw>print</kw><op>(</op><kw>type</kw><op>(</op><op>{}</op><op>)</op><op>)</op>        <cm>-- "table"</cm>
-<kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>nil</kw><op>)</op><op>)</op>       <cm>-- "nil"</cm>
-<kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>print</kw><op>)</op><op>)</op>    <cm>-- "function"</cm>
-</code>
-]=]
+    <code>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op><nu>42</nu><op>)</op><op>)</op>        <cm>-- "number"</cm>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op><st>"текст"</st><op>)</op><op>)</op>   <cm>-- "string"</cm>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>true</kw><op>)</op><op>)</op>      <cm>-- "boolean"</cm>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op><op>{}</op><op>)</op><op>)</op>        <cm>-- "table"</cm>
+    <kw>print</kw><op>(</op><kw>type</kw><op>(</op><kw>nil</kw><op>)</op><op>)</op>       <cm>-- "nil"</cm>
+    </code>
+    ]=]
     },
     [5] = {
         title = "Практика: Типы переменных",
@@ -17846,13 +17868,16 @@ print("Строка 5 - должна работать")
     [8] = {
         title = "Практика: Простой print",
         type = "printtest",
-        helpModules = {7},
+        helpModules = {7, 4},
+        content = [=[
+    <h>Практика: простой print</h>
+    ]=],
         tasks = {
             {
                 desc = "Выведи фразу 'HELLO_WOW_123' через print",
-                hint = 'Используй /run print("HELLO_WOW_123")',
+                hint = 'Используй /run print("HELLO_WOW_123") или /run print(\'HELLO_WOW_123\')',
                 pattern = "HELLO_WOW_123",
-                expectedExpression = 'print("HELLO_WOW_123")',
+                expectedExpression = {'print("HELLO_WOW_123")', "print('HELLO_WOW_123')"},
             },
             {
                 desc = "Выведи число 777 через print",
@@ -17861,10 +17886,16 @@ print("Строка 5 - должна работать")
                 expectedExpression = 'print(777)',
             },
             {
+                desc = "Выведи строку '777' через print",
+                hint = 'Используй /run print("777") или /run print(\'777\')',
+                pattern = "777",
+                expectedExpression = {'print("777")', "print('777')"},
+            },
+            {
                 desc = "Выведи фразу 'SIMPLE_TEST_OK' через print",
-                hint = 'Используй /run print("SIMPLE_TEST_OK")',
+                hint = 'Используй /run print("SIMPLE_TEST_OK") или /run print(\'SIMPLE_TEST_OK\')',
                 pattern = "SIMPLE_TEST_OK",
-                expectedExpression = 'print("SIMPLE_TEST_OK")',
+                expectedExpression = {'print("SIMPLE_TEST_OK")', "print('SIMPLE_TEST_OK')"},
             },
         }
     },
@@ -19052,8 +19083,6 @@ function LuaCourse:SaveProgress()
             allComplete = false
         end
         
-        -- Проверяем, был ли модуль уже пройден ранее.
-        -- Если да, то не сбрасываем allComplete из-за отсутствия pendingConcatCount в текущей сессии.
         local wasAlreadyCompleted = details.completed or false
         if module.requireConcatForDescription and allComplete then
             if (not self.pendingConcatCount or self.pendingConcatCount < 2) and not wasAlreadyCompleted then
@@ -19194,7 +19223,6 @@ end
 function LuaCourse:SetupCustomTest(module)
     self.contentText:SetText(ParseMarkup(module.content or ""))
     
-    -- Устанавливаем хук для customtest, если требуются проверки кода
     local needsCodeCheck = false
     if module.tasks then
         for _, task in ipairs(module.tasks) do
@@ -19267,7 +19295,6 @@ function LuaCourse:CheckCustomTasks()
             isComplete = success and result
         end
         
-        -- Проверяем требуемые переменные в коде
         if isComplete and task.requireCodeVars then
             local codeToCheck = self.lastCodeForVar and self.lastCodeForVar[task.var] or ""
             if codeToCheck == "" then
@@ -19294,7 +19321,6 @@ function LuaCourse:CheckCustomTasks()
             end
         end
         
-        -- Проверяем требуемые паттерны в коде (циклы, ключевые слова)
         if isComplete and task.requireCodePatterns then
             local codeToCheck = self.lastExecutedCode or ""
             if codeToCheck == "" then
@@ -20133,11 +20159,28 @@ function LuaCourse:CheckCommentTest(module, resultText)
 end
 
 function LuaCourse:SetupPrintTest(module)
-    self.contentText:SetText(COLORS.HEADER .. "Задание: практика с print" .. COLORS.RESET .. "\n\n" ..
+    local hasConcatTasks = false
+    for _, task in ipairs(module.tasks) do
+        if task.requireConcat then
+            hasConcatTasks = true
+            break
+        end
+    end
+    
+    local headerText = COLORS.HEADER .. "Задание: практика с print" .. COLORS.RESET .. "\n\n" ..
         "Выполни задания, используя команду " .. COLORS.KEYWORD .. "/run" .. COLORS.RESET ..
         " и функцию " .. COLORS.KEYWORD .. "print" .. COLORS.RESET .. ". " ..
-        "Система автоматически отследит вывод в чат.\n\n" ..
-        COLORS.HINT .. "Для заданий на конкатенацию используй оператор .. (две точки)" .. COLORS.RESET)
+        "Система автоматически отследит вывод в чат."
+    
+    if hasConcatTasks then
+        headerText = headerText .. "\n\n" ..
+            COLORS.HINT .. "Для заданий на конкатенацию используй оператор .. (две точки)" .. COLORS.RESET
+    else
+        headerText = headerText .. "\n\n" ..
+            COLORS.HINT .. "В этих заданиях конкатенация не нужна — используй print() с одним аргументом." .. COLORS.RESET
+    end
+    
+    self.contentText:SetText(headerText)
     
     local needsRunScriptHook = false
     for _, task in ipairs(module.tasks) do
@@ -20260,17 +20303,15 @@ function OpenLuaCourse()
         savedModule = nsDbc['luaTest'].totalModules or 24
     end
     
-    -- Проверяем, есть ли уже открытое окно
     if _G.activeLuaCourse and _G.activeLuaCourse.window and _G.activeLuaCourse.window:IsShown() then
         _G.activeLuaCourse.window:Hide()
         return
     end
     
     local course = LuaCourse:new(UIParent)
-    _G.activeLuaCourse = course  -- Сохраняем ссылку глобально
+    _G.activeLuaCourse = course
     course:ShowModule(ns_llua['lua'], savedModule)
 end
-
 
 
 
