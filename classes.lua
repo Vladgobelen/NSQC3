@@ -19564,6 +19564,8 @@ function LuaCourse:ShowModule(courseTable, moduleNumber)
     self.window:SetClampedToScreen(true)
     self.window:SetFrameStrata("HIGH")
     
+    self:LoadWindowState()
+    
     local bg = self.window:CreateTexture(self.uniquePrefix .. "Bg", "BACKGROUND")
     bg:SetAllPoints(self.window)
     bg:SetTexture(0.08, 0.08, 0.12, 0.97)
@@ -19612,6 +19614,7 @@ function LuaCourse:ShowModule(courseTable, moduleNumber)
         end
         self:ClearTestFrames()
         self:SaveProgress()
+        self:SaveWindowState()
         if self.helpWindow then
             self.helpWindow:Hide()
         end
@@ -19706,11 +19709,77 @@ function LuaCourse:ShowModule(courseTable, moduleNumber)
     self.moduleNumText:SetPoint("BOTTOM", self.window, "BOTTOM", 0, 14)
     self.moduleNumText:SetTextColor(0.6, 0.6, 0.7, 1)
     
+    self.scaleButton = CreateFrame("Button", self.uniquePrefix .. "ScaleButton", self.window)
+    self.scaleButton:SetSize(18, 18)
+    self.scaleButton:SetPoint("BOTTOMRIGHT", self.window, "BOTTOMRIGHT", -3, 3)
+    self.scaleButton:SetFrameLevel(self.window:GetFrameLevel() + 10)
+    
+    local scaleTex = self.scaleButton:CreateTexture(nil, "ARTWORK")
+    scaleTex:SetAllPoints(self.scaleButton)
+    scaleTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    
+    self.scaleButton:SetScript("OnEnter", function()
+        scaleTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+        GameTooltip:SetOwner(self.scaleButton, "ANCHOR_TOPLEFT")
+        GameTooltip:SetText("Масштаб окна", 1, 1, 1)
+        local currentScale = math.floor((self.window:GetScale() or 1.0) * 100 + 0.5)
+        GameTooltip:AddLine("Тяните наружу — увеличить", 0.7, 0.9, 0.7)
+        GameTooltip:AddLine("Тяните внутрь — уменьшить", 0.9, 0.7, 0.7)
+        GameTooltip:AddLine("Текущий масштаб: " .. currentScale .. "%", 1, 1, 0.5)
+        GameTooltip:Show()
+    end)
+    
+    self.scaleButton:SetScript("OnLeave", function()
+        scaleTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+        GameTooltip:Hide()
+    end)
+    
+    self.scaleButton:SetScript("OnMouseDown", function()
+        self.isScaling = true
+        self.scaleStartScale = self.window:GetScale() or 1.0
+        self.scaleStartMouseX, self.scaleStartMouseY = GetCursorPosition()
+    end)
+    
+    self.scaleButton:SetScript("OnMouseUp", function()
+        if self.isScaling then
+            self.isScaling = false
+            self:SaveWindowState()
+        end
+    end)
+    
     self.window:SetScript("OnMouseDown", function(frame, button)
-        if button == "LeftButton" then frame:StartMoving() end
+        if button == "LeftButton" then 
+            frame:StartMoving()
+            self.isMoving = true
+        end
     end)
     self.window:SetScript("OnMouseUp", function(frame, button)
         frame:StopMovingOrSizing()
+        if self.isMoving then
+            self.isMoving = false
+            self:SaveWindowState()
+        end
+    end)
+    
+    self.window:SetScript("OnUpdate", function(frame, elapsed)
+        if self.isScaling then
+            local mx, my = GetCursorPosition()
+            
+            local dx = mx - self.scaleStartMouseX
+            local dy = my - self.scaleStartMouseY
+            
+            local sensitivity = 1000
+            local scaleDelta = (dx - dy) / sensitivity
+            
+            local newScale = self.scaleStartScale + scaleDelta
+            
+            newScale = math.max(0.75, math.min(2.0, newScale))
+            
+            local currentScale = self.window:GetScale() or 1.0
+            if math.abs(newScale - currentScale) > 0.001 then
+                self.window:SetScale(newScale)
+            end
+        end
     end)
     
     self:UpdateContent()
@@ -20285,6 +20354,47 @@ function LuaCourse:SetupPrintTest(module)
     self.contentFrame:SetHeight(math.abs(yOffset) + 50)
 end
 
+function LuaCourse:SaveWindowState()
+    if not self.window or not nsDbc['luaTest'] then return end
+    
+    local point, relativeTo, relativePoint, xOfs, yOfs = self.window:GetPoint()
+    local relativeName = "UIParent"
+    if relativeTo and type(relativeTo) == "table" and relativeTo.GetName then
+        relativeName = relativeTo:GetName() or "UIParent"
+    end
+    
+    nsDbc['luaTest'].windowState = {
+        point = point or "CENTER",
+        relativeTo = relativeName,
+        relativePoint = relativePoint or "CENTER",
+        xOfs = xOfs or 0,
+        yOfs = yOfs or 0,
+        scale = self.window:GetScale() or 1.0,
+    }
+end
+
+function LuaCourse:LoadWindowState()
+    if not self.window or not nsDbc['luaTest'] or not nsDbc['luaTest'].windowState then return end
+    
+    local saved = nsDbc['luaTest'].windowState
+    
+    if saved.point then
+        local relFrame = _G[saved.relativeTo] or UIParent
+        self.window:ClearAllPoints()
+        self.window:SetPoint(
+            saved.point,
+            relFrame,
+            saved.relativePoint or saved.point,
+            saved.xOfs or 0,
+            saved.yOfs or 0
+        )
+    end
+    
+    if saved.scale and saved.scale > 0 then
+        self.window:SetScale(saved.scale)
+    end
+end
+
 function OpenLuaCourse()
     if not nsDbc then
         nsDbc = {}
@@ -20295,8 +20405,14 @@ function OpenLuaCourse()
             totalModules     = 24,
             completedModules = {},
             taskDetails      = {},
+            windowState      = {},
         }
     end
+    
+    if not nsDbc['luaTest'].windowState then
+        nsDbc['luaTest'].windowState = {}
+    end
+    
     local savedModule = nsDbc['luaTest'].currentModule or 1
     if savedModule < 1 then savedModule = 1 end
     if savedModule > (nsDbc['luaTest'].totalModules or 24) then
