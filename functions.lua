@@ -4675,3 +4675,149 @@ for i = 1, NUM_CHAT_WINDOWS do
     local frame = _G["ChatFrame" .. i]
     if frame then CreateChatMenuButton(frame) end
 end
+
+
+
+
+
+
+
+-- -- Таблицы для хранения итогов
+-- local lootSummary = {
+--     moneyStrings = {},
+--     items = {}  -- [название] = {count, link}
+-- }
+
+-- -- Функция очистки сообщения от escape-последовательностей
+-- local function CleanMessage(msg)
+--     msg = string.gsub(msg, "|4([^:]+):[^:]+:[^;]+;", "%1")
+--     msg = string.gsub(msg, "|", "")
+--     msg = string.gsub(msg, "%s+", " ")
+--     msg = string.gsub(msg, "^%s+", "")
+--     msg = string.gsub(msg, "%s+$", "")
+--     return msg
+-- end
+
+-- -- Функция извлечения названия и ссылки предмета
+-- local function ExtractItemInfo(msg)
+--     -- Ищем ссылку предмета: |cff......|h[Название]|h|r или просто [Название]
+--     local link = string.match(msg, "(|c%x+|Hitem:%d+.-|h.-|h|r)")
+--     local name = string.match(msg, "%[(.-)%]")
+--     return name, link
+-- end
+
+-- -- Функция формирования чистого сообщения для гильдчата
+-- local function FormatForGuild(event, msg)
+--     if event == "CHAT_MSG_MONEY" then
+--         return CleanMessage(msg)
+--     elseif event == "CHAT_MSG_LOOT" then
+--         local name, link = ExtractItemInfo(msg)
+--         if name then
+--             if link then
+--                 return "Ваша добыча: " .. link
+--             else
+--                 return "Ваша добыча: [" .. name .. "]."
+--             end
+--         end
+--     end
+--     return nil
+-- end
+
+-- -- Нормализация денег
+-- local function NormalizeMoney(gold, silver, copper)
+--     if copper >= 100 then
+--         silver = silver + math.floor(copper / 100)
+--         copper = copper % 100
+--     end
+--     if silver >= 100 then
+--         gold = gold + math.floor(silver / 100)
+--         silver = silver % 100
+--     end
+--     return gold, silver, copper
+-- end
+
+-- -- Функция вывода итогов в гильдчат
+-- local function PrintSummary()
+--     -- Суммируем все сохранённые деньги
+--     local totalGold, totalSilver, totalCopper = 0, 0, 0
+    
+--     for _, moneyStr in ipairs(lootSummary.moneyStrings) do
+--         local g = tonumber(string.match(moneyStr, "(%d+) золот"))
+--         local s = tonumber(string.match(moneyStr, "(%d+) серебр"))
+--         local c = tonumber(string.match(moneyStr, "(%d+) мед"))
+--         totalGold = totalGold + (g or 0)
+--         totalSilver = totalSilver + (s or 0)
+--         totalCopper = totalCopper + (c or 0)
+--     end
+    
+--     local g, s, c = NormalizeMoney(totalGold, totalSilver, totalCopper)
+    
+--     local moneyStr = ""
+--     if g > 0 or s > 0 or c > 0 then
+--         local parts = {}
+--         if g > 0 then table.insert(parts, g .. " золотых") end
+--         if s > 0 then table.insert(parts, s .. " серебряных") end
+--         if c > 0 then table.insert(parts, c .. " медных") end
+--         moneyStr = table.concat(parts, ", ")
+--     end
+    
+--     if moneyStr == "" and not next(lootSummary.items) then
+--         SendChatMessage("Добычи пока нет.", "GUILD")
+--         return
+--     end
+    
+--     SendChatMessage("=== ИТОГИ ДОБЫЧИ ===", "GUILD")
+    
+--     if moneyStr ~= "" then
+--         SendChatMessage("Деньги: " .. moneyStr, "GUILD")
+--     end
+    
+--     if next(lootSummary.items) then
+--         SendChatMessage("Предметы:", "GUILD")
+--         for itemName, itemData in pairs(lootSummary.items) do
+--             local link = itemData.link or "[" .. itemName .. "]"
+--             SendChatMessage("  " .. link .. " x" .. itemData.count, "GUILD")
+--         end
+--     end
+    
+--     SendChatMessage("====================", "GUILD")
+    
+--     -- Сбрасываем
+--     lootSummary.moneyStrings = {}
+--     lootSummary.items = {}
+-- end
+
+-- -- Фрейм для отслеживания добычи И гильдчата
+-- local f = CreateFrame("Frame")
+-- f:RegisterEvent("CHAT_MSG_MONEY")
+-- f:RegisterEvent("CHAT_MSG_LOOT")
+-- f:RegisterEvent("CHAT_MSG_GUILD")
+
+-- f:SetScript("OnEvent", function(self, event, msg, ...)
+--     if event == "CHAT_MSG_GUILD" then
+--         if msg == "-итоги" or string.find(msg, "^%-итоги") then
+--             PrintSummary()
+--         end
+--     elseif event == "CHAT_MSG_MONEY" or event == "CHAT_MSG_LOOT" then
+--         -- Формируем чистое сообщение
+--         local guildMsg = FormatForGuild(event, msg)
+        
+--         if guildMsg then
+--             -- Сохраняем для итогов
+--             if event == "CHAT_MSG_MONEY" then
+--                 table.insert(lootSummary.moneyStrings, guildMsg)
+--             elseif event == "CHAT_MSG_LOOT" then
+--                 local name, link = ExtractItemInfo(msg)
+--                 if name then
+--                     if not lootSummary.items[name] then
+--                         lootSummary.items[name] = { count = 0, link = link }
+--                     end
+--                     lootSummary.items[name].count = lootSummary.items[name].count + 1
+--                 end
+--             end
+            
+--             -- Отправляем в гильдчат
+--             SendChatMessage(guildMsg, "GUILD")
+--         end
+--     end
+-- end)

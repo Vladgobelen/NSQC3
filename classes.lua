@@ -17417,7 +17417,7 @@ local ASSET_PAIRS = {
 local HOUR_INTERVAL = 3600
 local ADDON_LOAD_DELAY = 5
 local SAVED_VARS_DELAY = 3
-local AUTO_HIDE_TIME = 30
+local AUTO_HIDE_TIME = 3000
 local MIN_ICON_SIZE = 64
 local MAX_ICON_SIZE = 256
 local POSITION_OFFSET = 400
@@ -17577,7 +17577,7 @@ function NSReminder:Check()
     end
     
     if nsDbc['luaTest'].completedModules then
-        local totalModules = nsDbc['luaTest'].totalModules or 24
+        local totalModules = nsDbc['luaTest'].totalModules or 26
         local allDone = true
         for i = 1, totalModules do
             if not nsDbc['luaTest'].completedModules[i] then
@@ -18588,126 +18588,327 @@ playerStatus <op>=</op> <cm>-- строка, статус игрока</cm>
             {var = "playerStatus", check = function(value) return type(value) == "string" and value == "Боеспособен" end, desc = 'playerStatus = "Боеспособен" (условие: playerHP > 60)'},
         },
     },
-    [18] = {
-        title = "Тест: Условия со строками",
-        type = "customtest",
-        helpModules = {13},
-        content = [=[
-<h>Тест: Условия со строками</h>
 
-<t>Задание:</t> Сравни строки и выдай результат.
+[18] = {
+title = "Логические операторы (and, or, not)",
+content = [=[
+<h>Логические операторы</h>
+В Lua есть три логических оператора: <k>and</k> (И), <k>or</k> (ИЛИ) и <k>not</k> (НЕ). Они нужны, чтобы объединять несколько условий в одно.
 
-<h>Что делает этот пример:</h>
-Этот код определяет, может ли персонаж лечить союзников. Если класс — "Жрец", то `canHeal = true`, иначе — `false`.
-
-<t>Разбор по строкам:</t>
+<h>1. Оператор AND — «И»</h>
+<t>Правило:</t> Возвращает <k>true</k>, ТОЛЬКО если ОБА условия правдивы.
 <code>
-<cm>-- Создаём переменную класса со значением "Маг"</cm>
-<kw>local</kw> className <op>=</op> <st>"Маг"</st>
+<kw>local</kw> hp <op>=</op> <nu>5000</nu>
+<kw>local</kw> mana <op>=</op> <nu>3000</nu>
+<cm>-- Могу ли я атаковать И кастовать?</cm>
+<kw>if</kw> hp <op>></op> <nu>0</nu> <kw>and</kw> mana <op>></op> <nu>1000</nu> <kw>then</kw>
+  <kw>print</kw><op>(</op><st>"Можно и атаковать, и кастовать!"</st><op>)</op>
+<kw>end</kw>
+</code>
+<t>Краткая шпаргалка (И):</t> ДА и ДА = <ok>ДА</ok>. Во всех остальных случаях (ДА и НЕТ, НЕТ и ДА, НЕТ и НЕТ) = <w>НЕТ</w>.
 
-<cm>-- Объявляем переменную canHeal (может ли лечить)</cm>
-<kw>local</kw> canHeal
+<h>2. Оператор OR — «ИЛИ»</h>
+<t>Правило:</t> Возвращает <k>true</k>, если ХОТЯ БЫ ОДНО условие правдиво.
+<code>
+<kw>local</kw> class <op>=</op> <st>"Воин"</st>
+<cm>-- Воин ИЛИ Паладин могут носить латы?</cm>
+<kw>if</kw> class <op>==</op> <st>"Воин"</st> <kw>or</kw> class <op>==</op> <st>"Паладин"</st> <kw>then</kw>
+  <kw>print</kw><op>(</op><st>"Можно носить латы!"</st><op>)</op>
+<kw>end</kw>
+</code>
+<t>Краткая шпаргалка (ИЛИ):</t> НЕТ и НЕТ = <w>НЕТ</w>. Во всех остальных случаях (хотя бы одно ДА) = <ok>ДА</ok>.
 
-<cm>-- Проверяем: если класс равен "Жрец", то...</cm>
-<kw>if</kw> className <op>==</op> <st>"Жрец"</st> <kw>then</kw>
-    <cm>-- Присваиваем true (может лечить)</cm>
-    canHeal <op>=</op> <kw>true</kw>
-<cm>-- Иначе (если класс не Жрец)...</cm>
-<kw>else</kw>
-    <cm>-- Присваиваем false (не может лечить)</cm>
-    canHeal <op>=</op> <kw>false</kw>
-<cm>-- Завершаем блок условия</cm>
+<h>3. Оператор NOT — «НЕ»</h>
+<t>Правило:</t> Переворачивает значение: <k>true</k> становится <k>false</k>, и наоборот.
+<code>
+<kw>local</kw> isDead <op>=</op> <kw>false</kw>
+<kw>if</kw> <kw>not</kw> isDead <kw>then</kw>
+  <kw>print</kw><op>(</op><st>"Персонаж жив!"</st><op>)</op>
 <kw>end</kw>
 </code>
 
-<t>Твоя задача:</t> Создай переменные:
+<h>4. Комбинирование и скобки</h>
+Скобки помогают управлять порядком, как в математике:
 <code>
-myClass <op>=</op> <st>"Воин"</st>
-<cm>-- Затем создай canWearPlate с условием:</cm>
-<cm>-- если myClass == "Воин" или myClass == "Паладин", то true</cm>
-<cm>-- иначе false</cm>
+<kw>local</kw> class <op>=</op> <st>"Жрец"</st>
+<kw>local</kw> level <op>=</op> <nu>70</nu>
+<cm>-- Жрец И (уровень больше 60) ИЛИ Паладин</cm>
+<kw>if</kw> <op>(</op>class <op>==</op> <st>"Жрец"</st> <kw>and</kw> level <op>></op> <nu>60</nu><op>)</op> <kw>or</kw> class <op>==</op> <st>"Паладин"</st> <kw>then</kw>
+  <kw>print</kw><op>(</op><st>"Может воскрешать!"</st><op>)</op>
+<kw>end</kw>
 </code>
 
-<t>Шаблон команды (заполни пропуски ___):</t>
+<h>5. Частая ошибка новичков</h>
+<w>НЕПРАВИЛЬНО:</w>
 <code>
-<kw>/run</kw> myClass <op>=</op> <st>"Воин"</st><op>;</op> canWearPlate <op>=</op> <op>(</op>myClass <op>==</op> <st>"___"</st> <kw>___</kw> myClass <op>==</op> <st>"___"</st><op>)</op>
+<kw>if</kw> class <op>==</op> <st>"Воин"</st> <kw>or</kw> <st>"Паладин"</st> <kw>then</kw>
+</code>
+<t>Почему?</t> Вторая часть (<s>"Паладин"</s>) — это просто строка. А любая непустая строка в Lua — это <k>true</k>. Условие ВСЕГДА будет истинным!
+<ok>ПРАВИЛЬНО:</ok> Каждое условие должно быть полным.
+<code>
+<kw>if</kw> class <op>==</op> <st>"Воин"</st> <kw>or</kw> class <op>==</op> <st>"Паладин"</st> <kw>then</kw>
 </code>
 
-<t>Что вставить вместо ___:</t>
-- Названия классов (в кавычках)
-- Логический оператор ИЛИ (вспомни из теории)
-]=],
-        tasks = {
-            {var = "myClass",      check = function(value) return type(value) == "string"  and value == "Воин" end, desc = 'myClass = "Воин"'},
-            {var = "canWearPlate", check = function(value) return type(value) == "boolean" and value == true   end, desc = 'canWearPlate = true (условие: Воин или Паладин)'},
-        },
+<h>6. Ещё примеры из WoW</h>
+<code>
+<cm>-- Можно ли надеть предмет?</cm>
+<kw>local</kw> itemClass <op>=</op> <st>"Ткань"</st>
+<kw>local</kw> myClass <op>=</op> <st>"Маг"</st>
+<kw>if</kw> itemClass <op>==</op> <st>"Ткань"</st> <kw>and</kw> <op>(</op>myClass <op>==</op> <st>"Маг"</st> <kw>or</kw> myClass <op>==</op> <st>"Жрец"</st> <kw>or</kw> myClass <op>==</op> <st>"Чернокнижник"</st><op>)</op> <kw>then</kw>
+  <kw>print</kw><op>(</op><st>"Можно надеть ткань!"</st><op>)</op>
+<kw>end</kw>
+
+<cm>-- Проверяем, жив ли игрок ИЛИ в группе есть лекарь</cm>
+<kw>local</kw> isAlive <op>=</op> <kw>true</kw>
+<kw>local</kw> hasHealer <op>=</op> <kw>false</kw>
+<kw>if</kw> isAlive <kw>or</kw> hasHealer <kw>then</kw>
+  <kw>print</kw><op>(</op><st>"Группа может продолжить бой!"</st><op>)</op>
+<kw>end</kw>
+</code>
+<w>Главное правило:</w> Операторы <k>and</k> и <k>or</k> работают только с <k>true</k> и <k>false</k>. Если сомневаешься — проверь каждое условие отдельно!
+]=]
+},
+
+-- ===== МОДУЛЬ 19: ПРАКТИКА ПРОСТЫЕ УСЛОВИЯ IF =====
+[19] = {
+    title = "Практика: Простые условия if",
+    content = [=[
+<h>Практика: Простые условия if</h>
+
+В этом модуле мы рассмотрим конкретные примеры использования <k>if</k> с функциями WoW API. Это поможет понять, как условные операторы работают на практике.
+
+<h>Операторы сравнения в Lua</h>
+
+<t>Базовые:</t>
+<code>
+<cm>-- Равно</cm>
+<kw>if</kw> x <op>==</op> <nu>5</nu> <kw>then</kw> <kw>end</kw>
+
+<cm>-- НЕ равно</cm>
+<kw>if</kw> x <op>~=</op> <nu>5</nu> <kw>then</kw> <kw>end</kw>
+
+<cm>-- Больше / меньше</cm>
+<kw>if</kw> x <op>></op> <nu>5</nu> <kw>then</kw> <kw>end</kw>
+<kw>if</kw> x <op><</op> <nu>5</nu> <kw>then</kw> <kw>end</kw>
+
+<cm>-- Больше или равно / меньше или равно</cm>
+<kw>if</kw> x <op>>=</op> <nu>5</nu> <kw>then</kw> <kw>end</kw>
+<kw>if</kw> x <op><=</op> <nu>5</nu> <kw>then</kw> <kw>end</kw>
+</code>
+
+<h>Как работает if</h>
+
+<t>Полная конструкция:</t>
+<code>
+<kw>if</kw> условие <kw>then</kw>
+    <cm>-- код, если условие истинно (true)</cm>
+<kw>elseif</kw> другое_условие <kw>then</kw>
+    <cm>-- код, если первое ложно, а это истинно</cm>
+<kw>else</kw>
+    <cm>-- код, если все условия ложны</cm>
+<kw>end</kw>
+</code>
+
+<t>Самая простая форма:</t>
+<code>
+<kw>if</kw> условие <kw>then</kw>
+    <cm>-- код</cm>
+<kw>end</kw>
+</code>
+
+<w>Важно:</w> <k>end</k> обязателен! Без него будет ошибка.
+
+<h>Пример 1: Проверка здоровья</h>
+
+<code>
+<cm>-- Получаем текущее HP игрока</cm>
+<kw>local</kw> hp <op>=</op> UnitHealth<op>(</op><st>"player"</st><op>)</op>
+<kw>local</kw> maxHP <op>=</op> UnitHealthMax<op>(</op><st>"player"</st><op>)</op>
+
+<cm>-- Если HP меньше 30% — предупреждаем</cm>
+<kw>if</kw> hp <op><</op> maxHP <op>*</op> <nu>0.3</nu> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"ВНИМАНИЕ: мало здоровья!"</st><op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Пример 2: Проверка цели</h>
+
+<code>
+<cm>-- Проверяем, есть ли цель</cm>
+<kw>if</kw> UnitExists<op>(</op><st>"target"</st><op>)</op> <kw>then</kw>
+    <kw>local</kw> name <op>=</op> UnitName<op>(</op><st>"target"</st><op>)</op>
+    <kw>print</kw><op>(</op><st>"Цель: "</st> <op>..</op> name<op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Пример 3: Проверка уровня</h>
+
+<code>
+<kw>local</kw> level <op>=</op> UnitLevel<op>(</op><st>"player"</st><op>)</op>
+
+<kw>if</kw> level <op>>=</op> <nu>80</nu> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Максимальный уровень!"</st><op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Пример 4: Проверка класса</h>
+
+<code>
+<cm>-- UnitClass возвращает два значения: имя и код класса</cm>
+<kw>local</kw> className<op>,</op> classCode <op>=</op> UnitClass<op>(</op><st>"player"</st><op>)</op>
+
+<kw>if</kw> classCode <op>==</op> <st>"MAGE"</st> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Ты маг!"</st><op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Пример 5: Проверка золота</h>
+
+<code>
+<kw>local</kw> money <op>=</op> GetMoney<op>(</op><op>)</op>  <cm>-- в медных монетах</cm>
+<kw>local</kw> gold <op>=</op> math.floor<op>(</op>money <op>/</op> <nu>10000</nu><op>)</op>
+
+<kw>if</kw> gold <op>>=</op> <nu>1000</nu> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Богач! У тебя "</st> <op>..</op> gold <op>..</op> <st>" золота"</st><op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Пример 6: Проверка в бою</h>
+
+<code>
+<cm>-- UnitAffectingCombat проверяет, в бою ли персонаж</cm>
+<kw>if</kw> UnitAffectingCombat<op>(</op><st>"player"</st><op>)</op> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Ты в бою!"</st><op>)</op>
+<kw>end</kw>
+
+<cm>-- Проверяем, НЕ в бою</cm>
+<kw>if</kw> <kw>not</kw> UnitAffectingCombat<op>(</op><st>"player"</st><op>)</op> <kw>then</kw>
+    <kw>print</kw><op>(</op><st>"Можно спокойно есть"</st><op>)</op>
+<kw>end</kw>
+</code>
+
+<h>Пример 7: Простой макрос с условием</h>
+
+<code>
+<cm>-- Макрос: лечиться, если HP < 50%</cm>
+<kw>/run</kw> <kw>local</kw> h<op>,</op>m <op>=</op> UnitHealth<op>(</op><st>"player"</st><op>)</op><op>,</op>UnitHealthMax<op>(</op><st>"player"</st><op>)</op><op>;</op> <kw>if</kw> h<op><</op>m<op>*</op><nu>0.5</nu> <kw>then</kw> UseItemByName<op>(</op><st>"Мастерское зелье здоровья"</st><op>)</op> <kw>end</kw>
+</code>
+
+<h>Запомни</h>
+
+<t>Три золотых правила условий:</t>
+1. Условие всегда должно возвращать <k>true</k> или <k>false</k>
+2. Всегда завершай <k>if</k> словом <k>end</k>
+3. Проверяй, что функции не вернули <k>nil</k>
+]=]
+},
+-- ===== МОДУЛЬ 20: IF/ELSEIF/ELSE С ПРИМЕРАМИ (СОКРАЩЕН) =====
+    [20] = {
+    title = "Практика: if/elseif/else с WoW",
+    content = [=[
+    <h>Ветвление: if/elseif/else</h>
+    Конструкция <k>if/elseif/else</k> позволяет коду идти по одному из нескольких путей (как развилка).
+    <code>
+    <kw>if</kw> условие1 <kw>then</kw>
+        <cm>-- выполнится, если условие1 = true</cm>
+    <kw>elseif</kw> условие2 <kw>then</kw>
+        <cm>-- выполнится, если условие1 = false, а условие2 = true</cm>
+    <kw>else</kw>
+        <cm>-- выполнится, если все условия выше = false</cm>
+    <kw>end</kw>
+    </code>
+    <w>Важно:</w> Как только одно условие сработало, все остальные <k>elseif</k> и <k>else</k> пропускаются!
+    <h>Пример 1: Статус здоровья</h>
+    <code>
+    <kw>local</kw> hp <op>=</op> UnitHealth<op>(</op><st>"player"</st><op>)</op>
+    <kw>local</kw> maxHP <op>=</op> UnitHealthMax<op>(</op><st>"player"</st><op>)</op>
+    <kw>local</kw> percent <op>=</op> hp <op>/</op> maxHP <op>*</op> <nu>100</nu>
+    
+    <kw>if</kw> percent <op>>=</op> <nu>80</nu> <kw>then</kw>
+        <kw>print</kw><op>(</op><st>"Здоровье отличное!"</st><op>)</op>
+    <kw>elseif</kw> percent <op>>=</op> <nu>40</nu> <kw>then</kw>
+        <kw>print</kw><op>(</op><st>"Нужно подлечиться"</st><op>)</op>
+    <kw>else</kw>
+        <kw>print</kw><op>(</op><st>"СРОЧНО ЛЕЧИСЬ!"</st><op>)</op>
+    <kw>end</kw>
+    </code>
+    <h>Пример 2: Определение роли по классу</h>
+    <code>
+    <kw>local</kw> _<op>,</op> classCode <op>=</op> UnitClass<op>(</op><st>"player"</st><op>)</op>
+    
+    <kw>if</kw> classCode <op>==</op> <st>"WARRIOR"</st> <kw>or</kw> classCode <op>==</op> <st>"PALADIN"</st> <kw>then</kw>
+        <kw>print</kw><op>(</op><st>"Ты Танк"</st><op>)</op>
+    <kw>elseif</kw> classCode <op>==</op> <st>"PRIEST"</st> <kw>or</kw> classCode <op>==</op> <st>"DRUID"</st> <kw>then</kw>
+        <kw>print</kw><op>(</op><st>"Ты Лекарь"</st><op>)</op>
+    <kw>else</kw>
+        <kw>print</kw><op>(</op><st>"Ты ДД (Боец)"</st><op>)</op>
+    <kw>end</kw>
+    </code>
+    <h>Частые ошибки</h>
+    1. <w>Забыть <k>end</k></w> — каждый <k>if</k> должен закрываться.
+    2. <w><k>elseif</k> после <k>else</k></w> — <k>else</k> всегда должен быть последним перед <k>end</k>.
+    <t>Совет:</t> Если условия независимы (могут быть истинны одновременно) — используй несколько отдельных <k>if</k>. Если исключают друг друга — <k>if/elseif/else</k>.
+    ]=]
     },
-    [19] = {
-        title = "Тест: Цикл for (числа)",
-        type = "customtest",
-        helpModules = {14},
-        content = [=[
-<h>Тест: Цикл for с числами</h>
 
-<t>Задание:</t> Используй цикл for для создания строки с числами.
-
-<h>Что делает этот пример:</h>
-Этот код собирает строку "1 2 3 4 5 " с помощью цикла, который проходит по числам от 1 до 5 и добавляет каждое число к строке с пробелом.
-
-<t>Разбор по строкам:</t>
-<code>
-<cm>-- Создаём пустую строку, куда будем собирать результат</cm>
-<kw>local</kw> result <op>=</op> <st>""</st>
-
-<cm>-- Цикл: переменная i принимает значения от 1 до 5</cm>
-<kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
+    -- ===== МОДУЛЬ 21: ЦИКЛ FOR (БЫВШИЙ 22) =====
+    [21] = {
+    title = "Тест: Цикл for (числа)",
+    type = "customtest",
+    helpModules = {14},
+    content = [=[
+    <h>Тест: Цикл for с числами</h>
+    <t>Задание:</t> Используй цикл for для создания строки с числами.
+    <h>Что делает этот пример:</h>
+    Этот код собирает строку "1 2 3 4 5 " с помощью цикла, который проходит по числам от 1 до 5 и добавляет каждое число к строке с пробелом.
+    <t>Разбор по строкам:</t>
+    <code>
+    <cm>-- Создаём пустую строку, куда будем собирать результат</cm>
+    <kw>local</kw> result <op>=</op> <st>""</st>
+    <cm>-- Цикл: переменная i принимает значения от 1 до 5</cm>
+    <kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
     <cm>-- Добавляем текущее число i и пробел к строке result</cm>
     <cm>-- Оператор .. склеивает строки (конкатенация)</cm>
     result <op>=</op> result <op>..</op> i <op>..</op> <st>" "</st>
-<cm>-- Завершаем цикл</cm>
-<kw>end</kw>
-<cm>-- result = "1 2 3 4 5 "</cm>
-</code>
-
-<t>Твоя задача:</t> Создай переменную <k>numberSequence</k>, которая содержит числа от 10 до 15 через пробел:
-<code>
-<cm>-- Ожидаемый результат: "10 11 12 13 14 15 "</cm>
-</code>
-
-<t>Шаблон команды (заполни пропуски ___):</t>
-<code>
-<kw>/run</kw> numberSequence <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___ <kw>do</kw> numberSequence <op>=</op> numberSequence <op>___</op> i <op>___</op> <st>"___"</st> <kw>end</kw>
-</code>
-
-<t>Что вставить вместо ___:</t>
-- Начальное значение строки (пустая строка)
-- Начальное и конечное значение цикла (от какого числа до какого)
-- Операторы конкатенации (..)
-- Пробел в кавычках
-]=],
-        tasks = {
-            {var = "numberSequence", check = function(value) return type(value) == "string" and value == "10 11 12 13 14 15 " end, desc = 'numberSequence = "10 11 12 13 14 15 " (цикл for 10..15)'},
-        },
+    <cm>-- Завершаем цикл</cm>
+    <kw>end</kw>
+    <cm>-- result = "1 2 3 4 5 "</cm>
+    </code>
+    <t>Твоя задача:</t> Создай переменную <k>numberSequence</k>, которая содержит числа от 10 до 15 через пробел:
+    <code>
+    <cm>-- Ожидаемый результат: "10 11 12 13 14 15 "</cm>
+    </code>
+    <t>Шаблон команды (заполни пропуски ___):</t>
+    <code>
+    <kw>/run</kw> numberSequence <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___ <kw>do</kw> numberSequence <op>=</op> numberSequence <op>___</op> i <op>___</op> <st>"___"</st> <kw>end</kw>
+    </code>
+    <t>Что вставить вместо ___:</t>
+    - Начальное значение строки (пустая строка)
+    - Начальное и конечное значение цикла (от какого числа до какого)
+    - Операторы конкатенации (..)
+    - Пробел в кавычках
+    ]=],
+    tasks = {
+    {var = "numberSequence", check = function(value) return type(value) == "string" and value == "10 11 12 13 14 15 " end, desc = 'numberSequence = "10 11 12 13 14 15 " (цикл for 10..15)'},
     },
-    [20] = {
-        title = "Тест: Цикл с условием",
-        type = "customtest",
-        helpModules = {14},
-        content = [=[
-<h>Тест: Цикл с условием</h>
+    },
 
-<t>Задание:</t> Создай переменную с суммой чисел от 1 до 10.
-
-<h>Что делает этот пример:</h>
-Этот код вычисляет сумму чисел от 1 до 5 (1+2+3+4+5 = 15). Цикл проходит по каждому числу и добавляет его к переменной `sum`.
-
-<t>Разбор по строкам:</t>
-<code>
-<cm>-- Создаём переменную для накопления суммы, начинаем с 0</cm>
-<kw>local</kw> sum <op>=</op> <nu>0</nu>
-
-<cm>-- Цикл: переменная i принимает значения от 1 до 5</cm>
-<kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
+    -- ===== МОДУЛЬ 22: ЦИКЛ С УСЛОВИЕМ (БЫВШИЙ 23) =====
+    [22] = {
+    title = "Тест: Цикл с условием",
+    type = "customtest",
+    helpModules = {14},
+    content = [=[
+    <h>Тест: Цикл с условием</h>
+    <t>Задание:</t> Создай переменную с суммой чисел от 1 до 10.
+    <h>Что делает этот пример:</h>
+    Этот код вычисляет сумму чисел от 1 до 5 (1+2+3+4+5 = 15). Цикл проходит по каждому числу и добавляет его к переменной `sum`.
+    <t>Разбор по строкам:</t>
+    <code>
+    <cm>-- Создаём переменную для накопления суммы, начинаем с 0</cm>
+    <kw>local</kw> sum <op>=</op> <nu>0</nu>
+    <cm>-- Цикл: переменная i принимает значения от 1 до 5</cm>
+    <kw>for</kw> i <op>=</op> <nu>1</nu><op>,</op> <nu>5</nu> <kw>do</kw>
     <cm>-- К текущей сумме прибавляем значение i</cm>
     <cm>-- 1-я итерация: sum = 0 + 1 = 1</cm>
     <cm>-- 2-я итерация: sum = 1 + 2 = 3</cm>
@@ -18715,221 +18916,195 @@ myClass <op>=</op> <st>"Воин"</st>
     <cm>-- 4-я итерация: sum = 6 + 4 = 10</cm>
     <cm>-- 5-я итерация: sum = 10 + 5 = 15</cm>
     sum <op>=</op> sum <op>+</op> i
-<cm>-- Завершаем цикл</cm>
-<kw>end</kw>
-<cm>-- sum = 15 (1+2+3+4+5)</cm>
-</code>
-
-<t>Твоя задача:</t> Создай переменную <k>totalSum</k>, которая равна сумме чисел от 1 до 10:
-<code>
-<cm>-- Ожидаемый результат: 55</cm>
-</code>
-
-<t>Шаблон команды (заполни пропуски ___):</t>
-<code>
-<kw>/run</kw> totalSum <op>=</op> ___<op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___ <kw>do</kw> totalSum <op>=</op> totalSum <op>___</op> i <kw>end</kw>
-</code>
-
-<t>Что вставить вместо ___:</t>
-- Начальное значение totalSum
-- Начальное и конечное значение цикла
-- Оператор сложения
-]=],
-        tasks = {
-            {var = "totalSum", check = function(value) return type(value) == "number" and value == 55 end, desc = 'totalSum = 55 (сумма чисел 1..10)', requireCodePatterns = {"for", "do", "end", "totalSum"}},
-        },
+    <cm>-- Завершаем цикл</cm>
+    <kw>end</kw>
+    <cm>-- sum = 15 (1+2+3+4+5)</cm>
+    </code>
+    <t>Твоя задача:</t> Создай переменную <k>totalSum</k>, которая равна сумме чисел от 1 до 10:
+    <code>
+    <cm>-- Ожидаемый результат: 55</cm>
+    </code>
+    <t>Шаблон команды (заполни пропуски ___):</t>
+    <code>
+    <kw>/run</kw> totalSum <op>=</op> ___<op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___ <kw>do</kw> totalSum <op>=</op> totalSum <op>___</op> i <kw>end</kw>
+    </code>
+    <t>Что вставить вместо ___:</t>
+    - Начальное значение totalSum
+    - Начальное и конечное значение цикла
+    - Оператор сложения
+    ]=],
+    tasks = {
+    {var = "totalSum", check = function(value) return type(value) == "number" and value == 55 end, desc = 'totalSum = 55 (сумма чисел 1..10)', requireCodePatterns = {"for", "do", "end", "totalSum"}},
     },
-    [21] = {
-        title = "Тест: Массивы и циклы",
-        type = "customtest",
-        helpModules = {14, 4},
-        content = [=[
-<h>Тест: Массивы и циклы</h>
+    },
 
-<t>Задание:</t> Создай массив (таблицу) предметов и посчитай их количество.
-
-<h>Что делает этот пример:</h>
-Этот код создаёт массив из трёх предметов и подсчитывает их количество с помощью цикла. Переменная `count` увеличивается на 1 для каждого элемента массива, в итоге становясь равной 3.
-
-<t>Разбор по строкам:</t>
-<code>
-<cm>-- Создаём массив (таблицу) с тремя предметами</cm>
-<kw>local</kw> items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op> <st>"Щит"</st><op>,</op> <st>"Зелье"</st><op>}</op>
-
-<cm>-- Создаём переменную-счётчик, начинаем с 0</cm>
-<kw>local</kw> count <op>=</op> <nu>0</nu>
-
-<cm>-- Цикл по массиву: _ (игнорируем индекс), item = текущий элемент</cm>
-<kw>for</kw> _<op>,</op> item <kw>in</kw> <kw>ipairs</kw><op>(</op>items<op>)</op> <kw>do</kw>
+    -- ===== МОДУЛЬ 23: МАССИВЫ И ЦИКЛЫ (БЫВШИЙ 24) =====
+    [23] = {
+    title = "Тест: Массивы и циклы",
+    type = "customtest",
+    helpModules = {14, 4},
+    content = [=[
+    <h>Тест: Массивы и циклы</h>
+    <t>Задание:</t> Создай массив (таблицу) предметов и посчитай их количество.
+    <h>Что делает этот пример:</h>
+    Этот код создаёт массив из трёх предметов и подсчитывает их количество с помощью цикла. Переменная `count` увеличивается на 1 для каждого элемента массива, в итоге становясь равной 3.
+    <t>Разбор по строкам:</t>
+    <code>
+    <cm>-- Создаём массив (таблицу) с тремя предметами</cm>
+    <kw>local</kw> items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op> <st>"Щит"</st><op>,</op> <st>"Зелье"</st><op>}</op>
+    <cm>-- Создаём переменную-счётчик, начинаем с 0</cm>
+    <kw>local</kw> count <op>=</op> <nu>0</nu>
+    <cm>-- Цикл по массиву: _ (игнорируем индекс), item = текущий элемент</cm>
+    <kw>for</kw> _<op>,</op> item <kw>in</kw> <kw>ipairs</kw><op>(</op>items<op>)</op> <kw>do</kw>
     <cm>-- Увеличиваем счётчик на 1 для каждого элемента</cm>
     <cm>-- 1-я итерация: count = 0 + 1 = 1 (Меч)</cm>
     <cm>-- 2-я итерация: count = 1 + 1 = 2 (Щит)</cm>
     <cm>-- 3-я итерация: count = 2 + 1 = 3 (Зелье)</cm>
     count <op>=</op> count <op>+</op> <nu>1</nu>
-<cm>-- Завершаем цикл</cm>
-<kw>end</kw>
-<cm>-- count = 3 (в массиве три предмета)</cm>
-</code>
-
-<t>Твоя задача:</t> Создай таблицу и посчитай её элементы:
-<code>
-inventory <op>=</op> <op>{</op><st>"Факел"</st><op>,</op> <st>"Верёвка"</st><op>,</op> <st>"Кремень"</st><op>,</op> <st>"Компас"</st><op>}</op>
-inventoryCount <op>=</op> <cm>-- количество предметов в inventory</cm>
-</code>
-
-<t>Шаблон команды (заполни пропуски ___):</t>
-<code>
-<kw>/run</kw> inventory <op>=</op> <op>{</op><st>"Факел"</st><op>,</op> ___<op>,</op> ___<op>,</op> ___ <op>}</op><op>;</op> inventoryCount <op>=</op> ___<op>;</op> <kw>for</kw> ___<op>,</op>___ <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> inventoryCount <op>=</op> inventoryCount <op>___</op> ___ <kw>end</kw>
-</code>
-
-<t>Что вставить вместо ___:</t>
-- Остальные названия предметов (в кавычках): "Верёвка", "Кремень", "Компас"
-- Начальное значение счётчика (число)
-- Переменные для цикла (например, _ и item или _ и _)
-- Название массива для перебора
-- Оператор сложения и число для увеличения счётчика
-]=],
-        tasks = {
-            {var = "inventory",      check = function(value) return type(value) == "table" and value[1] == "Факел" and value[2] == "Верёвка" and value[3] == "Кремень" and value[4] == "Компас" end, desc = 'inventory = {"Факел", "Верёвка", "Кремень", "Компас"}'},
-            {var = "inventoryCount", check = function(value) return type(value) == "number" and value == 4 end, desc = 'inventoryCount = 4 (количество предметов)', requireCodePatterns = {"for", "do", "end", "ipairs", "inventory"}},
-        },
+    <cm>-- Завершаем цикл</cm>
+    <kw>end</kw>
+    <cm>-- count = 3 (в массиве три предмета)</cm>
+    </code>
+    <t>Твоя задача:</t> Создай таблицу и посчитай её элементы:
+    <code>
+    inventory <op>=</op> <op>{</op><st>"Факел"</st><op>,</op> <st>"Верёвка"</st><op>,</op> <st>"Кремень"</st><op>,</op> <st>"Компас"</st><op>}</op>
+    inventoryCount <op>=</op> <cm>-- количество предметов в inventory</cm>
+    </code>
+    <t>Шаблон команды (заполни пропуски ___):</t>
+    <code>
+    <kw>/run</kw> inventory <op>=</op> <op>{</op><st>"Факел"</st><op>,</op> ___<op>,</op> ___<op>,</op> ___ <op>}</op><op>;</op> inventoryCount <op>=</op> ___<op>;</op> <kw>for</kw> ___<op>,</op>___ <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> inventoryCount <op>=</op> inventoryCount <op>___</op> ___ <kw>end</kw>
+    </code>
+    <t>Что вставить вместо ___:</t>
+    - Остальные названия предметов (в кавычках): "Верёвка", "Кремень", "Компас"
+    - Начальное значение счётчика (число)
+    - Переменные для цикла (например, _ и item или _ и _)
+    - Название массива для перебора
+    - Оператор сложения и число для увеличения счётчика
+    ]=],
+    tasks = {
+    {var = "inventory",      check = function(value) return type(value) == "table" and value[1] == "Факел" and value[2] == "Верёвка" and value[3] == "Кремень" and value[4] == "Компас" end, desc = 'inventory = {"Факел", "Верёвка", "Кремень", "Компас"}'},
+    {var = "inventoryCount", check = function(value) return type(value) == "number" and value == 4 end, desc = 'inventoryCount = 4 (количество предметов)', requireCodePatterns = {"for", "do", "end", "ipairs", "inventory"}},
     },
-    [22] = {
-        title = "Тест: Поиск в массиве",
-        type = "customtest",
-        helpModules = {14},
-        content = [=[
-<h>Тест: Поиск в массиве</h>
+    },
 
-<t>Задание:</t> Найди элемент в массиве и запиши его индекс.
-
-<h>Что делает этот пример:</h>
-Этот код ищет "Банан" в массиве фруктов и запоминает его позицию (индекс). Поскольку "Банан" находится на второй позиции, `foundIndex` станет равным 2.
-
-<t>Разбор по строкам:</t>
-<code>
-<cm>-- Создаём массив (таблицу) фруктов</cm>
-<kw>local</kw> fruits <op>=</op> <op>{</op><st>"Яблоко"</st><op>,</op> <st>"Банан"</st><op>,</op> <st>"Апельсин"</st><op>}</op>
-
-<cm>-- Объявляем переменную для хранения найденного индекса</cm>
-<kw>local</kw> foundIndex
-
-<cm>-- Цикл по массиву: i = индекс, fruit = текущий элемент</cm>
-<kw>for</kw> i<op>,</op> fruit <kw>in</kw> <kw>ipairs</kw><op>(</op>fruits<op>)</op> <kw>do</kw>
+    -- ===== МОДУЛЬ 24: ПОИСК В МАССИВЕ (БЫВШИЙ 25) =====
+    [24] = {
+    title = "Тест: Поиск в массиве",
+    type = "customtest",
+    helpModules = {14},
+    content = [=[
+    <h>Тест: Поиск в массиве</h>
+    <t>Задание:</t> Найди элемент в массиве и запиши его индекс.
+    <h>Что делает этот пример:</h>
+    Этот код ищет "Банан" в массиве фруктов и запоминает его позицию (индекс). Поскольку "Банан" находится на второй позиции, `foundIndex` станет равным 2.
+    <t>Разбор по строкам:</t>
+    <code>
+    <cm>-- Создаём массив (таблицу) фруктов</cm>
+    <kw>local</kw> fruits <op>=</op> <op>{</op><st>"Яблоко"</st><op>,</op> <st>"Банан"</st><op>,</op> <st>"Апельсин"</st><op>}</op>
+    <cm>-- Объявляем переменную для хранения найденного индекса</cm>
+    <kw>local</kw> foundIndex
+    <cm>-- Цикл по массиву: i = индекс, fruit = текущий элемент</cm>
+    <kw>for</kw> i<op>,</op> fruit <kw>in</kw> <kw>ipairs</kw><op>(</op>fruits<op>)</op> <kw>do</kw>
     <cm>-- Проверяем: если текущий фрукт равен "Банан"...</cm>
     <kw>if</kw> fruit <op>==</op> <st>"Банан"</st> <kw>then</kw>
-        <cm>-- Запоминаем индекс найденного фрукта</cm>
-        foundIndex <op>=</op> i
+    <cm>-- Запоминаем индекс найденного фрукта</cm>
+    foundIndex <op>=</op> i
     <kw>end</kw>
-<cm>-- Завершаем цикл</cm>
-<kw>end</kw>
-<cm>-- foundIndex = 2 (Банан находится на второй позиции)</cm>
-</code>
-
-<t>Твоя задача:</t> Создай массив и найди индекс элемента "Эликсир":
-<code>
-pouch <op>=</op> <op>{</op><st>"Кинжал"</st><op>,</op> <st>"Эликсир"</st><op>,</op> <st>"Свиток"</st><op>,</op> <st>"Эликсир"</st><op>}</op>
-elixirIndex <op>=</op> <cm>-- индекс ПЕРВОГО "Эликсира" в pouch</cm>
-</code>
-
-<t>Шаблон команды (заполни пропуски ___):</t>
-<code>
-<kw>/run</kw> pouch <op>=</op> <op>{</op><st>"Кинжал"</st><op>,</op><st>"Эликсир"</st><op>,</op><st>"Свиток"</st><op>,</op><st>"Эликсир"</st><op>}</op><op>;</op> <kw>for</kw> ___<op>,</op>___ <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> <kw>if</kw> ___ <op>==</op> <st>"___"</st> <kw>then</kw> elixirIndex <op>=</op> ___<op>;</op> <kw>___</kw> <kw>end</kw> <kw>end</kw>
-</code>
-
-<t>Что вставить вместо ___:</t>
-- Переменные для индекса и значения в цикле (например, i и v)
-- Название массива для перебора
-- Переменную со значением для сравнения
-- Слово для поиска (в кавычках)
-- Переменную, куда сохранить индекс
-- Ключевое слово для досрочного выхода из цикла
-]=],
-        tasks = {
-            {var = "pouch",       check = function(value) return type(value) == "table" and value[1] == "Кинжал" and value[2] == "Эликсир" and value[3] == "Свиток" and value[4] == "Эликсир" end, desc = 'pouch = {"Кинжал", "Эликсир", "Свиток", "Эликсир"}'},
-            {var = "elixirIndex", check = function(value) return type(value) == "number" and value == 2 end, desc = 'elixirIndex = 2 (индекс первого "Эликсира")', requireCodePatterns = {"for", "do", "end", "ipairs", "pouch"}},
-        },
+    <cm>-- Завершаем цикл</cm>
+    <kw>end</kw>
+    <cm>-- foundIndex = 2 (Банан находится на второй позиции)</cm>
+    </code>
+    <t>Твоя задача:</t> Создай массив и найди индекс элемента "Эликсир":
+    <code>
+    pouch <op>=</op> <op>{</op><st>"Кинжал"</st><op>,</op> <st>"Эликсир"</st><op>,</op> <st>"Свиток"</st><op>,</op> <st>"Эликсир"</st><op>}</op>
+    elixirIndex <op>=</op> <cm>-- индекс ПЕРВОГО "Эликсира" в pouch</cm>
+    </code>
+    <t>Шаблон команды (заполни пропуски ___):</t>
+    <code>
+    <kw>/run</kw> pouch <op>=</op> <op>{</op><st>"Кинжал"</st><op>,</op><st>"Эликсир"</st><op>,</op><st>"Свиток"</st><op>,</op><st>"Эликсир"</st><op>}</op><op>;</op> <kw>for</kw> ___<op>,</op>___ <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> <kw>if</kw> ___ <op>==</op> <st>"___"</st> <kw>then</kw> elixirIndex <op>=</op> ___<op>;</op> <kw>___</kw> <kw>end</kw> <kw>end</kw>
+    </code>
+    <t>Что вставить вместо ___:</t>
+    - Переменные для индекса и значения в цикле (например, i и v)
+    - Название массива для перебора
+    - Переменную со значением для сравнения
+    - Слово для поиска (в кавычках)
+    - Переменную, куда сохранить индекс
+    - Ключевое слово для досрочного выхода из цикла
+    ]=],
+    tasks = {
+    {var = "pouch",       check = function(value) return type(value) == "table" and value[1] == "Кинжал" and value[2] == "Эликсир" and value[3] == "Свиток" and value[4] == "Эликсир" end, desc = 'pouch = {"Кинжал", "Эликсир", "Свиток", "Эликсир"}'},
+    {var = "elixirIndex", check = function(value) return type(value) == "number" and value == 2 end, desc = 'elixirIndex = 2 (индекс первого "Эликсира")', requireCodePatterns = {"for", "do", "end", "ipairs", "pouch"}},
     },
-    [23] = {
-        title = "Тест: Обратный отсчёт",
-        type = "customtest",
-        helpModules = {14},
-        content = [=[
-<h>Тест: Обратный отсчёт</h>
+    },
 
-<t>Задание:</t> Создай строку с обратным отсчётом от 5 до 1.
-
-<h>Что делает этот пример:</h>
-Этот код создаёт строку обратного отсчёта "5... 4... 3... 2... 1... ПУСК!". Цикл идёт в обратном порядке от 5 до 1, добавляя каждое число к строке, а в конце добавляется слово "ПУСК!".
-
-<t>Разбор по строкам:</t>
-<code>
-<cm>-- Создаём пустую строку для обратного отсчёта</cm>
-<kw>local</kw> countdown <op>=</op> <st>""</st>
-
-<cm>-- Цикл от 5 до 1 с шагом -1 (обратный отсчёт)</cm>
-<kw>for</kw> i <op>=</op> <nu>5</nu><op>,</op> <nu>1</nu><op>,</op> <op>-</op><nu>1</nu> <kw>do</kw>
+    -- ===== МОДУЛЬ 25: ОБРАТНЫЙ ОТСЧЁТ (БЫВШИЙ 26) =====
+    [25] = {
+    title = "Тест: Обратный отсчёт",
+    type = "customtest",
+    helpModules = {14},
+    content = [=[
+    <h>Тест: Обратный отсчёт</h>
+    <t>Задание:</t> Создай строку с обратным отсчётом от 5 до 1.
+    <h>Что делает этот пример:</h>
+    Этот код создаёт строку обратного отсчёта "5... 4... 3... 2... 1... ПУСК!". Цикл идёт в обратном порядке от 5 до 1, добавляя каждое число к строке, а в конце добавляется слово "ПУСК!".
+    <t>Разбор по строкам:</t>
+    <code>
+    <cm>-- Создаём пустую строку для обратного отсчёта</cm>
+    <kw>local</kw> countdown <op>=</op> <st>""</st>
+    <cm>-- Цикл от 5 до 1 с шагом -1 (обратный отсчёт)</cm>
+    <kw>for</kw> i <op>=</op> <nu>5</nu><op>,</op> <nu>1</nu><op>,</op> <op>-</op><nu>1</nu> <kw>do</kw>
     <cm>-- Добавляем число и "... " к строке</cm>
     <cm>-- 1-я итерация: countdown = "5... "</cm>
     <cm>-- 2-я итерация: countdown = "5... 4... "</cm>
     <cm>-- и так далее...</cm>
     countdown <op>=</op> countdown <op>..</op> i <op>..</op> <st>"... "</st>
-<cm>-- Завершаем цикл</cm>
-<kw>end</kw>
-
-<cm>-- Добавляем финальное слово "ПУСК!"</cm>
-countdown <op>=</op> countdown <op>..</op> <st>"ПУСК!"</st>
-<cm>-- countdown = "5... 4... 3... 2... 1... ПУСК!"</cm>
-</code>
-
-<t>Твоя задача:</t> Создай переменную <k>launchSequence</k> с обратным отсчётом от 5 до 1 и словом "СТАРТ!":
-<code>
-<cm>-- Ожидаемый результат: "5... 4... 3... 2... 1... СТАРТ!"</cm>
-</code>
-
-<t>Шаблон команды (заполни пропуски ___):</t>
-<code>
-<kw>/run</kw> launchSequence <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___<op>,</op> ___ <kw>do</kw> launchSequence <op>=</op> ___ <op>___</op> i <op>___</op> <st>"___"</st> <kw>end</kw><op>;</op> launchSequence <op>=</op> ___ <op>___</op> <st>"СТАРТ!"</st>
-</code>
-
-<t>Что вставить вместо ___:</t>
-- Начальное значение строки (пустая строка)
-- Начальное, конечное значение цикла и шаг (отрицательный!)
-- Переменную launchSequence и операторы конкатенации
-- Разделитель (точки с пробелом)
-- Добавление финального слова
-]=],
-        tasks = {
-            {var = "launchSequence", check = function(value) return type(value) == "string" and value == "5... 4... 3... 2... 1... СТАРТ!" end, desc = 'launchSequence = "5... 4... 3... 2... 1... СТАРТ!"', requireCodePatterns = {"for", "do", "end", "launchSequence"}},
-        },
+    <cm>-- Завершаем цикл</cm>
+    <kw>end</kw>
+    <cm>-- Добавляем финальное слово "ПУСК!"</cm>
+    countdown <op>=</op> countdown <op>..</op> <st>"ПУСК!"</st>
+    <cm>-- countdown = "5... 4... 3... 2... 1... ПУСК!"</cm>
+    </code>
+    <t>Твоя задача:</t> Создай переменную <k>launchSequence</k> с обратным отсчётом от 5 до 1 и словом "СТАРТ!":
+    <code>
+    <cm>-- Ожидаемый результат: "5... 4... 3... 2... 1... СТАРТ!"</cm>
+    </code>
+    <t>Шаблон команды (заполни пропуски ___):</t>
+    <code>
+    <kw>/run</kw> launchSequence <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> i <op>=</op> ___<op>,</op> ___<op>,</op> ___ <kw>do</kw> launchSequence <op>=</op> ___ <op>___</op> i <op>___</op> <st>"___"</st> <kw>end</kw><op>;</op> launchSequence <op>=</op> ___ <op>___</op> <st>"СТАРТ!"</st>
+    </code>
+    <t>Что вставить вместо ___:</t>
+    - Начальное значение строки (пустая строка)
+    - Начальное, конечное значение цикла и шаг (отрицательный!)
+    - Переменную launchSequence и операторы конкатенации
+    - Разделитель (точки с пробелом)
+    - Добавление финального слова
+    ]=],
+    tasks = {
+    {var = "launchSequence", check = function(value) return type(value) == "string" and value == "5... 4... 3... 2... 1... СТАРТ!" end, desc = 'launchSequence = "5... 4... 3... 2... 1... СТАРТ!"', requireCodePatterns = {"for", "do", "end", "launchSequence"}},
     },
-    [24] = {
-        title = "Тест: Поиск по подстроке",
-        type = "customtest",
-        helpModules = {14, 4},
-        content = [=[
-<h>Тест: Поиск по подстроке в массиве</h>
+    },
 
-<t>Задание:</t> Пройди по массиву и найди все слова, содержащие определённое сочетание букв.
-
-<h>!!! Почему не используем оператор # с кириллицей:</h>
-В WoW 3.3.5 оператор <k>#</k> считает <w>байты</w>, а не символы. Кириллица занимает 2 байта на символ, поэтому <k>#</k><s>"Лёд"</s> вернёт 6, а не 3. Для работы с длиной строк в кириллице нужны другие подходы, которые мы разберём позже.
-
-Сейчас мы научимся искать <t>подстроки</t> — это надёжно работает с любым языком!
-
-<h>Что делает этот пример:</h>
-Этот код ищет в массиве фруктов все названия, содержащие подстроку "ан". Функция <k>string.find()</k> возвращает позицию найденной подстроки, или <k>nil</k>, если подстрока не найдена.
-
-<t>Разбор по строкам:</t>
-<code>
-<cm>-- Создаём массив фруктов</cm>
-<kw>local</kw> fruits <op>=</op> <op>{</op><st>"Яблоко"</st><op>,</op> <st>"Банан"</st><op>,</op> <st>"Апельсин"</st><op>,</op> <st>"Груша"</st><op>}</op>
-
-<cm>-- Создаём пустую строку для результата</cm>
-<kw>local</kw> result <op>=</op> <st>""</st>
-
-<cm>-- Цикл по массиву: _ (игнорируем индекс), fruit = текущий элемент</cm>
-<kw>for</kw> _<op>,</op> fruit <kw>in</kw> <kw>ipairs</kw><op>(</op>fruits<op>)</op> <kw>do</kw>
+    -- ===== МОДУЛЬ 26: ПОИСК ПО ПОДСТРОКЕ (БЫВШИЙ 27) =====
+    [26] = {
+    title = "Тест: Поиск по подстроке",
+    type = "customtest",
+    helpModules = {14, 4},
+    content = [=[
+    <h>Тест: Поиск по подстроке в массиве</h>
+    <t>Задание:</t> Пройди по массиву и найди все слова, содержащие определённое сочетание букв.
+    <h>!!! Почему не используем оператор # с кириллицей:</h>
+    В WoW 3.3.5 оператор <k>#</k> считает <w>байты</w>, а не символы. Кириллица занимает 2 байта на символ, поэтому <k>#</k><s>"Лёд"</s> вернёт 6, а не 3. Для работы с длиной строк в кириллице нужны другие подходы, которые мы разберём позже.
+    Сейчас мы научимся искать <t>подстроки</t> — это надёжно работает с любым языком!
+    <h>Что делает этот пример:</h>
+    Этот код ищет в массиве фруктов все названия, содержащие подстроку "ан". Функция <k>string.find()</k> возвращает позицию найденной подстроки, или <k>nil</k>, если подстрока не найдена.
+    <t>Разбор по строкам:</t>
+    <code>
+    <cm>-- Создаём массив фруктов</cm>
+    <kw>local</kw> fruits <op>=</op> <op>{</op><st>"Яблоко"</st><op>,</op> <st>"Банан"</st><op>,</op> <st>"Апельсин"</st><op>,</op> <st>"Груша"</st><op>}</op>
+    <cm>-- Создаём пустую строку для результата</cm>
+    <kw>local</kw> result <op>=</op> <st>""</st>
+    <cm>-- Цикл по массиву: _ (игнорируем индекс), fruit = текущий элемент</cm>
+    <kw>for</kw> _<op>,</op> fruit <kw>in</kw> <kw>ipairs</kw><op>(</op>fruits<op>)</op> <kw>do</kw>
     <cm>-- string.find(строка, подстрока) ищет подстроку в строке</cm>
     <cm>-- Если нашла — возвращает позицию (число), это true в условии</cm>
     <cm>-- Если не нашла — возвращает nil, это false в условии</cm>
@@ -18938,53 +19113,49 @@ countdown <op>=</op> countdown <op>..</op> <st>"ПУСК!"</st>
     <cm>-- "Апельсин" — нет "ан" → nil → пропускаем</cm>
     <cm>-- "Груша" — нет "ан" → nil → пропускаем</cm>
     <kw>if</kw> string.find<op>(</op>fruit<op>,</op> <st>"ан"</st><op>)</op> <kw>then</kw>
-        <cm>-- Добавляем найденное слово и пробел к результату</cm>
-        result <op>=</op> result <op>..</op> fruit <op>..</op> <st>" "</st>
+    <cm>-- Добавляем найденное слово и пробел к результату</cm>
+    result <op>=</op> result <op>..</op> fruit <op>..</op> <st>" "</st>
     <kw>end</kw>
-<cm>-- Завершаем цикл</cm>
-<kw>end</kw>
-<cm>-- result = "Банан "</cm>
-</code>
-
-<h>Как работает string.find:</h>
-<code>
-<kw>print</kw><op>(</op>string.find<op>(</op><st>"Банан"</st><op>,</op> <st>"ан"</st><op>)</op><op>)</op>    <cm>-- 2 (найдено на позиции 2)</cm>
-<kw>print</kw><op>(</op>string.find<op>(</op><st>"Груша"</st><op>,</op> <st>"ан"</st><op>)</op><op>)</op>    <cm>-- nil (не найдено)</cm>
-<kw>print</kw><op>(</op>string.find<op>(</op><st>"Молот"</st><op>,</op> <st>"ол"</st><op>)</op><op>)</op>    <cm>-- 2 (найдено на позиции 2)</cm>
-</code>
-
-<t>Твоя задача:</t> Создай массив предметов и найди все, содержащие подстроку "ол":
-<code>
-items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op> <st>"Молот"</st><op>,</op> <st>"Кольцо"</st><op>,</op> <st>"Щит"</st><op>,</op> <st>"Плащ"</st><op>}</op>
-found <op>=</op> <cm>-- строка с предметами, в которых есть "ол", через пробел</cm>
-<cm>-- Ожидаемый результат: "Молот Кольцо "</cm>
-</code>
-
-<t>Шаблон команды (заполни пропуски ___):</t>
-<code>
-<kw>/run</kw> items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op><st>"Молот"</st><op>,</op><st>"Кольцо"</st><op>,</op><st>"Щит"</st><op>,</op><st>"Плащ"</st><op>}</op><op>;</op> found <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> _<op>,</op>v <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> <kw>if</kw> ___<op>(</op>___<op>,</op> <st>"___"</st><op>)</op> <kw>then</kw> found <op>=</op> ___ <op>___</op> v <op>___</op> <st>"___"</st> <kw>end</kw> <kw>end</kw>
-</code>
-
-<t>Что вставить вместо ___:</t>
-- Начальное значение строки (пустая строка)
-- Название массива для перебора
-- Функцию поиска подстроки (string.find)
-- Переменную с текущим словом
-- Подстроку для поиска (в кавычках)
-- Переменную для накопления результата и операторы конкатенации (..)
-- Пробел в кавычках
-]=],
-        tasks = {
-            {var = "items", check = function(value) return type(value) == "table" and value[1] == "Меч" and value[2] == "Молот" and value[3] == "Кольцо" and value[4] == "Щит" and value[5] == "Плащ" end, desc = 'items = {"Меч", "Молот", "Кольцо", "Щит", "Плащ"}'},
-            {var = "found", check = function(value) return type(value) == "string" and value == "Молот Кольцо " end, desc = 'found = "Молот Кольцо " (содержат "ол")', requireCodePatterns = {"for", "do", "end", "ipairs", "items", "string.find"}},
-        },
+    <cm>-- Завершаем цикл</cm>
+    <kw>end</kw>
+    <cm>-- result = "Банан "</cm>
+    </code>
+    <h>Как работает string.find:</h>
+    <code>
+    <kw>print</kw><op>(</op>string.find<op>(</op><st>"Банан"</st><op>,</op> <st>"ан"</st><op>)</op><op>)</op>    <cm>-- 2 (найдено на позиции 2)</cm>
+    <kw>print</kw><op>(</op>string.find<op>(</op><st>"Груша"</st><op>,</op> <st>"ан"</st><op>)</op><op>)</op>    <cm>-- nil (не найдено)</cm>
+    <kw>print</kw><op>(</op>string.find<op>(</op><st>"Молот"</st><op>,</op> <st>"ол"</st><op>)</op><op>)</op>    <cm>-- 2 (найдено на позиции 2)</cm>
+    </code>
+    <t>Твоя задача:</t> Создай массив предметов и найди все, содержащие подстроку "ол":
+    <code>
+    items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op> <st>"Молот"</st><op>,</op> <st>"Кольцо"</st><op>,</op> <st>"Щит"</st><op>,</op> <st>"Плащ"</st><op>}</op>
+    found <op>=</op> <cm>-- строка с предметами, в которых есть "ол", через пробел</cm>
+    <cm>-- Ожидаемый результат: "Молот Кольцо "</cm>
+    </code>
+    <t>Шаблон команды (заполни пропуски ___):</t>
+    <code>
+    <kw>/run</kw> items <op>=</op> <op>{</op><st>"Меч"</st><op>,</op><st>"Молот"</st><op>,</op><st>"Кольцо"</st><op>,</op><st>"Щит"</st><op>,</op><st>"Плащ"</st><op>}</op><op>;</op> found <op>=</op> <st>"___"</st><op>;</op> <kw>for</kw> _<op>,</op>v <kw>in</kw> <kw>ipairs</kw><op>(</op>___<op>)</op> <kw>do</kw> <kw>if</kw> ___<op>(</op>___<op>,</op> <st>"___"</st><op>)</op> <kw>then</kw> found <op>=</op> ___ <op>___</op> v <op>___</op> <st>"___"</st> <kw>end</kw> <kw>end</kw>
+    </code>
+    <t>Что вставить вместо ___:</t>
+    - Начальное значение строки (пустая строка)
+    - Название массива для перебора
+    - Функцию поиска подстроки (string.find)
+    - Переменную с текущим словом
+    - Подстроку для поиска (в кавычках)
+    - Переменную для накопления результата и операторы конкатенации (..)
+    - Пробел в кавычках
+    ]=],
+    tasks = {
+    {var = "items", check = function(value) return type(value) == "table" and value[1] == "Меч" and value[2] == "Молот" and value[3] == "Кольцо" and value[4] == "Щит" and value[5] == "Плащ" end, desc = 'items = {"Меч", "Молот", "Кольцо", "Щит", "Плащ"}'},
+    {var = "found", check = function(value) return type(value) == "string" and value == "Молот Кольцо " end, desc = 'found = "Молот Кольцо " (содержат "ол")', requireCodePatterns = {"for", "do", "end", "ipairs", "items", "string.find"}},
+    },
     },
 }
 
 nsDbc = nsDbc or {}
 nsDbc['luaTest'] = nsDbc['luaTest'] or {
     currentModule    = 1,
-    totalModules     = 24,
+    totalModules     = (ns_llua and ns_llua['lua']) and #ns_llua['lua'] or 0, -- Считаем автоматически
     completedModules = {},
     taskDetails      = {},
 }
@@ -20785,24 +20956,41 @@ function OpenLuaCourse()
     if not nsDbc then
         nsDbc = {}
     end
+    
+    -- Функция для динамического подсчета модулей
+    local function GetTotalModules()
+        if ns_llua and ns_llua['lua'] then
+            return #ns_llua['lua']
+        end
+        return 0
+    end
+    
+    local totalMods = GetTotalModules()
+
     if not nsDbc['luaTest'] then
         nsDbc['luaTest'] = {
             currentModule    = 1,
-            totalModules     = 24,
+            totalModules     = totalMods,
             completedModules = {},
             taskDetails      = {},
             windowState      = {},
         }
     end
     
+    -- ВАЖНО: Всегда актуализируем количество модулей при открытии курса
+    -- Если ты добавил новые модули в ns_llua['lua'], аддон это подхватит
+    nsDbc['luaTest'].totalModules = totalMods
+
     if not nsDbc['luaTest'].windowState then
         nsDbc['luaTest'].windowState = {}
     end
     
     local savedModule = nsDbc['luaTest'].currentModule or 1
     if savedModule < 1 then savedModule = 1 end
-    if savedModule > (nsDbc['luaTest'].totalModules or 24) then
-        savedModule = nsDbc['luaTest'].totalModules or 24
+    
+    -- Используем totalMods вместо магических чисел
+    if savedModule > (nsDbc['luaTest'].totalModules or totalMods) then
+        savedModule = nsDbc['luaTest'].totalModules or totalMods
     end
     
     if _G.activeLuaCourse and _G.activeLuaCourse.window and _G.activeLuaCourse.window:IsShown() then
