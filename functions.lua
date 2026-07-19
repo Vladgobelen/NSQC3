@@ -4639,14 +4639,25 @@ local function CreateChatMenuButton(frame)
     if not frame then return end
     if frame.menuButton then return end
     
-    -- Кнопка "Общение" (FriendsMicroButton) - главная
+    -- Кнопка "Общение" - главная (ЧЁРНАЯ)
     local socialBtn = CreateFrame("Button", nil, frame)
     socialBtn:SetSize(20, 20)
     socialBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 22)
-    socialBtn:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-BattleBro-Up")
-    socialBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     socialBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     socialBtn:SetFrameStrata("FULLSCREEN")
+    
+    -- Чёрный фон кнопки
+    local btnBg = socialBtn:CreateTexture(nil, "BACKGROUND")
+    btnBg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    btnBg:SetVertexColor(0, 0, 0, 0.8)
+    btnBg:SetAllPoints(socialBtn)
+    
+    -- Чёрный фон для цифры
+    local bg = socialBtn:CreateTexture(nil, "ARTWORK")
+    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    bg:SetVertexColor(0, 0, 0, 0.8)
+    bg:SetPoint("CENTER", socialBtn, "CENTER", 0, 0)
+    bg:SetSize(16, 12)
     
     -- Текст с количеством друзей онлайн
     local socialText = socialBtn:CreateFontString(nil, "OVERLAY")
