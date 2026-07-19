@@ -4646,6 +4646,7 @@ local function CreateChatMenuButton(frame)
     socialBtn:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-BattleBro-Up")
     socialBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     socialBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    socialBtn:SetFrameStrata("FULLSCREEN")
     
     -- Текст с количеством друзей онлайн
     local socialText = socialBtn:CreateFontString(nil, "OVERLAY")
