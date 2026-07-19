@@ -4635,14 +4635,33 @@ end)
 
 
 
-
-
-
-
-
 local function CreateChatMenuButton(frame)
     if not frame then return end
     if frame.menuButton then return end
+    
+    -- Кнопка "Общение" (FriendsMicroButton) - главная
+    local socialBtn = CreateFrame("Button", nil, frame)
+    socialBtn:SetSize(20, 20)
+    socialBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 22)
+    socialBtn:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-BattleBro-Up")
+    socialBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    socialBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    
+    -- Текст с количеством друзей онлайн
+    local socialText = socialBtn:CreateFontString(nil, "OVERLAY")
+    socialText:SetPoint("CENTER", socialBtn, "CENTER", 0, 0)
+    socialText:SetFont("Fonts\\FRIZQT__.TTF", 12, "THICKOUTLINE")
+    socialText:SetTextColor(0, 1, 0)
+    socialText:SetText("0")
+    
+    -- Функция обновления текста
+    local function UpdateSocialCount()
+        local _, online = GetNumFriends()
+        socialText:SetText(online or 0)
+    end
+    
+    -- Переменная для отслеживания состояния видимости кнопок
+    local buttonsVisible = false
     
     -- Кнопка меню (облачко)
     local button = CreateFrame("Button", nil, frame)
@@ -4651,29 +4670,74 @@ local function CreateChatMenuButton(frame)
     button:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
     button:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Down")
     button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    button:SetScript("OnClick", function()
-        ChatFrameMenuButton:Click()
+    button:SetScript("OnClick", function(self, mouseButton)
+        if mouseButton == "LeftButton" then
+            ChatFrameMenuButton:Click()
+        end
     end)
-    button:Show()
+    button:Hide()
     
-    frame.menuButton = button
-    
-    -- Кнопка "Вниз" (прокрутка) — всегда видна
+    -- Кнопка "Вниз" (прокрутка)
     local downBtn = CreateFrame("Button", nil, frame)
     downBtn:SetSize(20, 20)
     downBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, -24)
     downBtn:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Up")
     downBtn:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Down")
     downBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    downBtn:SetScript("OnClick", function()
-        frame:ScrollToBottom()
+    downBtn:SetScript("OnClick", function(self, mouseButton)
+        if mouseButton == "LeftButton" then
+            frame:ScrollToBottom()
+        end
     end)
-    downBtn:Show()
+    downBtn:Hide()
+    
+    -- Функция показа/скрытия кнопок
+    local function ToggleButtons()
+        buttonsVisible = not buttonsVisible
+        if buttonsVisible then
+            button:Show()
+            downBtn:Show()
+        else
+            button:Hide()
+            downBtn:Hide()
+        end
+    end
+    
+    -- Скрипты для кнопки "Общение"
+    socialBtn:SetScript("OnClick", function(self, mouseButton)
+        if mouseButton == "LeftButton" then
+            if FriendsMicroButton then
+                FriendsMicroButton:Click()
+            end
+        elseif mouseButton == "RightButton" then
+            ToggleButtons()
+        end
+    end)
+    
+    -- Отдельный фрейм для событий
+    local eventFrame = CreateFrame("Frame", nil, socialBtn)
+    eventFrame:SetScript("OnEvent", function()
+        UpdateSocialCount()
+    end)
+    eventFrame:RegisterEvent("FRIENDLIST_UPDATE")
+    eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    
+    -- Инициализация
+    socialBtn:Show()
+    UpdateSocialCount()
+    
+    -- Сохраняем ссылки
+    frame.socialButton = socialBtn
+    frame.menuButton = button
+    frame.scrollButton = downBtn
 end
 
+-- Создаём кнопки для всех чат-фреймов
 for i = 1, NUM_CHAT_WINDOWS do
     local frame = _G["ChatFrame" .. i]
-    if frame then CreateChatMenuButton(frame) end
+    if frame then 
+        CreateChatMenuButton(frame)
+    end
 end
 
 
