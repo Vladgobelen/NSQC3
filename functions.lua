@@ -4639,29 +4639,26 @@ local function CreateChatMenuButton(frame)
     if not frame then return end
     if frame.menuButton then return end
     
-    -- Кнопка "Общение" - главная (ЧЁРНАЯ)
-    local socialBtn = CreateFrame("Button", nil, frame)
-    socialBtn:SetSize(20, 20)
+    -- Кнопка "Общение" - главная
+    local socialBtn = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate")
+    socialBtn:SetSize(24, 24)
     socialBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 22)
+    socialBtn:EnableMouse(true)
     socialBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     socialBtn:SetFrameStrata("FULLSCREEN")
     
-    -- Чёрный фон кнопки
-    local btnBg = socialBtn:CreateTexture(nil, "BACKGROUND")
-    btnBg:SetTexture("Interface\\Buttons\\WHITE8X8")
-    btnBg:SetVertexColor(0, 0, 0, 0.8)
-    btnBg:SetAllPoints(socialBtn)
-    
-    -- Чёрный фон для цифры
-    local bg = socialBtn:CreateTexture(nil, "ARTWORK")
-    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-    bg:SetVertexColor(0, 0, 0, 0.8)
-    bg:SetPoint("CENTER", socialBtn, "CENTER", 0, 0)
-    bg:SetSize(16, 12)
+    -- Backdrop полностью непрозрачный
+    socialBtn:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    socialBtn:SetBackdropColor(0, 0, 0, 1)
     
     -- Текст с количеством друзей онлайн
-    local socialText = socialBtn:CreateFontString(nil, "OVERLAY")
-    socialText:SetPoint("CENTER", socialBtn, "CENTER", 0, 0)
+    local socialText = socialBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    socialText:SetPoint("CENTER", socialBtn, "CENTER")
     socialText:SetFont("Fonts\\FRIZQT__.TTF", 12, "THICKOUTLINE")
     socialText:SetTextColor(0, 1, 0)
     socialText:SetText("0")
