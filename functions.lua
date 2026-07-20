@@ -5234,3 +5234,100 @@ end
 --         end
 --     end
 -- end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------- СБОР ПОЧТЫ --------------
+local btn = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+btn:SetSize(128, 23)
+btn:SetText("ЗАБРАТЬ ВСЕ")
+btn:SetFrameStrata("HIGH")
+btn:Hide()
+
+local testQ = {}
+
+btn:SetScript("OnClick", function(self, button)
+    if testQ ~= nil then
+        if testQ["mail"] == nil then
+            testQ["mail"] = 1
+        else
+            testQ["mail"] = nil
+        end
+    end
+    if testQ["mail"] == 1 then
+        btn:SetText("..сбор..")
+    else
+        btn:SetText("ЗАБРАТЬ ВСЕ")
+    end
+end)
+
+local f = CreateFrame("Frame")
+f:RegisterEvent("MAIL_SHOW")
+f:RegisterEvent("MAIL_CLOSED")
+f:RegisterEvent("MAIL_INBOX_UPDATE")
+
+f:SetScript("OnEvent", function()
+    if MailFrame:IsVisible() and not SendMailFrame:IsVisible() then
+        if not btn:IsVisible() then
+            btn:ClearAllPoints()
+            btn:SetPoint("TOPRIGHT", MailFrame, "TOPRIGHT", -55, -13)
+            btn:Show()
+        end
+    else
+        if btn:IsVisible() then
+            btn:Hide()
+            testQ["mail"] = nil
+        end
+        return
+    end
+    
+    if InboxPrevPageButton:IsEnabled() ~= 0 then
+        btn:Disable()
+    else
+        btn:Enable()
+    end
+    
+    if testQ["mail"] == 1 then
+        btn:SetText("..сбор..")
+    else
+        btn:SetText("ЗАБРАТЬ ВСЕ")
+    end
+end)
+
+-- Сбор почты
+local frameTime = CreateFrame("FRAME")
+local timeElapsed = 0
+frameTime:HookScript("OnUpdate", function(self, elapsed)
+    if MailFrame:IsVisible() then
+        timeElapsed = timeElapsed + elapsed
+        if timeElapsed > 0.01 then
+            timeElapsed = 0
+            if testQ["mail"] ~= nil then
+                local x = GetInboxNumItems()
+                if x >= 1 then
+                    local l1, l2, l3, l4, l5, l6 = GetInboxHeaderInfo(1)
+                    if tonumber(l6) == 0 then
+                        AutoLootMailItem(1)
+                        MailItem1Button:Click()
+                        OpenMailDeleteButton:Click()
+                        StaticPopup1Button2:Click()
+                    end
+                else
+                    testQ["mail"] = nil
+                end
+            end
+        end
+    end
+end)
+----------------КОНЕЦ СБОРА ПОЧТЫ-------------------
