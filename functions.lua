@@ -4635,6 +4635,45 @@ end)
 
 
 
+-- Таблица настроек (должна быть определена глобально)
+if not nsDbc then nsDbc = {} end
+if not nsDbc["сохранения чата"] then 
+    nsDbc["сохранения чата"] = {}
+end
+
+-- Кэш настроек для быстрого доступа
+local cachedSettings = {
+    showChatColor = true,
+    openGuildChat = false
+}
+
+-- Инициализируем кэш из сохраненных настроек
+if nsDbc["сохранения чата"].showChatColor ~= nil then
+    cachedSettings.showChatColor = nsDbc["сохранения чата"].showChatColor
+end
+if nsDbc["сохранения чата"].openGuildChat ~= nil then
+    cachedSettings.openGuildChat = nsDbc["сохранения чата"].openGuildChat
+end
+
+local function GetCurrentChatFrame()
+    -- Получаем текущую активную вкладку чата
+    for i = 1, NUM_CHAT_WINDOWS do
+        local tab = _G["ChatFrame"..i.."Tab"]
+        local frame = _G["ChatFrame"..i]
+        if tab and frame and frame:IsShown() then
+            local name = tab:GetName()
+            local selectedMiddle = _G[name.."SelectedMiddle"]
+            
+            -- Активная вкладка имеет видимую текстуру SelectedMiddle
+            if selectedMiddle and selectedMiddle:IsShown() then
+                return frame
+            end
+        end
+    end
+    -- Если не нашли активную, возвращаем первый чат
+    return ChatFrame1
+end
+
 local function CreateChatMenuButton(frame)
     if not frame then return end
     if frame.menuButton then return end
@@ -4644,10 +4683,10 @@ local function CreateChatMenuButton(frame)
     socialBtn:SetSize(24, 24)
     socialBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 22)
     socialBtn:EnableMouse(true)
-    socialBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    socialBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
     socialBtn:SetFrameStrata("FULLSCREEN")
     
-    -- Backdrop полностью непрозрачный
+    -- Backdrop всегда черный
     socialBtn:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -4655,18 +4694,44 @@ local function CreateChatMenuButton(frame)
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
     socialBtn:SetBackdropColor(0, 0, 0, 1)
+    socialBtn:SetBackdropBorderColor(0, 0, 0, 1)
     
     -- Текст с количеством друзей онлайн
     local socialText = socialBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     socialText:SetPoint("CENTER", socialBtn, "CENTER")
     socialText:SetFont("Fonts\\FRIZQT__.TTF", 12, "THICKOUTLINE")
-    socialText:SetTextColor(0, 1, 0)
+    socialText:SetTextColor(1, 1, 1, 1) -- По умолчанию белый
     socialText:SetText("0")
+    
+    -- Храним последний тип чата
+    local lastChatType = "default"
     
     -- Функция обновления текста
     local function UpdateSocialCount()
         local _, online = GetNumFriends()
         socialText:SetText(online or 0)
+    end
+    
+    -- Функция установки цвета текста по типу чата (использует кэш)
+    local function SetTextColor(chatType)
+        if not cachedSettings.showChatColor then
+            socialText:SetTextColor(0, 1, 0, 1) -- Зеленый по умолчанию если опция выключена
+            return
+        end
+        
+        if chatType == "guild" then
+            socialText:SetTextColor(0, 1, 0, 1) -- Зеленый - гильдия
+        elseif chatType == "raid" then
+            socialText:SetTextColor(1, 0.5, 0, 1) -- Оранжевый - рейд
+        elseif chatType == "party" then
+            socialText:SetTextColor(0.3, 0.5, 1, 1) -- Синий - группа
+        elseif chatType == "say" then
+            socialText:SetTextColor(1, 1, 1, 1) -- Белый - общий
+        else
+            socialText:SetTextColor(1, 1, 1, 1) -- Белый - по умолчанию
+        end
+        
+        lastChatType = chatType
     end
     
     -- Переменная для отслеживания состояния видимости кнопок
@@ -4695,10 +4760,129 @@ local function CreateChatMenuButton(frame)
     downBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     downBtn:SetScript("OnClick", function(self, mouseButton)
         if mouseButton == "LeftButton" then
-            frame:ScrollToBottom()
+            local currentFrame = GetCurrentChatFrame()
+            if currentFrame then
+                currentFrame:ScrollToBottom()
+            end
         end
     end)
     downBtn:Hide()
+    
+    -- Кнопка настроек
+    local settingsBtn = CreateFrame("Button", nil, frame)
+    settingsBtn:SetSize(20, 20)
+    settingsBtn:SetPoint("BOTTOM", socialBtn, "TOP", 0, 2)
+    settingsBtn:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+    settingsBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    
+    -- Текст * на кнопке настроек
+    local settingsBtnText = settingsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    settingsBtnText:SetPoint("CENTER", settingsBtn, "CENTER")
+    settingsBtnText:SetFont("Fonts\\FRIZQT__.TTF", 14, "THICKOUTLINE")
+    settingsBtnText:SetTextColor(1, 1, 1, 1)
+    settingsBtnText:SetText("*")
+    settingsBtn:Hide()
+    
+    settingsBtn:SetScript("OnClick", function(self, mouseButton)
+        if mouseButton == "LeftButton" then
+            ToggleSettingsPanel()
+        end
+    end)
+    
+    -- Создание панели настроек
+    local settingsPanel = CreateFrame("Frame", nil, UIParent)
+    settingsPanel:SetSize(330, 130)
+    settingsPanel:SetPoint("CENTER", UIParent, "CENTER")
+    settingsPanel:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    settingsPanel:SetBackdropColor(0, 0, 0, 0.8)
+    settingsPanel:SetMovable(true)
+    settingsPanel:EnableMouse(true)
+    settingsPanel:SetClampedToScreen(true)
+    settingsPanel:Hide()
+    
+    -- Заголовок
+    local title = settingsPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", settingsPanel, "TOP", 0, -15)
+    title:SetText("Настройки чата")
+    
+    -- Кнопка закрытия
+    local closeBtn = CreateFrame("Button", nil, settingsPanel, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", settingsPanel, "TOPRIGHT", -2, -2)
+    
+    -- Чекбокс "Открывать гильдчат при входе"
+    local guildChatCheckbox = CreateFrame("CheckButton", nil, settingsPanel, "UICheckButtonTemplate")
+    guildChatCheckbox:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 15, -40)
+    guildChatCheckbox:SetSize(26, 26)
+    
+    local checkboxText = guildChatCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    checkboxText:SetPoint("LEFT", guildChatCheckbox, "RIGHT", 5, 0)
+    checkboxText:SetText("Открывать гильдчат при входе в игру")
+    
+    -- Чекбокс "Отображать текущий чат цветом"
+    local colorChatCheckbox = CreateFrame("CheckButton", nil, settingsPanel, "UICheckButtonTemplate")
+    colorChatCheckbox:SetPoint("TOPLEFT", guildChatCheckbox, "BOTTOMLEFT", 0, -10)
+    colorChatCheckbox:SetSize(26, 26)
+    
+    local colorCheckboxText = colorChatCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    colorCheckboxText:SetPoint("LEFT", colorChatCheckbox, "RIGHT", 5, 0)
+    colorCheckboxText:SetText("Отображать текущий чат цветом")
+    
+    -- Функция обновления чекбоксов из кэша
+    local function UpdateCheckboxes()
+        guildChatCheckbox:SetChecked(cachedSettings.openGuildChat)
+        colorChatCheckbox:SetChecked(cachedSettings.showChatColor)
+    end
+    
+    guildChatCheckbox:SetScript("OnClick", function(self)
+        cachedSettings.openGuildChat = self:GetChecked()
+        if not nsDbc["сохранения чата"] then
+            nsDbc["сохранения чата"] = {}
+        end
+        nsDbc["сохранения чата"].openGuildChat = cachedSettings.openGuildChat
+    end)
+    
+    colorChatCheckbox:SetScript("OnClick", function(self)
+        cachedSettings.showChatColor = self:GetChecked()
+        if not nsDbc["сохранения чата"] then
+            nsDbc["сохранения чата"] = {}
+        end
+        nsDbc["сохранения чата"].showChatColor = cachedSettings.showChatColor
+        -- Обновляем цвет текста на всех кнопках
+        for i = 1, NUM_CHAT_WINDOWS do
+            local f = _G["ChatFrame"..i]
+            if f and f.socialButton and f.socialButton.UpdateColor then
+                f.socialButton.UpdateColor()
+            end
+        end
+    end)
+    
+    -- Функция перетаскивания для панели
+    settingsPanel:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            self:StartMoving()
+        end
+    end)
+    
+    settingsPanel:SetScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" then
+            self:StopMovingOrSizing()
+        end
+    end)
+    
+    -- Функция показа/скрытия панели настроек
+    function ToggleSettingsPanel()
+        if settingsPanel:IsShown() then
+            settingsPanel:Hide()
+        else
+            UpdateCheckboxes()
+            settingsPanel:Show()
+        end
+    end
     
     -- Функция показа/скрытия кнопок
     local function ToggleButtons()
@@ -4706,30 +4890,184 @@ local function CreateChatMenuButton(frame)
         if buttonsVisible then
             button:Show()
             downBtn:Show()
+            settingsBtn:Show()
         else
             button:Hide()
             downBtn:Hide()
+            settingsBtn:Hide()
         end
     end
     
+    -- Переменные для отслеживания даблклика ПКМ
+    local lastRightClickTime = 0
+    local rightDoubleClickDetected = false
+    local rightClickResetTimer = 0
+    
     -- Скрипты для кнопки "Общение"
-    socialBtn:SetScript("OnClick", function(self, mouseButton)
-        if mouseButton == "LeftButton" then
-            if FriendsMicroButton then
-                FriendsMicroButton:Click()
+    socialBtn:SetScript("OnMouseDown", function(self, mouseButton)
+        if mouseButton == "RightButton" then
+            local currentTime = GetTime()
+            
+            -- Проверяем время между правыми кликами
+            if (currentTime - lastRightClickTime) < 0.3 then -- 300ms
+                rightDoubleClickDetected = true
+                rightClickResetTimer = 0
+                
+                -- Открываем общий чат /с в текущей вкладке
+                local currentFrame = GetCurrentChatFrame()
+                if currentFrame and currentFrame.editBox then
+                    currentFrame.editBox:SetText("/с ")
+                    currentFrame.editBox:SetFocus()
+                    currentFrame.editBox:HighlightText()
+                    SetTextColor("say")
+                end
+            else
+                rightClickResetTimer = 0.3
             end
-        elseif mouseButton == "RightButton" then
-            ToggleButtons()
+            
+            lastRightClickTime = currentTime
         end
     end)
     
+    -- Фрейм для обновления таймера сброса
+    local timerFrame = CreateFrame("Frame", nil, socialBtn)
+    timerFrame:SetScript("OnUpdate", function(self, elapsed)
+        if rightClickResetTimer > 0 then
+            rightClickResetTimer = rightClickResetTimer - elapsed
+            if rightClickResetTimer <= 0 then
+                lastRightClickTime = 0
+                rightClickResetTimer = 0
+            end
+        end
+    end)
+    
+    socialBtn:SetScript("OnClick", function(self, mouseButton)
+        -- Игнорируем клик если был даблклик ПКМ
+        if rightDoubleClickDetected then
+            rightDoubleClickDetected = false
+            return
+        end
+        
+        if mouseButton == "LeftButton" then
+            if IsShiftKeyDown() then
+                -- Shift+ЛКМ - групповой чат
+                local currentFrame = GetCurrentChatFrame()
+                if currentFrame and currentFrame.editBox then
+                    currentFrame.editBox:SetText("/p ")
+                    currentFrame.editBox:SetFocus()
+                    currentFrame.editBox:HighlightText()
+                    SetTextColor("party")
+                end
+            else
+                -- Обычный ЛКМ - друзья
+                if FriendsMicroButton then
+                    FriendsMicroButton:Click()
+                end
+            end
+        elseif mouseButton == "RightButton" then
+            if IsShiftKeyDown() then
+                -- Shift+ПКМ - рейдовый чат
+                local currentFrame = GetCurrentChatFrame()
+                if currentFrame and currentFrame.editBox then
+                    currentFrame.editBox:SetText("/ra ")
+                    currentFrame.editBox:SetFocus()
+                    currentFrame.editBox:HighlightText()
+                    SetTextColor("raid")
+                end
+            else
+                ToggleButtons()
+            end
+        elseif mouseButton == "MiddleButton" then
+            -- Колесо мыши - гильдчат
+            local currentFrame = GetCurrentChatFrame()
+            if currentFrame and currentFrame.editBox then
+                currentFrame.editBox:SetText("/g ")
+                currentFrame.editBox:SetFocus()
+                currentFrame.editBox:HighlightText()
+                SetTextColor("guild")
+            end
+        end
+    end)
+    
+    -- Тултип для кнопки
+    socialBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Меню общения", 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ff00ЛКМ|r - Список друзей", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cff00ff00Shift+ЛКМ|r - Групповой чат |cff8888ff(/p)|r", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cff00ff00ПКМ|r - Показать/скрыть меню", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cff00ff00Даблклик ПКМ|r - Общий чат |cff8888ff(/с)|r", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cff00ff00Shift+ПКМ|r - Рейдовый чат |cff8888ff(/ra)|r", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cff00ff00Колесо мыши|r - Гильдчат |cff8888ff(/g)|r", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Цвет текста показывает последний чат:", 1, 0.8, 0)
+        GameTooltip:AddLine("|cff00ff00Зеленый|r - Гильдия", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cffFF8000Оранжевый|r - Рейд", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cff4D80FFСиний|r - Группа", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("|cffFFFFFFБелый|r - Общий", 0.9, 0.9, 0.9)
+        GameTooltip:Show()
+    end)
+    
+    socialBtn:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+    end)
+    
+    -- Задержка 3 секунды только для первого входа и загрузки настроек
+    local enterWorldDelay = 0
+    local enterWorldCheck = false
+    
     -- Отдельный фрейм для событий
     local eventFrame = CreateFrame("Frame", nil, socialBtn)
-    eventFrame:SetScript("OnEvent", function()
-        UpdateSocialCount()
+    eventFrame:SetScript("OnEvent", function(self, event, ...)
+        if event == "FRIENDLIST_UPDATE" then
+            UpdateSocialCount()
+        elseif event == "PLAYER_ENTERING_WORLD" then
+            UpdateSocialCount()
+            enterWorldDelay = 3
+            enterWorldCheck = true
+        end
     end)
+    
+    eventFrame:SetScript("OnUpdate", function(self, elapsed)
+        if enterWorldCheck then
+            enterWorldDelay = enterWorldDelay - elapsed
+            if enterWorldDelay <= 0 then
+                enterWorldCheck = false
+                
+                -- Обновляем кэш из сохраненных настроек
+                if not nsDbc["сохранения чата"] then
+                    nsDbc["сохранения чата"] = {}
+                end
+                
+                if nsDbc["сохранения чата"].showChatColor ~= nil then
+                    cachedSettings.showChatColor = nsDbc["сохранения чата"].showChatColor
+                end
+                if nsDbc["сохранения чата"].openGuildChat ~= nil then
+                    cachedSettings.openGuildChat = nsDbc["сохранения чата"].openGuildChat
+                end
+                
+                -- Проверяем настройку открытия гильдчата
+                if cachedSettings.openGuildChat then
+                    local currentFrame = GetCurrentChatFrame()
+                    if currentFrame and currentFrame.editBox then
+                        currentFrame.editBox:SetText("/g ")
+                        currentFrame.editBox:SetFocus()
+                        currentFrame.editBox:HighlightText()
+                        SetTextColor("guild")
+                    end
+                end
+            end
+        end
+    end)
+    
     eventFrame:RegisterEvent("FRIENDLIST_UPDATE")
     eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    
+    -- Функция обновления цвета для вызова извне
+    socialBtn.UpdateColor = function()
+        SetTextColor(lastChatType)
+    end
     
     -- Инициализация
     socialBtn:Show()
@@ -4739,6 +5077,8 @@ local function CreateChatMenuButton(frame)
     frame.socialButton = socialBtn
     frame.menuButton = button
     frame.scrollButton = downBtn
+    frame.settingsButton = settingsBtn
+    frame.settingsPanel = settingsPanel
 end
 
 -- Создаём кнопки для всех чат-фреймов
