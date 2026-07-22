@@ -16,6 +16,7 @@
 !game_server.lua
 !nstdc.lua
 !FilteredChat.lua
+!lua.lua
 
 # Рекурсивно разрешить всё внутри libs/
 !libs/
