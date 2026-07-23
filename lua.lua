@@ -3690,7 +3690,7 @@ local ASSET_PAIRS = {
 
 -- Настройки времени.
 local INITIAL_DELAY         = 3          -- первая проверка через 3 секунды после входа
-local MIN_REMINDER_INTERVAL = 10 * 60    -- минимум 10 минут
+local MIN_REMINDER_INTERVAL = 30 * 60    -- минимум 10 минут
 local MAX_REMINDER_INTERVAL = 60 * 60    -- максимум 1 час
 local NOT_OPENED_RECHECK    = 60         -- если курс ещё ни разу не открывали
 local API_WAIT_TIMEOUT      = 30         -- сколько ждать появления курса
