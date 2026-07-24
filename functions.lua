@@ -5925,7 +5925,7 @@ local function startMove()
     if FAST_MODE then
         moveDur = 10
     else
-        moveDur = math.random(600, 1800)
+        moveDur = math.random(300, 950)
     end
 
     tMove      = 0
@@ -5952,7 +5952,7 @@ local function setupRadial(i)
     if FAST_MODE then
         rDur = 3
     else
-        rDur = math.random(30, 90)
+        rDur = math.random(15, 50)
     end
 
     rT         = 0
