@@ -5393,8 +5393,9 @@ end)
       Если рекорда нет — записываем и пишем в офицерский чат.
       Если текущая длина больше сохранённого рекорда — пишем новый рекорд.
     • Клик по пауку пишет в офицерский чат, что игрок убил паука тапкой.
+    • После клика часовой таймер не отменяется движением.
 
-    /nsqc3 debug | trace | mark | clear | reset | stop | fast | size | speed
+    /nsqc3 debug | mark | clear | reset | stop | fast | size | speed
 
     В .toc желательно:
     ## SavedVariables: nsDbc
@@ -5442,10 +5443,6 @@ if type(nsDbc) ~= "table" then
     nsDbc = {}
 end
 
-if type(nsDbc["паук"]) ~= "table" then
-    nsDbc["паук"] = {}
-end
-
 -- ═══════════════════════════════════════════════════════════
 --  Размер экрана
 -- ═══════════════════════════════════════════════════════════
@@ -5458,7 +5455,14 @@ local function getScreenSize()
         return sw, sh
     end
 
-    return UIParent:GetWidth(), UIParent:GetHeight()
+    if UIParent then
+        local uw, uh = UIParent:GetWidth(), UIParent:GetHeight()
+        if uw and uh and uw > 0 and uh > 0 then
+            return uw, uh
+        end
+    end
+
+    return 1, 1
 end
 
 local SW, SH = getScreenSize()
@@ -5544,22 +5548,18 @@ local fadeTextures  = {}
 local fadeBaseAlpha = {}
 local disableTimer  = 0
 
--- ═══════════════════════════════════════════════════════════
---  Отладка
--- ═══════════════════════════════════════════════════════════
-
-local TRACE     = false
+-- Маркер угла
 local SHOW_MARK = true
 local debugMark = nil
 
-local function trace(msg)
-    if TRACE then
-        print("|cFFFF8800[NSQC3]|r " .. msg)
-    end
-end
+-- ═══════════════════════════════════════════════════════════
+--  Маркер угла
+-- ═══════════════════════════════════════════════════════════
 
 local function showCornerMark()
-    if not SHOW_MARK then return end
+    if not SHOW_MARK then
+        return
+    end
 
     if debugMark and debugMark:GetParent() ~= activeFrame then
         debugMark:Hide()
@@ -5662,9 +5662,11 @@ end
 
 local function sendOfficer(text)
     if playerHasGuild() and SendChatMessage then
-        SendChatMessage(text, "OFFICER")
-    elseif TRACE then
-        trace("OFFICER: " .. text)
+        if type(pcall) == "function" then
+            pcall(SendChatMessage, text, "OFFICER")
+        else
+            SendChatMessage(text, "OFFICER")
+        end
     end
 end
 
@@ -5678,7 +5680,7 @@ end
 local function setSavedWebRecord(db, count, name)
     db.record  = count
     db.name    = name
-    db.updated = time()
+    db.updated = time and time() or 0
 end
 
 local function recordWebLength(count)
@@ -5835,7 +5837,7 @@ local function onSpiderClick()
     hideSpider()
     hideCornerMark()
 
-    -- Фаза затухания.
+    -- Фаза затухания, после неё гарантированно будет disabled.
     phase      = "fade"
     fadeTimer  = 0
     speedTimer = 0
@@ -5931,7 +5933,6 @@ local function startMove()
     lastDrop   = 0
     speedTimer = 0
     phase      = "traverse"
-
 end
 
 local function setupRadial(i)
@@ -5988,7 +5989,6 @@ local function startNewWeb()
     toEdge2 = true
     arcs    = { dist }
 
-
     showCornerMark()
     mkSpider()
     mkClickBtn()
@@ -5999,7 +5999,6 @@ local function interrupt(fromMovement)
     if fromMovement then
         recordWebLength(webPoints)
     end
-
 
     clearWebs()
     hideSpider()
@@ -6037,8 +6036,6 @@ local function onUpdate(self, dt)
             speedTimer = 0
 
             if isMoving() then
-                if stillTimer > 0 then
-                end
                 stillTimer = 0
             else
                 stillTimer = stillTimer + SPEED_CHECK
@@ -6151,12 +6148,13 @@ local function onUpdate(self, dt)
         if speedTimer >= SPEED_CHECK then
             speedTimer = 0
 
+            -- Если игрок двинулся во время затухания:
+            -- очищаем экран, но всё равно уходим в часовой disabled.
             if isMoving() then
                 clearAllVisuals()
 
-                phase      = "watch"
-                stillTimer = 0
-                speedTimer = 0
+                phase        = "disabled"
+                disableTimer = 0
 
                 return
             end
@@ -6183,10 +6181,10 @@ local function onUpdate(self, dt)
             fadeBaseAlpha = {}
             webs          = {}
             webPoints     = 0
+            fadeTimer     = 0
 
             phase        = "disabled"
             disableTimer = 0
-
         end
 
         return
@@ -6197,10 +6195,10 @@ local function onUpdate(self, dt)
         disableTimer = disableTimer + dt
 
         if disableTimer >= DISABLE_TIME then
-            phase      = "watch"
-            stillTimer = 0
-            speedTimer = 0
-
+            phase        = "watch"
+            stillTimer   = 0
+            speedTimer   = 0
+            disableTimer = 0
         end
 
         return
@@ -6220,10 +6218,18 @@ SlashCmdList["NSQC3CMD"] = function(msg)
     if msg == "clear" then
         clearAllVisuals()
 
-        phase        = "watch"
-        stillTimer   = 0
-        speedTimer   = 0
-        disableTimer = 0
+        local stopped = (phase == "init" and initTimer < 0)
+
+        -- Если была фаза затухания после клика — не отменяем часовой таймер.
+        if phase == "fade" then
+            phase        = "disabled"
+            disableTimer = 0
+        elseif phase ~= "disabled" and not stopped then
+            phase        = "watch"
+            stillTimer   = 0
+            speedTimer   = 0
+            disableTimer = 0
+        end
 
         print("|cFF88FF88NSQC3:|r экран очищен.")
 
@@ -6248,8 +6254,12 @@ SlashCmdList["NSQC3CMD"] = function(msg)
     elseif msg == "stop" then
         clearAllVisuals()
 
-        phase     = "init"
-        initTimer = -999999
+        phase        = "init"
+        initTimer    = -999999
+        stillTimer   = 0
+        speedTimer   = 0
+        fadeTimer    = 0
+        disableTimer = 0
 
         print("|cFF88FF88NSQC3:|r остановлено.")
 
@@ -6257,7 +6267,7 @@ SlashCmdList["NSQC3CMD"] = function(msg)
         local w, h = getScreenSize()
 
         print(format("|cFF88FF88NSQC3:|r UI: %.1f x %.1f (gx: %s)",
-              w, h, GetCVar("gxResolution") or "?"))
+              w, h, GetCVar and GetCVar("gxResolution") or "?"))
 
     elseif msg == "speed" then
         local s = GetUnitSpeed and GetUnitSpeed("player") or nil
@@ -6291,14 +6301,8 @@ SlashCmdList["NSQC3CMD"] = function(msg)
         print(format("  fadeTimer  = %.1f / %d", fadeTimer, FADE_DURATION))
         print(format("  disable    = %.0f / %d", disableTimer, DISABLE_TIME))
         print(format("  FAST_MODE  = %s", tostring(FAST_MODE)))
-        print(format("  TRACE      = %s", tostring(TRACE)))
+        print(format("  SHOW_MARK  = %s", tostring(SHOW_MARK)))
         print("|cFF88FF88─────────────────|r")
-
-    elseif msg == "trace" then
-        TRACE = not TRACE
-
-        print("|cFF88FF88NSQC3:|r трассировка: "
-              .. (TRACE and "|cFF00FF00ВКЛ|r" or "|cFFFF0000ВЫКЛ|r"))
 
     elseif msg == "mark" then
         SHOW_MARK = not SHOW_MARK
@@ -6313,7 +6317,6 @@ SlashCmdList["NSQC3CMD"] = function(msg)
     else
         print("|cFF88FF88NSQC3:|r команды:")
         print("  /nsqc3 debug — дамп состояния")
-        print("  /nsqc3 trace — трассировка фаз")
         print("  /nsqc3 mark  — маркер угла")
         print("  /nsqc3 clear — очистить экран")
         print("  /nsqc3 reset — сброс")
