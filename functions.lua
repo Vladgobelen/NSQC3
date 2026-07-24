@@ -5389,8 +5389,15 @@ end)
     • Персонаж двинулся → экран очищается, паук прячется.
     • Левый нижний угол → BACKGROUND. Остальные 3 → TOOLTIP.
     • Клик по пауку → звук, текстура, затухание 10 сек, пауза 1 час.
+    • При скрытии паутины из-за движения проверяется nsDbc["паук"].
+      Если рекорда нет — записываем и пишем в офицерский чат.
+      Если текущая длина больше сохранённого рекорда — пишем новый рекорд.
+    • Клик по пауку пишет в офицерский чат, что игрок убил паука тапкой.
 
     /nsqc3 debug | trace | mark | clear | reset | stop | fast | size | speed
+
+    В .toc желательно:
+    ## SavedVariables: nsDbc
 ]]
 
 local ADDON = "NSQC3"
@@ -5428,14 +5435,29 @@ local FADE_DURATION = 10       -- сек затухания текстур
 local DISABLE_TIME  = 3600     -- сек отключения паука (1 час)
 
 -- ═══════════════════════════════════════════════════════════
+--  База данных
+-- ═══════════════════════════════════════════════════════════
+
+if type(nsDbc) ~= "table" then
+    nsDbc = {}
+end
+
+if type(nsDbc["паук"]) ~= "table" then
+    nsDbc["паук"] = {}
+end
+
+-- ═══════════════════════════════════════════════════════════
 --  Размер экрана
 -- ═══════════════════════════════════════════════════════════
+
 local function getScreenSize()
-    local sw = GetScreenWidth()
-    local sh = GetScreenHeight()
+    local sw = GetScreenWidth and GetScreenWidth() or 0
+    local sh = GetScreenHeight and GetScreenHeight() or 0
+
     if sw and sh and sw > 0 and sh > 0 then
         return sw, sh
     end
+
     return UIParent:GetWidth(), UIParent:GetHeight()
 end
 
@@ -5444,9 +5466,10 @@ local SW, SH = getScreenSize()
 -- ═══════════════════════════════════════════════════════════
 --  Два фрейма: нижний и верхний слой
 -- ═══════════════════════════════════════════════════════════
+
 local F_LOW = CreateFrame("Frame", ADDON .. "_WebLow", UIParent)
 F_LOW:SetAllPoints(UIParent)
-F_LOW:SetFrameStrata("LOW")
+F_LOW:SetFrameStrata("BACKGROUND")
 F_LOW:SetFrameLevel(0)
 F_LOW:EnableMouse(false)
 
@@ -5461,6 +5484,7 @@ local activeFrame = F_HIGH
 -- ═══════════════════════════════════════════════════════════
 --  Текстуры
 -- ═══════════════════════════════════════════════════════════
+
 local TEX_SPIDER = "Interface\\AddOns\\NSQC3\\libs\\pauk.tga"
 local TEX_WEB    = "Interface\\AddOns\\NSQC3\\libs\\pautina.tga"
 
@@ -5470,6 +5494,7 @@ local TEX_WEB    = "Interface\\AddOns\\NSQC3\\libs\\pautina.tga"
 -- Фазы:
 --   init | watch | traverse | radial | complete
 --   fade (затухание после клика) | disabled (пауза 1 час)
+
 local phase = "init"
 
 local initTimer  = 0
@@ -5483,7 +5508,9 @@ local lastDrop = 0
 
 local spider   = nil
 local clickBtn = nil
-local webs     = {}
+
+local webs      = {}
+local webPoints = 0
 
 local corner   = { x = 0, y = 0 }
 local dir1     = { x = 0, y = 0 }
@@ -5512,13 +5539,15 @@ local lastSpiderX = 0
 local lastSpiderY = 0
 
 -- Затухание и отключение
-local fadeTimer    = 0
-local fadeTextures = {}
-local disableTimer = 0
+local fadeTimer     = 0
+local fadeTextures  = {}
+local fadeBaseAlpha = {}
+local disableTimer  = 0
 
 -- ═══════════════════════════════════════════════════════════
 --  Отладка
 -- ═══════════════════════════════════════════════════════════
+
 local TRACE     = false
 local SHOW_MARK = true
 local debugMark = nil
@@ -5531,10 +5560,12 @@ end
 
 local function showCornerMark()
     if not SHOW_MARK then return end
+
     if debugMark and debugMark:GetParent() ~= activeFrame then
         debugMark:Hide()
         debugMark = nil
     end
+
     if not debugMark then
         debugMark = activeFrame:CreateTexture(nil, "OVERLAY")
         debugMark:SetTexture(1, 0, 0, 0.8)
@@ -5542,18 +5573,22 @@ local function showCornerMark()
         debugMark:SetHeight(12)
         debugMark:SetDrawLayer("OVERLAY", 7)
     end
+
     debugMark:ClearAllPoints()
     debugMark:SetPoint("CENTER", UIParent, "BOTTOMLEFT", corner.x, corner.y)
     debugMark:Show()
 end
 
 local function hideCornerMark()
-    if debugMark then debugMark:Hide() end
+    if debugMark then
+        debugMark:Hide()
+    end
 end
 
 -- ═══════════════════════════════════════════════════════════
 --  Математика
 -- ═══════════════════════════════════════════════════════════
+
 local function bz(t, a, b, c)
     local m = 1 - t
     return m * m * a + 2 * m * t * b + t * t * c
@@ -5571,20 +5606,113 @@ end
 -- ═══════════════════════════════════════════════════════════
 --  Скорость
 -- ═══════════════════════════════════════════════════════════
+
 local function isMoving()
-    local speed = GetUnitSpeed("player")
-    if not speed then return false end
+    local speed = GetUnitSpeed and GetUnitSpeed("player") or nil
+    if not speed then
+        return false
+    end
     return speed > SPEED_THRESHOLD
+end
+
+-- ═══════════════════════════════════════════════════════════
+--  Рекорды / офицерский чат
+-- ═══════════════════════════════════════════════════════════
+
+local function getPlayerName()
+    local name = UnitName and UnitName("player") or nil
+    if not name or name == "" then
+        name = "Игрок"
+    end
+    return name
+end
+
+local function playerHasGuild()
+    if IsInGuild and IsInGuild() then
+        return true
+    end
+
+    if GetGuildInfo then
+        local guildName = GetGuildInfo("player")
+        if guildName and guildName ~= "" then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function ensureSpiderDb()
+    if type(nsDbc) ~= "table" then
+        nsDbc = {}
+    end
+
+    if type(nsDbc["паук"]) ~= "table" then
+        local old = nsDbc["паук"]
+        nsDbc["паук"] = {}
+
+        -- Если раньше там уже лежало число, переносим его как рекорд.
+        if type(old) == "number" then
+            nsDbc["паук"].record = old
+        end
+    end
+
+    return nsDbc["паук"]
+end
+
+local function sendOfficer(text)
+    if playerHasGuild() and SendChatMessage then
+        SendChatMessage(text, "OFFICER")
+    elseif TRACE then
+        trace("OFFICER: " .. text)
+    end
+end
+
+local function getSavedWebRecord(db)
+    if type(db) == "table" and type(db.record) == "number" then
+        return db.record
+    end
+    return nil
+end
+
+local function setSavedWebRecord(db, count, name)
+    db.record  = count
+    db.name    = name
+    db.updated = time()
+end
+
+local function recordWebLength(count)
+    if not count or count <= 0 then
+        return
+    end
+
+    local db    = ensureSpiderDb()
+    local name  = getPlayerName()
+    local saved = getSavedWebRecord(db)
+
+    if saved == nil then
+        setSavedWebRecord(db, count, name)
+        sendOfficer(format("Мой паук успел сплести %d милиметров паутины", count))
+    elseif count > saved then
+        setSavedWebRecord(db, count, name)
+        sendOfficer(format("Мой паук успел сплести %d милиметров паутины", count))
+    end
+end
+
+local function announceSpiderKill()
+    sendOfficer("Я зверски убиваю паука..тапкой!")
 end
 
 -- ═══════════════════════════════════════════════════════════
 --  Текстуры: паук, паутина, кнопка клика
 -- ═══════════════════════════════════════════════════════════
+
 local function mkSpider()
     if spider and spider:GetParent() ~= activeFrame then
         spider:Hide()
         spider = nil
     end
+
     if not spider then
         spider = activeFrame:CreateTexture(nil, "OVERLAY")
         spider:SetTexture(TEX_SPIDER)
@@ -5592,32 +5720,19 @@ local function mkSpider()
         spider:SetHeight(SPIDER_SIZE)
         spider:SetDrawLayer("OVERLAY", 7)
     end
-    spider:Show()
-end
 
-local function mkClickBtn()
-    if clickBtn and clickBtn:GetParent() ~= activeFrame then
-        clickBtn:Hide()
-        clickBtn = nil
-    end
-    if not clickBtn then
-        clickBtn = CreateFrame("Button", nil, activeFrame)
-        clickBtn:SetWidth(SPIDER_SIZE)
-        clickBtn:SetHeight(SPIDER_SIZE)
-        clickBtn:EnableMouse(true)
-        clickBtn:SetFrameLevel(activeFrame:GetFrameLevel() + 1)
-        clickBtn:SetScript("OnClick", function()
-            onSpiderClick()
-        end)
-    end
-    clickBtn:Show()
+    spider:Show()
 end
 
 local function putSpider(x, y)
     lastSpiderX = x
     lastSpiderY = y
-    spider:ClearAllPoints()
-    spider:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+
+    if spider then
+        spider:ClearAllPoints()
+        spider:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+    end
+
     if clickBtn then
         clickBtn:ClearAllPoints()
         clickBtn:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
@@ -5625,14 +5740,21 @@ local function putSpider(x, y)
 end
 
 local function hideSpider()
-    if spider then spider:Hide() end
-    if clickBtn then clickBtn:Hide() end
+    if spider then
+        spider:Hide()
+    end
+
+    if clickBtn then
+        clickBtn:Hide()
+    end
 end
 
 local function dropWeb(x, y)
     if MAX_WEB_SEGS > 0 and #webs >= MAX_WEB_SEGS then
         local old = table.remove(webs, 1)
-        if old then old:Hide() end
+        if old then
+            old:Hide()
+        end
     end
 
     local t = activeFrame:CreateTexture(nil, "OVERLAY")
@@ -5642,28 +5764,53 @@ local function dropWeb(x, y)
     t:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
     t:SetAlpha(WEB_ALPHA)
     t:SetDrawLayer("OVERLAY", 7)
+
     webs[#webs + 1] = t
+    webPoints = webPoints + 1
 end
 
 local function clearWebs()
     for _, t in ipairs(webs) do
         t:Hide()
     end
+
     webs = {}
+    webPoints = 0
+end
+
+local function clearFadeTextures()
+    for _, t in ipairs(fadeTextures) do
+        t:Hide()
+    end
+
+    fadeTextures  = {}
+    fadeBaseAlpha = {}
+    fadeTimer     = 0
+end
+
+local function clearAllVisuals()
+    clearWebs()
+    clearFadeTextures()
+    hideSpider()
+    hideCornerMark()
 end
 
 -- ═══════════════════════════════════════════════════════════
 --  Клик по пауку
 -- ═══════════════════════════════════════════════════════════
-function onSpiderClick()
-    if phase ~= "traverse" and phase ~= "radial" then return end
 
-    trace("клик по пауку!")
+local function onSpiderClick()
+    if phase ~= "traverse" and phase ~= "radial" and phase ~= "complete" then
+        return
+    end
 
-    -- Звук
-    PlaySoundFile(CLICK_SOUND)
+    if PlaySoundFile then
+        PlaySoundFile(CLICK_SOUND)
+    end
 
-    -- Текстура pxxx на месте паука
+    announceSpiderKill()
+
+    -- Текстура pxxx на месте паука.
     local pxxx = activeFrame:CreateTexture(nil, "OVERLAY")
     pxxx:SetTexture(CLICK_TEX)
     pxxx:SetWidth(SPIDER_SIZE * 4)
@@ -5672,27 +5819,56 @@ function onSpiderClick()
     pxxx:SetDrawLayer("OVERLAY", 7)
     pxxx:SetAlpha(1)
 
-    -- Собираем все текстуры для затухания: паутина + pxxx
-    fadeTextures = {}
+    -- Собираем все текстуры для затухания: паутина + pxxx.
+    fadeTextures  = {}
+    fadeBaseAlpha = {}
+
     for _, t in ipairs(webs) do
         table.insert(fadeTextures, t)
+        fadeBaseAlpha[#fadeTextures] = WEB_ALPHA
     end
-    table.insert(fadeTextures, pxxx)
 
-    -- Прячем паука и кнопку
+    table.insert(fadeTextures, pxxx)
+    fadeBaseAlpha[#fadeTextures] = 1
+
+    -- Прячем паука и кнопку.
     hideSpider()
     hideCornerMark()
 
-    -- Фаза затухания
-    phase     = "fade"
-    fadeTimer = 0
+    -- Фаза затухания.
+    phase      = "fade"
+    fadeTimer  = 0
+    speedTimer = 0
+end
+
+local function mkClickBtn()
+    if clickBtn and clickBtn:GetParent() ~= activeFrame then
+        clickBtn:Hide()
+        clickBtn = nil
+    end
+
+    if not clickBtn then
+        clickBtn = CreateFrame("Button", nil, activeFrame)
+        clickBtn:SetWidth(SPIDER_SIZE)
+        clickBtn:SetHeight(SPIDER_SIZE)
+        clickBtn:EnableMouse(true)
+        clickBtn:SetFrameLevel(activeFrame:GetFrameLevel() + 1)
+        clickBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        clickBtn:SetScript("OnClick", function()
+            onSpiderClick()
+        end)
+    end
+
+    clickBtn:Show()
 end
 
 -- ═══════════════════════════════════════════════════════════
 --  Геометрия
 -- ═══════════════════════════════════════════════════════════
+
 local function pickCorner()
     local c = math.random(4)
+
     if c == 1 then
         corner = { x = 0,  y = SH }
         dir1   = { x = 1,  y = 0  }
@@ -5721,6 +5897,7 @@ local function makeArc(d, fwd)
     local bx = dir1.x + dir2.x
     local by = dir1.y + dir2.y
     local blen = math.sqrt(bx * bx + by * by)
+
     if blen > 0 then
         bx = bx / blen
         by = by / blen
@@ -5736,22 +5913,25 @@ local function makeArc(d, fwd)
         P0.x, P0.y = e2x, e2y
         P2.x, P2.y = e1x, e1y
     end
+
     P1.x, P1.y = cx, cy
 end
 
 local function startMove()
     makeArc(dist, toEdge2)
+
     if FAST_MODE then
         moveDur = 10
     else
         moveDur = math.random(600, 1800)
     end
+
     tMove      = 0
     moveT      = 0
     lastDrop   = 0
     speedTimer = 0
     phase      = "traverse"
-    trace(format("traverse: dist=%d dur=%ds toEdge2=%s", dist, moveDur, tostring(toEdge2)))
+
 end
 
 local function setupRadial(i)
@@ -5773,6 +5953,7 @@ local function setupRadial(i)
     else
         rDur = math.random(30, 90)
     end
+
     rT         = 0
     rProg      = 0
     rLastDrop  = 0
@@ -5782,16 +5963,15 @@ end
 -- ═══════════════════════════════════════════════════════════
 --  Запуск / прерывание
 -- ═══════════════════════════════════════════════════════════
+
 local function startNewWeb()
     SW, SH = getScreenSize()
     pickCorner()
 
     if corner.x == 0 and corner.y == 0 then
         activeFrame = F_LOW
-        trace("угол: низ-лево → BACKGROUND")
     else
         activeFrame = F_HIGH
-        trace("угол: верхний/правый → TOOLTIP")
     end
 
     webBow       = 1.0 + math.random() * 0.2
@@ -5799,13 +5979,15 @@ local function startNewWeb()
 
     local minD = MIN_START_DIST
     local maxD = math.floor(math.min(SW, SH) * MAX_START_RATIO)
-    if maxD < minD + 1 then maxD = minD + 1 end
+
+    if maxD < minD + 1 then
+        maxD = minD + 1
+    end
+
     dist    = math.random(minD, maxD)
     toEdge2 = true
     arcs    = { dist }
 
-    trace(format("новая паутина: угол=(%.0f,%.0f) dist=%d (%d–%d) bow=%.2f radials=%d",
-          corner.x, corner.y, dist, minD, maxD, webBow, radialsCount))
 
     showCornerMark()
     mkSpider()
@@ -5813,11 +5995,16 @@ local function startNewWeb()
     startMove()
 end
 
-local function interrupt()
-    trace("interrupt: очистка")
+local function interrupt(fromMovement)
+    if fromMovement then
+        recordWebLength(webPoints)
+    end
+
+
     clearWebs()
     hideSpider()
     hideCornerMark()
+
     phase      = "watch"
     stillTimer = 0
     speedTimer = 0
@@ -5826,49 +6013,54 @@ end
 -- ═══════════════════════════════════════════════════════════
 --  OnUpdate
 -- ═══════════════════════════════════════════════════════════
+
 local function onUpdate(self, dt)
 
     -- ── init ──
     if phase == "init" then
         initTimer = initTimer + dt
+
         if initTimer >= DELAY_AFTER_LOGIN then
             phase      = "watch"
             stillTimer = 0
             speedTimer = 0
-            trace("init → watch")
         end
+
         return
     end
 
     -- ── watch: ждём остановку ──
     if phase == "watch" then
         speedTimer = speedTimer + dt
+
         if speedTimer >= SPEED_CHECK then
             speedTimer = 0
+
             if isMoving() then
                 if stillTimer > 0 then
-                    trace(format("движение, сброс (stood %.1fs)", stillTimer))
                 end
                 stillTimer = 0
             else
                 stillTimer = stillTimer + SPEED_CHECK
+
                 if stillTimer >= STILL_WAIT then
-                    trace(format("стоим %.1fs → рисуем", stillTimer))
                     startNewWeb()
                 end
             end
         end
+
         return
     end
 
     -- ── проверка скорости во время рисования ──
     if phase == "traverse" or phase == "radial" then
         speedTimer = speedTimer + dt
+
         if speedTimer >= SPEED_CHECK then
             speedTimer = 0
+
             if isMoving() then
-                trace("движение во время рисования → interrupt")
-                interrupt()
+                interrupt(true)
                 return
             end
         end
@@ -5878,7 +6070,10 @@ local function onUpdate(self, dt)
     if phase == "traverse" then
         tMove = tMove + dt
         moveT = tMove / moveDur
-        if moveT > 1 then moveT = 1 end
+
+        if moveT > 1 then
+            moveT = 1
+        end
 
         local x, y = bzPt(moveT)
         putSpider(x, y)
@@ -5890,18 +6085,19 @@ local function onUpdate(self, dt)
 
         if moveT >= 1 then
             dist = dist - ARC_GAP
-            trace(format("дуга готова, след. dist=%d", dist))
+
             if dist < MIN_DIST then
                 phase = "radial"
                 rIdx  = 0
-                trace(format("→ radial (%d спиц)", radialsCount))
                 setupRadial(0)
                 return
             end
+
             arcs[#arcs + 1] = dist
             toEdge2 = not toEdge2
             startMove()
         end
+
         return
     end
 
@@ -5909,7 +6105,10 @@ local function onUpdate(self, dt)
     if phase == "radial" then
         rT    = rT + dt
         rProg = rT / rDur
-        if rProg > 1 then rProg = 1 end
+
+        if rProg > 1 then
+            rProg = 1
+        end
 
         local x = lerp(rFrom.x, rTo.x, rProg)
         local y = lerp(rFrom.y, rTo.y, rProg)
@@ -5922,61 +6121,88 @@ local function onUpdate(self, dt)
 
         if rProg >= 1 then
             rIdx = rIdx + 1
-            trace(format("радиал %d/%d", rIdx, radialsCount))
+
             if rIdx >= radialsCount then
                 phase = "complete"
-                trace("→ complete")
                 return
             end
+
             setupRadial(rIdx)
         end
+
         return
     end
 
     -- ── complete: новая паутина ──
     if phase == "complete" then
         if isMoving() then
-            trace("движение в complete → interrupt")
-            interrupt()
+            interrupt(true)
         else
-            trace("complete → новая паутина")
             startNewWeb()
         end
+
         return
     end
 
     -- ── fade: затухание текстур после клика ──
     if phase == "fade" then
-        fadeTimer = fadeTimer + dt
-        local alpha = 1 - (fadeTimer / FADE_DURATION)
-        if alpha < 0 then alpha = 0 end
+        speedTimer = speedTimer + dt
 
-        for _, t in ipairs(fadeTextures) do
-            t:SetAlpha(alpha * WEB_ALPHA)
+        if speedTimer >= SPEED_CHECK then
+            speedTimer = 0
+
+            if isMoving() then
+                clearAllVisuals()
+
+                phase      = "watch"
+                stillTimer = 0
+                speedTimer = 0
+
+                return
+            end
+        end
+
+        fadeTimer = fadeTimer + dt
+
+        local alpha = 1 - (fadeTimer / FADE_DURATION)
+        if alpha < 0 then
+            alpha = 0
+        end
+
+        for i, t in ipairs(fadeTextures) do
+            local base = fadeBaseAlpha[i] or WEB_ALPHA
+            t:SetAlpha(alpha * base)
         end
 
         if fadeTimer >= FADE_DURATION then
             for _, t in ipairs(fadeTextures) do
                 t:Hide()
             end
-            fadeTextures = {}
-            webs         = {}
+
+            fadeTextures  = {}
+            fadeBaseAlpha = {}
+            webs          = {}
+            webPoints     = 0
+
             phase        = "disabled"
             disableTimer = 0
-            trace(format("затухание завершено → disabled на %d сек", DISABLE_TIME))
+
         end
+
         return
     end
 
     -- ── disabled: паук отключён на 1 час ──
     if phase == "disabled" then
         disableTimer = disableTimer + dt
+
         if disableTimer >= DISABLE_TIME then
             phase      = "watch"
             stillTimer = 0
             speedTimer = 0
-            trace("disabled завершён → watch")
+
         end
+
         return
     end
 end
@@ -5986,58 +6212,66 @@ F_HIGH:SetScript("OnUpdate", onUpdate)
 -- ═══════════════════════════════════════════════════════════
 --  Слэш-команды
 -- ═══════════════════════════════════════════════════════════
+
 SLASH_NSQC3CMD1 = "/nsqc3"
 SlashCmdList["NSQC3CMD"] = function(msg)
     msg = (msg or ""):lower():gsub("%s+", "")
 
     if msg == "clear" then
-        clearWebs()
-        hideSpider()
-        hideCornerMark()
-        phase      = "watch"
-        stillTimer = 0
-        speedTimer = 0
+        clearAllVisuals()
+
+        phase        = "watch"
+        stillTimer   = 0
+        speedTimer   = 0
+        disableTimer = 0
+
         print("|cFF88FF88NSQC3:|r экран очищен.")
 
     elseif msg == "fast" then
         FAST_MODE = not FAST_MODE
+
         print("|cFF88FF88NSQC3:|r быстрый режим: "
               .. (FAST_MODE and "|cFF00FF00ВКЛ|r" or "|cFFFF0000ВЫКЛ|r"))
 
     elseif msg == "reset" then
-        clearWebs()
-        hideSpider()
-        hideCornerMark()
+        clearAllVisuals()
+
         phase        = "init"
         initTimer    = 0
         stillTimer   = 0
         speedTimer   = 0
         fadeTimer    = 0
         disableTimer = 0
-        fadeTextures = {}
+
         print("|cFF88FF88NSQC3:|r сброс.")
 
     elseif msg == "stop" then
-        clearWebs()
-        hideSpider()
-        hideCornerMark()
+        clearAllVisuals()
+
         phase     = "init"
         initTimer = -999999
+
         print("|cFF88FF88NSQC3:|r остановлено.")
 
     elseif msg == "size" then
         local w, h = getScreenSize()
+
         print(format("|cFF88FF88NSQC3:|r UI: %.1f x %.1f (gx: %s)",
               w, h, GetCVar("gxResolution") or "?"))
 
     elseif msg == "speed" then
-        local s = GetUnitSpeed("player")
+        local s = GetUnitSpeed and GetUnitSpeed("player") or nil
+
         print(format("|cFF88FF88NSQC3:|r скорость: %.2f (порог: %.1f, moving: %s)",
               s or 0, SPEED_THRESHOLD, tostring(isMoving())))
 
     elseif msg == "debug" then
-        local s = GetUnitSpeed("player") or 0
+        local s     = GetUnitSpeed and GetUnitSpeed("player") or 0
         local layer = (activeFrame == F_LOW) and "BACKGROUND" or "TOOLTIP"
+
+        local db    = ensureSpiderDb()
+        local saved = getSavedWebRecord(db)
+
         print("|cFF88FF88── NSQC3 DEBUG ──|r")
         print(format("  phase      = %s", phase))
         print(format("  speed      = %.2f  moving=%s", s, tostring(isMoving())))
@@ -6049,6 +6283,8 @@ SlashCmdList["NSQC3CMD"] = function(msg)
         print(format("  radials    = %d", radialsCount))
         print(format("  moveT      = %.3f  moveDur=%d", moveT, moveDur))
         print(format("  webs       = %d / %d", #webs, MAX_WEB_SEGS))
+        print(format("  webPoints  = %d", webPoints))
+        print(format("  saved rec  = %s", tostring(saved)))
         print(format("  webBow     = %.2f", webBow))
         print(format("  spider     = %s",
               spider and (spider:IsShown() and "shown" or "hidden") or "nil"))
@@ -6060,12 +6296,17 @@ SlashCmdList["NSQC3CMD"] = function(msg)
 
     elseif msg == "trace" then
         TRACE = not TRACE
+
         print("|cFF88FF88NSQC3:|r трассировка: "
               .. (TRACE and "|cFF00FF00ВКЛ|r" or "|cFFFF0000ВЫКЛ|r"))
 
     elseif msg == "mark" then
         SHOW_MARK = not SHOW_MARK
-        if not SHOW_MARK then hideCornerMark() end
+
+        if not SHOW_MARK then
+            hideCornerMark()
+        end
+
         print("|cFF88FF88NSQC3:|r маркер угла: "
               .. (SHOW_MARK and "|cFF00FF00ВКЛ|r" or "|cFFFF0000ВЫКЛ|r"))
 
@@ -6084,8 +6325,21 @@ SlashCmdList["NSQC3CMD"] = function(msg)
 end
 
 -- ═══════════════════════════════════════════════════════════
+--  События
+-- ═══════════════════════════════════════════════════════════
+
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:SetScript("OnEvent", function()
+    SW, SH = getScreenSize()
+    ensureSpiderDb()
+end)
+
+-- ═══════════════════════════════════════════════════════════
 --  Загрузка
 -- ═══════════════════════════════════════════════════════════
+
 print("|cFF88FF88NSQC3:|r загружен. UI=" ..
       format("%.0fx%.0f", SW, SH) ..
       " | /nsqc3 debug")
