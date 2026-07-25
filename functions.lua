@@ -5970,10 +5970,6 @@ function NSPauk:SettleWebPoints(count, _reason, _inst)
     ))
 end
 
-if type(NSPauk.BaseMethods) == "table" then
-    NSPauk.BaseMethods.SettleWebPoints = NSPauk.SettleWebPoints
-end
-
 function NSPauk:RecordWebLength(count)
     self:SettleWebPoints(count, "manual")
 end
@@ -8958,33 +8954,9 @@ function NSPauk:IsTaskValid(task)
 end
 
 function NSPauk:GetWebPointSpacing()
-    local C = self.C
+    local C = self.C or {}
 
-    if type(C.WEB_POINT_SPACING_MM) == "number" and C.WEB_POINT_SPACING_MM > 0 then
-        local pixelsPerMM
-
-        if type(C.PIXELS_PER_MM) == "number" and C.PIXELS_PER_MM > 0 then
-            pixelsPerMM = C.PIXELS_PER_MM
-        elseif type(C.SCREEN_WIDTH_MM) == "number" and C.SCREEN_WIDTH_MM > 0 then
-            local uiW = GetScreenWidth and GetScreenWidth() or 0
-
-            if type(uiW) == "number" and uiW > 0 then
-                pixelsPerMM = uiW / C.SCREEN_WIDTH_MM
-            end
-        elseif type(C.SCREEN_DPI) == "number" and C.SCREEN_DPI > 0 and type(GetPhysicalScreenSize) == "function" then
-            local physW = GetPhysicalScreenSize()
-            local uiW = GetScreenWidth and GetScreenWidth() or 0
-
-            if type(physW) == "number" and physW > 0 and type(uiW) == "number" and uiW > 0 then
-                pixelsPerMM = (C.SCREEN_DPI / 25.4) * (uiW / physW)
-            end
-        end
-
-        if type(pixelsPerMM) == "number" and pixelsPerMM > 0 then
-            return pixelsPerMM * C.WEB_POINT_SPACING_MM
-        end
-    end
-
+    -- Теперь WEB_POINT_SPACING_MAX — это точное расстояние между точками в UI-пикселях.
     local spacing = C.WEB_POINT_SPACING_MAX
 
     if type(spacing) ~= "number" or spacing ~= spacing or spacing <= 0 then
@@ -8992,6 +8964,10 @@ function NSPauk:GetWebPointSpacing()
     end
 
     return spacing
+end
+
+if type(NSPauk.BaseMethods) == "table" then
+    NSPauk.BaseMethods.GetWebPointSpacing = NSPauk.GetWebPointSpacing
 end
 
 function NSPauk:StartTask(task)
