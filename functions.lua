@@ -5575,7 +5575,7 @@ NSPauk.C = {
     -- при средней геометрии и нормальном FPS.
     -- Если хочется медленнее — уменьшайте.
     -- Если быстрее — увеличивайте.
-    FAST_MODE         = 0.085,
+    FAST_MODE         = .085,
 
     -- Лимит живых текстур паутины.
     -- Когда лимит достигнут, новые точки не создаются, пока не освободятся
@@ -8287,15 +8287,15 @@ function NSPauk:RecordWebLength(count)
 
     if saved == nil then
         self:SetSavedWebRecord(db, count, name)
-        self:SendOfficer(format("Мой паук успел сплести %d миллиметров паутины", count))
+        self:SendOfficer(format("Мой павук успел сплести %d миллиметров паутины", count))
     elseif count > saved then
         self:SetSavedWebRecord(db, count, name)
-        self:SendOfficer(format("Мой паук успел сплести %d миллиметров паутины", count))
+        self:SendOfficer(format("Мой павук успел сплести %d миллиметров паутины", count))
     end
 end
 
 function NSPauk:AnnounceSpiderKill()
-    self:SendOfficer("Я зверски убиваю паука..тапкой!")
+    self:SendOfficer("Я зверски убиваю павука..тапкой!")
 end
 
 -- ═══════════════════════════════════════════════════════════
