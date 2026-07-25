@@ -5580,6 +5580,9 @@ NSPauk.DefaultConstants = {
     MOUSE_HOVER_LIMIT = 5,
     MOUSE_STREAK_RESET = 4,
     POINTS_PER_LEVEL = 60000,
+    SESSION_FULL_POINTS = 60000,
+    SESSION_EXP_PERCENT_MAX = 1.0,
+    COCOON_EXP_PERCENT = 0.05,
 }
 
 NSPauk.S = {
@@ -5748,42 +5751,150 @@ function NSPauk:SendOfficer(text)
     end
 end
 
-function NSPauk:RecordWebLength(count)
-    if not count or count <= 0 then
-        return
+function NSPauk:AddExperience(amount)
+    if type(amount) ~= "number" or amount ~= amount or amount <= 0 then
+        return 0, 0, 0, 0
     end
 
     local db = self:EnsureDB()
     local progress = db.progress
     local perLevel = self.C.POINTS_PER_LEVEL or 60000
 
-    if perLevel <= 0 then
+    if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
+    end
+
+    amount = math.floor(amount + 0.5)
+
+    if amount <= 0 then
+        return 0, 0, 0, 0
     end
 
     local oldTotal = progress.totalPoints or 0
     local oldLevel = math.floor(oldTotal / perLevel)
-    local newTotal = oldTotal + count
+    local newTotal = oldTotal + amount
 
     progress.totalPoints = newTotal
 
     local newLevel = math.floor(newTotal / perLevel)
     local left = perLevel - (newTotal % perLevel)
+    local levelsGained = newLevel - oldLevel
 
-    self:SendOfficer(string.format(
-        "Мой павук успел сплести %d миллиметров паутины. Уровень %d, до уровня %d",
-        count,
-        newLevel,
-        left
-    ))
-
-    if newLevel > oldLevel then
+    if levelsGained > 0 then
         if PlaySoundFile then
             PlaySoundFile(self.C.LEVELUP_SOUND or "Interface\\AddOns\\NSQC3\\libs\\lvlUp.ogg")
         end
 
         self:ShowLevelUpFrame()
     end
+
+    return amount, newLevel, left, levelsGained
+end
+
+function NSPauk:AwardCocoonExperience(targetName)
+    local C = self.C
+    local perLevel = C.POINTS_PER_LEVEL or 60000
+
+    if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
+        perLevel = 60000
+    end
+
+    local pct = C.COCOON_EXP_PERCENT
+
+    if type(pct) ~= "number" or pct ~= pct or pct < 0 then
+        pct = 0.05
+    end
+
+    if pct > 1 then
+        pct = 1
+    end
+
+    local amount = math.floor(perLevel * pct + 0.5)
+
+    if amount <= 0 then
+        return
+    end
+
+    local _, level, left = self:AddExperience(amount)
+
+    if type(targetName) == "string" and targetName ~= "" then
+        self:SendOfficer(string.format(
+            "Мой павук свил кокон и съел %s! Единоразово получено %d опыта (%.1f%% уровня). Уровень %d, до уровня %d",
+            targetName,
+            amount,
+            pct * 100,
+            level,
+            left
+        ))
+    else
+        self:SendOfficer(string.format(
+            "Мой павук свил кокон и съел объект! Единоразово получено %d опыта (%.1f%% уровня). Уровень %d, до уровня %d",
+            amount,
+            pct * 100,
+            level,
+            left
+        ))
+    end
+end
+
+function NSPauk:RecordWebLength(count)
+    if type(count) ~= "number" or count ~= count or count <= 0 then
+        return
+    end
+
+    count = math.floor(count + 0.5)
+
+    if count <= 0 then
+        return
+    end
+
+    local C = self.C
+    local full = C.SESSION_FULL_POINTS
+
+    if type(full) ~= "number" or full ~= full or full <= 0 then
+        full = C.POINTS_PER_LEVEL or 60000
+    end
+
+    if type(full) ~= "number" or full ~= full or full <= 0 then
+        full = 60000
+    end
+
+    local maxPct = C.SESSION_EXP_PERCENT_MAX
+
+    if type(maxPct) ~= "number" or maxPct ~= maxPct or maxPct < 0 then
+        maxPct = 1
+    end
+
+    if maxPct > 1 then
+        maxPct = 1
+    end
+
+    local pct = count / full
+
+    if pct > maxPct then
+        pct = maxPct
+    end
+
+    if pct < 0 then
+        pct = 0
+    end
+
+    local expGain = math.floor(count * pct + 0.5)
+
+    if expGain <= 0 then
+        return
+    end
+
+    local _, level, left = self:AddExperience(expGain)
+
+    self:SendOfficer(string.format(
+        "Мой павук успел сплести %d миллиметров паутины. В опыт отложено %d (%.1f%%). Уровень %d, до уровня %d",
+        count,
+        expGain,
+        pct * 100,
+        level,
+        left
+    ))
 end
 
 function NSPauk:ShowProgress()
@@ -7766,6 +7877,16 @@ function NSPauk:FinishCocoonDigestion()
         return
     end
 
+    local victimName
+
+    if c.inst and c.inst.hub and type(c.inst.hub.name) == "string" and c.inst.hub.name ~= "" then
+        victimName = c.inst.hub.name
+    elseif c.frame and c.frame.GetName then
+        victimName = c.frame:GetName()
+    end
+
+    self:AwardCocoonExperience(victimName)
+
     if c.frame then
         self:SafeHideFrame(c.frame)
         self:AddDigestedFrame(c.frame, c.baseAlpha or 1)
@@ -9036,7 +9157,7 @@ function NSPauk:ClampConstant(key, old, new)
         end
     end
 
-    if key:find("ALPHA") or key:find("CHANCE") then
+    if key:find("ALPHA", 1, true) or key:find("CHANCE", 1, true) or key:find("PERCENT", 1, true) then
         if new < 0 then
             new = 0
         end
@@ -9059,6 +9180,10 @@ function NSPauk:ClampConstant(key, old, new)
     end
 
     if key == "POINTS_PER_LEVEL" and new < 1 then
+        new = 1
+    end
+
+    if key == "SESSION_FULL_POINTS" and new < 1 then
         new = 1
     end
 
