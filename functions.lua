@@ -5509,24 +5509,29 @@ NSPauk – Spider Web (UI anchors, infinite hub chain + cocoon)
 WoW 3.3.5a (WotLK)
 
 Логика:
-• Выбирается один видимый UI-объект как базовый (hub).
-• Выбираются 4 случайных видимых UI-объекта как цели.
-• К каждой цели тянется от 1 до 6 основных нитей от края hub к краю цели.
-• Все полученные основные нити соединяются аккуратными перемычками.
-• После завершения паутины один из пяти использованных объектов выбирается
-  следующим базовым, затем снова ищутся 4 случайных цели, и так бесконечно.
+• Выбирается один базовый UI-объект (hub).
+• Выбирается от 4 до 8 случайных видимых UI-объектов как цели.
+• К каждой цели тянется одна основная нить с удвоенной скоростью
+  и провисанием вниз.
+• Между основными нитями плетутся поперечные перекладины с шагом
+  CROSS_ROW_SPACING вдоль нитей.
+• Дополнительно плетутся перекладины между перекладинами с тем же шагом.
+• После завершения паутины выбирается следующий базовый объект
+  из уже использованных, и плетение повторяется бесконечно.
 • Паук не телепортируется: он ползёт к следующей стартовой точке.
-• Если UI-объекты сдвинулись — конкретная паутинка рвётся с затуханием.
+• Если UI-объекты сдвинулись или пропали — конкретная паутинка рвётся
+  с затуханием.
 • Клик по пауку — звук, текстура, затухание 10 сек, пауза 1 час.
 
-Дополнительно:
-• Точки паутины ставятся по фактическому расстоянию: зазор не более
-  WEB_POINT_SPACING_MAX на любых дистанциях.
-• Коконы: иногда паук выбирает один объект, оплетает его и затем
-  "растворяет" объект за несколько минут. Клик по пауку или движение
-  игрока немедленно возвращают объект как было.
-• Мышь: если курсор подряд более 5 раз пересёк одну и ту же нить,
-  нить рвётся и постепенно пропадает.
+Коконы:
+• Паук иногда выбирает один объект, оплетает его и затем "переваривает"
+  3 минуты.
+• Объект исчезает вместе с коконом.
+• После переваривания паук не стоит на месте: он сразу продолжает
+  обычный алгоритм — ищет новый объект и плетёт паутину.
+• Переваренный объект возвращается только если игрок начнёт двигаться
+  или убьёт паука.
+• После переваривания все нити, которые вели к этому объекту, рвутся.
 
 В .toc желательно:
 ## SavedVariables: nsDbc
@@ -5565,11 +5570,12 @@ NSPauk.C = {
     WEB_ALPHA         = 0.55,
     SPIDER_SIZE       = 64,
 
-    -- Числовой коэффициент скорости.
-    -- Базовое значение 0.012 примерно рассчитано на 12 часов рисования
-    -- при пределе MAX_WEB_SEGS.
-    -- Чтобы сделать вдвое быстрее, поставьте C.FAST_MODE = 0.024.
-    FAST_MODE         = .024,
+    -- Калибровка скорости.
+    -- Примерно под 10 часов рисования до MAX_WEB_SEGS = 60000
+    -- при средней геометрии и нормальном FPS.
+    -- Если хочется медленнее — уменьшайте.
+    -- Если быстрее — увеличивайте.
+    FAST_MODE         = 0.085,
 
     -- Лимит живых текстур паутины.
     -- Когда лимит достигнут, новые точки не создаются, пока не освободятся
@@ -5584,21 +5590,24 @@ NSPauk.C = {
     MIN_ANCHOR_SIZE   = 14,
     MIN_INNER_SIZE    = 6,
     MIN_WEB_GAP       = 22,
-    MIN_HUB_DIST      = 70,
     MIN_CROSS_LEN     = 4,
 
     MAX_VISIBLE_RECTS = 300,
 
-    TARGET_COUNT      = 4,
-    MAIN_LINES_MIN    = 1,
-    MAIN_LINES_MAX    = 6,
+    -- Сколько целей выбирается для обычной паутины.
+    TARGET_COUNT_MIN  = 4,
+    TARGET_COUNT_MAX  = 8,
+
     MAX_INSTANCES     = 6,
 
-    CROSS_ROWS_MIN    = 5,
-    CROSS_ROWS_MAX    = 36,
-    CROSS_ROW_SPACING = 26,
-    CROSS_T_MIN       = 0.06,
-    CROSS_T_MAX       = 0.95,
+    -- Шаг поперечных перекладин вдоль основных нитей, px.
+    CROSS_ROW_SPACING = 20,
+
+    -- Предохранитель от бесконечного числа рядов на очень длинных нитях.
+    MAX_CROSS_ROWS    = 1600,
+
+    -- Количество сэмплов для расчёта длины кривой нити.
+    ARC_SAMPLES       = 256,
 
     MAIN_SAG_MIN      = 0.06,
     MAIN_SAG_MAX      = 0.16,
@@ -5611,9 +5620,10 @@ NSPauk.C = {
     TRAVEL_SPEED_MULT = 6,
     CROSS_SPEED_MULT  = 1.15,
 
+    -- Удвоенная скорость на основных нитях hub -> цель.
+    MAIN_SPEED_MULT   = 2.0,
+
     -- Максимальный зазор между соседними точками паутины, px.
-    -- 1.2 px на обычном мониторе примерно соответствует <= 0.5 мм,
-    -- но при этом не кладёт FPS.
     WEB_POINT_SPACING_MAX = 2.2,
 
     -- Лимит точек, ставящихся за один кадр.
@@ -5635,11 +5645,20 @@ NSPauk.C = {
     COCOON_DIAG_MAX         = 6,
     COCOON_MIN_AREA         = 2000,
     COCOON_MAX_AREA         = 180000,
-    DISSOLVE_DURATION_MIN   = 150,
-    DISSOLVE_DURATION_MAX   = 300,
+
+    -- Переваривание: 3 минуты.
+    DISSOLVE_DURATION_MIN   = 180,
+    DISSOLVE_DURATION_MAX   = 180,
+
     COCOON_HOLD             = 45,
     COCOON_RESTORE_DURATION = 8,
     MIN_COCOON_ALPHA        = 0.03,
+
+    -- ── Перекладины между перекладинами ──
+    MAX_INTERCROSS_SEGS     = 12000,
+    MAX_INTERCROSS_PER_PAIR = 60,
+    INTERCROSS_SAG_MIN      = 0.04,
+    INTERCROSS_SAG_MAX      = 0.10,
 
     -- ── Мышь против нитей ──
     MOUSE_CHECK        = 0.15,
@@ -5656,6 +5675,9 @@ NSPauk.C = {
         ["NSPauk_WebLow"]   = true,
     },
 }
+
+-- Шаг перекладин между перекладинами равен шагу обычных перекладин.
+NSPauk.C.INTERCROSS_SPACING = NSPauk.C.CROSS_ROW_SPACING
 
 -- ═══════════════════════════════════════════════════════════
 --  СОСТОЯНИЕ
@@ -5702,6 +5724,11 @@ NSPauk.S = {
     mouseIdle     = 0,
 
     cocoon = nil,
+
+    -- Список UI-объектов, которые были переварены коконом
+    -- и спрятаны. Восстанавливаются при движении игрока
+    -- или при убийстве паука.
+    digestedFrames = {},
 
     P0 = { x = 0, y = 0 },
     P1 = { x = 0, y = 0 },
@@ -6254,6 +6281,7 @@ end
 --  Геометрия паутины
 -- ═══════════════════════════════════════════════════════════
 
+-- Основные нити всегда провисают вниз.
 function NSPauk:MakeMainSag(thread)
     local C = self.C
 
@@ -6275,23 +6303,10 @@ function NSPauk:MakeMainSag(thread)
 
     local ratio = C.MAIN_SAG_MIN + math.random() * (C.MAIN_SAG_MAX - C.MAIN_SAG_MIN)
 
-    if math.abs(dx) > math.abs(dy) then
-        thread.p1 = {
-            x = mx + (math.random() - 0.5) * len * 0.05,
-            y = my - len * ratio,
-        }
-    else
-        local px = -dy / len
-        local py =  dx / len
-
-        local sign = (math.random() < 0.5) and -1 or 1
-        local off  = len * ratio * sign
-
-        thread.p1 = {
-            x = mx + px * off,
-            y = my + py * off,
-        }
-    end
+    thread.p1 = {
+        x = mx + (math.random() - 0.5) * len * 0.06,
+        y = my - len * ratio,
+    }
 end
 
 function NSPauk:MakeCrossSag(thread, hubX, hubY)
@@ -6335,6 +6350,137 @@ function NSPauk:MakeCrossSag(thread, hubX, hubY)
         x = mx + px * sign * len * ratio,
         y = my + py * sign * len * ratio,
     }
+end
+
+function NSPauk:MakeInterCrossSag(thread, hubX, hubY)
+    local C = self.C
+
+    local p0 = thread.p0
+    local p2 = thread.p2
+
+    local dx = p2.x - p0.x
+    local dy = p2.y - p0.y
+
+    local len = math.sqrt(dx * dx + dy * dy)
+
+    local mx = (p0.x + p2.x) / 2
+    local my = (p0.y + p2.y) / 2
+
+    if len < 1 then
+        thread.p1 = { x = mx, y = my }
+        return
+    end
+
+    local minSag = C.INTERCROSS_SAG_MIN or 0.04
+    local maxSag = C.INTERCROSS_SAG_MAX or 0.10
+
+    local ratio = minSag + math.random() * (maxSag - minSag)
+
+    local px = -dy / len
+    local py =  dx / len
+
+    local outX = mx - hubX
+    local outY = my - hubY
+
+    local sign = 1
+
+    if px * outX + py * outY < 0 then
+        sign = -1
+    end
+
+    if outX == 0 and outY == 0 then
+        sign = (math.random() < 0.5) and -1 or 1
+    end
+
+    thread.p1 = {
+        x = mx + px * sign * len * ratio,
+        y = my + py * sign * len * ratio,
+    }
+end
+
+-- Сэмплы длины дуги вдоль нити.
+-- Позволяет находить параметр t по пройденному расстоянию от старта нити.
+function NSPauk:BuildArcSamples(thread)
+    local C = self.C
+
+    local samples = {}
+    local total   = 0
+
+    local prevX, prevY = self:BzThread(thread, 0)
+
+    samples[1] = { len = 0, t = 0 }
+
+    local n = C.ARC_SAMPLES
+
+    if n < 16 then
+        n = 16
+    end
+
+    for i = 1, n do
+        local t = i / n
+
+        local x, y = self:BzThread(thread, t)
+
+        local dx = x - prevX
+        local dy = y - prevY
+
+        total = total + math.sqrt(dx * dx + dy * dy)
+
+        samples[i + 1] = { len = total, t = t }
+
+        prevX, prevY = x, y
+    end
+
+    return samples, total
+end
+
+-- Возвращает t на нити, соответствующий расстоянию targetLen от старта.
+-- Если нить короче targetLen — возвращает nil.
+function NSPauk:ThreadTAtLength(conn, targetLen)
+    local samples = conn.arcSamples
+    local total   = conn.arcLength
+
+    if not samples or not total or total <= 0 then
+        return nil
+    end
+
+    if targetLen <= 0 then
+        return 0
+    end
+
+    if targetLen > total + 0.001 then
+        return nil
+    end
+
+    if targetLen >= total - 0.001 then
+        return 1
+    end
+
+    local lo = 1
+    local hi = #samples
+
+    while lo + 1 < hi do
+        local mid = math.floor((lo + hi) / 2)
+
+        if samples[mid].len < targetLen then
+            lo = mid
+        else
+            hi = mid
+        end
+    end
+
+    local a = samples[lo]
+    local b = samples[hi]
+
+    local span = b.len - a.len
+
+    if span <= 0.0001 then
+        return a.t
+    end
+
+    local f = (targetLen - a.len) / span
+
+    return a.t + (b.t - a.t) * f
 end
 
 function NSPauk:MakeRadialThread(hubRect, targetRect, lineIndex, lineCount)
@@ -6444,41 +6590,29 @@ end
 --  Выбор базового объекта и целей
 -- ═══════════════════════════════════════════════════════════
 
-function NSPauk:SelectRandomTargets(hub, items, count)
-    local C = self.C
-    local cand = {}
+-- Центральный объект: ближайший видимый UI-объект к центру экрана.
+function NSPauk:PickCentralHub(items)
+    local S = self.S
+
+    local cx = S.SW / 2
+    local cy = S.SH / 2
+
+    local best  = nil
+    local bestD = math.huge
 
     for _, item in ipairs(items) do
-        if item.frame ~= hub.frame then
-            local dx = item.cx - hub.cx
-            local dy = item.cy - hub.cy
-            local dist = math.sqrt(dx * dx + dy * dy)
+        local dx = item.cx - cx
+        local dy = item.cy - cy
 
-            if dist >= C.MIN_HUB_DIST then
-                cand[#cand + 1] = { item = item }
-            end
+        local d = dx * dx + dy * dy
+
+        if d < bestD then
+            bestD = d
+            best  = item
         end
     end
 
-    if #cand < count then
-        cand = {}
-
-        for _, item in ipairs(items) do
-            if item.frame ~= hub.frame then
-                cand[#cand + 1] = { item = item }
-            end
-        end
-    end
-
-    self:Shuffle(cand)
-
-    local out = {}
-
-    for i = 1, math.min(count, #cand) do
-        out[i] = cand[i]
-    end
-
-    return out
+    return best
 end
 
 function NSPauk:FallbackHubAndTargets()
@@ -6526,13 +6660,13 @@ function NSPauk:FallbackHubAndTargets()
         }),
     }
 
-    local selected = {}
+    local candidates = {}
 
     for _, target in ipairs(targetRects) do
-        selected[#selected + 1] = { item = target }
+        candidates[#candidates + 1] = { item = target }
     end
 
-    return hub, selected
+    return hub, candidates, 4
 end
 
 function NSPauk:PickHub(preferred, items)
@@ -6549,7 +6683,7 @@ function NSPauk:PickHub(preferred, items)
     end
 
     if items and #items > 0 then
-        return items[math.random(#items)]
+        return self:PickCentralHub(items)
     end
 
     return nil
@@ -6583,15 +6717,91 @@ function NSPauk:ChooseNextHub(inst)
     return nil
 end
 
+-- Кандидаты-цели: все видимые объекты, кроме самого hub.
+-- Порядок случайный, CreateInstance возьмёт первые успешно построенные.
+function NSPauk:CollectTargetCandidates(hub, items)
+    local cand = {}
+
+    for _, item in ipairs(items) do
+        if item ~= hub and item.frame ~= hub.frame then
+            cand[#cand + 1] = { item = item }
+        end
+    end
+
+    self:Shuffle(cand)
+
+    return cand
+end
+
+-- ═══════════════════════════════════════════════════════════
+--  Валидация якорей и соединений
+-- ═══════════════════════════════════════════════════════════
+
+function NSPauk:ValidateAnchorRect(rect)
+    if not rect then
+        return false
+    end
+
+    -- fallback-прямоугольники без реального фрейма считаем статичными.
+    if not rect.frame then
+        return true
+    end
+
+    local cur = self:ComputeFrameVisibleInner(rect.frame)
+
+    if not cur then
+        return false
+    end
+
+    local tol = self.C.MOVEMENT_TOLERANCE
+
+    return math.abs(cur.left - rect.left) <= tol
+       and math.abs(cur.right - rect.right) <= tol
+       and math.abs(cur.bottom - rect.bottom) <= tol
+       and math.abs(cur.top - rect.top) <= tol
+end
+
+function NSPauk:ValidateConnection(inst, conn)
+    if not inst or not conn or not conn.alive then
+        return false
+    end
+
+    if not self:ValidateAnchorRect(inst.hub.rect) then
+        self:KillConnection(inst, conn)
+        return false
+    end
+
+    if not self:ValidateAnchorRect(conn.target.rect) then
+        self:KillConnection(inst, conn)
+        return false
+    end
+
+    return true
+end
+
+function NSPauk:InstanceHasAliveConn(inst)
+    if not inst then
+        return false
+    end
+
+    for _, conn in ipairs(inst.conns) do
+        if conn.alive then
+            return true
+        end
+    end
+
+    return false
+end
+
 -- ═══════════════════════════════════════════════════════════
 --  Создание экземпляра паутины
 -- ═══════════════════════════════════════════════════════════
 
-function NSPauk:CreateCrossSeg(inst, connA, connB, t)
+function NSPauk:CreateCrossSegArc(inst, connA, connB, tA, tB)
     local C = self.C
 
-    local ax, ay = self:BzThread(connA.thread, t)
-    local bx, by = self:BzThread(connB.thread, t)
+    local ax, ay = self:BzThread(connA.thread, tA)
+    local bx, by = self:BzThread(connB.thread, tB)
 
     local dx = bx - ax
     local dy = by - ay
@@ -6613,7 +6823,7 @@ function NSPauk:CreateCrossSeg(inst, connA, connB, t)
         thread   = thread,
         textures = {},
         alive    = true,
-        t        = t,
+        t        = (tA + tB) / 2,
     }
 
     thread.ownerRef = { inst = inst, seg = seg }
@@ -6689,23 +6899,282 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
     task.isCross = owner.connA ~= nil
 
     tasks[#tasks + 1] = task
+
+    return task
 end
 
-function NSPauk:CalcCrossRows(inst)
+-- Один ряд поперечных перекладин на расстоянии arcLen от старта нитей.
+function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
     local C = self.C
 
-    local total = 0
-    local n = 0
+    local N = #inst.conns
 
-    for _, conn in ipairs(inst.conns) do
-        total = total + self:ApproxThreadLength(conn.thread)
-        n = n + 1
+    if N < 2 then
+        return
     end
 
-    local avg = (n > 0) and (total / n) or 0
-    local rows = math.floor(avg / C.CROSS_ROW_SPACING + 0.5)
+    if not inst.crossRowsList then
+        inst.crossRowsList = {}
+    end
 
-    return self:Clamp(rows, C.CROSS_ROWS_MIN, C.CROSS_ROWS_MAX)
+    if not rowIdx then
+        rowIdx = #inst.crossRowsList + 1
+    end
+
+    local rowSegs = inst.crossRowsList[rowIdx] or {}
+
+    local minD2 = C.MIN_CROSS_LEN * C.MIN_CROSS_LEN
+
+    local function moveTo(connA, idxA, tA, ax, ay)
+        if cursor.idx == idxA and cursor.t then
+            if math.abs(tA - cursor.t) > 0.001 then
+                self:AddTravelThreadTask(tasks, connA, cursor.t, tA)
+            end
+        else
+            self:AddTravelPointTask(tasks, cursor.point, { x = ax, y = ay }, connA)
+        end
+
+        cursor.idx   = idxA
+        cursor.t     = tA
+        cursor.point = { x = ax, y = ay }
+    end
+
+    if N == 2 then
+        local aIdx = cursor.idx
+
+        if aIdx ~= 1 and aIdx ~= 2 then
+            aIdx = 1
+        end
+
+        local bIdx = (aIdx % 2) + 1
+
+        local connA = inst.conns[aIdx]
+        local connB = inst.conns[bIdx]
+
+        local tA = self:ThreadTAtLength(connA, arcLen)
+        local tB = self:ThreadTAtLength(connB, arcLen)
+
+        if tA and tB then
+            local ax, ay = self:BzThread(connA.thread, tA)
+            local bx, by = self:BzThread(connB.thread, tB)
+
+            local dx = bx - ax
+            local dy = by - ay
+
+            if (dx * dx + dy * dy) >= minD2 then
+                moveTo(connA, aIdx, tA, ax, ay)
+
+                local seg = self:CreateCrossSegArc(inst, connA, connB, tA, tB)
+
+                if seg then
+                    self:AddThreadTask(tasks, seg, seg.thread)
+
+                    -- Для двух нитей всегда храним один сегмент под индексом 1.
+                    rowSegs[1] = seg
+
+                    cursor.idx   = bIdx
+                    cursor.t     = tB
+                    cursor.point = { x = bx, y = by }
+                end
+            end
+        end
+
+        inst.crossRowsList[rowIdx] = rowSegs
+        return
+    end
+
+    for i = 1, N do
+        local aIdx = i
+        local bIdx = (i % N) + 1
+
+        local connA = inst.conns[aIdx]
+        local connB = inst.conns[bIdx]
+
+        local tA = self:ThreadTAtLength(connA, arcLen)
+        local tB = self:ThreadTAtLength(connB, arcLen)
+
+        if tA and tB then
+            local ax, ay = self:BzThread(connA.thread, tA)
+            local bx, by = self:BzThread(connB.thread, tB)
+
+            local dx = bx - ax
+            local dy = by - ay
+
+            if (dx * dx + dy * dy) >= minD2 then
+                moveTo(connA, aIdx, tA, ax, ay)
+
+                local seg = self:CreateCrossSegArc(inst, connA, connB, tA, tB)
+
+                if seg then
+                    self:AddThreadTask(tasks, seg, seg.thread)
+
+                    rowSegs[aIdx] = seg
+
+                    cursor.idx   = bIdx
+                    cursor.t     = tB
+                    cursor.point = { x = bx, y = by }
+                end
+            end
+        end
+    end
+
+    inst.crossRowsList[rowIdx] = rowSegs
+end
+
+-- Перекладины между перекладинами.
+-- Берём соседние ряды обычных перекладин и соединяем их соответствующие
+-- сегменты с тем же шагом CROSS_ROW_SPACING / INTERCROSS_SPACING.
+function NSPauk:AddInterCrossTasks(tasks, inst, cursor)
+    local C = self.C
+
+    if not inst or not inst.crossRowsList then
+        return
+    end
+
+    local rowsList = inst.crossRowsList
+    local rowCount = #rowsList
+
+    if rowCount < 2 then
+        return
+    end
+
+    if not inst.interSegs then
+        inst.interSegs = {}
+    end
+
+    local N = #inst.conns
+
+    if N < 2 then
+        return
+    end
+
+    local spacing = C.INTERCROSS_SPACING or C.CROSS_ROW_SPACING
+
+    if not spacing or spacing < 1 then
+        spacing = 1
+    end
+
+    local maxTotal = C.MAX_INTERCROSS_SEGS or 0
+    local maxPerPair = C.MAX_INTERCROSS_PER_PAIR or 60
+
+    local made = 0
+    local done = false
+
+    local indices = {}
+
+    if N == 2 then
+        indices[1] = 1
+    else
+        for i = 1, N do
+            indices[#indices + 1] = i
+        end
+    end
+
+    local minD2 = C.MIN_CROSS_LEN * C.MIN_CROSS_LEN
+
+    for r = 1, rowCount - 1 do
+        if done then
+            break
+        end
+
+        local rowA = rowsList[r]
+        local rowB = rowsList[r + 1]
+
+        if rowA and rowB then
+            for _, idx in ipairs(indices) do
+                if done then
+                    break
+                end
+
+                local segA = rowA[idx]
+                local segB = rowB[idx]
+
+                if segA and segB
+                   and segA.alive and segB.alive
+                   and segA.thread and segB.thread then
+
+                    local lenA = self:ApproxThreadLength(segA.thread)
+                    local lenB = self:ApproxThreadLength(segB.thread)
+                    local len  = math.min(lenA, lenB)
+
+                    local count = math.floor(len / spacing)
+
+                    if count > maxPerPair then
+                        count = maxPerPair
+                    end
+
+                    if count >= 2 then
+                        for k = 1, count - 1 do
+                            if maxTotal > 0 and made >= maxTotal then
+                                done = true
+                                break
+                            end
+
+                            local f = k / count
+
+                            local ax, ay = self:BzThread(segA.thread, f)
+                            local bx, by = self:BzThread(segB.thread, f)
+
+                            local dx = bx - ax
+                            local dy = by - ay
+
+                            if (dx * dx + dy * dy) >= minD2 then
+                                local thread = {
+                                    p0 = { x = ax, y = ay },
+                                    p2 = { x = bx, y = by },
+                                }
+
+                                self:MakeInterCrossSag(
+                                    thread,
+                                    inst.hub.rect.cx,
+                                    inst.hub.rect.cy
+                                )
+
+                                local inter = {
+                                    connA      = segA.connA,
+                                    connB      = segA.connB,
+                                    parentSegA = segA,
+                                    parentSegB = segB,
+                                    thread     = thread,
+                                    textures   = {},
+                                    alive      = true,
+                                    isInterCross = true,
+                                    t          = f,
+                                }
+
+                                thread.ownerRef = { inst = inst, seg = inter }
+
+                                inst.crossSegs[#inst.crossSegs + 1] = inter
+                                inst.interSegs[#inst.interSegs + 1] = inter
+
+                                if cursor and cursor.point then
+                                    self:AddTravelPointTask(
+                                        tasks,
+                                        cursor.point,
+                                        thread.p0,
+                                        segA.connA
+                                    )
+                                end
+
+                                self:AddThreadTask(tasks, inter, thread)
+
+                                if not cursor then
+                                    cursor = {}
+                                end
+
+                                cursor.point = {
+                                    x = thread.p2.x,
+                                    y = thread.p2.y,
+                                }
+
+                                made = made + 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 function NSPauk:BuildInstanceTasks(inst)
@@ -6713,6 +7182,12 @@ function NSPauk:BuildInstanceTasks(inst)
     local C = self.C
 
     local tasks = {}
+
+    inst.crossRowsList = {}
+
+    if not inst.interSegs then
+        inst.interSegs = {}
+    end
 
     local cursorPoint = nil
 
@@ -6723,13 +7198,15 @@ function NSPauk:BuildInstanceTasks(inst)
         }
     end
 
-    -- Основные нити: hub -> target -> вернуться по этой же нити к hub.
+    -- Основные нити: hub -> цель -> вернуться по этой же нити к hub.
     for _, conn in ipairs(inst.conns) do
         if cursorPoint then
             self:AddTravelPointTask(tasks, cursorPoint, conn.thread.p0, conn)
         end
 
-        self:AddThreadTask(tasks, conn, conn.thread)
+        local task = self:AddThreadTask(tasks, conn, conn.thread)
+        task.isMain = true
+
         self:AddTravelThreadTask(tasks, conn, 1, 0)
 
         cursorPoint = {
@@ -6740,102 +7217,69 @@ function NSPauk:BuildInstanceTasks(inst)
 
     local N = #inst.conns
 
-    -- Перемычки между всеми соседними основными нитями.
     if N >= 2 then
-        local rows = self:CalcCrossRows(inst)
+        local maxLen = 0
+
+        for _, conn in ipairs(inst.conns) do
+            local samples, total = self:BuildArcSamples(conn.thread)
+
+            conn.arcSamples = samples
+            conn.arcLength  = total
+
+            if total > maxLen then
+                maxLen = total
+            end
+        end
+
+        local spacing = C.CROSS_ROW_SPACING
+
+        if spacing < 0.5 then
+            spacing = 0.5
+        end
+
+        local rows = math.floor(maxLen / spacing + 0.0001)
+
+        if rows > C.MAX_CROSS_ROWS then
+            rows = C.MAX_CROSS_ROWS
+        end
+
         inst.crossRows = rows
 
-        local px, py = self:BzThread(inst.conns[1].thread, 0)
+        if rows > 0 then
+            local px, py = self:BzThread(inst.conns[1].thread, 0)
 
-        if cursorPoint then
-            self:AddTravelPointTask(tasks, cursorPoint, { x = px, y = py }, inst.conns[1])
-        end
-
-        local cursorIdx = 1
-        local cursorT   = 0
-        cursorPoint     = { x = px, y = py }
-
-        for row = 1, rows do
-            local baseT = C.CROSS_T_MIN
-                + (C.CROSS_T_MAX - C.CROSS_T_MIN) * (row / (rows + 1))
-
-            local t = self:Clamp(
-                baseT + (math.random() - 0.5) * 0.04,
-                C.CROSS_T_MIN,
-                C.CROSS_T_MAX
-            )
-
-            if math.abs(t - cursorT) > 0.001 then
-                self:AddTravelThreadTask(tasks, inst.conns[cursorIdx], cursorT, t)
-
-                local nx, ny = self:BzThread(inst.conns[cursorIdx].thread, t)
-
-                cursorPoint = { x = nx, y = ny }
-                cursorT     = t
+            if cursorPoint then
+                self:AddTravelPointTask(tasks, cursorPoint, { x = px, y = py }, inst.conns[1])
             end
 
-            if N == 2 then
-                local aIdx = cursorIdx
-                local bIdx = (cursorIdx % 2) + 1
+            local cursor = {
+                idx   = 1,
+                t     = 0,
+                point = { x = px, y = py },
+            }
 
-                local connA = inst.conns[aIdx]
-                local connB = inst.conns[bIdx]
-
-                local bx, by = self:BzThread(connB.thread, t)
-
-                local seg = self:CreateCrossSeg(inst, connA, connB, t)
-
-                if seg then
-                    self:AddThreadTask(tasks, seg, seg.thread)
-                else
-                    self:AddTravelPointTask(tasks, cursorPoint, { x = bx, y = by }, connB)
-                end
-
-                cursorIdx   = bIdx
-                cursorPoint = { x = bx, y = by }
-            else
-                if cursorIdx ~= 1 then
-                    local sx, sy = self:BzThread(inst.conns[1].thread, t)
-
-                    self:AddTravelPointTask(tasks, cursorPoint, { x = sx, y = sy }, inst.conns[1])
-
-                    cursorPoint = { x = sx, y = sy }
-                    cursorIdx   = 1
-                end
-
-                for i = 1, N do
-                    local connA = inst.conns[i]
-                    local connB = inst.conns[(i % N) + 1]
-
-                    local bx, by = self:BzThread(connB.thread, t)
-
-                    local seg = self:CreateCrossSeg(inst, connA, connB, t)
-
-                    if seg then
-                        self:AddThreadTask(tasks, seg, seg.thread)
-                    else
-                        self:AddTravelPointTask(tasks, cursorPoint, { x = bx, y = by }, connB)
-                    end
-
-                    cursorPoint = { x = bx, y = by }
-                end
-
-                cursorIdx = 1
-                cursorT   = t
+            -- Перекладины между основными нитями.
+            for row = 1, rows do
+                self:AddArcRowTasks(tasks, inst, cursor, row * spacing, row)
             end
-        end
 
-        if cursorIdx >= 1 and cursorIdx <= N and math.abs(cursorT) > 0.001 then
-            self:AddTravelThreadTask(tasks, inst.conns[cursorIdx], cursorT, 0)
+            -- Вернуться по текущей нити к hub.
+            if cursor.t and cursor.t > 0.001
+               and cursor.idx >= 1 and cursor.idx <= N then
+                self:AddTravelThreadTask(tasks, inst.conns[cursor.idx], cursor.t, 0)
+            end
+
+            -- После основных перекладин плетём перекладины между перекладинами.
+            self:AddInterCrossTasks(tasks, inst, {
+                point = { x = px, y = py },
+            })
         end
     end
 
     inst.tasks = tasks
 end
 
-function NSPauk:CreateInstance(hub, selected)
-    local C = self.C
-
+function NSPauk:CreateInstance(hub, candidates, targetCount)
     local inst = {
         id = self.nextInstanceId,
 
@@ -6847,6 +7291,8 @@ function NSPauk:CreateInstance(hub, selected)
 
         conns            = {},
         crossSegs        = {},
+        interSegs        = {},
+        crossRowsList    = {},
         tasks            = {},
         crossRows        = 0,
         anchorCandidates = {},
@@ -6871,38 +7317,42 @@ function NSPauk:CreateInstance(hub, selected)
 
     addAnchor(inst.hub.rect)
 
-    for _, sel in ipairs(selected) do
-        local target = sel.item
-        local lines = math.random(C.MAIN_LINES_MIN, C.MAIN_LINES_MAX)
-        local made = 0
+    -- По одной основной нити к каждому успешному кандидату.
+    -- Останавливаемся, когда набрали нужное число целей.
+    local made = 0
 
-        for lineIndex = 1, lines do
-            local thread = self:MakeRadialThread(inst.hub.rect, target, lineIndex, lines)
-
-            if thread then
-                local conn = {
-                    id = #inst.conns + 1,
-
-                    target = {
-                        frame = target.frame,
-                        name  = target.name,
-                        rect  = self:CopyRect(target),
-                    },
-
-                    thread   = thread,
-                    angle    = thread.angle,
-                    textures = {},
-                    alive    = true,
-                }
-
-                thread.ownerRef = { inst = inst, conn = conn }
-
-                inst.conns[#inst.conns + 1] = conn
-                made = made + 1
-            end
+    for _, cand in ipairs(candidates) do
+        if targetCount and made >= targetCount then
+            break
         end
 
-        if made > 0 then
+        local target = cand.item
+        local thread = self:MakeRadialThread(inst.hub.rect, target, 1, 1)
+
+        if thread then
+            local conn = {
+                id = #inst.conns + 1,
+
+                target = {
+                    frame = target.frame,
+                    name  = target.name,
+                    rect  = self:CopyRect(target),
+                },
+
+                thread     = thread,
+                angle      = thread.angle,
+                textures   = {},
+                alive      = true,
+                arcSamples = nil,
+                arcLength  = 0,
+            }
+
+            thread.ownerRef = { inst = inst, conn = conn }
+
+            inst.conns[#inst.conns + 1] = conn
+
+            made = made + 1
+
             addAnchor(self:CopyRect(target))
         end
     end
@@ -6989,6 +7439,8 @@ function NSPauk:CreateCocoonInstance(item)
 
         conns            = {},
         crossSegs        = {},
+        interSegs        = {},
+        crossRowsList    = {},
         tasks            = {},
         crossRows        = 0,
         anchorCandidates = { self:CopyRect(item) },
@@ -7153,21 +7605,228 @@ function NSPauk:BeginDissolve(inst)
         return
     end
 
+    local baseAlpha = frame:GetAlpha() or 1
+
     S.cocoon = {
         inst      = inst,
         frame     = frame,
-        baseAlpha = frame:GetAlpha() or 1,
+        baseAlpha = baseAlpha,
+        minAlpha  = math.min(C.MIN_COCOON_ALPHA, baseAlpha),
         duration  = C.DISSOLVE_DURATION_MIN
             + math.random() * (C.DISSOLVE_DURATION_MAX - C.DISSOLVE_DURATION_MIN),
         timer     = 0,
-        holdAlpha = C.MIN_COCOON_ALPHA,
+        digested  = false,
     }
 
     S.phase      = "dissolve"
     S.speedTimer = 0
 end
 
--- Полный откат кокона: вернуть альфу объекта и порвать нити.
+function NSPauk:SetInstanceWebAlpha(inst, alpha)
+    if not inst then
+        return
+    end
+
+    if alpha < 0 then
+        alpha = 0
+    end
+
+    for _, conn in ipairs(inst.conns) do
+        for _, t in ipairs(conn.textures) do
+            t:SetAlpha(alpha)
+        end
+    end
+
+    for _, seg in ipairs(inst.crossSegs) do
+        for _, t in ipairs(seg.textures) do
+            t:SetAlpha(alpha)
+        end
+    end
+end
+
+function NSPauk:SafeHideFrame(f)
+    if not f then
+        return
+    end
+
+    local canHide = true
+
+    if f.IsProtected and f:IsProtected() then
+        canHide = false
+    end
+
+    if canHide and f.Hide then
+        f:Hide()
+    end
+
+    if f.SetAlpha then
+        f:SetAlpha(0)
+    end
+end
+
+function NSPauk:SafeShowFrame(f, alpha)
+    if not f then
+        return
+    end
+
+    if f.Show then
+        f:Show()
+    end
+
+    if f.SetAlpha then
+        f:SetAlpha(alpha or 1)
+    end
+end
+
+function NSPauk:AddDigestedFrame(frame, baseAlpha)
+    if not frame then
+        return
+    end
+
+    local S = self.S
+
+    if not S.digestedFrames then
+        S.digestedFrames = {}
+    end
+
+    for _, info in ipairs(S.digestedFrames) do
+        if info.frame == frame then
+            info.baseAlpha = baseAlpha or info.baseAlpha or 1
+            return
+        end
+    end
+
+    table.insert(S.digestedFrames, {
+        frame     = frame,
+        baseAlpha = baseAlpha or 1,
+    })
+end
+
+function NSPauk:RestoreDigestedFrames()
+    local S = self.S
+
+    if not S.digestedFrames then
+        S.digestedFrames = {}
+    end
+
+    for i = #S.digestedFrames, 1, -1 do
+        local info = S.digestedFrames[i]
+
+        if info and info.frame then
+            self:SafeShowFrame(info.frame, info.baseAlpha or 1)
+        end
+
+        table.remove(S.digestedFrames, i)
+    end
+end
+
+function NSPauk:RemoveInstance(inst)
+    local S = self.S
+
+    if not inst then
+        return
+    end
+
+    for i, v in ipairs(S.instances) do
+        if v == inst then
+            table.remove(S.instances, i)
+            break
+        end
+    end
+
+    if S.currentInstance == inst then
+        S.currentInstance = nil
+    end
+end
+
+function NSPauk:HideInstanceTextures(inst)
+    if not inst then
+        return
+    end
+
+    local S = self.S
+
+    local function recycle(list)
+        for _, t in ipairs(list) do
+            t:Hide()
+            table.insert(S.webPool, t)
+        end
+    end
+
+    for _, conn in ipairs(inst.conns) do
+        recycle(conn.textures)
+        conn.textures = {}
+        conn.alive    = false
+    end
+
+    for _, seg in ipairs(inst.crossSegs) do
+        recycle(seg.textures)
+        seg.textures = {}
+        seg.alive    = false
+    end
+end
+
+function NSPauk:BreakAnchoredToFrame(frame)
+    if not frame then
+        return
+    end
+
+    local S = self.S
+
+    for _, inst in ipairs(S.instances) do
+        if inst.hub.frame == frame then
+            self:TearInstance(inst)
+        else
+            for _, conn in ipairs(inst.conns) do
+                if conn.alive and conn.target.frame == frame then
+                    self:KillConnection(inst, conn)
+                end
+            end
+        end
+    end
+end
+
+function NSPauk:FinishCocoonDigestion()
+    local S = self.S
+
+    local c = S.cocoon
+
+    if not c then
+        S.phase      = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+        return
+    end
+
+    -- Объект исчезает вместе с коконом.
+    if c.frame then
+        self:SafeHideFrame(c.frame)
+        self:AddDigestedFrame(c.frame, c.baseAlpha or 1)
+    end
+
+    if c.inst then
+        self:HideInstanceTextures(c.inst)
+        self:RemoveInstance(c.inst)
+    end
+
+    -- Все нити из других пауков, ведущие к этому объекту, рвутся.
+    self:BreakAnchoredToFrame(c.frame)
+
+    S.cocoon = nil
+
+    S.tasks         = {}
+    S.taskIdx       = 1
+    S.currentTask   = nil
+    S.completeTimer = 0
+
+    -- После переваривания паук не остаётся на месте,
+    -- а сразу продолжает обычный алгоритм.
+    self:StartNewInstance(nil)
+end
+
+-- Полный откат активного кокона: вернуть альфу объекта и порвать нити.
+-- Переваренные ранее объекты здесь не трогаем: они восстанавливаются
+-- отдельно через RestoreDigestedFrames при движении/убийстве паука.
 function NSPauk:AbortCocoon()
     local S = self.S
 
@@ -7177,8 +7836,8 @@ function NSPauk:AbortCocoon()
         return
     end
 
-    if c.frame and c.frame.SetAlpha then
-        c.frame:SetAlpha(c.baseAlpha)
+    if c.frame then
+        self:SafeShowFrame(c.frame, c.baseAlpha or 1)
     end
 
     if c.inst then
@@ -7240,7 +7899,7 @@ function NSPauk:UpdateLocalFades(dt)
 end
 
 function NSPauk:KillSeg(seg)
-    if not seg.alive then
+    if not seg or not seg.alive then
         return
     end
 
@@ -7249,6 +7908,19 @@ function NSPauk:KillSeg(seg)
     if #seg.textures > 0 then
         self:StartLocalFade(seg.textures, self.C.TEAR_FADE_DURATION)
         seg.textures = {}
+    end
+
+    -- Если это обычная перекладина, рвём также её дочерние
+    -- перекладины между перекладинами.
+    local ref = seg.thread and seg.thread.ownerRef
+    local inst = ref and ref.inst
+
+    if inst and inst.interSegs then
+        for _, inter in ipairs(inst.interSegs) do
+            if inter.alive and (inter.parentSegA == seg or inter.parentSegB == seg) then
+                self:KillSeg(inter)
+            end
+        end
     end
 end
 
@@ -7306,12 +7978,9 @@ function NSPauk:CheckInstancesMovement()
             if inst.isCocoon and S.cocoon and S.cocoon.inst == inst then
                 self:AbortCocoon()
 
-                if S.phase == "dissolve" or S.phase == "cocoonHold"
-                   or S.phase == "cocoonRestore" then
-                    S.phase      = "watch"
-                    S.stillTimer = 0
-                    S.speedTimer = 0
-                end
+                S.phase      = "watch"
+                S.stillTimer = 0
+                S.speedTimer = 0
             end
         else
             for _, conn in ipairs(inst.conns) do
@@ -7770,6 +8439,11 @@ function NSPauk:ClearAllVisuals()
     -- Если был активный кокон — вернуть альфу объекта.
     self:AbortCocoon()
 
+    -- Переваренные объекты возвращаются только при движении
+    -- или при убийстве паука. ClearAllVisuals вызывается
+    -- в этих ситуациях через Interrupt / клик.
+    self:RestoreDigestedFrames()
+
     for _, inst in ipairs(S.instances) do
         for _, conn in ipairs(inst.conns) do
             for _, t in ipairs(conn.textures) do
@@ -7831,7 +8505,7 @@ function NSPauk:OnSpiderClick()
 
     if S.phase ~= "task" and S.phase ~= "instanceComplete"
        and S.phase ~= "dissolve" and S.phase ~= "cocoonHold"
-       and S.phase ~= "cocoonRestore" then
+       and S.phase ~= "cocoonRestore" and S.phase ~= "cocoonDigested" then
         return
     end
 
@@ -7841,8 +8515,11 @@ function NSPauk:OnSpiderClick()
 
     self:AnnounceSpiderKill()
 
-    -- Тапок: объект в коконе сразу возвращается к исходной альфе.
+    -- Тапок: активный кокон сразу возвращается к исходной альфе.
     self:AbortCocoon()
+
+    -- Также возвращаем все переваренные и спрятанные объекты.
+    self:RestoreDigestedFrames()
 
     local textures = {}
 
@@ -7987,12 +8664,56 @@ function NSPauk:IsTaskValid(task)
     end
 
     if task.kind == "thread" then
-        return task.owner and task.owner.alive
+        local owner = task.owner
+
+        if not owner or not owner.alive then
+            return false
+        end
+
+        local ref  = owner.thread and owner.thread.ownerRef
+        local inst = ref and ref.inst
+
+        if not inst then
+            return false
+        end
+
+        if owner.connA or owner.connB then
+            if owner.connA and not self:ValidateConnection(inst, owner.connA) then
+                return false
+            end
+
+            if owner.connB and not self:ValidateConnection(inst, owner.connB) then
+                return false
+            end
+
+            if owner.parentSegA and not owner.parentSegA.alive then
+                return false
+            end
+
+            if owner.parentSegB and not owner.parentSegB.alive then
+                return false
+            end
+        elseif owner.conn then
+            if not self:ValidateConnection(inst, owner.conn) then
+                return false
+            end
+        end
+
+        return true
     end
 
     if task.kind == "travel" then
         if task.conn and not task.conn.alive then
             return false
+        end
+
+        if task.conn then
+            local ref  = task.conn.thread and task.conn.thread.ownerRef
+            local inst = ref and ref.inst
+
+            if inst and not self:ValidateConnection(inst, task.conn) then
+                return false
+            end
         end
 
         return true
@@ -8025,6 +8746,11 @@ function NSPauk:StartTask(task)
 
     if task.isCross then
         speed = speed * C.CROSS_SPEED_MULT
+    end
+
+    -- Основные нити hub -> цель плетутся с удвоенной скоростью.
+    if task.isMain then
+        speed = speed * C.MAIN_SPEED_MULT
     end
 
     if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
@@ -8130,17 +8856,19 @@ function NSPauk:StartNewInstance(preferredHub)
     end
 
     local hub = self:PickHub(preferredHub, items)
-    local selected = {}
+
+    local candidates = {}
+    local targetCount = math.random(C.TARGET_COUNT_MIN, C.TARGET_COUNT_MAX)
 
     if hub then
-        selected = self:SelectRandomTargets(hub, items, C.TARGET_COUNT)
+        candidates = self:CollectTargetCandidates(hub, items)
     end
 
-    if not hub or #selected == 0 then
-        hub, selected = self:FallbackHubAndTargets()
+    if not hub or #candidates == 0 then
+        hub, candidates, targetCount = self:FallbackHubAndTargets()
     end
 
-    local inst = self:CreateInstance(hub, selected)
+    local inst = self:CreateInstance(hub, candidates, targetCount)
 
     if not inst or #inst.conns == 0 then
         S.phase      = "watch"
@@ -8207,7 +8935,7 @@ function NSPauk:OnUpdate(dt)
     -- Мониторинг смещения UI-якорей.
     if S.phase == "watch" or S.phase == "task" or S.phase == "instanceComplete"
        or S.phase == "dissolve" or S.phase == "cocoonHold"
-       or S.phase == "cocoonRestore" then
+       or S.phase == "cocoonRestore" or S.phase == "cocoonDigested" then
         S.monitorTimer = S.monitorTimer + dt
 
         if S.monitorTimer >= C.MONITOR_CHECK then
@@ -8335,6 +9063,16 @@ function NSPauk:OnUpdate(dt)
             return
         end
 
+        -- Если все нити кокона порваны — возвращаем объект.
+        if not self:InstanceHasAliveConn(c.inst) then
+            self:AbortCocoon()
+
+            S.phase      = "watch"
+            S.stillTimer = 0
+            S.speedTimer = 0
+            return
+        end
+
         c.timer = c.timer + dt
 
         local progress = c.timer / c.duration
@@ -8344,24 +9082,37 @@ function NSPauk:OnUpdate(dt)
         end
 
         local alpha = c.baseAlpha * (1 - progress)
+        local minAlpha = c.minAlpha or C.MIN_COCOON_ALPHA
 
-        if alpha < C.MIN_COCOON_ALPHA then
-            alpha = C.MIN_COCOON_ALPHA
+        if alpha < minAlpha then
+            alpha = minAlpha
         end
 
         if c.frame and c.frame.SetAlpha then
             c.frame:SetAlpha(alpha)
         end
 
+        -- Кокон исчезает вместе с объектом.
+        if c.inst then
+            self:SetInstanceWebAlpha(c.inst, C.WEB_ALPHA * (1 - progress))
+        end
+
         if progress >= 1 then
-            c.timer = 0
-            S.phase = "cocoonHold"
+            self:FinishCocoonDigestion()
         end
 
         return
     end
 
-    -- ── cocoonHold: выдержка в прозрачном состоянии ──
+    -- ── cocoonDigested: защитная совместимость ──
+    -- Раньше паук здесь стоял и ждал движения/клика.
+    -- Теперь продолжаем алгоритм сразу.
+    if S.phase == "cocoonDigested" then
+        self:StartNewInstance(nil)
+        return
+    end
+
+    -- ── cocoonHold: оставлен для совместимости, сейчас не используется ──
     if S.phase == "cocoonHold" then
         S.speedTimer = S.speedTimer + dt
 
@@ -8398,7 +9149,7 @@ function NSPauk:OnUpdate(dt)
         return
     end
 
-    -- ── cocoonRestore: плавное возвращение альфы объекта ──
+    -- ── cocoonRestore: оставлен для совместимости, сейчас не используется ──
     if S.phase == "cocoonRestore" then
         S.speedTimer = S.speedTimer + dt
 
