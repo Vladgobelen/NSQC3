@@ -5505,7 +5505,6 @@ end)
 
 
 local ADDON_FOLDER = ...
-
 if type(ADDON_FOLDER) ~= "string" or ADDON_FOLDER == "" then
     ADDON_FOLDER = "NSPauk"
 end
@@ -5530,7 +5529,7 @@ NSPauk.DefaultConstants = {
     WEB_ALPHA = 0.55,
     SPIDER_SIZE = 64,
     FAST_MODE = 0.085,
-    MAX_WEB_SEGS = 60000,
+    MAX_WEB_SEGS = 120000,
     FADE_DURATION = 10,
     DISABLE_TIME = 3600,
     MIN_ANCHOR_SIZE = 14,
@@ -5585,6 +5584,8 @@ NSPauk.DefaultConstants = {
     COCOON_EXP_PERCENT = 0.05,
     WEB_POINT_SPACING_MM = 1,
     SCREEN_WIDTH_MM = 527,
+    LIMIT_COCOON_INTERVAL = 1800,
+    LIMIT_COCOON_RETRY = 60,
 }
 
 NSPauk.S = {
@@ -5604,6 +5605,7 @@ NSPauk.S = {
     webPool = {},
     webCreated = 0,
     webPoints = 0,
+    webAliveCount = 0,
     fades = {},
     disableTimer = 0,
     lastSpiderX = 0,
@@ -5627,6 +5629,11 @@ NSPauk.S = {
         bestExpAwarded = 0,
     },
     suppressSettle = false,
+    limitReached = false,
+    limitReturnPending = false,
+    limitCocoonPending = false,
+    limitWaitTimer = 0,
+    limitHomePoint = nil,
 }
 
 NSPauk.C = {}
@@ -5686,20 +5693,29 @@ function NSPauk:ApplyRuntimeConstants()
     if type(C.INTERCROSS_SPACING) ~= "number" then
         C.INTERCROSS_SPACING = C.CROSS_ROW_SPACING
     end
+
+    if type(C.LIMIT_COCOON_INTERVAL) ~= "number"
+        or C.LIMIT_COCOON_INTERVAL ~= C.LIMIT_COCOON_INTERVAL
+        or C.LIMIT_COCOON_INTERVAL <= 0 then
+        C.LIMIT_COCOON_INTERVAL = 1800
+    end
+
+    if type(C.LIMIT_COCOON_RETRY) ~= "number"
+        or C.LIMIT_COCOON_RETRY ~= C.LIMIT_COCOON_RETRY
+        or C.LIMIT_COCOON_RETRY <= 0 then
+        C.LIMIT_COCOON_RETRY = 60
+    end
 end
 
 function NSPauk:LoadConstants()
     local db = self:EnsureDB()
-
     self.DB = db
     self.C = db.constants
-
     self:ApplyRuntimeConstants()
 end
 
 function NSPauk:ResetConstants()
     local db = self:EnsureDB()
-
     self.DB = db
 
     local constants = db.constants
@@ -5713,7 +5729,6 @@ function NSPauk:ResetConstants()
     end
 
     self.C = constants
-
     self:ApplyRuntimeConstants()
 end
 
@@ -5726,12 +5741,12 @@ end
 
 function NSPauk:ResetProgress()
     local db = self:EnsureDB()
-
     self.DB = db
+
     db.progress.totalPoints = 0
     db.record = nil
-    self.S.webPoints = 0
 
+    self.S.webPoints = 0
     self:ResetSessionRecord()
 end
 
@@ -5748,7 +5763,6 @@ function NSPauk:PlayerHasGuild()
 
     if GetGuildInfo then
         local guildName = GetGuildInfo("player")
-
         if guildName and guildName ~= "" then
             return true
         end
@@ -5776,26 +5790,26 @@ function NSPauk:AddExperience(amount)
 
     local db = self:EnsureDB()
     local progress = db.progress
-    local perLevel = self.C.POINTS_PER_LEVEL or 60000
 
+    local perLevel = self.C.POINTS_PER_LEVEL or 60000
     if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
     end
 
     amount = math.floor(amount + 0.5)
-
     if amount <= 0 then
         return 0, 0, 0, 0
     end
 
     local oldTotal = progress.totalPoints or 0
     local oldLevel = math.floor(oldTotal / perLevel)
-    local newTotal = oldTotal + amount
 
+    local newTotal = oldTotal + amount
     progress.totalPoints = newTotal
 
     local newLevel = math.floor(newTotal / perLevel)
     local left = perLevel - (newTotal % perLevel)
+
     local levelsGained = newLevel - oldLevel
 
     if levelsGained > 0 then
@@ -5811,14 +5825,13 @@ end
 
 function NSPauk:AwardCocoonExperience(targetName)
     local C = self.C
-    local perLevel = C.POINTS_PER_LEVEL or 60000
 
+    local perLevel = C.POINTS_PER_LEVEL or 60000
     if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
     end
 
     local pct = C.COCOON_EXP_PERCENT
-
     if type(pct) ~= "number" or pct ~= pct or pct < 0 then
         pct = 0.05
     end
@@ -5828,7 +5841,6 @@ function NSPauk:AwardCocoonExperience(targetName)
     end
 
     local amount = math.floor(perLevel * pct + 0.5)
-
     if amount <= 0 then
         return
     end
@@ -5861,7 +5873,6 @@ function NSPauk:CalcWebExperience(count)
     end
 
     count = math.floor(count + 0.5)
-
     if count <= 0 then
         return 0, 0, 0
     end
@@ -5869,7 +5880,6 @@ function NSPauk:CalcWebExperience(count)
     local C = self.C or {}
 
     local full = C.SESSION_FULL_POINTS
-
     if type(full) ~= "number" or full ~= full or full <= 0 then
         full = C.POINTS_PER_LEVEL or 60000
     end
@@ -5879,7 +5889,6 @@ function NSPauk:CalcWebExperience(count)
     end
 
     local maxPct = C.SESSION_EXP_PERCENT_MAX
-
     if type(maxPct) ~= "number" or maxPct ~= maxPct or maxPct < 0 then
         maxPct = 1
     end
@@ -5889,7 +5898,6 @@ function NSPauk:CalcWebExperience(count)
     end
 
     local pct = count / full
-
     if pct > maxPct then
         pct = maxPct
     end
@@ -5899,7 +5907,6 @@ function NSPauk:CalcWebExperience(count)
     end
 
     local expGain = math.floor(count * pct + 0.5)
-
     if expGain < 0 then
         expGain = 0
     end
@@ -5913,7 +5920,6 @@ function NSPauk:SettleWebPoints(count, _reason, _inst)
     end
 
     count = math.floor(count + 0.5)
-
     if count <= 0 then
         return
     end
@@ -5933,10 +5939,8 @@ function NSPauk:SettleWebPoints(count, _reason, _inst)
 
     local newExp = self:CalcWebExperience(count)
     local oldExp = self:CalcWebExperience(oldBest)
-
     local expGain = newExp - oldExp
 
-    -- Чтобы маленький новый рекорд не молчал и давал хотя бы 1 опыт.
     if expGain <= 0 then
         expGain = 1
     end
@@ -5948,13 +5952,11 @@ function NSPauk:SettleWebPoints(count, _reason, _inst)
 
     local C = self.C or {}
     local perLevel = C.POINTS_PER_LEVEL or 60000
-
     if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
     end
 
     local levelPct = 0
-
     if perLevel > 0 then
         levelPct = expGain / perLevel * 100
     end
@@ -5977,10 +5979,11 @@ end
 function NSPauk:ShowProgress()
     local S = self.S
     local C = self.C
+
     local db = self:EnsureDB()
     local progress = db.progress
-    local perLevel = C.POINTS_PER_LEVEL or 60000
 
+    local perLevel = C.POINTS_PER_LEVEL or 60000
     if perLevel <= 0 then
         perLevel = 60000
     end
@@ -6021,6 +6024,13 @@ function NSPauk:ShowProgress()
     ))
 
     self:SendOfficer(string.format(
+        "Живых точек: %d/%s, лимит: %s",
+        S.webAliveCount or 0,
+        tostring(C.MAX_WEB_SEGS),
+        S.limitReached and "достигнут" or "нет"
+    ))
+
+    self:SendOfficer(string.format(
         "Рекорд сессии: %d точек, учтено опыта за рекорды: %d",
         session.bestPoints or 0,
         session.bestExpAwarded or 0
@@ -6041,7 +6051,6 @@ function NSPauk:GetScreenSize()
 
     if UIParent then
         local uw, uh = UIParent:GetWidth(), UIParent:GetHeight()
-
         if uw and uh and uw > 0 and uh > 0 then
             return uw, uh
         end
@@ -6083,7 +6092,7 @@ end
 
 function NSPauk:BzThread(thread, t)
     return self:Bz(t, thread.p0.x, thread.p1.x, thread.p2.x),
-           self:Bz(t, thread.p0.y, thread.p1.y, thread.p2.y)
+        self:Bz(t, thread.p0.y, thread.p1.y, thread.p2.y)
 end
 
 function NSPauk:ApproxThreadLength(thread)
@@ -6103,6 +6112,7 @@ function NSPauk:ApproxThreadLength(thread)
     local d1y = thread.p1.y - thread.p0.y
     local d2x = thread.p2.x - thread.p1.x
     local d2y = thread.p2.y - thread.p1.y
+
     local net = math.sqrt(d1x * d1x + d1y * d1y) + math.sqrt(d2x * d2x + d2y * d2y)
 
     return math.max((chord + net) / 2, 1)
@@ -6120,6 +6130,7 @@ end
 function NSPauk:EdgePoint(rect, tx, ty)
     local cx = rect.cx
     local cy = rect.cy
+
     local dx = tx - cx
     local dy = ty - cy
 
@@ -6144,7 +6155,6 @@ function NSPauk:EdgePoint(rect, tx, ty)
     end
 
     local s = math.min(sx, sy)
-
     if not s or s < 0 then
         s = 0
     end
@@ -6155,16 +6165,16 @@ end
 function NSPauk:PointSegDist2(px, py, ax, ay, bx, by)
     local vx = bx - ax
     local vy = by - ay
+
     local wx = px - ax
     local wy = py - ay
-    local c1 = wx * vx + wy * vy
 
+    local c1 = wx * vx + wy * vy
     if c1 <= 0 then
         return wx * wx + wy * wy
     end
 
     local c2 = vx * vx + vy * vy
-
     if c1 >= c2 then
         local dx = px - bx
         local dy = py - by
@@ -6174,6 +6184,7 @@ function NSPauk:PointSegDist2(px, py, ax, ay, bx, by)
     local t = c1 / c2
     local projX = ax + vx * t
     local projY = ay + vy * t
+
     local dx = px - projX
     local dy = py - projY
 
@@ -6200,19 +6211,16 @@ end
 
 function NSPauk:VisibleTexture(r)
     local tex = r:GetTexture()
-
     if not tex or tex == "" then
         return false
     end
 
     local ra = (r.GetAlpha and r:GetAlpha()) or 1
-
     if ra <= 0.01 then
         return false
     end
 
     local _, _, _, va = r:GetVertexColor()
-
     if (va or 1) <= 0.01 then
         return false
     end
@@ -6222,7 +6230,6 @@ end
 
 function NSPauk:VisibleText(r)
     local text = (r.GetText and r:GetText()) or nil
-
     if not text or text == "" then
         return false
     end
@@ -6232,7 +6239,6 @@ function NSPauk:VisibleText(r)
     end
 
     local ra = (r.GetAlpha and r:GetAlpha()) or 1
-
     return ra > 0.01
 end
 
@@ -6242,7 +6248,6 @@ function NSPauk:VisibleBackdrop(f)
     end
 
     local bd = f:GetBackdrop()
-
     if not bd then
         return false
     end
@@ -6250,7 +6255,6 @@ function NSPauk:VisibleBackdrop(f)
     if bd.bgFile and bd.bgFile ~= "" then
         if f.GetBackdropColor then
             local _, _, _, ba = f:GetBackdropColor()
-
             if (ba or 1) > 0.01 then
                 return true
             end
@@ -6260,7 +6264,6 @@ function NSPauk:VisibleBackdrop(f)
     if bd.edgeFile and bd.edgeFile ~= "" then
         if f.GetBackdropBorderColor then
             local _, _, _, ea = f:GetBackdropBorderColor()
-
             if (ea or 1) > 0.01 then
                 return true
             end
@@ -6272,7 +6275,6 @@ end
 
 function NSPauk:DisplayName(f)
     local name = f.GetName and f:GetName()
-
     if name then
         return name
     end
@@ -6295,7 +6297,6 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     end
 
     local name = f.GetName and f:GetName()
-
     if name and C.EXCLUDE_FRAMES[name] then
         return nil
     end
@@ -6305,7 +6306,6 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     end
 
     local fa = self:EffAlpha(f)
-
     if fa < 0.02 then
         return nil
     end
@@ -6331,6 +6331,7 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     end
 
     local fs = self:EffScale(f)
+
     local draws = false
     local ul, urt, ub, ut
 
@@ -6360,7 +6361,6 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
 
     if self:VisibleBackdrop(f) then
         local l, rt, b, t = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
-
         if l and rt and b and t then
             grow(l * fs, rt * fs, b * fs, t * fs)
         end
@@ -6394,7 +6394,6 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
                         grow(l * fs, rt * fs, b * fs, t * fs)
                     elseif not fallbackUsed then
                         local fl, frt, fb, ft = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
-
                         if fl and frt and fb and ft then
                             fallbackUsed = true
                             grow(fl * fs, frt * fs, fb * fs, ft * fs)
@@ -6433,6 +6432,7 @@ end
 
 function NSPauk:MakeInnerRect(r)
     local C = self.C
+
     local w = r.right - r.left
     local h = r.top - r.bottom
 
@@ -6442,10 +6442,12 @@ function NSPauk:MakeInnerRect(r)
 
     local ix = w * 0.10
     local iy = h * 0.10
+
     local left = r.left + ix
     local right = r.right - ix
     local bottom = r.bottom + iy
     local top = r.top - iy
+
     local iw = right - left
     local ih = top - bottom
 
@@ -6468,7 +6470,6 @@ end
 
 function NSPauk:ComputeFrameVisibleInner(frame)
     local rect = self:ComputeFrameVisibleRect(frame)
-
     if not rect then
         return nil
     end
@@ -6486,7 +6487,6 @@ function NSPauk:FrameMoved(storedRect, frame)
     end
 
     local cur = self:ComputeFrameVisibleInner(frame)
-
     if not cur then
         return true
     end
@@ -6502,11 +6502,13 @@ end
 function NSPauk:CollectVisibleItems()
     local C = self.C
     local items = {}
+
     local uiScale = self:EffScale(UIParent)
     local baseX = (UIParent.GetLeft and UIParent:GetLeft() or 0) * uiScale
     local baseY = (UIParent.GetBottom and UIParent:GetBottom() or 0) * uiScale
     local scrW = ((GetScreenWidth and GetScreenWidth()) or UIParent:GetWidth() or 1) * uiScale
     local scrH = ((GetScreenHeight and GetScreenHeight()) or UIParent:GetHeight() or 1) * uiScale
+
     local f = EnumerateFrames()
 
     while f do
@@ -6514,7 +6516,6 @@ function NSPauk:CollectVisibleItems()
 
         if rect then
             local inner = self:MakeInnerRect(rect)
-
             if inner then
                 inner.frame = f
                 inner.name = rect.name
@@ -6534,11 +6535,14 @@ end
 
 function NSPauk:MakeSag(thread, mode, hubX, hubY)
     local C = self.C
+
     local p0 = thread.p0
     local p2 = thread.p2
+
     local dx = p2.x - p0.x
     local dy = p2.y - p0.y
     local len = math.sqrt(dx * dx + dy * dy)
+
     local mx = (p0.x + p2.x) / 2
     local my = (p0.y + p2.y) / 2
 
@@ -6569,12 +6573,14 @@ function NSPauk:MakeSag(thread, mode, hubX, hubY)
     end
 
     local ratio = self:RandomFloat(minSag, maxSag)
+
     local px = -dy / len
     local py = dx / len
+
     local outX = mx - (hubX or 0)
     local outY = my - (hubY or 0)
-    local sign = 1
 
+    local sign = 1
     if px * outX + py * outY < 0 then
         sign = -1
     end
@@ -6591,14 +6597,14 @@ end
 
 function NSPauk:BuildArcSamples(thread)
     local C = self.C
+
     local samples = {}
     local total = 0
-    local prevX, prevY = self:BzThread(thread, 0)
 
+    local prevX, prevY = self:BzThread(thread, 0)
     samples[1] = { len = 0, t = 0 }
 
     local n = C.ARC_SAMPLES
-
     if n < 16 then
         n = 16
     end
@@ -6606,6 +6612,7 @@ function NSPauk:BuildArcSamples(thread)
     for i = 1, n do
         local t = i / n
         local x, y = self:BzThread(thread, t)
+
         local dx = x - prevX
         local dy = y - prevY
 
@@ -6654,14 +6661,13 @@ function NSPauk:ThreadTAtLength(conn, targetLen)
 
     local a = samples[lo]
     local b = samples[hi]
-    local span = b.len - a.len
 
+    local span = b.len - a.len
     if span <= 0.0001 then
         return a.t
     end
 
     local f = (targetLen - a.len) / span
-
     return a.t + (b.t - a.t) * f
 end
 
@@ -6689,6 +6695,7 @@ function NSPauk:MakeRadialThread(hubRect, targetRect, lineIndex, lineCount)
 
         local sx, sy = self:EdgePoint(hubRect, tx, ty)
         local ex, ey = self:EdgePoint(targetRect, hx, hy)
+
         local dx = ex - sx
         local dy = ey - sy
         local len = math.sqrt(dx * dx + dy * dy)
@@ -6710,7 +6717,6 @@ function NSPauk:MakeRadialThread(hubRect, targetRect, lineIndex, lineCount)
             end
 
             local angle = math.atan2(ay, ax)
-
             if angle < 0 then
                 angle = angle + (2 * math.pi)
             end
@@ -6723,6 +6729,7 @@ function NSPauk:MakeRadialThread(hubRect, targetRect, lineIndex, lineCount)
 
     local sx, sy = self:EdgePoint(hubRect, targetRect.cx, targetRect.cy)
     local ex, ey = self:EdgePoint(targetRect, hubRect.cx, hubRect.cy)
+
     local dx = ex - sx
     local dy = ey - sy
     local len = math.sqrt(dx * dx + dy * dy)
@@ -6739,7 +6746,6 @@ function NSPauk:MakeRadialThread(hubRect, targetRect, lineIndex, lineCount)
     self:MakeSag(thread, "main")
 
     local angle = math.atan2(targetRect.cy - hubRect.cy, targetRect.cx - hubRect.cx)
-
     if angle < 0 then
         angle = angle + (2 * math.pi)
     end
@@ -6776,8 +6782,10 @@ end
 
 function NSPauk:PickCentralHub(items)
     local S = self.S
+
     local cx = S.SW / 2
     local cy = S.SH / 2
+
     local best = nil
     local bestD = math.huge
 
@@ -6797,8 +6805,8 @@ end
 
 function NSPauk:FallbackHubAndTargets()
     local S = self.S
-    local SW, SH = self:GetScreenSize()
 
+    local SW, SH = self:GetScreenSize()
     S.SW, S.SH = SW, SH
 
     local hub = self:NormalizeFallbackRect({
@@ -6837,7 +6845,6 @@ function NSPauk:PickHub(preferred, items)
     if preferred then
         if preferred.frame then
             local cur = self:ComputeFrameVisibleInner(preferred.frame)
-
             if cur then
                 return cur
             end
@@ -6869,7 +6876,6 @@ function NSPauk:ChooseNextHub(inst)
     for _, r in ipairs(list) do
         if r.frame then
             local cur = self:ComputeFrameVisibleInner(r.frame)
-
             if cur then
                 return cur
             end
@@ -6905,7 +6911,6 @@ function NSPauk:ValidateAnchorRect(rect)
     end
 
     local cur = self:ComputeFrameVisibleInner(rect.frame)
-
     if not cur then
         return false
     end
@@ -6964,7 +6969,6 @@ function NSPauk:SettleInstance(inst, reason)
     inst.settled = true
 
     local count = inst.drawnPoints or 0
-
     if count <= 0 then
         return
     end
@@ -7015,6 +7019,7 @@ function NSPauk:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
 
     local ax, ay = self:BzThread(connA.thread, tA)
     local bx, by = self:BzThread(connB.thread, tB)
+
     local dx = bx - ax
     local dy = by - ay
 
@@ -7119,8 +7124,8 @@ end
 
 function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
     local C = self.C
-    local N = #inst.conns
 
+    local N = #inst.conns
     if N < 2 then
         return
     end
@@ -7134,8 +7139,8 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
     end
 
     local rowSegs = inst.crossRowsList[rowIdx] or {}
-    local spacing = C.CROSS_ROW_SPACING
 
+    local spacing = C.CROSS_ROW_SPACING
     if not spacing or spacing < 0.5 then
         spacing = 0.5
     end
@@ -7144,19 +7149,16 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
 
     local function getPoint(conn, len)
         local total = conn.arcLength or 0
-
         if total <= 0 then
             return nil
         end
 
         local target = len
-
         if target > total then
             target = total
         end
 
         local t = self:ThreadTAtLength(conn, target)
-
         if not t then
             return nil
         end
@@ -7182,14 +7184,15 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
 
     if N == 2 then
         local aIdx = cursor.idx
-
         if aIdx ~= 1 and aIdx ~= 2 then
             aIdx = 1
         end
 
         local bIdx = (aIdx % 2) + 1
+
         local connA = inst.conns[aIdx]
         local connB = inst.conns[bIdx]
+
         local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
 
         if arcLen <= pairMin + eps then
@@ -7205,10 +7208,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
                     moveTo(connA, aIdx, tA, ax, ay)
 
                     local seg = self:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
-
                     if seg then
                         self:AddThreadTask(tasks, seg, seg.thread)
+
                         rowSegs[1] = seg
+
                         cursor.idx = bIdx
                         cursor.t = tB
                         cursor.point = { x = bx, y = by }
@@ -7218,14 +7222,17 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
         end
 
         inst.crossRowsList[rowIdx] = rowSegs
+
         return
     end
 
     for i = 1, N do
         local aIdx = i
         local bIdx = (i % N) + 1
+
         local connA = inst.conns[aIdx]
         local connB = inst.conns[bIdx]
+
         local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
 
         if arcLen <= pairMin + eps then
@@ -7245,10 +7252,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx)
                     moveTo(connA, aIdx, tA, ax, ay)
 
                     local seg = self:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
-
                     if seg then
                         self:AddThreadTask(tasks, seg, seg.thread)
+
                         rowSegs[aIdx] = seg
+
                         cursor.idx = bIdx
                         cursor.t = tB
                         cursor.point = { x = bx, y = by }
@@ -7280,21 +7288,21 @@ function NSPauk:AddInterCrossTasks(tasks, inst, cursor)
     end
 
     local N = #inst.conns
-
     if N < 2 then
         return
     end
 
     local spacing = C.INTERCROSS_SPACING or C.CROSS_ROW_SPACING
-
     if not spacing or spacing < 1 then
         spacing = 1
     end
 
     local maxTotal = C.MAX_INTERCROSS_SEGS or 0
     local maxPerPair = C.MAX_INTERCROSS_PER_PAIR or 60
+
     local made = 0
     local done = false
+
     local indices = {}
 
     if N == 2 then
@@ -7306,6 +7314,7 @@ function NSPauk:AddInterCrossTasks(tasks, inst, cursor)
     end
 
     local minD2 = C.MIN_CROSS_LEN * C.MIN_CROSS_LEN
+
     local hubX = (inst.hub.rect and inst.hub.rect.cx) or 0
     local hubY = (inst.hub.rect and inst.hub.rect.cy) or 0
 
@@ -7330,8 +7339,8 @@ function NSPauk:AddInterCrossTasks(tasks, inst, cursor)
                     local lenA = self:ApproxThreadLength(segA.thread)
                     local lenB = self:ApproxThreadLength(segB.thread)
                     local len = math.min(lenA, lenB)
-                    local count = math.floor(len / spacing)
 
+                    local count = math.floor(len / spacing)
                     if count > maxPerPair then
                         count = maxPerPair
                     end
@@ -7344,8 +7353,10 @@ function NSPauk:AddInterCrossTasks(tasks, inst, cursor)
                             end
 
                             local f = k / count
+
                             local ax, ay = self:BzThread(segA.thread, f)
                             local bx, by = self:BzThread(segB.thread, f)
+
                             local dx = bx - ax
                             local dy = by - ay
 
@@ -7402,6 +7413,7 @@ end
 function NSPauk:BuildInstanceTasks(inst)
     local S = self.S
     local C = self.C
+
     local tasks = {}
 
     inst.crossRowsList = {}
@@ -7439,7 +7451,6 @@ function NSPauk:BuildInstanceTasks(inst)
         end
 
         local spacing = C.CROSS_ROW_SPACING
-
         if not spacing or spacing < 0.5 then
             spacing = 0.5
         end
@@ -7449,8 +7460,10 @@ function NSPauk:BuildInstanceTasks(inst)
 
         for i = 1, N do
             local j = (i % N) + 1
+
             local lenA = inst.conns[i].arcLength or 0
             local lenB = inst.conns[j].arcLength or 0
+
             local pairMin = math.min(lenA, lenB)
 
             pairMinLens[i] = pairMin
@@ -7481,13 +7494,11 @@ function NSPauk:BuildInstanceTasks(inst)
         end
 
         local maxRows = C.MAX_CROSS_ROWS or 0
-
         if maxRows < 0 then
             maxRows = 0
         end
 
         local rows = math.floor(maxPairLen / spacing + 0.0001)
-
         if rows > maxRows then
             rows = maxRows
         end
@@ -7584,8 +7595,8 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
         end
 
         local target = cand.item
-        local thread = self:MakeRadialThread(inst.hub.rect, target, 1, 1)
 
+        local thread = self:MakeRadialThread(inst.hub.rect, target, 1, 1)
         if thread then
             local conn = {
                 id = #inst.conns + 1,
@@ -7608,6 +7619,7 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
             }
 
             inst.conns[#inst.conns + 1] = conn
+
             made = made + 1
 
             addAnchor(self:CopyRect(target))
@@ -7633,6 +7645,7 @@ end
 
 function NSPauk:PickCocoonVictim(items)
     local C = self.C
+
     local cand = {}
 
     for _, item in ipairs(items) do
@@ -7706,14 +7719,18 @@ function NSPauk:CreateCocoonInstance(item)
 
     local cx = item.cx
     local cy = item.cy
+
     local a0 = item.width / 2
     local b0 = item.height / 2
+
     local wraps = self:RandomInt(C.COCOON_WRAPS_MIN, C.COCOON_WRAPS_MAX)
     local segs = C.COCOON_LOOP_SEGS
+
     local prevEnd = nil
 
     for w = 1, wraps do
         local grow = 0.58 + 0.50 * (w / wraps)
+
         local a = a0 * grow + (math.random() - 0.5) * 6
         local b = b0 * grow + (math.random() - 0.5) * 6
 
@@ -7731,6 +7748,7 @@ function NSPauk:CreateCocoonInstance(item)
         for s = 1, segs do
             local ang0 = startAng + dir * (s - 1) * (2 * math.pi / segs)
             local ang1 = startAng + dir * s * (2 * math.pi / segs)
+
             local x0, y0 = self:EllipsePoint(cx, cy, a, b, ang0)
             local x1, y1 = self:EllipsePoint(cx, cy, a, b, ang1)
 
@@ -7741,10 +7759,11 @@ function NSPauk:CreateCocoonInstance(item)
 
             local midX = (x0 + x1) / 2
             local midY = (y0 + y1) / 2
+
             local pushX = midX - cx
             local pushY = midY - cy
-            local pl = math.sqrt(pushX * pushX + pushY * pushY)
 
+            local pl = math.sqrt(pushX * pushX + pushY * pushY)
             if pl < 1 then
                 pushX, pushY, pl = 0, 1, 1
             end
@@ -7777,6 +7796,7 @@ function NSPauk:CreateCocoonInstance(item)
     for _ = 1, diags do
         local angA = math.random() * 2 * math.pi
         local angB = angA + math.pi + (math.random() - 0.5) * 1.1
+
         local x0, y0 = self:EllipsePoint(cx, cy, a0 * 1.06, b0 * 1.06, angA)
         local x1, y1 = self:EllipsePoint(cx, cy, a0 * 1.06, b0 * 1.06, angB)
 
@@ -7807,12 +7827,25 @@ end
 
 function NSPauk:StartCocoon(victim)
     local S = self.S
+    local C = self.C
+
     local inst = self:CreateCocoonInstance(victim)
 
     if not inst then
-        S.phase = "watch"
-        S.stillTimer = 0
-        S.speedTimer = 0
+        if S.limitCocoonPending then
+            S.limitCocoonPending = false
+            S.phase = "limitWait"
+
+            local interval = tonumber(C.LIMIT_COCOON_INTERVAL) or 1800
+            local retry = tonumber(C.LIMIT_COCOON_RETRY) or 60
+
+            S.limitWaitTimer = math.max(0, interval - retry)
+        else
+            S.phase = "watch"
+            S.stillTimer = 0
+            S.speedTimer = 0
+        end
+
         return
     end
 
@@ -7832,9 +7865,23 @@ end
 function NSPauk:BeginDissolve(inst)
     local S = self.S
     local C = self.C
-    local frame = inst.hub.frame
-    local aliveCount = 0
 
+    if not inst then
+        if S.limitReached or S.limitCocoonPending then
+            S.limitCocoonPending = false
+            self:ReturnToLimitHome()
+        else
+            S.phase = "watch"
+            S.stillTimer = 0
+            S.speedTimer = 0
+        end
+
+        return
+    end
+
+    local frame = inst.hub.frame
+
+    local aliveCount = 0
     for _, conn in ipairs(inst.conns) do
         if conn.alive then
             aliveCount = aliveCount + 1
@@ -7846,9 +7893,14 @@ function NSPauk:BeginDissolve(inst)
             self:TearInstance(inst)
         end
 
-        S.phase = "watch"
-        S.stillTimer = 0
-        S.speedTimer = 0
+        if S.limitReached or S.limitCocoonPending then
+            S.limitCocoonPending = false
+            self:ReturnToLimitHome()
+        else
+            S.phase = "watch"
+            S.stillTimer = 0
+            S.speedTimer = 0
+        end
 
         return
     end
@@ -8021,12 +8073,18 @@ end
 
 function NSPauk:FinishCocoonDigestion()
     local S = self.S
+
     local c = S.cocoon
 
     if not c then
-        S.phase = "watch"
-        S.stillTimer = 0
-        S.speedTimer = 0
+        if S.limitReached or S.limitCocoonPending then
+            self:ReturnToLimitHome()
+        else
+            S.phase = "watch"
+            S.stillTimer = 0
+            S.speedTimer = 0
+        end
+
         return
     end
 
@@ -8062,14 +8120,27 @@ function NSPauk:FinishCocoonDigestion()
     S.currentTask = nil
     S.completeTimer = 0
 
-    self:StartNewInstance(nil)
+    if S.limitReached or S.limitCocoonPending then
+        self:ReturnToLimitHome()
+    else
+        self:StartNewInstance(nil)
+    end
 end
 
 function NSPauk:AbortCocoon()
     local S = self.S
+
     local c = S.cocoon
 
     if not c then
+        if S.limitCocoonPending then
+            S.limitCocoonPending = false
+
+            if S.limitReached and S.phase ~= "fade" and not S.limitReturnPending then
+                self:ReturnToLimitHome()
+            end
+        end
+
         return
     end
 
@@ -8082,6 +8153,14 @@ function NSPauk:AbortCocoon()
     end
 
     S.cocoon = nil
+
+    if S.limitCocoonPending then
+        S.limitCocoonPending = false
+
+        if S.limitReached and S.phase ~= "fade" and not S.limitReturnPending then
+            self:ReturnToLimitHome()
+        end
+    end
 end
 
 function NSPauk:RecycleTextures(list)
@@ -8092,8 +8171,19 @@ function NSPauk:RecycleTextures(list)
     local S = self.S
 
     for _, texture in ipairs(list) do
-        texture:Hide()
-        table.insert(S.webPool, texture)
+        if texture then
+            if texture._nspAlive then
+                texture._nspAlive = false
+                S.webAliveCount = math.max(0, (S.webAliveCount or 0) - 1)
+            end
+
+            texture:Hide()
+
+            if not texture._nspInPool then
+                texture._nspInPool = true
+                table.insert(S.webPool, texture)
+            end
+        end
     end
 
     for i = #list, 1, -1 do
@@ -8219,6 +8309,7 @@ end
 
 function NSPauk:CheckInstancesMovement()
     local S = self.S
+
     local killed = false
 
     for _, inst in ipairs(S.instances) do
@@ -8231,9 +8322,16 @@ function NSPauk:CheckInstancesMovement()
         if hubMoved then
             if inst.isCocoon and S.cocoon and S.cocoon.inst == inst then
                 self:AbortCocoon()
-                S.phase = "watch"
-                S.stillTimer = 0
-                S.speedTimer = 0
+
+                if S.phase ~= "limitWait" and not S.limitReturnPending then
+                    if S.limitReached then
+                        self:ReturnToLimitHome()
+                    else
+                        S.phase = "watch"
+                        S.stillTimer = 0
+                        S.speedTimer = 0
+                    end
+                end
             else
                 self:TearInstance(inst)
             end
@@ -8263,6 +8361,7 @@ function NSPauk:ThreadNearMouse(thread, mx, my, pad)
     end
 
     local p1 = thread.p1
+
     local minX = p0.x
     local maxX = p0.x
     local minY = p0.y
@@ -8314,11 +8413,13 @@ function NSPauk:DistToThread(thread, mx, my)
     end
 
     local p1 = thread.p1 or { x = (p0.x + p2.x) / 2, y = (p0.y + p2.y) / 2 }
+
     local best = math.huge
     local prevX, prevY
 
     for i = 0, 16 do
         local t = i / 16
+
         local x = self:Bz(t, p0.x, p1.x, p2.x)
         local y = self:Bz(t, p0.y, p1.y, p2.y)
 
@@ -8328,7 +8429,6 @@ function NSPauk:DistToThread(thread, mx, my)
             best = dx * dx + dy * dy
         else
             local d2 = self:PointSegDist2(mx, my, prevX, prevY, x, y)
-
             if d2 < best then
                 best = d2
             end
@@ -8343,6 +8443,7 @@ end
 function NSPauk:FindThreadUnderMouse(mx, my)
     local S = self.S
     local C = self.C
+
     local bestThread = nil
     local bestDist = C.MOUSE_THREAD_DIST
 
@@ -8446,6 +8547,7 @@ function NSPauk:CheckMouseThreads(dt)
 
         if S.mouseOnThread ~= hit then
             S.mouseOnThread = hit
+
             hit.hoverCount = (hit.hoverCount or 0) + 1
 
             if hit.hoverCount > C.MOUSE_HOVER_LIMIT then
@@ -8467,6 +8569,7 @@ end
 function NSPauk:MkSpider()
     local S = self.S
     local C = self.C
+
     local spider = S.spider
 
     if spider and spider:GetParent() ~= S.activeFrame then
@@ -8519,9 +8622,15 @@ end
 function NSPauk:DropWebForTask(task, x, y)
     local S = self.S
     local C = self.C
-    local owner = task.owner
 
+    local owner = task.owner
     if not owner or not owner.alive then
+        return
+    end
+
+    local maxSegs = tonumber(C.MAX_WEB_SEGS) or 0
+
+    if maxSegs > 0 and (S.webAliveCount or 0) >= maxSegs then
         return
     end
 
@@ -8529,7 +8638,11 @@ function NSPauk:DropWebForTask(task, x, y)
 
     if #S.webPool > 0 then
         texture = table.remove(S.webPool)
-    elseif C.MAX_WEB_SEGS <= 0 or S.webCreated < C.MAX_WEB_SEGS then
+
+        if texture then
+            texture._nspInPool = false
+        end
+    elseif maxSegs <= 0 or (S.webAliveCount or 0) < maxSegs then
         texture = S.activeFrame:CreateTexture(nil, "OVERLAY")
         S.webCreated = S.webCreated + 1
     else
@@ -8552,8 +8665,12 @@ function NSPauk:DropWebForTask(task, x, y)
 
     owner.textures[#owner.textures + 1] = texture
 
-    local inst = self:GetOwnerInstance(owner)
+    if not texture._nspAlive then
+        texture._nspAlive = true
+        S.webAliveCount = (S.webAliveCount or 0) + 1
+    end
 
+    local inst = self:GetOwnerInstance(owner)
     if inst then
         inst.drawnPoints = (inst.drawnPoints or 0) + 1
     end
@@ -8564,14 +8681,15 @@ end
 function NSPauk:DropAlongLine(task, fx, fy, tx, ty)
     local S = self.S
     local C = self.C
-    local spacing = C.WEB_POINT_SPACING_MAX
 
+    local spacing = C.WEB_POINT_SPACING_MAX
     if spacing <= 0 then
         spacing = 1
     end
 
     local dx = tx - fx
     local dy = ty - fy
+
     local dist = math.sqrt(dx * dx + dy * dy)
 
     if dist < spacing then
@@ -8608,14 +8726,12 @@ function NSPauk:DropAlongCurve(task, t0, t1)
     end
 
     local spacing = task.dropSpacing
-
     if type(spacing) ~= "number" or spacing ~= spacing or spacing <= 0 then
         spacing = self:GetWebPointSpacing()
         task.dropSpacing = spacing
     end
 
     local totalLen = task.pathLength
-
     if type(totalLen) ~= "number" or totalLen <= 0 then
         totalLen = self:ApproxThreadLength(task)
         task.pathLength = totalLen
@@ -8626,7 +8742,6 @@ function NSPauk:DropAlongCurve(task, t0, t1)
     end
 
     local segLen = totalLen * (t1 - t0)
-
     if segLen <= 0 then
         return
     end
@@ -8649,19 +8764,16 @@ function NSPauk:DropAlongCurve(task, t0, t1)
     end
 
     local planned = math.floor(total / spacing)
-
     if planned < 1 then
         planned = 1
     end
 
     local maxDrops = C.MAX_DROPS_PER_FRAME
-
     if type(maxDrops) ~= "number" or maxDrops ~= maxDrops or maxDrops < 0 then
         maxDrops = 0
     end
 
     local drops = planned
-
     if maxDrops > 0 and drops > maxDrops then
         drops = maxDrops
     end
@@ -8682,6 +8794,7 @@ function NSPauk:DropAlongCurve(task, t0, t1)
 
         local f = distFromStart / segLen
         local t = t0 + span * f
+
         local x, y = self:BzThread(task, t)
 
         self:DropWebForTask(task, x, y)
@@ -8743,8 +8856,16 @@ function NSPauk:ClearAllVisuals(source)
     S.tasks = {}
     S.taskIdx = 1
     S.currentTask = nil
+
     S.webPoints = 0
+    S.webAliveCount = 0
     S.mouseOnThread = nil
+
+    S.limitReached = false
+    S.limitReturnPending = false
+    S.limitCocoonPending = false
+    S.limitWaitTimer = 0
+    S.limitHomePoint = nil
 
     self:HideSpider()
 end
@@ -8752,6 +8873,7 @@ end
 function NSPauk:FinishClickFade()
     local S = self.S
 
+    S.webAliveCount = 0
     S.phase = "disabled"
     S.disableTimer = 0
 end
@@ -8765,7 +8887,10 @@ function NSPauk:OnSpiderClick(button)
         return
     end
 
-    if S.phase ~= "task" and S.phase ~= "instanceComplete" and S.phase ~= "dissolve" then
+    if S.phase ~= "task"
+        and S.phase ~= "instanceComplete"
+        and S.phase ~= "dissolve"
+        and S.phase ~= "limitWait" then
         return
     end
 
@@ -8780,6 +8905,12 @@ function NSPauk:OnSpiderClick(button)
     self:ResetConstants()
     self:AbortCocoon()
     self:RestoreDigestedFrames()
+
+    S.limitReached = false
+    S.limitReturnPending = false
+    S.limitCocoonPending = false
+    S.limitWaitTimer = 0
+    S.limitHomePoint = nil
 
     local textures = {}
 
@@ -8840,19 +8971,20 @@ function NSPauk:OnSpiderClick(button)
     S.webPoints = 0
 
     self:HideSpider()
+
     self:AddFade(textures, C.FADE_DURATION, function(addon)
         addon:FinishClickFade()
     end)
 
     S.phase = "fade"
     S.speedTimer = 0
-
     S.suppressSettle = false
 end
 
 function NSPauk:MkClickBtn()
     local S = self.S
     local C = self.C
+
     local btn = S.clickBtn
 
     if btn and btn:GetParent() ~= S.activeFrame then
@@ -8880,8 +9012,8 @@ end
 
 function NSPauk:IsMoving()
     local C = self.C
-    local speed = GetUnitSpeed and GetUnitSpeed("player") or nil
 
+    local speed = GetUnitSpeed and GetUnitSpeed("player") or nil
     if not speed then
         return false
     end
@@ -8956,18 +9088,12 @@ end
 function NSPauk:GetWebPointSpacing()
     local C = self.C or {}
 
-    -- Теперь WEB_POINT_SPACING_MAX — это точное расстояние между точками в UI-пикселях.
     local spacing = C.WEB_POINT_SPACING_MAX
-
     if type(spacing) ~= "number" or spacing ~= spacing or spacing <= 0 then
         spacing = 1
     end
 
     return spacing
-end
-
-if type(NSPauk.BaseMethods) == "table" then
-    NSPauk.BaseMethods.GetWebPointSpacing = NSPauk.GetWebPointSpacing
 end
 
 function NSPauk:StartTask(task)
@@ -8984,7 +9110,6 @@ function NSPauk:StartTask(task)
     task.pathLength = pathLen
 
     local len = pathLen
-
     if len < 1 then
         len = 1
     end
@@ -9012,7 +9137,6 @@ function NSPauk:StartTask(task)
     end
 
     S.moveDur = len / speed
-
     if S.moveDur < 0.05 then
         S.moveDur = 0.05
     end
@@ -9021,6 +9145,7 @@ function NSPauk:StartTask(task)
     S.lastTaskT = 0
     S.speedTimer = 0
     S.phase = "task"
+
     S.lastDropX = task.p0.x
     S.lastDropY = task.p0.y
 
@@ -9061,7 +9186,6 @@ function NSPauk:AdvanceTask()
                     }
 
                     S.currentTask = travel
-
                     self:StartTask(travel)
 
                     return
@@ -9077,6 +9201,15 @@ function NSPauk:AdvanceTask()
         else
             S.taskIdx = S.taskIdx + 1
         end
+    end
+
+    if S.limitReturnPending then
+        S.limitReturnPending = false
+        S.phase = "limitWait"
+        S.limitWaitTimer = 0
+        S.completeTimer = 0
+
+        return
     end
 
     S.phase = "instanceComplete"
@@ -9103,6 +9236,10 @@ end
 function NSPauk:StartNewInstance(preferredHub)
     local S = self.S
     local C = self.C
+
+    if S.limitReached then
+        return
+    end
 
     S.SW, S.SH = self:GetScreenSize()
 
@@ -9135,6 +9272,7 @@ function NSPauk:StartNewInstance(preferredHub)
         S.phase = "watch"
         S.stillTimer = 0
         S.speedTimer = 0
+
         return
     end
 
@@ -9181,7 +9319,11 @@ function NSPauk:OnUpdate(dt)
         self:UpdateFades(dt)
     end
 
-    if S.phase == "watch" or S.phase == "task" or S.phase == "instanceComplete" or S.phase == "dissolve" then
+    if S.phase == "watch"
+        or S.phase == "task"
+        or S.phase == "instanceComplete"
+        or S.phase == "dissolve"
+        or S.phase == "limitWait" then
         S.monitorTimer = S.monitorTimer + dt
 
         if S.monitorTimer >= C.MONITOR_CHECK then
@@ -9190,7 +9332,10 @@ function NSPauk:OnUpdate(dt)
         end
     end
 
-    if S.phase == "task" or S.phase == "instanceComplete" or S.phase == "dissolve" then
+    if S.phase == "task"
+        or S.phase == "instanceComplete"
+        or S.phase == "dissolve"
+        or S.phase == "limitWait" then
         self:CheckMouseThreads(dt)
     end
 
@@ -9244,12 +9389,15 @@ function NSPauk:OnUpdate(dt)
         end
 
         local x, y = self:BzThread(task, S.moveT)
-
         self:PutSpider(x, y)
 
         if task.kind == "thread" and task.drop then
             self:DropAlongCurve(task, S.lastTaskT or 0, S.moveT)
             S.lastTaskT = S.moveT
+
+            if self:CheckPointLimit() then
+                return
+            end
         else
             S.lastTaskT = S.moveT
         end
@@ -9271,6 +9419,10 @@ function NSPauk:OnUpdate(dt)
                 self:Interrupt(true)
                 return
             end
+        end
+
+        if self:CheckPointLimit() then
+            return
         end
 
         S.completeTimer = S.completeTimer + dt
@@ -9302,24 +9454,36 @@ function NSPauk:OnUpdate(dt)
         local c = S.cocoon
 
         if not c then
-            S.phase = "watch"
-            S.stillTimer = 0
-            S.speedTimer = 0
+            if S.limitReached or S.limitCocoonPending then
+                self:ReturnToLimitHome()
+            else
+                S.phase = "watch"
+                S.stillTimer = 0
+                S.speedTimer = 0
+            end
+
             return
         end
 
         if not self:InstanceHasAliveConn(c.inst) then
             self:AbortCocoon()
-            S.phase = "watch"
-            S.stillTimer = 0
-            S.speedTimer = 0
+
+            if S.phase ~= "limitWait" and not S.limitReturnPending then
+                if S.limitReached then
+                    self:ReturnToLimitHome()
+                else
+                    S.phase = "watch"
+                    S.stillTimer = 0
+                    S.speedTimer = 0
+                end
+            end
+
             return
         end
 
         c.timer = c.timer + dt
 
         local progress = c.timer / c.duration
-
         if progress > 1 then
             progress = 1
         end
@@ -9346,6 +9510,39 @@ function NSPauk:OnUpdate(dt)
         return
     end
 
+    if S.phase == "limitWait" then
+        S.speedTimer = S.speedTimer + dt
+
+        if S.speedTimer >= C.SPEED_CHECK then
+            S.speedTimer = 0
+
+            if self:IsMoving() then
+                self:Interrupt(true)
+                return
+            end
+        end
+
+        if not S.spider or not S.spider:IsShown() then
+            self:MkSpider()
+            self:MkClickBtn()
+
+            if S.limitHomePoint and S.limitHomePoint.x and S.limitHomePoint.y then
+                self:PutSpider(S.limitHomePoint.x, S.limitHomePoint.y)
+            end
+        end
+
+        S.limitWaitTimer = (S.limitWaitTimer or 0) + dt
+
+        local interval = tonumber(C.LIMIT_COCOON_INTERVAL) or 1800
+
+        if S.limitWaitTimer >= interval then
+            S.limitWaitTimer = 0
+            self:StartLimitCocoon()
+        end
+
+        return
+    end
+
     if S.phase == "fade" then
         S.speedTimer = S.speedTimer + dt
 
@@ -9356,6 +9553,7 @@ function NSPauk:OnUpdate(dt)
                 self:ClearAllVisuals("fade")
                 S.phase = "disabled"
                 S.disableTimer = 0
+
                 return
             end
         end
@@ -9397,7 +9595,6 @@ function NSPauk:ClampConstant(key, old, new)
     end
 
     local def = self.DefaultConstants[key]
-
     if type(def) ~= "number" then
         return new
     end
@@ -9440,27 +9637,34 @@ function NSPauk:ClampConstant(key, old, new)
         new = 1
     end
 
+    if key == "LIMIT_COCOON_INTERVAL" and new < 1 then
+        new = 1
+    end
+
+    if key == "LIMIT_COCOON_RETRY" and new < 1 then
+        new = 1
+    end
+
     return new
 end
 
 function NSPauk:AdjustConstant(key, direction)
     local db = self:EnsureDB()
     local C = self.C
-    local old = C[key]
 
+    local old = C[key]
     if type(old) ~= "number" then
         return
     end
 
     local pct = self:RandomFloat(0.001, 0.05)
-    local base = math.abs(old)
 
+    local base = math.abs(old)
     if base == 0 then
         base = 1
     end
 
     local delta = base * pct
-
     if delta == 0 then
         delta = 0.001
     end
@@ -9526,12 +9730,15 @@ function NSPauk:CreateLevelUpFrame()
     f:SetMovable(true)
     f:SetClampedToScreen(true)
     f:RegisterForDrag("LeftButton")
+
     f:SetScript("OnDragStart", function(frame)
         frame:StartMoving()
     end)
+
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
     end)
+
     f:Hide()
 
     if type(UISpecialFrames) == "table" and f:GetName() then
@@ -9586,9 +9793,11 @@ function NSPauk:CreateLevelUpFrame()
 
     scroll:SetScrollChild(child)
     scroll:EnableMouseWheel(true)
+
     scroll:SetScript("OnMouseWheel", function(frame, delta)
         local current = frame:GetVerticalScroll()
         local maxScroll = frame:GetVerticalScrollRange()
+
         local newScroll = current - (delta * 20)
 
         if newScroll < 0 then
@@ -9619,6 +9828,7 @@ function NSPauk:CreateLevelUpFrame()
 
     for i, key in ipairs(keys) do
         local row = CreateFrame("Frame", nil, child)
+
         row:SetHeight(rowHeight)
         row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -((i - 1) * rowHeight))
         row:SetPoint("RIGHT", child, "RIGHT", 0, 0)
@@ -9683,7 +9893,6 @@ end
 
 function NSPauk:OnEvent()
     self:LoadConstants()
-
     self.S.SW, self.S.SH = self:GetScreenSize()
 end
 
@@ -9700,6 +9909,13 @@ function NSPauk:Init()
     local S = self.S
 
     S.SW, S.SH = self:GetScreenSize()
+
+    S.webAliveCount = 0
+    S.limitReached = false
+    S.limitReturnPending = false
+    S.limitCocoonPending = false
+    S.limitWaitTimer = 0
+    S.limitHomePoint = nil
 
     self.F_HIGH = CreateFrame("Frame", C.ADDON .. "_WebHigh", UIParent)
     self.F_HIGH:SetAllPoints(UIParent)
@@ -9720,6 +9936,235 @@ function NSPauk:Init()
     self.eventFrame:SetScript("OnEvent", function(frame, event)
         NSPauk:OnEvent(event)
     end)
+end
+
+function NSPauk:IsActiveAnchorFrame(frame)
+    if not frame then
+        return false
+    end
+
+    local S = self.S
+
+    for _, inst in ipairs(S.instances) do
+        if self:InstanceHasAliveConn(inst) then
+            if inst.hub and inst.hub.frame == frame then
+                return true
+            end
+
+            for _, conn in ipairs(inst.conns) do
+                if conn.alive and conn.target and conn.target.frame == frame then
+                    return true
+                end
+            end
+        end
+    end
+
+    if S.cocoon and S.cocoon.frame == frame then
+        return true
+    end
+
+    return false
+end
+
+function NSPauk:PickLimitCocoonVictim(items)
+    local C = self.C
+
+    local cand = {}
+
+    for _, item in ipairs(items or {}) do
+        if item.frame and not self:IsActiveAnchorFrame(item.frame) then
+            local area = (item.width or 0) * (item.height or 0)
+
+            local minArea = tonumber(C.COCOON_MIN_AREA) or 0
+            local maxArea = tonumber(C.COCOON_MAX_AREA) or math.huge
+
+            if area >= minArea and area <= maxArea then
+                cand[#cand + 1] = item
+            end
+        end
+    end
+
+    if #cand == 0 then
+        return nil
+    end
+
+    return cand[self:RandomInt(1, #cand)]
+end
+
+function NSPauk:ChooseLimitHomePoint()
+    local S = self.S
+
+    local pts = {}
+
+    for _, inst in ipairs(S.instances) do
+        if self:InstanceHasAliveConn(inst) and inst.hub then
+            if inst.hub.frame then
+                local cur = self:ComputeFrameVisibleInner(inst.hub.frame)
+
+                if cur then
+                    pts[#pts + 1] = { x = cur.cx, y = cur.cy }
+                end
+            end
+
+            if inst.hub.rect and inst.hub.rect.cx and inst.hub.rect.cy then
+                pts[#pts + 1] = { x = inst.hub.rect.cx, y = inst.hub.rect.cy }
+            end
+        end
+    end
+
+    if #pts > 0 then
+        return pts[self:RandomInt(1, #pts)]
+    end
+
+    if S.limitHomePoint and S.limitHomePoint.x and S.limitHomePoint.y then
+        return { x = S.limitHomePoint.x, y = S.limitHomePoint.y }
+    end
+
+    local sw, sh = self:GetScreenSize()
+
+    return { x = sw / 2, y = sh / 2 }
+end
+
+function NSPauk:EnterLimitIdle()
+    local S = self.S
+
+    if S.limitReached then
+        return
+    end
+
+    S.limitReached = true
+    S.limitCocoonPending = false
+    S.limitReturnPending = true
+    S.limitWaitTimer = 0
+
+    for _, inst in ipairs(S.instances) do
+        self:SettleInstance(inst, "limit")
+    end
+
+    S.tasks = {}
+    S.taskIdx = 1
+    S.currentTask = nil
+    S.completeTimer = 0
+
+    local home = self:ChooseLimitHomePoint()
+    S.limitHomePoint = home
+
+    self:MkSpider()
+    self:MkClickBtn()
+
+    local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+
+    local travel = {
+        kind = "travel",
+        drop = false,
+        p0 = from,
+        p1 = {
+            x = (from.x + home.x) / 2,
+            y = (from.y + home.y) / 2,
+        },
+        p2 = { x = home.x, y = home.y },
+    }
+
+    S.tasks = { travel }
+    S.taskIdx = 1
+    S.currentTask = nil
+
+    self:AdvanceTask()
+end
+
+function NSPauk:CheckPointLimit()
+    local S = self.S
+    local C = self.C
+
+    if S.limitReached or S.limitReturnPending or S.limitCocoonPending then
+        return false
+    end
+
+    if S.phase ~= "task" and S.phase ~= "instanceComplete" then
+        return false
+    end
+
+    if S.currentInstance and S.currentInstance.isCocoon then
+        return false
+    end
+
+    if S.cocoon then
+        return false
+    end
+
+    local max = tonumber(C.MAX_WEB_SEGS) or 0
+    if max <= 0 then
+        return false
+    end
+
+    if (S.webAliveCount or 0) >= max then
+        self:EnterLimitIdle()
+        return true
+    end
+
+    return false
+end
+
+function NSPauk:StartLimitCocoon()
+    local S = self.S
+    local C = self.C
+
+    local items = self:CollectVisibleItems()
+    local victim = self:PickLimitCocoonVictim(items)
+
+    if not victim then
+        S.phase = "limitWait"
+
+        local interval = tonumber(C.LIMIT_COCOON_INTERVAL) or 1800
+        local retry = tonumber(C.LIMIT_COCOON_RETRY) or 60
+
+        S.limitWaitTimer = math.max(0, interval - retry)
+
+        return
+    end
+
+    S.limitCocoonPending = true
+
+    self:StartCocoon(victim)
+end
+
+function NSPauk:ReturnToLimitHome()
+    local S = self.S
+
+    S.limitReached = true
+    S.limitCocoonPending = false
+    S.limitReturnPending = true
+    S.limitWaitTimer = 0
+
+    S.tasks = {}
+    S.taskIdx = 1
+    S.currentTask = nil
+    S.completeTimer = 0
+
+    local home = self:ChooseLimitHomePoint()
+    S.limitHomePoint = home
+
+    self:MkSpider()
+    self:MkClickBtn()
+
+    local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+
+    local travel = {
+        kind = "travel",
+        drop = false,
+        p0 = from,
+        p1 = {
+            x = (from.x + home.x) / 2,
+            y = (from.y + home.y) / 2,
+        },
+        p2 = { x = home.x, y = home.y },
+    }
+
+    S.tasks = { travel }
+    S.taskIdx = 1
+    S.currentTask = nil
+
+    self:AdvanceTask()
 end
 
 NSPauk.Modes = {}
