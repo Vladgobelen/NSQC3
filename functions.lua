@@ -6850,23 +6850,175 @@ function NSPauk:FallbackHubAndTargets()
   return hub, candidates, 4
 end
 
-function NSPauk:PickHub(preferred, items)
-  if preferred then
-    if preferred.frame then
-      local cur = self:ComputeFrameVisibleInner(preferred.frame)
-      if cur then
-        return cur
-      end
-    elseif preferred.left and preferred.right and preferred.bottom and preferred.top then
-      return self:NormalizeFallbackRect(self:CopyRect(preferred))
+-- Общий помощник: видимые фреймы шириной больше 30 пикселей.
+function NSPauk:CollectCocoonCandidates(items, excludeActive)
+    local cand = {}
+
+    for _, item in ipairs(items or {}) do
+        if item.frame
+            and type(item.width) == "number"
+            and item.width > 30 then
+
+            local ok = true
+
+            if excludeActive and self:IsActiveAnchorFrame(item.frame) then
+                ok = false
+            end
+
+            if ok then
+                cand[#cand + 1] = item
+            end
+        end
     end
-  end
 
-  if items and #items > 0 then
-    return self:PickCentralHub(items)
-  end
+    return cand
+end
 
-  return nil
+function NSPauk:PickCocoonVictim(items)
+    local cand = self:CollectCocoonCandidates(items, false)
+
+    if #cand == 0 then
+        return nil
+    end
+
+    return cand[math.random(1, #cand)]
+end
+
+function NSPauk:PickLimitCocoonVictim(items)
+    local cand = self:CollectCocoonCandidates(items, true)
+
+    if #cand == 0 then
+        return nil
+    end
+
+    return cand[math.random(1, #cand)]
+end
+
+function NSPauk:PickWebHub(items)
+    if not items or #items == 0 then
+        return nil
+    end
+
+    local mode = math.random(1, 2)
+
+    if mode == 1 then
+        local hub = self:PickCentralHub(items)
+        if hub then
+            return hub
+        end
+    end
+
+    return items[math.random(1, #items)]
+end
+
+function NSPauk:PickWebTargets(hub, items, targetCount)
+    local candidates = {}
+
+    if not hub then
+        return candidates
+    end
+
+    if not items or #items == 0 then
+        return candidates
+    end
+
+    if type(targetCount) ~= "number" or targetCount <= 0 then
+        return candidates
+    end
+
+    local n = #items
+
+    for _ = 1, targetCount do
+        local picked = nil
+
+        -- Несколько попыток, чтобы не выбрать сам хаб.
+        -- Если кроме хаба ничего нет, кандидаты закончатся пустыми.
+        for _ = 1, 10 do
+            local item = items[math.random(1, n)]
+
+            if item and item ~= hub and item.frame ~= hub.frame then
+                picked = item
+                break
+            end
+        end
+
+        if picked then
+            candidates[#candidates + 1] = { item = picked }
+        end
+    end
+
+    return candidates
+end
+
+-- Новый старт паутины по новой логике.
+function NSPauk:StartNewInstance(preferredHub)
+    local S = self.S
+    local C = self.C
+
+    if S.limitReached then
+        return
+    end
+
+    S.SW, S.SH = self:GetScreenSize()
+
+    local items = self:CollectVisibleItems()
+
+    -- Сначала пробуем кокон.
+    if math.random() < C.COCOON_CHANCE then
+        local victim = self:PickCocoonVictim(items)
+
+        if victim then
+            self:StartCocoon(victim)
+            return
+        end
+    end
+
+    -- Выбираем основной фрейм паутины.
+    local hub = self:PickWebHub(items)
+
+    -- Если хаб вдруг уже невалиден, считаем что его нет.
+    if hub and hub.frame and not self:ValidateAnchorRect(hub) then
+        hub = nil
+    end
+
+    -- Сколько нитей хотим в этот раз.
+    local targetCount = self:RandomInt(C.TARGET_COUNT_MIN, C.TARGET_COUNT_MAX)
+
+    -- Выбираем вторичные фреймы.
+    local candidates = {}
+    if hub then
+        candidates = self:PickWebTargets(hub, items, targetCount)
+    end
+
+    -- Если не нашли хаб или цели, уходим в статический fallback.
+    if not hub or #candidates == 0 then
+        hub, candidates, targetCount = self:FallbackHubAndTargets()
+    end
+
+    local inst = self:CreateInstance(hub, candidates, targetCount)
+
+    if not inst or #inst.conns == 0 then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+        return
+    end
+
+    self:AddInstance(inst)
+
+    S.currentInstance = inst
+    S.tasks = inst.tasks
+    S.taskIdx = 1
+    S.currentTask = nil
+    S.completeTimer = 0
+
+    self:MkSpider()
+    self:MkClickBtn()
+    self:AdvanceTask()
+end
+
+function NSPauk:PickHub(preferred, items)
+    return self:PickWebHub(items)
 end
 
 function NSPauk:ChooseNextHub(inst)
@@ -7674,26 +7826,7 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
   return inst
 end
 
-function NSPauk:PickCocoonVictim(items)
-  local C = self.C
-  local cand = {}
 
-  for _, item in ipairs(items) do
-    if item.frame then
-      local area = item.width * item.height
-
-      if area >= C.COCOON_MIN_AREA and area <= C.COCOON_MAX_AREA then
-        cand[#cand + 1] = item
-      end
-    end
-  end
-
-  if #cand == 0 then
-    return nil
-  end
-
-  return cand[self:RandomInt(1, #cand)]
-end
 
 function NSPauk:EllipsePoint(cx, cy, a, b, ang)
   return cx + a * math.cos(ang), cy + b * math.sin(ang)
@@ -9310,67 +9443,6 @@ function NSPauk:AddInstance(inst)
   end
 end
 
-function NSPauk:StartNewInstance(preferredHub)
-  local S = self.S
-  local C = self.C
-
-  if S.limitReached then
-    return
-  end
-
-  S.SW, S.SH = self:GetScreenSize()
-
-  local items = self:CollectVisibleItems()
-
-  if math.random() < C.COCOON_CHANCE then
-    local victim = self:PickCocoonVictim(items)
-
-    if victim then
-      self:StartCocoon(victim)
-      return
-    end
-  end
-
-  local hub = self:PickHub(preferredHub, items)
-
-  if hub and hub.frame and not self:ValidateAnchorRect(hub) then
-    hub = nil
-  end
-
-  local candidates = {}
-  local targetCount = self:RandomInt(C.TARGET_COUNT_MIN, C.TARGET_COUNT_MAX)
-
-  if hub then
-    candidates = self:CollectTargetCandidates(hub, items)
-  end
-
-  if not hub or #candidates == 0 then
-    hub, candidates, targetCount = self:FallbackHubAndTargets()
-  end
-
-  local inst = self:CreateInstance(hub, candidates, targetCount)
-
-  if not inst or #inst.conns == 0 then
-    S.phase = "watch"
-    S.stillTimer = 0
-    S.speedTimer = 0
-
-    return
-  end
-
-  self:AddInstance(inst)
-
-  S.currentInstance = inst
-  S.tasks = inst.tasks
-  S.taskIdx = 1
-  S.currentTask = nil
-  S.completeTimer = 0
-
-  self:MkSpider()
-  self:MkClickBtn()
-  self:AdvanceTask()
-end
-
 function NSPauk:Interrupt(fromMovement)
   self:ClearAllVisuals(fromMovement and "movement" or "interrupt")
 
@@ -10078,30 +10150,6 @@ function NSPauk:IsActiveAnchorFrame(frame)
   return false
 end
 
-function NSPauk:PickLimitCocoonVictim(items)
-  local C = self.C
-  local cand = {}
-
-  for _, item in ipairs(items or {}) do
-    if item.frame and not self:IsActiveAnchorFrame(item.frame) then
-      local area = (item.width or 0) * (item.height or 0)
-
-      local minArea = tonumber(C.COCOON_MIN_AREA) or 0
-      local maxArea = tonumber(C.COCOON_MAX_AREA) or math.huge
-
-      if area >= minArea and area <= maxArea then
-        cand[#cand + 1] = item
-      end
-    end
-  end
-
-  if #cand == 0 then
-    return nil
-  end
-
-  return cand[self:RandomInt(1, #cand)]
-end
-
 function NSPauk:ChooseLimitHomePoint()
   local S = self.S
   local pts = {}
@@ -10332,3 +10380,182 @@ end
 NSPauk:LoadConstants()
 NSPauk:SetMode("base")
 NSPauk:Init()
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- NSPauk: подсветка кандидатов для кокона (чистая отладка, логику не меняет)
+-------------------------------------------------------------------------------
+
+function NSPauk:CocoonHlSetColor(tex, r, g, b, a)
+    if not tex then
+        return
+    end
+
+    if tex.SetColorTexture then
+        tex:SetColorTexture(r, g, b, a or 1)
+    else
+        tex:SetTexture(1, 1, 1, 1)
+        tex:SetVertexColor(r, g, b, a or 1)
+    end
+end
+
+function NSPauk:ClearCocoonHighlights()
+    if self.cocoonHlRegions then
+        for _, region in ipairs(self.cocoonHlRegions) do
+            region:Hide()
+        end
+    end
+
+    self.cocoonHlRegions = {}
+
+    if self.cocoonHlFrame then
+        self.cocoonHlFrame:SetScript("OnUpdate", nil)
+        self.cocoonHlFrame:Hide()
+    end
+end
+
+function NSPauk:HighlightCocoonCandidates(duration)
+    -- повторный вызов выключает подсветку
+    if self.cocoonHlFrame and self.cocoonHlFrame:IsShown() then
+        self:ClearCocoonHighlights()
+        self:Print("[NSPauk] Подсветка кокон-кандидатов выключена")
+        return
+    end
+
+    local C = self.C
+
+    if not self.cocoonHlFrame then
+        local f = CreateFrame("Frame", "NSPauk_CocoonHighlight", UIParent)
+        f:SetAllPoints(UIParent)
+        f:SetFrameStrata("TOOLTIP")
+        f:SetFrameLevel(105)
+        f:EnableMouse(false)
+        self.cocoonHlFrame = f
+    end
+
+    self.cocoonHlRegions = {}
+
+    local f = self.cocoonHlFrame
+    f:Show()
+
+    local items = self:CollectVisibleItems()
+
+    local eligible = 0
+    local limitEligible = 0
+    local activeAnchors = 0
+
+    for _, item in ipairs(items) do
+        local area = (item.width or 0) * (item.height or 0)
+
+        if item.frame and area >= C.COCOON_MIN_AREA and area <= C.COCOON_MAX_AREA then
+            eligible = eligible + 1
+
+            local isActive = self:IsActiveAnchorFrame(item.frame)
+
+            if isActive then
+                activeAnchors = activeAnchors + 1
+            else
+                limitEligible = limitEligible + 1
+            end
+
+            local r, g, b
+
+            if isActive then
+                -- активный якорь текущей паутины:
+                -- подходит для обычного кокона,
+                -- но исключён для лимитного
+                r, g, b = 0.95, 0.50, 0.15
+            else
+                -- подходит и для обычного, и для лимитного кокона
+                r, g, b = 0.20, 0.85, 0.30
+            end
+
+            local left = item.left
+            local bottom = item.bottom
+            local width = item.width
+            local height = item.height
+
+            -- полупрозрачная заливка
+            local fill = f:CreateTexture(nil, "OVERLAY")
+            self:CocoonHlSetColor(fill, r, g, b, 0.14)
+            fill:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
+            fill:SetWidth(width)
+            fill:SetHeight(height)
+            fill:Show()
+            self.cocoonHlRegions[#self.cocoonHlRegions + 1] = fill
+
+            -- рамка: низ, верх, лево, право
+            local edges = {
+                { left, bottom, width, 2 },
+                { left, bottom + height - 2, width, 2 },
+                { left, bottom, 2, height },
+                { left + width - 2, bottom, 2, height },
+            }
+
+            for _, e in ipairs(edges) do
+                local edge = f:CreateTexture(nil, "OVERLAY")
+                self:CocoonHlSetColor(edge, r, g, b, 0.9)
+                edge:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", e[1], e[2])
+                edge:SetWidth(e[3])
+                edge:SetHeight(e[4])
+                edge:Show()
+                self.cocoonHlRegions[#self.cocoonHlRegions + 1] = edge
+            end
+
+            -- подпись: имя + площадь
+            local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            label:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom + height + 2)
+            label:SetJustifyH("LEFT")
+            label:SetText(string.format("%s [%d]", item.name or "?", math.floor(area)))
+            label:SetTextColor(1, 1, 1, 0.95)
+            label:Show()
+            self.cocoonHlRegions[#self.cocoonHlRegions + 1] = label
+        end
+    end
+
+    self:Print(string.format(
+        "[NSPauk] Кокон-кандидаты: видимых=%d, подходит=%d, для лимитного=%d, активные якоря=%d (оранжевые)",
+        #items,
+        eligible,
+        limitEligible,
+        activeAnchors
+    ))
+
+    self:Print(string.format(
+        "[NSPauk] Допустимая площадь: %s-%s. Повторный вызов — выключить.",
+        tostring(C.COCOON_MIN_AREA),
+        tostring(C.COCOON_MAX_AREA)
+    ))
+
+    -- автоотключение
+    local ttl = tonumber(duration)
+    if not ttl or ttl <= 0 then
+        ttl = 45
+    end
+
+    self.cocoonHlTimer = ttl
+
+    f:SetScript("OnUpdate", function(_, dt)
+        self.cocoonHlTimer = (self.cocoonHlTimer or 0) - dt
+
+        if self.cocoonHlTimer <= 0 then
+            self:ClearCocoonHighlights()
+            self:Print("[NSPauk] Подсветка кокон-кандидатов скрыта (таймаут)")
+        end
+    end)
+end
+
+-------------------------------------------------------------------------------
+-- end подсветка кокон-кандидатов
+-------------------------------------------------------------------------------
