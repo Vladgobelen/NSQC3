@@ -10832,3 +10832,2420 @@ end
 NSPauk:LoadConstants()
 NSPauk:SetMode("base")
 NSPauk:Init()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+do
+    if NSPauk.__nspMapCrawlPatch then
+        return
+    end
+    NSPauk.__nspMapCrawlPatch = true
+
+    local ORIG = {}
+    local names = {
+        "AddTravelPointTask",
+        "AddTravelThreadTask",
+        "AddThreadTask",
+        "StartTask",
+        "AdvanceTask",
+        "IsTaskValid",
+        "CheckPointLimit",
+        "ClearAllVisuals",
+        "OnSpiderClick",
+        "GetWebPointSpacing",
+        "DropAlongCurve",
+    }
+
+    for _, name in ipairs(names) do
+        ORIG[name] = (NSPauk.BaseMethods and NSPauk.BaseMethods[name]) or NSPauk[name]
+    end
+
+    local PATCH = {}
+
+    local function copyPoint(p)
+        if not p then
+            return { x = 0, y = 0 }
+        end
+        return { x = p.x or 0, y = p.y or 0 }
+    end
+
+    local function dist2(ax, ay, bx, by)
+        local dx = (ax or 0) - (bx or 0)
+        local dy = (ay or 0) - (by or 0)
+        return dx * dx + dy * dy
+    end
+
+    local function dist(ax, ay, bx, by)
+        return math.sqrt(dist2(ax, ay, bx, by))
+    end
+
+    function PATCH:NP_GetGap()
+        local C = self.C or {}
+        local size = tonumber(C.SPIDER_SIZE) or 64
+        local gap = size * 0.5
+        if gap < 8 then
+            gap = 8
+        end
+        return gap
+    end
+
+    function PATCH:NP_EnsureThreadSamples(thread)
+        if not thread then
+            return nil
+        end
+        if thread._nspMapSamples then
+            return thread._nspMapSamples
+        end
+
+        local pts = {}
+        local n = 16
+        for i = 0, n - 1 do
+            local t = i / (n - 1)
+            local x, y = self:BzThread(thread, t)
+            pts[#pts + 1] = { x = x, y = y }
+        end
+
+        thread._nspMapSamples = pts
+        return pts
+    end
+
+    function PATCH:NP_EnsureFrameCache()
+        local S = self.S
+        local now = GetTime()
+
+        if S.nspFrameCache and now - (S.nspFrameCache.t or 0) < 0.35 then
+            return S.nspFrameCache.rects
+        end
+
+        local items = self:CollectVisibleItems()
+        local rects = {}
+
+        for _, item in ipairs(items) do
+            if item and item.frame and item.left and item.right and item.bottom and item.top then
+                local r = {
+                    name = item.name,
+                    frame = item.frame,
+                    left = item.left,
+                    right = item.right,
+                    bottom = item.bottom,
+                    top = item.top,
+                    width = item.width or (item.right - item.left),
+                    height = item.height or (item.top - item.bottom),
+                    cx = item.cx or ((item.left + item.right) / 2),
+                    cy = item.cy or ((item.bottom + item.top) / 2),
+                }
+                rects[#rects + 1] = r
+            end
+        end
+
+        S.nspFrameCache = {
+            t = now,
+            rects = rects,
+        }
+
+        return rects
+    end
+
+    function PATCH:NP_GetVisibleFrameRects(a, b, padOverride)
+        local all = self:NP_EnsureFrameCache()
+        local pad = padOverride or 280
+
+        local minX = math.min(a.x, b.x) - pad
+        local maxX = math.max(a.x, b.x) + pad
+        local minY = math.min(a.y, b.y) - pad
+        local maxY = math.max(a.y, b.y) + pad
+        local cx = (minX + maxX) / 2
+        local cy = (minY + maxY) / 2
+
+        local cand = {}
+        for _, r in ipairs(all) do
+            if r.right >= minX and r.left <= maxX and r.top >= minY and r.bottom <= maxY then
+                local dx = r.cx - cx
+                local dy = r.cy - cy
+                cand[#cand + 1] = { r = r, d = dx * dx + dy * dy }
+            end
+        end
+
+        table.sort(cand, function(x, y)
+            return x.d < y.d
+        end)
+
+        local out = {}
+        local limit = 50
+        for i = 1, #cand do
+            if i > limit then
+                break
+            end
+            out[#out + 1] = cand[i].r
+        end
+
+        return out
+    end
+
+    function PATCH:NP_GetWebThreads(a, b, padOverride)
+        local S = self.S
+        local pad = padOverride or 260
+
+        local minX = math.min(a.x, b.x) - pad
+        local maxX = math.max(a.x, b.x) + pad
+        local minY = math.min(a.y, b.y) - pad
+        local maxY = math.max(a.y, b.y) + pad
+        local cx = (minX + maxX) / 2
+        local cy = (minY + maxY) / 2
+
+        local cand = {}
+
+        local function consider(thread, owner)
+            if not thread or not thread.p0 or not thread.p2 then
+                return
+            end
+            if not owner or not owner.textures or #owner.textures == 0 then
+                return
+            end
+
+            local minx = math.min(thread.p0.x, thread.p2.x)
+            local maxx = math.max(thread.p0.x, thread.p2.x)
+            local miny = math.min(thread.p0.y, thread.p2.y)
+            local maxy = math.max(thread.p0.y, thread.p2.y)
+
+            if thread.p1 then
+                if thread.p1.x < minx then minx = thread.p1.x end
+                if thread.p1.x > maxx then maxx = thread.p1.x end
+                if thread.p1.y < miny then miny = thread.p1.y end
+                if thread.p1.y > maxy then maxy = thread.p1.y end
+            end
+
+            if maxx < minX or minx > maxX or maxy < minY or miny > maxY then
+                return
+            end
+
+            local mx = (minx + maxx) / 2
+            local my = (miny + maxy) / 2
+            local dx = mx - cx
+            local dy = my - cy
+            cand[#cand + 1] = { thread = thread, d = dx * dx + dy * dy }
+        end
+
+        for _, inst in ipairs(S.instances) do
+            if inst.conns then
+                for _, conn in ipairs(inst.conns) do
+                    if conn.alive and conn.thread then
+                        consider(conn.thread, conn)
+                    end
+                end
+            end
+
+            if inst.crossSegs then
+                for _, seg in ipairs(inst.crossSegs) do
+                    if seg.alive and seg.thread then
+                        consider(seg.thread, seg)
+                    end
+                end
+            end
+        end
+
+        table.sort(cand, function(x, y)
+            return x.d < y.d
+        end)
+
+        local out = {}
+        local limit = 35
+        for i = 1, #cand do
+            if i > limit then
+                break
+            end
+            local thread = cand[i].thread
+            local samples = self:NP_EnsureThreadSamples(thread)
+            if samples then
+                out[#out + 1] = { thread = thread, samples = samples }
+            end
+        end
+
+        return out
+    end
+
+    function PATCH:NP_FindSupportAt(x, y)
+        local S = self.S
+        local gap = self:NP_GetGap()
+        local sw, sh = self:GetScreenSize()
+
+        local rects = self:NP_EnsureFrameCache()
+        for _, r in ipairs(rects) do
+            if x >= r.left - 1 and x <= r.right + 1 and y >= r.bottom - 1 and y <= r.top + 1 then
+                return { kind = "frame", name = r.name, x = x, y = y, rect = r }
+            end
+        end
+
+        local checked = 0
+        local function checkThread(thread, owner)
+            if not thread or not thread.p0 or not thread.p2 then
+                return false
+            end
+            if not owner or not owner.textures or #owner.textures == 0 then
+                return false
+            end
+            if self:ThreadNearMouse(thread, x, y, gap) then
+                local d = self:DistToThread(thread, x, y)
+                if d <= gap * 0.75 then
+                    return true
+                end
+            end
+            return false
+        end
+
+        for _, inst in ipairs(S.instances) do
+            if inst.conns then
+                for _, conn in ipairs(inst.conns) do
+                    if conn.alive and conn.thread then
+                        checked = checked + 1
+                        if checkThread(conn.thread, conn) then
+                            return { kind = "web", name = "паутина", x = x, y = y }
+                        end
+                    end
+                end
+            end
+
+            if inst.crossSegs then
+                for _, seg in ipairs(inst.crossSegs) do
+                    if seg.alive and seg.thread then
+                        checked = checked + 1
+                        if checkThread(seg.thread, seg) then
+                            return { kind = "web", name = "паутина", x = x, y = y }
+                        end
+                    end
+                end
+            end
+
+            if checked >= 80 then
+                break
+            end
+        end
+
+        if x <= gap then
+            return { kind = "edge", name = "край экрана", side = "left", x = 0, y = y }
+        elseif x >= sw - gap then
+            return { kind = "edge", name = "край экрана", side = "right", x = sw, y = y }
+        elseif y <= gap then
+            return { kind = "edge", name = "край экрана", side = "bottom", x = x, y = 0 }
+        elseif y >= sh - gap then
+            return { kind = "edge", name = "край экрана", side = "top", x = x, y = sh }
+        end
+
+        return nil
+    end
+
+    function PATCH:NP_HasSupportAt(x, y)
+        local S = self.S
+        local now = GetTime()
+        local rx = math.floor((x or 0) / 2 + 0.5)
+        local ry = math.floor((y or 0) / 2 + 0.5)
+
+        local c = S.nspSupportCache
+        if c and now - (c.t or 0) < 0.12 and c.x == rx and c.y == ry then
+            return c.ok
+        end
+
+        local sup = self:NP_FindSupportAt(x, y)
+        local ok = sup ~= nil
+        S.nspSupportCache = { t = now, x = rx, y = ry, ok = ok, sup = sup }
+        return ok
+    end
+
+    function PATCH:NP_FindFallTarget(x, y)
+        local gap = self:NP_GetGap()
+        local sw, sh = self:GetScreenSize()
+
+        local bestY = -math.huge
+        local best = { x = x, y = 0, kind = "edge", name = "край экрана" }
+
+        local rects = self:NP_EnsureFrameCache()
+        for _, r in ipairs(rects) do
+            if x >= r.left - 2 and x <= r.right + 2 then
+                local top = r.top
+                if top <= y + 1 and top > bestY then
+                    bestY = top
+                    best = { x = x, y = top, kind = "frame", name = r.name, rect = r }
+                end
+            end
+        end
+
+        local checked = 0
+        local function consider(thread, owner)
+            if not thread or not thread.p0 or not thread.p2 then
+                return
+            end
+            if not owner or not owner.textures or #owner.textures == 0 then
+                return
+            end
+
+            local samples = self:NP_EnsureThreadSamples(thread)
+            if not samples then
+                return
+            end
+
+            for _, p in ipairs(samples) do
+                if math.abs(p.x - x) <= gap and p.y <= y + 1 and p.y > bestY then
+                    bestY = p.y
+                    best = { x = x, y = p.y, kind = "web", name = "паутина" }
+                end
+            end
+        end
+
+        for _, inst in ipairs(self.S.instances) do
+            if inst.conns then
+                for _, conn in ipairs(inst.conns) do
+                    if conn.alive and conn.thread then
+                        checked = checked + 1
+                        consider(conn.thread, conn)
+                    end
+                end
+            end
+
+            if inst.crossSegs then
+                for _, seg in ipairs(inst.crossSegs) do
+                    if seg.alive and seg.thread then
+                        checked = checked + 1
+                        consider(seg.thread, seg)
+                    end
+                end
+            end
+
+            if checked >= 80 then
+                break
+            end
+        end
+
+        if best.y > y - 1 then
+            best = { x = x, y = math.max(0, y - 1), kind = "edge", name = "край экрана" }
+        end
+
+        if best.y < 0 then
+            best.y = 0
+        end
+
+        return best
+    end
+
+    function PATCH:NP_SupportDescription(sup)
+        if not sup then
+            return "нет"
+        end
+
+        if sup.kind == "frame" then
+            return string.format("фрейм %s (%.0f,%.0f)", tostring(sup.name or "?"), sup.x or 0, sup.y or 0)
+        elseif sup.kind == "web" then
+            return string.format("паутина (%.0f,%.0f)", sup.x or 0, sup.y or 0)
+        elseif sup.kind == "edge" then
+            return string.format("край экрана %s (%.0f,%.0f)", tostring(sup.side or "?"), sup.x or 0, sup.y or 0)
+        end
+
+        return string.format("объект (%.0f,%.0f)", sup.x or 0, sup.y or 0)
+    end
+
+    function PATCH:NP_Dijkstra(start, nodes, edges)
+        local n = #nodes
+        local distArr = {}
+        local prev = {}
+        local done = {}
+
+        for i = 1, n do
+            distArr[i] = math.huge
+        end
+        distArr[start] = 0
+
+        for _ = 1, n do
+            local u = nil
+            local best = math.huge
+
+            for i = 1, n do
+                if not done[i] and distArr[i] < best then
+                    best = distArr[i]
+                    u = i
+                end
+            end
+
+            if not u then
+                break
+            end
+
+            done[u] = true
+
+            if edges[u] then
+                for _, e in ipairs(edges[u]) do
+                    local v = e.to
+                    if v and distArr[u] + e.w < distArr[v] then
+                        distArr[v] = distArr[u] + e.w
+                        prev[v] = u
+                    end
+                end
+            end
+        end
+
+        return distArr, prev
+    end
+
+    function PATCH:NP_ReconstructPath(prev, start, goal, nodes)
+        local rev = {}
+        local cur = goal
+        local reached = false
+        local guard = 0
+
+        while cur do
+            guard = guard + 1
+            if guard > 10000 then
+                break
+            end
+
+            rev[#rev + 1] = cur
+            if cur == start then
+                reached = true
+                break
+            end
+
+            cur = prev[cur]
+        end
+
+        if not reached then
+            return nil
+        end
+
+        local pts = {}
+        for i = #rev, 1, -1 do
+            local n = nodes[rev[i]]
+            if n then
+                pts[#pts + 1] = { x = n.x or 0, y = n.y or 0, kind = n.kind }
+            end
+        end
+
+        return pts
+    end
+
+    function PATCH:NP_BuildRoute(from, to)
+        local S = self.S
+        local sw, sh = self:GetScreenSize()
+        S.SW, S.SH = sw, sh
+
+        local gap = self:NP_GetGap()
+        local frames = self:NP_GetVisibleFrameRects(from, to, 280)
+        local threads = self:NP_GetWebThreads(from, to, 260)
+
+        local nodes = {}
+        local edges = {}
+
+        local function addNode(n)
+            table.insert(nodes, n)
+            edges[#nodes] = {}
+            return #nodes
+        end
+
+        local function addEdge(a, b, w)
+            if a and b and a ~= b then
+                if not w or w < 0 then
+                    w = 0
+                end
+                table.insert(edges[a], { to = b, w = w })
+                table.insert(edges[b], { to = a, w = w })
+            end
+        end
+
+        local function addEdgeNode(x, y, side)
+            addNode({ x = x, y = y, kind = "edge", edgeSide = side })
+        end
+
+        -- Глобальные узлы края экрана.
+        addEdgeNode(0, 0, "bottom")
+        addEdgeNode(sw * 0.5, 0, "bottom")
+        addEdgeNode(sw, 0, "bottom")
+
+        addEdgeNode(sw, 0, "right")
+        addEdgeNode(sw, sh * 0.5, "right")
+        addEdgeNode(sw, sh, "right")
+
+        addEdgeNode(sw, sh, "top")
+        addEdgeNode(sw * 0.5, sh, "top")
+        addEdgeNode(0, sh, "top")
+
+        addEdgeNode(0, sh, "left")
+        addEdgeNode(0, sh * 0.5, "left")
+        addEdgeNode(0, 0, "left")
+
+        local function addEdgeProjection(id)
+            local n = nodes[id]
+            if not n or n.kind == "edge" then
+                return
+            end
+
+            if n.x <= gap then
+                local eid = addNode({ x = 0, y = n.y, kind = "edge", edgeSide = "left" })
+                addEdge(id, eid, math.abs(n.x))
+            end
+
+            if n.x >= sw - gap then
+                local eid = addNode({ x = sw, y = n.y, kind = "edge", edgeSide = "right" })
+                addEdge(id, eid, math.abs(sw - n.x))
+            end
+
+            if n.y <= gap then
+                local eid = addNode({ x = n.x, y = 0, kind = "edge", edgeSide = "bottom" })
+                addEdge(id, eid, math.abs(n.y))
+            end
+
+            if n.y >= sh - gap then
+                local eid = addNode({ x = n.x, y = sh, kind = "edge", edgeSide = "top" })
+                addEdge(id, eid, math.abs(sh - n.y))
+            end
+        end
+
+        -- Узлы видимых фреймов.
+        for fi, rect in ipairs(frames) do
+            local cx = (rect.left + rect.right) / 2
+            local cy = (rect.bottom + rect.top) / 2
+
+            local pts = {
+                { x = rect.left, y = rect.bottom },
+                { x = cx, y = rect.bottom },
+                { x = rect.right, y = rect.bottom },
+                { x = rect.right, y = cy },
+                { x = rect.right, y = rect.top },
+                { x = cx, y = rect.top },
+                { x = rect.left, y = rect.top },
+                { x = rect.left, y = cy },
+            }
+
+            local ids = {}
+            for _, p in ipairs(pts) do
+                local id = addNode({
+                    x = p.x,
+                    y = p.y,
+                    kind = "frame",
+                    frameId = fi,
+                    name = rect.name,
+                    frame = rect.frame,
+                })
+                ids[#ids + 1] = id
+            end
+
+            frames[fi].nodeIds = ids
+
+            for a = 1, #ids do
+                for b = a + 1, #ids do
+                    local na = nodes[ids[a]]
+                    local nb = nodes[ids[b]]
+                    addEdge(ids[a], ids[b], dist(na.x, na.y, nb.x, nb.y))
+                end
+                addEdgeProjection(ids[a])
+            end
+        end
+
+        -- Узлы нарисованной паутины.
+        for wi, info in ipairs(threads) do
+            local ids = {}
+            local prevId = nil
+
+            for _, p in ipairs(info.samples) do
+                local id = addNode({
+                    x = p.x,
+                    y = p.y,
+                    kind = "web",
+                    webId = wi,
+                    thread = info.thread,
+                })
+                ids[#ids + 1] = id
+
+                if prevId then
+                    local pp = nodes[prevId]
+                    addEdge(prevId, id, dist(pp.x, pp.y, p.x, p.y))
+                end
+
+                addEdgeProjection(id)
+                prevId = id
+            end
+
+            threads[wi].nodeIds = ids
+        end
+
+        local supportCount = #nodes
+
+        -- Переходы между разными опорами, если зазор не больше gap.
+        for i = 1, supportCount do
+            local ni = nodes[i]
+            if ni.kind == "frame" or ni.kind == "web" then
+                for j = i + 1, supportCount do
+                    local nj = nodes[j]
+                    if nj.kind == "frame" or nj.kind == "web" then
+                        local same = false
+
+                        if ni.kind == "frame" and nj.kind == "frame" and ni.frameId == nj.frameId then
+                            same = true
+                        end
+
+                        if ni.kind == "web" and nj.kind == "web" and ni.webId == nj.webId then
+                            same = true
+                        end
+
+                        if not same then
+                            local d2 = dist2(ni.x, ni.y, nj.x, nj.y)
+                            if d2 <= gap * gap then
+                                addEdge(i, j, math.sqrt(d2))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Соединяем узлы края экрана вдоль сторон.
+        local sides = { bottom = {}, top = {}, left = {}, right = {} }
+        for i, n in ipairs(nodes) do
+            if n.kind == "edge" and n.edgeSide and sides[n.edgeSide] then
+                table.insert(sides[n.edgeSide], i)
+            end
+        end
+
+        local function connectSide(list, useX)
+            table.sort(list, function(a, b)
+                if useX then
+                    if nodes[a].x == nodes[b].x then
+                        return nodes[a].y < nodes[b].y
+                    end
+                    return nodes[a].x < nodes[b].x
+                else
+                    if nodes[a].y == nodes[b].y then
+                        return nodes[a].x < nodes[b].x
+                    end
+                    return nodes[a].y < nodes[b].y
+                end
+            end)
+
+            for k = 1, #list - 1 do
+                local a = list[k]
+                local b = list[k + 1]
+                addEdge(a, b, dist(nodes[a].x, nodes[a].y, nodes[b].x, nodes[b].y))
+            end
+        end
+
+        connectSide(sides.bottom, true)
+        connectSide(sides.top, true)
+        connectSide(sides.left, false)
+        connectSide(sides.right, false)
+
+        -- Углы: соседние стороны должны стыковаться.
+        for i = 1, #nodes do
+            if nodes[i].kind == "edge" then
+                for j = i + 1, #nodes do
+                    if nodes[j].kind == "edge" then
+                        local d2 = dist2(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y)
+                        if d2 <= gap * gap then
+                            addEdge(i, j, math.sqrt(d2))
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Union-find для цепочек опор без края экрана.
+        local parent = {}
+        for i = 1, supportCount do
+            parent[i] = i
+        end
+
+        local function find(a)
+            while parent[a] ~= a do
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            end
+            return a
+        end
+
+        local function union(a, b)
+            local ra = find(a)
+            local rb = find(b)
+            if ra ~= rb then
+                parent[rb] = ra
+            end
+        end
+
+        for i = 1, supportCount do
+            local n = nodes[i]
+            if n.kind == "frame" or n.kind == "web" then
+                if edges[i] then
+                    for _, e in ipairs(edges[i]) do
+                        if e.to <= supportCount then
+                            local m = nodes[e.to]
+                            if m and (m.kind == "frame" or m.kind == "web") then
+                                union(i, e.to)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        local compAccess = {}
+        for i = 1, supportCount do
+            local n = nodes[i]
+            if n.kind == "frame" or n.kind == "web" then
+                if n.x <= gap or n.x >= sw - gap or n.y <= gap or n.y >= sh - gap then
+                    compAccess[find(i)] = true
+                end
+            end
+        end
+
+        for i = 1, supportCount do
+            local n = nodes[i]
+            if n.kind == "frame" or n.kind == "web" then
+                n.comp = find(i)
+                n.edgeAccess = compAccess[n.comp] and true or false
+            end
+        end
+
+        -- Стартовая, целевая и резервная верхняя точки.
+        local startIdx = addNode({ x = from.x, y = from.y, kind = "start" })
+        local targetIdx = addNode({ x = to.x, y = to.y, kind = "target" })
+
+        local topX = to.x
+        if topX < 0 then
+            topX = 0
+        elseif topX > sw then
+            topX = sw
+        end
+
+        local topIdx = addNode({ x = topX, y = sh, kind = "edge", edgeSide = "top" })
+
+        for i, n in ipairs(nodes) do
+            if i ~= topIdx and n.kind == "edge" and n.edgeSide == "top" then
+                addEdge(topIdx, i, math.abs(n.x - topX))
+            end
+        end
+
+        local function connectPoint(idx, point)
+            -- Подключение к фреймам.
+            for fi, rect in ipairs(frames) do
+                local inside = point.x >= rect.left - 1
+                    and point.x <= rect.right + 1
+                    and point.y >= rect.bottom - 1
+                    and point.y <= rect.top + 1
+
+                if inside and rect.nodeIds then
+                    for _, nid in ipairs(rect.nodeIds) do
+                        local n = nodes[nid]
+                        addEdge(idx, nid, dist(point.x, point.y, n.x, n.y))
+                    end
+                elseif rect.nodeIds then
+                    for _, nid in ipairs(rect.nodeIds) do
+                        local n = nodes[nid]
+                        local d2 = dist2(point.x, point.y, n.x, n.y)
+                        if d2 <= gap * gap then
+                            addEdge(idx, nid, math.sqrt(d2))
+                        end
+                    end
+                end
+            end
+
+            -- Подключение к паутине.
+            local webGap = gap * 1.5
+            for wi, info in ipairs(threads) do
+                if info.nodeIds then
+                    for _, nid in ipairs(info.nodeIds) do
+                        local n = nodes[nid]
+                        local d2 = dist2(point.x, point.y, n.x, n.y)
+                        if d2 <= webGap * webGap then
+                            addEdge(idx, nid, math.sqrt(d2))
+                        end
+                    end
+                end
+            end
+
+            -- Подключение к краю экрана, если точка рядом.
+            local function connectEdgeProj(side, px, py, weight)
+                local eid = addNode({ x = px, y = py, kind = "edge", edgeSide = side })
+                addEdge(idx, eid, weight)
+
+                for i, n in ipairs(nodes) do
+                    if i ~= eid and n.kind == "edge" and n.edgeSide == side then
+                        local d
+                        if side == "bottom" or side == "top" then
+                            d = math.abs(px - n.x)
+                        else
+                            d = math.abs(py - n.y)
+                        end
+                        addEdge(eid, i, d)
+                    end
+                end
+            end
+
+            if point.x <= gap then
+                connectEdgeProj("left", 0, point.y, point.x)
+            end
+
+            if point.x >= sw - gap then
+                connectEdgeProj("right", sw, point.y, sw - point.x)
+            end
+
+            if point.y <= gap then
+                connectEdgeProj("bottom", point.x, 0, point.y)
+            end
+
+            if point.y >= sh - gap then
+                connectEdgeProj("top", point.x, sh, sh - point.y)
+            end
+        end
+
+        connectPoint(startIdx, from)
+        connectPoint(targetIdx, to)
+
+        local distArr, prev = self:NP_Dijkstra(startIdx, nodes, edges)
+
+        local directPath = nil
+        local directLen = nil
+        if distArr[targetIdx] and distArr[targetIdx] < math.huge then
+            directLen = distArr[targetIdx]
+            directPath = self:NP_ReconstructPath(prev, startIdx, targetIdx, nodes)
+        end
+
+        local topPath = nil
+        local topLen = nil
+        if distArr[topIdx] and distArr[topIdx] < math.huge then
+            topLen = distArr[topIdx]
+            topPath = self:NP_ReconstructPath(prev, startIdx, topIdx, nodes)
+        end
+
+        local fallbackLen = nil
+        if topLen and topPath then
+            fallbackLen = topLen + math.abs(sh - to.y)
+        end
+
+        local route = nil
+
+        if directPath and fallbackLen and directLen <= fallbackLen then
+            route = { points = directPath, length = directLen, kind = "direct" }
+        elseif topPath then
+            route = {
+                points = topPath,
+                length = fallbackLen,
+                kind = "drop",
+                dropToTarget = true,
+                dropFrom = { x = topX, y = sh },
+            }
+        elseif directPath then
+            route = { points = directPath, length = directLen, kind = "direct" }
+        end
+
+        if route then
+            local fromSup = self:NP_FindSupportAt(from.x, from.y)
+            local toSup = self:NP_FindSupportAt(to.x, to.y)
+
+            self.S.nspLastRoute = {
+                fromName = self:NP_SupportDescription(fromSup),
+                toName = self:NP_SupportDescription(toSup),
+                count = route.points and #route.points or 0,
+                length = route.length or 0,
+                kind = route.kind or "?",
+            }
+        end
+
+        return route
+    end
+
+    function PATCH:NP_MakePlanTask(kind, from, to, conn, owner)
+        local task = {
+            kind = (kind == "thread") and "thread" or "travel",
+            nspPlan = true,
+            drop = false,
+            p0 = copyPoint(from),
+            p1 = { x = (from.x + to.x) / 2, y = (from.y + to.y) / 2 },
+            p2 = copyPoint(to),
+            conn = conn,
+            owner = owner,
+            nspNoInsert = true,
+        }
+        return task
+    end
+
+    function PATCH:NP_CopyPlanTask(task)
+        local copy = {}
+        for k, v in pairs(task) do
+            copy[k] = v
+        end
+
+        copy.nspAttempts = (task.nspAttempts or 0) + 1
+        copy.p0 = task.p0 and copyPoint(task.p0) or nil
+        copy.p1 = task.p1 and copyPoint(task.p1) or nil
+        copy.p2 = task.p2 and copyPoint(task.p2) or nil
+
+        return copy
+    end
+
+    function PATCH:NP_MakeCrawlTask(a, b, plan)
+        local task = {
+            kind = "travel",
+            nspCrawl = true,
+            drop = false,
+            p0 = copyPoint(a),
+            p1 = { x = (a.x + b.x) / 2, y = (a.y + b.y) / 2 },
+            p2 = copyPoint(b),
+            conn = plan and plan.conn,
+            owner = plan and plan.owner,
+            nspNoInsert = true,
+        }
+
+        if plan then
+            task.isCross = plan.isCross
+            task.isMain = plan.isMain
+            if plan.nspDrag then
+                task.nspDuringDrag = true
+            end
+        end
+
+        return task
+    end
+
+    function PATCH:NP_MakeTempDropTask(from, to)
+        local S = self.S
+        if not S.nspTempOwners then
+            S.nspTempOwners = {}
+        end
+
+        local fromC = copyPoint(from)
+        local toY = tonumber(to and to.y) or 0
+
+        if toY > fromC.y - 1 then
+            toY = math.max(0, fromC.y - 1)
+        end
+
+        local toC = { x = fromC.x, y = toY }
+
+        local fakeInst = { isTemp = true, conns = {}, crossSegs = {} }
+        local fakeOwner = { alive = true, textures = {} }
+
+        local thread = {
+            p0 = copyPoint(fromC),
+            p1 = { x = fromC.x, y = (fromC.y + toC.y) / 2 },
+            p2 = copyPoint(toC),
+        }
+
+        thread.ownerRef = { inst = fakeInst, seg = fakeOwner }
+        fakeOwner.thread = thread
+
+        S.nspTempOwners[#S.nspTempOwners + 1] = fakeOwner
+
+        local task = {
+            kind = "thread",
+            nspTempThread = true,
+            nspNoSupportCheck = true,
+            nspNoInsert = true,
+            drop = false,
+            p0 = thread.p0,
+            p1 = thread.p1,
+            p2 = thread.p2,
+            owner = fakeOwner,
+            nspFakeInst = fakeInst,
+        }
+
+        return task
+    end
+
+    function PATCH:NP_DropPermanentThread(owner, thread)
+        if not owner or not owner.alive or not thread then
+            return
+        end
+
+        if not owner.textures then
+            owner.textures = {}
+        end
+
+        local th = thread
+        if not th.p1 then
+            th = {
+                p0 = th.p0,
+                p1 = { x = (th.p0.x + th.p2.x) / 2, y = (th.p0.y + th.p2.y) / 2 },
+                p2 = th.p2,
+            }
+        end
+
+        local total = self:ApproxThreadLength(th)
+        if total <= 0 then
+            return
+        end
+
+        local spacing = self:GetWebPointSpacing()
+        local count = math.floor(total / spacing) + 1
+        if count < 2 then
+            count = 2
+        end
+
+        local hard = math.max(tonumber(self.C.MAX_DROPS_PER_FRAME) or 140, 1000)
+        if count > hard then
+            count = hard
+        end
+
+        local dropTask = { owner = owner, drop = true }
+
+        for i = 0, count - 1 do
+            local t = i / (count - 1)
+            local x, y = self:BzThread(th, t)
+            self:DropWebForTask(dropTask, x, y)
+        end
+    end
+
+    function PATCH:NP_StartDrag(task)
+        local S = self.S
+
+        if S.nspDrag and S.nspDrag.owner == task.owner then
+            return
+        end
+
+        if S.nspDrag then
+            self:NP_ClearGlobalDrag(false)
+        end
+
+        local finalThread = task.finalThread
+        if not finalThread then
+            finalThread = {
+                p0 = copyPoint(task.p0),
+                p1 = copyPoint(task.p1),
+                p2 = copyPoint(task.p2),
+            }
+        end
+
+        S.nspDrag = {
+            anchor = copyPoint(task.p0),
+            owner = task.owner,
+            finalThread = finalThread,
+            textures = {},
+            temp = false,
+        }
+    end
+
+    function PATCH:NP_ClearGlobalDrag(fade)
+        local S = self.S
+        local drag = S.nspDrag
+        if not drag then
+            return
+        end
+
+        local list = drag.textures or {}
+        if fade and #list > 0 then
+            self:AddFade(list, self.C.TEAR_FADE_DURATION or 1.5, nil)
+        else
+            self:RecycleTextures(list)
+        end
+
+        S.nspDrag = nil
+    end
+
+    function PATCH:NP_FinishGlobalDrag(task)
+        local S = self.S
+        local drag = S.nspDrag
+        if not drag then
+            return
+        end
+
+        if drag.owner and drag.owner.alive and drag.finalThread then
+            self:NP_DropPermanentThread(drag.owner, drag.finalThread)
+        end
+
+        self:NP_ClearGlobalDrag(false)
+
+        if ORIG.CheckPointLimit then
+            ORIG.CheckPointLimit(self)
+        end
+    end
+
+    function PATCH:NP_UpdateDragTextures(list, anchor, current, vertical)
+        local S = self.S
+        local C = self.C
+
+        local dx = current.x - anchor.x
+        local dy = current.y - anchor.y
+        local len = math.sqrt(dx * dx + dy * dy)
+
+        if len < 1 then
+            for i = 1, #list do
+                list[i]:Hide()
+            end
+            return
+        end
+
+        local webSize = tonumber(C.WEB_SIZE) or 2
+        local alpha = tonumber(C.WEB_ALPHA) or 0.55
+        local step = math.max(1, webSize * 0.65)
+
+        local count = math.floor(len / step) + 1
+        if count < 2 then
+            count = 2
+        end
+
+        local cap = vertical and 160 or 220
+        if count > cap then
+            count = cap
+        end
+
+        while #list < count do
+            local tex
+            if #S.webPool > 0 then
+                tex = table.remove(S.webPool)
+                tex._nspInPool = false
+            else
+                tex = S.activeFrame:CreateTexture(nil, "OVERLAY")
+                S.webCreated = (S.webCreated or 0) + 1
+            end
+
+            tex:SetTexture(C.TEX_WEB)
+            tex:SetWidth(webSize)
+            tex:SetHeight(webSize)
+            tex:SetDrawLayer("OVERLAY")
+            tex:SetAlpha(alpha)
+            list[#list + 1] = tex
+        end
+
+        local p1
+        if vertical then
+            p1 = { x = anchor.x, y = (anchor.y + current.y) / 2 }
+        else
+            local sag = len * 0.10
+            if sag < 2 then
+                sag = 2
+            end
+            p1 = { x = (anchor.x + current.x) / 2, y = (anchor.y + current.y) / 2 - sag }
+        end
+
+        for i = 1, #list do
+            local tex = list[i]
+            if i <= count then
+                local t = (i - 1) / (count - 1)
+                local x = self:Bz(t, anchor.x, p1.x, current.x)
+                local y = self:Bz(t, anchor.y, p1.y, current.y)
+
+                tex:ClearAllPoints()
+                tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+                tex:SetAlpha(alpha)
+                tex:Show()
+            else
+                tex:Hide()
+            end
+        end
+    end
+
+    function PATCH:NP_UpdateGlobalDrag()
+        local S = self.S
+        local drag = S.nspDrag
+        if not drag then
+            return
+        end
+
+        if drag.owner and not drag.owner.alive then
+            self:NP_ClearGlobalDrag(true)
+            return
+        end
+
+        self:NP_UpdateDragTextures(
+            drag.textures,
+            drag.anchor,
+            { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 },
+            false
+        )
+    end
+
+    function PATCH:NP_UpdateTempDrag(task)
+        local S = self.S
+        if not task then
+            return
+        end
+
+        if not task.nspDragTextures then
+            task.nspDragTextures = {}
+        end
+
+        self:NP_UpdateDragTextures(
+            task.nspDragTextures,
+            task.p0,
+            { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 },
+            true
+        )
+    end
+
+    function PATCH:NP_FinishTempDrag(task)
+        if not task then
+            return
+        end
+
+        if task.nspDragTextures and #task.nspDragTextures > 0 then
+            self:AddFade(task.nspDragTextures, self.C.TEAR_FADE_DURATION or 2, nil)
+        end
+
+        task.nspDragTextures = {}
+    end
+
+    function PATCH:NP_RecycleTempDrag(task)
+        if not task then
+            return
+        end
+
+        if task.nspDragTextures then
+            self:RecycleTextures(task.nspDragTextures)
+        end
+
+        task.nspDragTextures = {}
+    end
+
+    function PATCH:NP_ClearTempOwners()
+        local S = self.S
+        if not S.nspTempOwners then
+            S.nspTempOwners = {}
+        end
+
+        for _, owner in ipairs(S.nspTempOwners) do
+            owner.alive = false
+        end
+
+        S.nspTempOwners = {}
+    end
+
+    function PATCH:NP_ExecutePlan(task)
+        local S = self.S
+        if not task then
+            return 0
+        end
+
+        local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+        local to = task.p2 and { x = task.p2.x, y = task.p2.y } or { x = from.x, y = from.y }
+
+        local insertIndex = S.taskIdx
+        local inserted = 0
+
+        local function insert(t)
+            if t then
+                table.insert(S.tasks, insertIndex, t)
+                insertIndex = insertIndex + 1
+                inserted = inserted + 1
+            end
+        end
+
+        if not task.nspTempThread and not task.nspAllowNoSupport and not self:NP_HasSupportAt(from.x, from.y) then
+            insert(self:NP_MakeTempDropTask(from, self:NP_FindFallTarget(from.x, from.y)))
+
+            local copy = self:NP_CopyPlanTask(task)
+            copy.nspAllowNoSupport = true
+            insert(copy)
+
+            return inserted
+        end
+
+        if task.nspDrag then
+            self:NP_StartDrag(task)
+        end
+
+        local route = self:NP_BuildRoute(from, to)
+
+        if route and route.points and #route.points >= 2 then
+            for i = 1, #route.points - 1 do
+                insert(self:NP_MakeCrawlTask(route.points[i], route.points[i + 1], task))
+            end
+
+            if route.dropToTarget then
+                local dropFrom = route.dropFrom or { x = to.x, y = S.SH or 0 }
+                local dropDist = math.abs((dropFrom.y or 0) - to.y)
+
+                if dropDist > 2 then
+                    local drop = self:NP_MakeTempDropTask(dropFrom, to)
+                    if task.nspDrag then
+                        drop.nspDuringDrag = true
+                    end
+                    insert(drop)
+                else
+                    insert(self:NP_MakeCrawlTask(dropFrom, to, task))
+                end
+            end
+        else
+            if (task.nspAttempts or 0) < 2 then
+                local drop = self:NP_MakeTempDropTask(from, { x = from.x, y = 0 })
+                if task.nspDrag then
+                    drop.nspDuringDrag = true
+                end
+
+                insert(drop)
+                insert(self:NP_CopyPlanTask(task))
+            else
+                local direct = self:NP_MakeCrawlTask(from, to, task)
+                direct.nspNoSupportCheck = true
+                insert(direct)
+            end
+        end
+
+        if task.nspDrag and inserted > 0 then
+            local last = S.tasks[insertIndex - 1]
+            if last then
+                last.nspDragEnd = true
+                last.nspDuringDrag = true
+            end
+        end
+
+        if inserted == 0 and task.nspDrag then
+            self:NP_StartDrag(task)
+            self:NP_FinishGlobalDrag(task)
+        end
+
+        return inserted
+    end
+
+    function PATCH:NP_PostUpdate()
+        local S = self.S
+
+        if S.phase == "task" then
+            local task = S.currentTask
+            if task then
+                if S.nspDrag and task.nspDuringDrag then
+                    self:NP_UpdateGlobalDrag()
+                end
+
+                if task.nspTempThread then
+                    self:NP_UpdateTempDrag(task)
+                end
+            end
+        else
+            if S.nspDrag and S.phase ~= "instanceComplete" and S.phase ~= "limitWait" then
+                self:NP_ClearGlobalDrag(true)
+            end
+        end
+    end
+
+    function PATCH:NP_DebugPrint()
+        local S = self.S
+
+        self:Print("NSPauk debug:")
+        self:Print(string.format("Фаза: %s, режим: %s", tostring(S.phase), tostring(S.mode)))
+        self:Print(string.format("Паук: %.1f, %.1f", S.lastSpiderX or 0, S.lastSpiderY or 0))
+
+        local sup = self:NP_FindSupportAt(S.lastSpiderX or 0, S.lastSpiderY or 0)
+        self:Print("Опора: " .. self:NP_SupportDescription(sup))
+
+        local task = S.currentTask
+        if task then
+            local kind = "обычная"
+            if task.nspPlan then
+                kind = "plan"
+            elseif task.nspTempThread then
+                kind = "tempdrop"
+            elseif task.nspCrawl then
+                kind = "crawl"
+            elseif task.kind then
+                kind = tostring(task.kind)
+            end
+
+            self:Print(string.format(
+                "Задача: %s, drop=%s, drag=%s, end=%s, t=%.2f",
+                kind,
+                tostring(task.drop),
+                tostring(task.nspDuringDrag),
+                tostring(task.nspDragEnd),
+                S.moveT or 0
+            ))
+
+            if task.p0 and task.p2 then
+                self:Print(string.format(
+                    "  от %.1f,%.1f к %.1f,%.1f",
+                    task.p0.x or 0,
+                    task.p0.y or 0,
+                    task.p2.x or 0,
+                    task.p2.y or 0
+                ))
+            end
+        else
+            self:Print("Задача: нет")
+        end
+
+        if S.nspLastRoute then
+            local r = S.nspLastRoute
+            self:Print(string.format(
+                "Маршрут: от %s к %s, точек %d, длина %.0f, тип %s",
+                tostring(r.fromName or "?"),
+                tostring(r.toName or "?"),
+                r.count or 0,
+                r.length or 0,
+                tostring(r.kind or "?")
+            ))
+        else
+            self:Print("Маршрут: нет")
+        end
+
+        if S.nspDrag and S.nspDrag.anchor then
+            self:Print(string.format(
+                "Тянем нить от %.1f,%.1f",
+                S.nspDrag.anchor.x or 0,
+                S.nspDrag.anchor.y or 0
+            ))
+        end
+    end
+
+    function PATCH:GetWebPointSpacing()
+        local C = self.C or {}
+        local spacing = tonumber(C.WEB_POINT_SPACING_MAX)
+        if not spacing or spacing ~= spacing or spacing <= 0 then
+            spacing = 1
+        end
+
+        local webSize = tonumber(C.WEB_SIZE) or 2
+        local maxSpacing = math.max(1, webSize * 0.75)
+        if spacing > maxSpacing then
+            spacing = maxSpacing
+        end
+
+        return spacing
+    end
+
+    function PATCH:DropAlongCurve(task, t0, t1)
+        local S = self.S
+        local C = self.C
+
+        if not task or not task.drop then
+            return
+        end
+
+        if not t0 or not t1 or t1 <= t0 then
+            return
+        end
+
+        local spacing = self:GetWebPointSpacing()
+        task.dropSpacing = spacing
+
+        local totalLen = task.pathLength
+        if type(totalLen) ~= "number" or totalLen <= 0 then
+            totalLen = self:ApproxThreadLength(task)
+            task.pathLength = totalLen
+        end
+
+        if totalLen <= 0 then
+            return
+        end
+
+        local segLen = totalLen * (t1 - t0)
+        if segLen <= 0 then
+            return
+        end
+
+        if type(task.dropRemainder) ~= "number" or task.dropRemainder < 0 then
+            task.dropRemainder = 0
+        end
+
+        local total = task.dropRemainder + segLen
+        if total < spacing then
+            task.dropRemainder = total
+            local lx, ly = self:BzThread(task, t1)
+            S.lastDropX = lx
+            S.lastDropY = ly
+            return
+        end
+
+        local planned = math.floor(total / spacing)
+        if planned < 1 then
+            planned = 1
+        end
+
+        local maxDrops = tonumber(C.MAX_DROPS_PER_FRAME) or 0
+        local hard = math.max(maxDrops, 500)
+        local span = t1 - t0
+        local lastX, lastY
+
+        if planned > hard then
+            for i = 1, hard do
+                local f = i / hard
+                local t = t0 + span * f
+                local x, y = self:BzThread(task, t)
+                self:DropWebForTask(task, x, y)
+                lastX, lastY = x, y
+            end
+
+            task.dropRemainder = 0
+        else
+            for i = 1, planned do
+                local distFromStart = i * spacing - task.dropRemainder
+                if distFromStart < 0 then
+                    distFromStart = 0
+                end
+
+                if distFromStart > segLen then
+                    distFromStart = segLen
+                end
+
+                local f = 0
+                if segLen > 0 then
+                    f = distFromStart / segLen
+                end
+
+                local t = t0 + span * f
+                local x, y = self:BzThread(task, t)
+                self:DropWebForTask(task, x, y)
+                lastX, lastY = x, y
+            end
+
+            task.dropRemainder = total - planned * spacing
+            if task.dropRemainder < 0 then
+                task.dropRemainder = 0
+            end
+        end
+
+        if lastX then
+            S.lastDropX = lastX
+            S.lastDropY = lastY
+        else
+            local lx, ly = self:BzThread(task, t1)
+            S.lastDropX = lx
+            S.lastDropY = ly
+        end
+    end
+
+    function PATCH:AddTravelPointTask(tasks, from, to, conn, owner)
+        local task
+        if ORIG.AddTravelPointTask then
+            task = ORIG.AddTravelPointTask(self, tasks, from, to, conn, owner)
+        end
+
+        if task then
+            task.nspPlan = true
+            task.drop = false
+            task.nspNoInsert = true
+        end
+
+        return task
+    end
+
+    function PATCH:AddTravelThreadTask(tasks, conn, tA, tB, owner)
+        local task
+        if ORIG.AddTravelThreadTask then
+            task = ORIG.AddTravelThreadTask(self, tasks, conn, tA, tB, owner)
+        end
+
+        if task then
+            task.nspCrawl = true
+            task.nspAlongWeb = true
+            task.nspNoSupportCheck = true
+        end
+
+        return task
+    end
+
+    function PATCH:AddThreadTask(tasks, owner, thread)
+        local task
+        if ORIG.AddThreadTask then
+            task = ORIG.AddThreadTask(self, tasks, owner, thread)
+        end
+
+        if task then
+            task.nspPlan = true
+            task.nspDrag = true
+            task.drop = false
+            task.nspNoInsert = true
+
+            task.finalThread = {
+                p0 = copyPoint(thread.p0),
+                p1 = thread.p1 and copyPoint(thread.p1) or {
+                    x = (thread.p0.x + thread.p2.x) / 2,
+                    y = (thread.p0.y + thread.p2.y) / 2,
+                },
+                p2 = copyPoint(thread.p2),
+            }
+
+            if thread.ownerRef then
+                task.finalThread.ownerRef = thread.ownerRef
+            end
+        end
+
+        return task
+    end
+
+    function PATCH:IsTaskValid(task)
+        if not task then
+            return false
+        end
+
+        if task.nspTempThread then
+            return task.owner and task.owner.alive
+        end
+
+        if task.nspPlan then
+            if task.owner and not task.owner.alive then
+                return false
+            end
+
+            if task.conn and not task.conn.alive then
+                return false
+            end
+
+            if task.owner and (task.owner.connA or task.owner.connB) then
+                if task.owner.connA and not task.owner.connA.alive then
+                    return false
+                end
+                if task.owner.connB and not task.owner.connB.alive then
+                    return false
+                end
+            end
+
+            return true
+        end
+
+        if task.nspCrawl then
+            if task.owner and not task.owner.alive then
+                return false
+            end
+
+            if task.conn and not task.conn.alive then
+                return false
+            end
+
+            if task.nspDuringDrag then
+                local S = self.S
+                if not S.nspDrag or not S.nspDrag.owner or not S.nspDrag.owner.alive then
+                    return false
+                end
+            end
+
+            return true
+        end
+
+        if ORIG.IsTaskValid then
+            return ORIG.IsTaskValid(self, task)
+        end
+
+        return false
+    end
+
+    function PATCH:StartTask(task)
+        local S = self.S
+        local C = self.C
+
+        if task.nspPlan then
+            S.currentTask = nil
+            self:NP_ExecutePlan(task)
+            S.phase = "task"
+            S.moveDur = 0.05
+            S.moveT = 0
+            return
+        end
+
+        if ORIG.StartTask then
+            ORIG.StartTask(self, task)
+        end
+
+        if task.nspCrawl or task.nspTempThread then
+            if S.spider and S.spider:IsShown() then
+                local dx = task.p0.x - S.lastSpiderX
+                local dy = task.p0.y - S.lastSpiderY
+
+                if dx * dx + dy * dy > 1 then
+                    task.p0 = { x = S.lastSpiderX, y = S.lastSpiderY }
+                    task.p1 = { x = (S.lastSpiderX + task.p2.x) / 2, y = (S.lastSpiderY + task.p2.y) / 2 }
+                    task.pathLength = nil
+                end
+            end
+
+            if task.nspTempThread then
+                task.p1 = { x = task.p0.x, y = (task.p0.y + task.p2.y) / 2 }
+                task.p2 = { x = task.p0.x, y = task.p2.y }
+                task.pathLength = nil
+            end
+
+            local len = self:ApproxThreadLength(task)
+            task.pathLength = len
+
+            if len < 1 then
+                len = 1
+            end
+
+            local speed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX)
+
+            if not task.nspTempThread then
+                if task.isCross then
+                    speed = speed * (C.CROSS_SPEED_MULT or 1)
+                end
+
+                if task.isMain then
+                    speed = speed * (C.MAIN_SPEED_MULT or 1)
+                end
+            end
+
+            if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
+                speed = speed * C.FAST_MODE
+            end
+
+            if speed <= 0 then
+                speed = 1
+            end
+
+            S.moveDur = len / speed
+            if S.moveDur < 0.05 then
+                S.moveDur = 0.05
+            end
+
+            S.moveT = 0
+            S.lastTaskT = 0
+            self:PutSpider(task.p0.x, task.p0.y)
+        end
+    end
+
+    function PATCH:AdvanceTask()
+        local S = self.S
+        local old = S.currentTask
+
+        if old and old.nspTempThread then
+            if S.moveT and S.moveT >= 1 and self:IsTaskValid(old) then
+                self:NP_FinishTempDrag(old)
+            else
+                self:NP_RecycleTempDrag(old)
+            end
+        end
+
+        if old and old.nspDuringDrag then
+            if old.nspDragEnd then
+                if S.moveT and S.moveT >= 1 and self:IsTaskValid(old) then
+                    self:NP_FinishGlobalDrag(old)
+                else
+                    self:NP_ClearGlobalDrag(true)
+                end
+            else
+                if not self:IsTaskValid(old) then
+                    self:NP_ClearGlobalDrag(true)
+                end
+            end
+        end
+
+        if S.limitReturnPending or S.phase == "limitWait" then
+            if S.limitReturnPending then
+                S.limitReturnPending = false
+                S.phase = "limitWait"
+                S.limitWaitTimer = 0
+                S.completeTimer = 0
+            end
+            return
+        end
+
+        if old and old.nspPlan then
+            S.currentTask = nil
+        end
+
+        while S.taskIdx <= #S.tasks do
+            local task = S.tasks[S.taskIdx]
+
+            if self:IsTaskValid(task) then
+                if task.nspPlan then
+                    S.taskIdx = S.taskIdx + 1
+                    self:NP_ExecutePlan(task)
+
+                    if S.limitReturnPending or S.phase == "limitWait" then
+                        return
+                    end
+                elseif task.nspCrawl and not task.nspNoSupportCheck and not self:NP_HasSupportAt(S.lastSpiderX, S.lastSpiderY) then
+                    local fall = self:NP_MakeTempDropTask(
+                        { x = S.lastSpiderX, y = S.lastSpiderY },
+                        self:NP_FindFallTarget(S.lastSpiderX, S.lastSpiderY)
+                    )
+
+                    if task.nspDuringDrag then
+                        fall.nspDuringDrag = true
+                    end
+
+                    table.insert(S.tasks, S.taskIdx, fall)
+                else
+                    if S.spider and S.spider:IsShown() and not task.nspNoInsert then
+                        local dx = task.p0.x - S.lastSpiderX
+                        local dy = task.p0.y - S.lastSpiderY
+
+                        if dx * dx + dy * dy > 100 then
+                            local plan = self:NP_MakePlanTask(
+                                "travel",
+                                { x = S.lastSpiderX, y = S.lastSpiderY },
+                                { x = task.p0.x, y = task.p0.y },
+                                task.conn,
+                                task.owner
+                            )
+
+                            table.insert(S.tasks, S.taskIdx, plan)
+                        else
+                            S.currentTask = task
+                            S.taskIdx = S.taskIdx + 1
+                            self:StartTask(task)
+                            return
+                        end
+                    else
+                        S.currentTask = task
+                        S.taskIdx = S.taskIdx + 1
+                        self:StartTask(task)
+                        return
+                    end
+                end
+            else
+                if task and task.nspDuringDrag and not task.nspTempThread then
+                    self:NP_ClearGlobalDrag(true)
+                end
+
+                S.taskIdx = S.taskIdx + 1
+            end
+        end
+
+        if S.limitReturnPending then
+            S.limitReturnPending = false
+            S.phase = "limitWait"
+            S.limitWaitTimer = 0
+            S.completeTimer = 0
+            return
+        end
+
+        S.phase = "instanceComplete"
+        S.completeTimer = 0
+    end
+
+    function PATCH:CheckPointLimit()
+        local S = self.S
+        local t = S.currentTask
+
+        if t and t.nspTempThread then
+            return false
+        end
+
+        if S.phase == "task" and t and t.nspDuringDrag and not t.nspDragEnd then
+            return false
+        end
+
+        if ORIG.CheckPointLimit then
+            return ORIG.CheckPointLimit(self)
+        end
+
+        return false
+    end
+
+    function PATCH:ClearAllVisuals()
+        local S = self.S
+
+        self:NP_ClearGlobalDrag(false)
+        self:NP_ClearTempOwners()
+
+        if S.currentTask and S.currentTask.nspDragTextures then
+            self:RecycleTextures(S.currentTask.nspDragTextures)
+            S.currentTask.nspDragTextures = nil
+        end
+
+        for _, task in ipairs(S.tasks) do
+            if task.nspDragTextures then
+                self:RecycleTextures(task.nspDragTextures)
+                task.nspDragTextures = nil
+            end
+        end
+
+        S.nspFrameCache = nil
+        S.nspSupportCache = nil
+        S.nspLastRoute = nil
+
+        if ORIG.ClearAllVisuals then
+            ORIG.ClearAllVisuals(self)
+        end
+    end
+
+    function PATCH:OnSpiderClick(button)
+        if button ~= "RightButton" then
+            local S = self.S
+
+            self:NP_ClearGlobalDrag(false)
+            self:NP_ClearTempOwners()
+
+            if S.currentTask and S.currentTask.nspDragTextures then
+                self:RecycleTextures(S.currentTask.nspDragTextures)
+                S.currentTask.nspDragTextures = nil
+            end
+
+            for _, task in ipairs(S.tasks) do
+                if task.nspDragTextures then
+                    self:RecycleTextures(task.nspDragTextures)
+                    task.nspDragTextures = nil
+                end
+            end
+
+            S.nspFrameCache = nil
+            S.nspSupportCache = nil
+            S.nspLastRoute = nil
+        end
+
+        if ORIG.OnSpiderClick then
+            ORIG.OnSpiderClick(self, button)
+        end
+    end
+
+    for k, v in pairs(PATCH) do
+        if type(v) == "function" then
+            NSPauk[k] = v
+            if NSPauk.BaseMethods then
+                NSPauk.BaseMethods[k] = v
+            end
+        end
+    end
+
+    if NSPauk.F_HIGH and NSPauk.F_HIGH.HookScript then
+        NSPauk.F_HIGH:HookScript("OnUpdate", function()
+            NSPauk:NP_PostUpdate()
+        end)
+    end
+
+    if type(SlashCmdList) == "table" then
+        local cmdName = "NSPAUKCRAWLDEBUG"
+        if not SlashCmdList[cmdName] then
+            SlashCmdList[cmdName] = function()
+                NSPauk:NP_DebugPrint()
+            end
+
+            if _G then
+                _G["SLASH_" .. cmdName .. "1"] = "/nspmap"
+                _G["SLASH_" .. cmdName .. "2"] = "/paukmap"
+            end
+        end
+    end
+end
+
+
+
+
+
+
+do
+    if not NSPauk.__nspMapCrawlPatch then
+        return
+    end
+
+    if NSPauk.__nspMapCrawlPatch2 then
+        return
+    end
+    NSPauk.__nspMapCrawlPatch2 = true
+
+    local function copyPoint(p)
+        if not p then
+            return { x = 0, y = 0 }
+        end
+        return { x = p.x or 0, y = p.y or 0 }
+    end
+
+    function NSPauk:NP_MakeStartDragTask(plan, anchor)
+        local finalThread = plan.finalThread
+        if not finalThread then
+            finalThread = {
+                p0 = copyPoint(anchor),
+                p1 = copyPoint(plan.p1),
+                p2 = copyPoint(plan.p2),
+            }
+        end
+
+        local task = {
+            kind = "travel",
+            nspStartDragTask = true,
+            nspDuringDrag = true,
+            nspNoInsert = true,
+            nspNoSupportCheck = true,
+            drop = false,
+            p0 = { x = anchor.x or 0, y = anchor.y or 0 },
+            p1 = { x = anchor.x or 0, y = anchor.y or 0 },
+            p2 = { x = anchor.x or 0, y = anchor.y or 0 },
+            owner = plan.owner,
+            conn = plan.conn,
+            finalThread = finalThread,
+            isCross = plan.isCross,
+            isMain = plan.isMain,
+        }
+
+        return task
+    end
+
+    function NSPauk:NP_ExecutePlan(task)
+        local S = self.S
+        if not task then
+            return 0
+        end
+
+        local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+        local insertIndex = S.taskIdx
+        local inserted = 0
+
+        local function insert(t)
+            if t then
+                table.insert(S.tasks, insertIndex, t)
+                insertIndex = insertIndex + 1
+                inserted = inserted + 1
+            end
+        end
+
+        -- Если под пауком нет опоры, сначала падаем вниз, затем повторяем план.
+        if not task.nspTempThread and not task.nspAllowNoSupport and not self:NP_HasSupportAt(from.x, from.y) then
+            insert(self:NP_MakeTempDropTask(from, self:NP_FindFallTarget(from.x, from.y)))
+
+            local copy = self:NP_CopyPlanTask(task)
+            copy.nspAllowNoSupport = true
+            insert(copy)
+
+            return inserted
+        end
+
+        local function insertRoute(fromPoint, toPoint, dragMode, plan)
+            local route = self:NP_BuildRoute(fromPoint, toPoint)
+
+            -- Если граф не нашёл маршрут, пробуем безопасно спуститься на нижний край экрана.
+            if (not route or not route.points or #route.points < 2) and (fromPoint.y or 0) > 2 then
+                local drop = self:NP_MakeTempDropTask(fromPoint, { x = fromPoint.x, y = 0 })
+                if dragMode then
+                    drop.nspDuringDrag = true
+                end
+
+                insert(drop)
+
+                fromPoint = { x = fromPoint.x, y = 0 }
+                route = self:NP_BuildRoute(fromPoint, toPoint)
+            end
+
+            local made = 0
+
+            if route and route.points and #route.points >= 2 then
+                for i = 1, #route.points - 1 do
+                    local ct = self:NP_MakeCrawlTask(route.points[i], route.points[i + 1], plan)
+                    if dragMode then
+                        ct.nspDuringDrag = true
+                    end
+
+                    insert(ct)
+                    made = made + 1
+                end
+
+                if route.dropToTarget then
+                    local dropFrom = route.dropFrom or { x = toPoint.x, y = S.SH or 0 }
+                    local dropDist = math.abs((dropFrom.y or 0) - toPoint.y)
+
+                    if dropDist > 2 then
+                        local drop = self:NP_MakeTempDropTask(dropFrom, toPoint)
+                        if dragMode then
+                            drop.nspDuringDrag = true
+                        end
+
+                        insert(drop)
+                        made = made + 1
+                    else
+                        local ct = self:NP_MakeCrawlTask(dropFrom, toPoint, plan)
+                        if dragMode then
+                            ct.nspDuringDrag = true
+                        end
+
+                        insert(ct)
+                        made = made + 1
+                    end
+                end
+            else
+                -- Аварийный fallback, чтобы не застрять навсегда.
+                local direct = self:NP_MakeCrawlTask(fromPoint, toPoint, plan)
+                direct.nspNoSupportCheck = true
+
+                if dragMode then
+                    direct.nspDuringDrag = true
+                end
+
+                insert(direct)
+                made = made + 1
+            end
+
+            return made
+        end
+
+        if task.nspDrag then
+            -- Обязательно чистим старое перетаскивание, если план перестраивается.
+            self:NP_ClearGlobalDrag(false)
+
+            local anchor = (task.finalThread and task.finalThread.p0) or task.p0
+            local target = (task.finalThread and task.finalThread.p2) or task.p2
+
+            anchor = { x = anchor.x or 0, y = anchor.y or 0 }
+            target = { x = target.x or 0, y = target.y or 0 }
+
+            -- Сначала паук должен добраться до стартовой точки p0 БЕЗ натянутой нити.
+            local dx = from.x - anchor.x
+            local dy = from.y - anchor.y
+
+            if dx * dx + dy * dy > 9 then
+                insertRoute(from, anchor, false, task)
+            end
+
+            -- Только теперь включаем перетаскивание.
+            insert(self:NP_MakeStartDragTask(task, anchor))
+
+            -- Затем паук тащит нить к конечной точке p2.
+            insertRoute(anchor, target, true, task)
+
+            if inserted > 0 then
+                local last = S.tasks[insertIndex - 1]
+                if last then
+                    last.nspDragEnd = true
+                    last.nspDuringDrag = true
+                end
+            end
+
+            return inserted
+        end
+
+        -- Обычный travel-plan.
+        local to = task.p2 and { x = task.p2.x, y = task.p2.y } or { x = from.x, y = from.y }
+        insertRoute(from, to, false, task)
+
+        return inserted
+    end
+
+    function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
+        local S = self.S
+        local C = self.C
+
+        if not list or not anchor or not current then
+            return
+        end
+
+        if not S.activeFrame then
+            return
+        end
+
+        local dx = current.x - anchor.x
+        local dy = current.y - anchor.y
+        local len = math.sqrt(dx * dx + dy * dy)
+
+        if len < 1 then
+            for i = 1, #list do
+                list[i]:Hide()
+            end
+            return
+        end
+
+        local webSize = tonumber(C.WEB_SIZE) or 2
+        local alpha = tonumber(C.WEB_ALPHA) or 0.55
+
+        -- Желаемый шаг для сплошной динамической дуги.
+        local step = math.max(1, webSize * 0.65)
+
+        local count = math.floor(len / step) + 1
+        if count < 2 then
+            count = 2
+        end
+
+        -- Увеличен лимит, чтобы обычные экранные диагонали не резались до пунктира.
+        local cap = vertical and 700 or 2200
+        if count > cap then
+            count = cap
+        end
+
+        while #list < count do
+            local tex
+
+            if #S.webPool > 0 then
+                tex = table.remove(S.webPool)
+                if tex then
+                    tex._nspInPool = false
+                end
+            else
+                tex = S.activeFrame:CreateTexture(nil, "OVERLAY")
+                if tex then
+                    S.webCreated = (S.webCreated or 0) + 1
+                end
+            end
+
+            if not tex then
+                count = #list
+                break
+            end
+
+            tex:SetTexture(C.TEX_WEB)
+            tex:SetDrawLayer("OVERLAY")
+            tex:SetVertexColor(1, 1, 1, 1)
+            tex:SetWidth(webSize)
+            tex:SetHeight(webSize)
+
+            list[#list + 1] = tex
+        end
+
+        if count < 2 then
+            for i = 1, #list do
+                list[i]:Hide()
+            end
+            return
+        end
+
+        local actualStep = len / (count - 1)
+
+        -- Если точек всё-таки не хватает, увеличиваем размер текстуры,
+        -- чтобы соседние точки перекрывались и линия не была пунктирной.
+        local drawSize = math.max(webSize, actualStep * 1.35)
+
+        local p1
+        if vertical then
+            p1 = { x = anchor.x, y = (anchor.y + current.y) / 2 }
+        else
+            local sag = len * 0.10
+            if sag < 2 then
+                sag = 2
+            end
+
+            p1 = {
+                x = (anchor.x + current.x) / 2,
+                y = (anchor.y + current.y) / 2 - sag,
+            }
+        end
+
+        for i = 1, #list do
+            local tex = list[i]
+
+            if i <= count then
+                local t = (i - 1) / (count - 1)
+
+                local x = self:Bz(t, anchor.x, p1.x, current.x)
+                local y = self:Bz(t, anchor.y, p1.y, current.y)
+
+                tex:ClearAllPoints()
+                tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+                tex:SetWidth(drawSize)
+                tex:SetHeight(drawSize)
+                tex:SetAlpha(alpha)
+                tex:Show()
+            else
+                tex:Hide()
+            end
+        end
+    end
+
+    local OLD_StartTask = NSPauk.StartTask
+
+    function NSPauk:StartTask(task)
+        if OLD_StartTask then
+            OLD_StartTask(self, task)
+        end
+
+        if task and task.nspStartDragTask then
+            self:NP_StartDrag(task)
+        end
+    end
+
+    if NSPauk.BaseMethods then
+        NSPauk.BaseMethods.NP_MakeStartDragTask = NSPauk.NP_MakeStartDragTask
+        NSPauk.BaseMethods.NP_ExecutePlan = NSPauk.NP_ExecutePlan
+        NSPauk.BaseMethods.NP_UpdateDragTextures = NSPauk.NP_UpdateDragTextures
+        NSPauk.BaseMethods.StartTask = NSPauk.StartTask
+    end
+end
