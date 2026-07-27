@@ -6894,23 +6894,6 @@ function NSPauk:PickLimitCocoonVictim(items)
     return cand[math.random(1, #cand)]
 end
 
-function NSPauk:PickWebHub(items)
-    if not items or #items == 0 then
-        return nil
-    end
-
-    local mode = math.random(1, 2)
-
-    if mode == 1 then
-        local hub = self:PickCentralHub(items)
-        if hub then
-            return hub
-        end
-    end
-
-    return items[math.random(1, #items)]
-end
-
 function NSPauk:PickWebTargets(hub, items, targetCount)
     local candidates = {}
 
@@ -6950,7 +6933,261 @@ function NSPauk:PickWebTargets(hub, items, targetCount)
     return candidates
 end
 
--- Новый старт паутины по новой логике.
+NSPauk.DefaultConstants.WEB_THREAD_MIN_SEPARATION = 20
+NSPauk.DefaultConstants.WEB_HUB_IGNORE_DIST = 100
+NSPauk.DefaultConstants.WEB_TARGET_REROLL_ATTEMPTS = 8
+
+NSPauk.C.WEB_THREAD_MIN_SEPARATION = tonumber(NSPauk.C.WEB_THREAD_MIN_SEPARATION) or 20
+NSPauk.C.WEB_HUB_IGNORE_DIST = tonumber(NSPauk.C.WEB_HUB_IGNORE_DIST) or 100
+NSPauk.C.WEB_TARGET_REROLL_ATTEMPTS = tonumber(NSPauk.C.WEB_TARGET_REROLL_ATTEMPTS) or 8
+
+function NSPauk:PickWebHub(items)
+    if not items or #items == 0 then
+        return nil
+    end
+
+    local mode = math.random(1, 2)
+
+    if mode == 1 then
+        local hub = self:PickCentralHub(items)
+        if hub then
+            return hub
+        end
+    end
+
+    return items[math.random(1, #items)]
+end
+
+function NSPauk:SampleThreadPoints(thread, ignoreHubDist)
+    local points = {}
+
+    if not thread then
+        return points
+    end
+
+    local samples, total = self:BuildArcSamples(thread)
+
+    if not total or total <= 0 then
+        return points
+    end
+
+    if type(ignoreHubDist) ~= "number" or ignoreHubDist ~= ignoreHubDist or ignoreHubDist < 0 then
+        ignoreHubDist = 0
+    end
+
+    if total <= ignoreHubDist then
+        return points
+    end
+
+    local step = 6
+
+    local temp = {
+        arcSamples = samples,
+        arcLength = total,
+    }
+
+    local len = ignoreHubDist
+
+    while len <= total do
+        local t = self:ThreadTAtLength(temp, len)
+
+        if t then
+            local x, y = self:BzThread(thread, t)
+            points[#points + 1] = { x = x, y = y }
+        end
+
+        len = len + step
+    end
+
+    local x, y = self:BzThread(thread, 1)
+    local last = points[#points]
+
+    if not last or math.abs(last.x - x) > 0.5 or math.abs(last.y - y) > 0.5 then
+        points[#points + 1] = { x = x, y = y }
+    end
+
+    return points
+end
+
+function NSPauk:GetThreadCollisionPoints(thread, ignoreHubDist)
+    if not thread then
+        return {}
+    end
+
+    if thread._nspColPts and thread._nspColIgnore == ignoreHubDist then
+        return thread._nspColPts
+    end
+
+    local pts = self:SampleThreadPoints(thread, ignoreHubDist)
+
+    thread._nspColPts = pts
+    thread._nspColIgnore = ignoreHubDist
+
+    return pts
+end
+
+function NSPauk:ThreadsTooClose(threadA, threadB, minDist, ignoreHubDist)
+    if not threadA or not threadB then
+        return false
+    end
+
+    if type(minDist) ~= "number" or minDist ~= minDist or minDist <= 0 then
+        return false
+    end
+
+    local ptsA = self:GetThreadCollisionPoints(threadA, ignoreHubDist)
+    local ptsB = self:GetThreadCollisionPoints(threadB, ignoreHubDist)
+
+    if #ptsA == 0 or #ptsB == 0 then
+        return false
+    end
+
+    local min2 = minDist * minDist
+
+    for _, a in ipairs(ptsA) do
+        for _, b in ipairs(ptsB) do
+            local dx = a.x - b.x
+            local dy = a.y - b.y
+
+            if (dx * dx + dy * dy) < min2 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+function NSPauk:CreateInstance(hub, candidates, targetCount)
+    local inst = {
+        id = self.nextInstanceId,
+        hub = {
+            frame = hub.frame,
+            name = hub.name,
+            rect = self:CopyRect(hub),
+        },
+        conns = {},
+        crossSegs = {},
+        interSegs = {},
+        crossRowsList = {},
+        tasks = {},
+        crossRows = 0,
+        anchorCandidates = {},
+        drawnPoints = 0,
+        settled = false,
+    }
+
+    self.nextInstanceId = self.nextInstanceId + 1
+
+    local seenAnchors = {}
+
+    local function addAnchor(rect)
+        local key = (rect.frame and tostring(rect.frame)) or rect.name
+
+        if not key then
+            key = tostring(rect.left) .. ":" .. tostring(rect.top)
+        end
+
+        if not seenAnchors[key] then
+            seenAnchors[key] = true
+            inst.anchorCandidates[#inst.anchorCandidates + 1] = rect
+        end
+    end
+
+    addAnchor(inst.hub.rect)
+
+    local made = 0
+    local acceptedThreads = {}
+
+    local minDist = tonumber(self.C.WEB_THREAD_MIN_SEPARATION)
+    if type(minDist) ~= "number" or minDist ~= minDist or minDist < 0 then
+        minDist = 20
+    end
+
+    local ignoreHub = tonumber(self.C.WEB_HUB_IGNORE_DIST)
+    if type(ignoreHub) ~= "number" or ignoreHub ~= ignoreHub or ignoreHub < 0 then
+        ignoreHub = 100
+    end
+
+    local maxAttempts = tonumber(self.C.WEB_TARGET_REROLL_ATTEMPTS)
+    if type(maxAttempts) ~= "number" or maxAttempts ~= maxAttempts or maxAttempts < 1 then
+        maxAttempts = 8
+    end
+
+    for _, cand in ipairs(candidates) do
+        if targetCount and made >= targetCount then
+            break
+        end
+
+        local target = cand.item
+
+        if target then
+            for _ = 1, maxAttempts do
+                local thread = self:MakeRadialThread(inst.hub.rect, target, 1, 1)
+
+                if not thread then
+                    break
+                end
+
+                local conflict = false
+
+                for _, otherThread in ipairs(acceptedThreads) do
+                    if self:ThreadsTooClose(thread, otherThread, minDist, ignoreHub) then
+                        conflict = true
+                        break
+                    end
+                end
+
+                if not conflict then
+                    local conn = {
+                        id = #inst.conns + 1,
+                        target = {
+                            frame = target.frame,
+                            name = target.name,
+                            rect = self:CopyRect(target),
+                        },
+                        thread = thread,
+                        angle = thread.angle,
+                        textures = {},
+                        alive = true,
+                        arcSamples = nil,
+                        arcLength = 0,
+                    }
+
+                    thread.ownerRef = {
+                        inst = inst,
+                        conn = conn,
+                    }
+
+                    inst.conns[#inst.conns + 1] = conn
+                    acceptedThreads[#acceptedThreads + 1] = thread
+
+                    made = made + 1
+                    addAnchor(self:CopyRect(target))
+
+                    break
+                end
+            end
+        end
+    end
+
+    if #inst.conns == 0 then
+        return nil
+    end
+
+    table.sort(inst.conns, function(a, b)
+        return a.angle < b.angle
+    end)
+
+    for i, conn in ipairs(inst.conns) do
+        conn.id = i
+    end
+
+    self:BuildInstanceTasks(inst)
+
+    return inst
+end
+
 function NSPauk:StartNewInstance(preferredHub)
     local S = self.S
     local C = self.C
@@ -6963,7 +7200,6 @@ function NSPauk:StartNewInstance(preferredHub)
 
     local items = self:CollectVisibleItems()
 
-    -- Сначала пробуем кокон.
     if math.random() < C.COCOON_CHANCE then
         local victim = self:PickCocoonVictim(items)
 
@@ -6973,29 +7209,30 @@ function NSPauk:StartNewInstance(preferredHub)
         end
     end
 
-    -- Выбираем основной фрейм паутины.
     local hub = self:PickWebHub(items)
 
-    -- Если хаб вдруг уже невалиден, считаем что его нет.
     if hub and hub.frame and not self:ValidateAnchorRect(hub) then
         hub = nil
     end
 
-    -- Сколько нитей хотим в этот раз.
     local targetCount = self:RandomInt(C.TARGET_COUNT_MIN, C.TARGET_COUNT_MAX)
 
-    -- Выбираем вторичные фреймы.
     local candidates = {}
+
     if hub then
-        candidates = self:PickWebTargets(hub, items, targetCount)
+        candidates = self:CollectTargetCandidates(hub, items)
     end
 
-    -- Если не нашли хаб или цели, уходим в статический fallback.
     if not hub or #candidates == 0 then
         hub, candidates, targetCount = self:FallbackHubAndTargets()
     end
 
     local inst = self:CreateInstance(hub, candidates, targetCount)
+
+    if not inst or #inst.conns == 0 then
+        hub, candidates, targetCount = self:FallbackHubAndTargets()
+        inst = self:CreateInstance(hub, candidates, targetCount)
+    end
 
     if not inst or #inst.conns == 0 then
         S.phase = "watch"
@@ -7731,102 +7968,6 @@ function NSPauk:BuildInstanceTasks(inst)
 
   inst.tasks = tasks
 end
-
-function NSPauk:CreateInstance(hub, candidates, targetCount)
-  local inst = {
-    id = self.nextInstanceId,
-    hub = {
-      frame = hub.frame,
-      name = hub.name,
-      rect = self:CopyRect(hub),
-    },
-    conns = {},
-    crossSegs = {},
-    interSegs = {},
-    crossRowsList = {},
-    tasks = {},
-    crossRows = 0,
-    anchorCandidates = {},
-    drawnPoints = 0,
-    settled = false,
-  }
-
-  self.nextInstanceId = self.nextInstanceId + 1
-
-  local seenAnchors = {}
-
-  local function addAnchor(rect)
-    local key = (rect.frame and tostring(rect.frame)) or rect.name
-
-    if not key then
-      key = tostring(rect.left) .. ":" .. tostring(rect.top)
-    end
-
-    if not seenAnchors[key] then
-      seenAnchors[key] = true
-      inst.anchorCandidates[#inst.anchorCandidates + 1] = rect
-    end
-  end
-
-  addAnchor(inst.hub.rect)
-
-  local made = 0
-
-  for _, cand in ipairs(candidates) do
-    if targetCount and made >= targetCount then
-      break
-    end
-
-    local target = cand.item
-    local thread = self:MakeRadialThread(inst.hub.rect, target, 1, 1)
-
-    if thread then
-      local conn = {
-        id = #inst.conns + 1,
-        target = {
-          frame = target.frame,
-          name = target.name,
-          rect = self:CopyRect(target),
-        },
-        thread = thread,
-        angle = thread.angle,
-        textures = {},
-        alive = true,
-        arcSamples = nil,
-        arcLength = 0,
-      }
-
-      thread.ownerRef = {
-        inst = inst,
-        conn = conn,
-      }
-
-      inst.conns[#inst.conns + 1] = conn
-
-      made = made + 1
-
-      addAnchor(self:CopyRect(target))
-    end
-  end
-
-  if #inst.conns == 0 then
-    return nil
-  end
-
-  table.sort(inst.conns, function(a, b)
-    return a.angle < b.angle
-  end)
-
-  for i, conn in ipairs(inst.conns) do
-    conn.id = i
-  end
-
-  self:BuildInstanceTasks(inst)
-
-  return inst
-end
-
-
 
 function NSPauk:EllipsePoint(cx, cy, a, b, ang)
   return cx + a * math.cos(ang), cy + b * math.sin(ang)
