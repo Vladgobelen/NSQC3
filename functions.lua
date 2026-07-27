@@ -6633,67 +6633,79 @@ function NSPauk:IsGoodAnchorName(name)
 end
 
 function NSPauk:MakeSag(thread, mode, hubX, hubY)
+    if not thread or not thread.p0 or not thread.p2 then
+        return
+    end
+
     local C = self.C
+    local D = self.DefaultConstants
 
     local p0 = thread.p0
     local p2 = thread.p2
 
     local dx = p2.x - p0.x
     local dy = p2.y - p0.y
-
     local len = math.sqrt(dx * dx + dy * dy)
 
     local mx = (p0.x + p2.x) / 2
     local my = (p0.y + p2.y) / 2
 
+    -- Для очень коротких нитей тоже задаем минимальный провис вниз.
     if len < 1 then
-        thread.p1 = { x = mx, y = my }
+        thread.p1 = {
+            x = mx,
+            y = my - 0.5,
+        }
         return
     end
+
+    local minSag
+    local maxSag
+    local jitter
 
     if mode == "main" then
-        local ratio = self:RandomFloat(C.MAIN_SAG_MIN, C.MAIN_SAG_MAX)
-
-        thread.p1 = {
-            x = mx + (math.random() - 0.5) * len * 0.06,
-            y = my - len * ratio,
-        }
-
-        return
-    end
-
-    local minSag, maxSag
-
-    if mode == "cross" then
-        minSag = C.CROSS_SAG_MIN
-        maxSag = C.CROSS_SAG_MAX
+        minSag = C.MAIN_SAG_MIN or D.MAIN_SAG_MIN
+        maxSag = C.MAIN_SAG_MAX or D.MAIN_SAG_MAX
+        jitter = 0.06
+    elseif mode == "cross" then
+        minSag = C.CROSS_SAG_MIN or D.CROSS_SAG_MIN
+        maxSag = C.CROSS_SAG_MAX or D.CROSS_SAG_MAX
+        jitter = 0.08
     else
-        minSag = C.INTERCROSS_SAG_MIN
-        maxSag = C.INTERCROSS_SAG_MAX
+        minSag = C.INTERCROSS_SAG_MIN or D.INTERCROSS_SAG_MIN
+        maxSag = C.INTERCROSS_SAG_MAX or D.INTERCROSS_SAG_MAX
+        jitter = 0.08
     end
 
     local ratio = self:RandomFloat(minSag, maxSag)
 
-    local px = -dy / len
-    local py = dx / len
-
-    local outX = mx - (hubX or 0)
-    local outY = my - (hubY or 0)
-
-    local sign = 1
-
-    if px * outX + py * outY < 0 then
-        sign = -1
+    if type(ratio) ~= "number" or ratio ~= ratio or ratio <= 0 then
+        ratio = 0.10
     end
 
-    if outX == 0 and outY == 0 then
-        sign = (math.random() < 0.5) and -1 or 1
+    local sag = len * ratio
+
+    if type(sag) ~= "number" or sag ~= sag or sag <= 0 then
+        sag = math.max(len * 0.10, 0.5)
+    elseif sag < 0.5 then
+        sag = 0.5
     end
 
+    -- Небольшое горизонтальное отклонение, чтобы нити не выглядели одинаково.
+    local offsetX = (math.random() - 0.5) * len * jitter
+
+    -- В координатах WoW UI низ экрана имеет меньшее значение Y,
+    -- поэтому провис всегда делается через вычитание из средней точки.
     thread.p1 = {
-        x = mx + px * sign * len * ratio,
-        y = my + py * sign * len * ratio,
+        x = mx + offsetX,
+        y = my - sag,
     }
+
+    -- Дополнительная страховка: средняя точка никогда не должна быть выше
+    -- геометрической середины нити.
+    if thread.p1.y >= my then
+        thread.p1.y = my - sag
+    end
 end
 
 function NSPauk:BuildArcSamples(thread)
