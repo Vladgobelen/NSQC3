@@ -13277,14 +13277,51 @@ end
 
 
 do
-    if not NSPauk.__nspMapCrawlPatch or not NSPauk.__nspMapCrawlPatch2 then
+    if not NSPauk.__nspMapCrawlPatch then
         return
     end
 
-    if NSPauk.__nspMapCrawlPatch3 then
+    if NSPauk.__nspMapCrawlPatch5 then
         return
     end
-    NSPauk.__nspMapCrawlPatch3 = true
+    NSPauk.__nspMapCrawlPatch5 = true
+
+    ---------------------------------------------------------------------------
+    -- Быстрое аварийное падение без создания паутины
+    ---------------------------------------------------------------------------
+
+    function NSPauk:NP_MakeFallTask(from, to)
+        local fromC = { x = from.x or 0, y = from.y or 0 }
+        local toY = tonumber(to and to.y) or 0
+
+        if toY > fromC.y - 1 then
+            toY = math.max(0, fromC.y - 1)
+        end
+
+        local toC = { x = fromC.x, y = toY }
+
+        local task = {
+            kind = "travel",
+            nspFall = true,
+            nspNoSupportCheck = true,
+            nspNoInsert = true,
+            drop = false,
+            p0 = { x = fromC.x, y = fromC.y },
+            p1 = { x = fromC.x, y = (fromC.y + toC.y) / 2 },
+            p2 = { x = toC.x, y = toC.y },
+        }
+
+        return task
+    end
+
+    -- Старые вызовы NP_MakeTempDropTask теперь становятся быстрым падением.
+    function NSPauk:NP_MakeTempDropTask(from, to)
+        return self:NP_MakeFallTask(from, to)
+    end
+
+    ---------------------------------------------------------------------------
+    -- Свежая проверка опоры
+    ---------------------------------------------------------------------------
 
     function NSPauk:NP_FreshHasSupportAt(x, y)
         local gap = self:NP_GetGap()
@@ -13305,6 +13342,7 @@ do
         end
 
         local checked = 0
+        local found = false
 
         local function checkThread(thread, owner)
             if not thread or not thread.p0 or not thread.p2 then
@@ -13331,10 +13369,15 @@ do
                     if conn.alive and conn.thread then
                         checked = checked + 1
                         if checkThread(conn.thread, conn) then
-                            return true
+                            found = true
+                            break
                         end
                     end
                 end
+            end
+
+            if found then
+                break
             end
 
             if inst.crossSegs then
@@ -13342,15 +13385,20 @@ do
                     if seg.alive and seg.thread then
                         checked = checked + 1
                         if checkThread(seg.thread, seg) then
-                            return true
+                            found = true
+                            break
                         end
                     end
                 end
             end
 
-            if checked >= 80 then
+            if found or checked >= 80 then
                 break
             end
+        end
+
+        if found then
+            return true
         end
 
         if x <= gap or x >= sw - gap or y <= gap or y >= sh - gap then
@@ -13360,13 +13408,16 @@ do
         return false
     end
 
+    ---------------------------------------------------------------------------
+    -- Поиск ближайшей опоры ниже
+    ---------------------------------------------------------------------------
+
     function NSPauk:NP_FindFallTarget(x, y)
         local gap = self:NP_GetGap()
 
         local bestY = -math.huge
         local best = { x = x, y = 0, kind = "edge", name = "край экрана" }
 
-        -- Свежая проверка видимых фреймов, чтобы не падать на скрытые/исчезнувшие прямоугольники.
         local rects = self:NP_EnsureFrameCache()
         for _, r in ipairs(rects) do
             if r.frame then
@@ -13387,7 +13438,6 @@ do
             end
         end
 
-        -- Живая нарисованная паутина.
         local checked = 0
 
         local function consider(thread, owner)
@@ -13448,118 +13498,310 @@ do
         return best
     end
 
+    ---------------------------------------------------------------------------
+    -- Проверка, есть ли опора рядом, чтобы разрешать короткие переходы
+    ---------------------------------------------------------------------------
+
+    function NSPauk:NP_NearSupportWithin(x, y, tol)
+        local S = self.S
+
+        if type(tol) ~= "number" or tol ~= tol or tol < 0 then
+            tol = self:NP_GetGap()
+        end
+
+        local now = GetTime()
+        local rx = math.floor((x or 0) / 3 + 0.5)
+        local ry = math.floor((y or 0) / 3 + 0.5)
+        local rt = math.floor(tol + 0.5)
+
+        local cache = S.nspNearCache
+        if cache
+            and now - (cache.t or 0) < 0.10
+            and cache.x == rx
+            and cache.y == ry
+            and cache.tol == rt then
+            return cache.ok
+        end
+
+        local ok = false
+        local sw, sh = self:GetScreenSize()
+        local gap = self:NP_GetGap()
+        local edgeTol = math.min(tol, gap)
+
+        if x <= edgeTol or x >= sw - edgeTol or y <= edgeTol or y >= sh - edgeTol then
+            ok = true
+        end
+
+        if not ok then
+            local rects = self:NP_EnsureFrameCache()
+            for _, r in ipairs(rects) do
+                if r.frame then
+                    local cur = self:ComputeFrameVisibleInner(r.frame)
+                    if cur
+                        and x >= cur.left - tol
+                        and x <= cur.right + tol
+                        and y >= cur.bottom - tol
+                        and y <= cur.top + tol then
+                        ok = true
+                        break
+                    end
+                end
+            end
+        end
+
+        if not ok then
+            local checked = 0
+            local found = false
+
+            local function checkThread(thread, owner)
+                if not thread or not thread.p0 or not thread.p2 then
+                    return false
+                end
+
+                if not owner or not owner.textures or #owner.textures == 0 then
+                    return false
+                end
+
+                if self:ThreadNearMouse(thread, x, y, tol) then
+                    local d = self:DistToThread(thread, x, y)
+                    if d <= tol then
+                        return true
+                    end
+                end
+
+                return false
+            end
+
+            for _, inst in ipairs(S.instances) do
+                if inst.conns then
+                    for _, conn in ipairs(inst.conns) do
+                        if conn.alive and conn.thread then
+                            checked = checked + 1
+                            if checkThread(conn.thread, conn) then
+                                found = true
+                                break
+                            end
+                        end
+                    end
+                end
+
+                if found then
+                    break
+                end
+
+                if inst.crossSegs then
+                    for _, seg in ipairs(inst.crossSegs) do
+                        if seg.alive and seg.thread then
+                            checked = checked + 1
+                            if checkThread(seg.thread, seg) then
+                                found = true
+                                break
+                            end
+                        end
+                    end
+                end
+
+                if found or checked >= 80 then
+                    break
+                end
+            end
+
+            if found then
+                ok = true
+            end
+        end
+
+        S.nspNearCache = {
+            t = now,
+            x = rx,
+            y = ry,
+            tol = rt,
+            ok = ok,
+        }
+
+        return ok
+    end
+
+    ---------------------------------------------------------------------------
+    -- IsTaskValid: crawl-задача становится невалидной при потере опоры
+    ---------------------------------------------------------------------------
+
+    local OLD_IsTaskValid = NSPauk.IsTaskValid
+
+    function NSPauk:IsTaskValid(task)
+        local ok = false
+
+        if OLD_IsTaskValid then
+            ok = OLD_IsTaskValid(self, task)
+        end
+
+        if not ok then
+            return false
+        end
+
+        if task and task.nspCrawl and not task.nspNoSupportCheck then
+            local S = self.S
+
+            if S.spider and S.spider:IsShown() then
+                local gap = self:NP_GetGap()
+                local x = S.lastSpiderX or 0
+                local y = S.lastSpiderY or 0
+
+                local hasExact = false
+                if self.NP_HasSupportAt then
+                    hasExact = self:NP_HasSupportAt(x, y)
+                end
+
+                if not hasExact and not self:NP_NearSupportWithin(x, y, gap * 1.5) then
+                    return false
+                end
+            end
+        end
+
+        return true
+    end
+
+    ---------------------------------------------------------------------------
+    -- StartTask: быстрое падение
+    ---------------------------------------------------------------------------
+
+    local OLD_StartTask = NSPauk.StartTask
+
+    function NSPauk:StartTask(task)
+        if OLD_StartTask then
+            OLD_StartTask(self, task)
+        end
+
+        if task and task.nspFall then
+            local S = self.S
+            local C = self.C
+
+            if S.spider and S.spider:IsShown() then
+                task.p0 = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+
+                if task.p2.y > task.p0.y - 1 then
+                    task.p2 = { x = task.p0.x, y = math.max(0, task.p0.y - 1) }
+                else
+                    task.p2 = { x = task.p0.x, y = task.p2.y }
+                end
+
+                task.p1 = { x = task.p0.x, y = (task.p0.y + task.p2.y) / 2 }
+            end
+
+            local len = self:ApproxThreadLength(task)
+            task.pathLength = len
+
+            if len < 1 then
+                len = 1
+            end
+
+            local fallMult = math.max(3, (tonumber(C.TRAVEL_SPEED_MULT) or 6) * 0.8)
+            local speed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX) * fallMult
+
+            if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
+                speed = speed * C.FAST_MODE
+            end
+
+            if speed <= 0 then
+                speed = 1
+            end
+
+            S.moveDur = len / speed
+            if S.moveDur < 0.05 then
+                S.moveDur = 0.05
+            end
+
+            S.moveT = 0
+            S.lastTaskT = 0
+
+            self:PutSpider(task.p0.x, task.p0.y)
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- NP_ExecutePlan:
+    -- 1. перед планом проверяем свежую опору;
+    -- 2. если опоры нет, быстро падаем;
+    -- 3. поддерживаем продолжение перетаскивания после падения.
+    ---------------------------------------------------------------------------
+
+    local OLD_NP_ExecutePlan = NSPauk.NP_ExecutePlan
+
     function NSPauk:NP_ExecutePlan(task)
         local S = self.S
+
         if not task then
             return 0
         end
 
         local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
-        local insertIndex = S.taskIdx
-        local inserted = 0
 
-        local function insert(t)
-            if t then
-                table.insert(S.tasks, insertIndex, t)
-                insertIndex = insertIndex + 1
-                inserted = inserted + 1
-            end
-        end
+        -- Продолжение уже начатого перетаскивания после потери опоры.
+        if task.nspContinueDrag then
+            local insertIndex = S.taskIdx
+            local inserted = 0
 
-        local depth = tonumber(task.nspFallDepth) or 0
-
-        -- Если под пауком нет опоры, сначала падаем вниз.
-        -- Используем свежую проверку, чтобы не падать из-за устаревшего кэша.
-        if not task.nspTempThread and not self:NP_FreshHasSupportAt(from.x, from.y) then
-            if depth < 3 then
-                local land = self:NP_FindFallTarget(from.x, from.y)
-
-                if not land or type(land.y) ~= "number" then
-                    land = { x = from.x, y = 0, kind = "edge", name = "край экрана" }
-                elseif land.kind == "edge" and land.y >= from.y - 2 then
-                    land = { x = from.x, y = 0, kind = "edge", name = "край экрана" }
+            local function insert(t)
+                if t then
+                    table.insert(S.tasks, insertIndex, t)
+                    insertIndex = insertIndex + 1
+                    inserted = inserted + 1
                 end
+            end
 
-                insert(self:NP_MakeTempDropTask(from, land))
+            local depth = tonumber(task.nspFallDepth) or 0
+
+            if not self:NP_FreshHasSupportAt(from.x, from.y) and depth < 3 then
+                local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+                insert(fall)
 
                 local copy = self:NP_CopyPlanTask(task)
                 copy.nspFallDepth = depth + 1
-                copy.nspAllowNoSupport = nil
                 insert(copy)
 
                 return inserted
-            else
-                -- Аварийный режим: если уже несколько раз падали, но опоры нет,
-                -- спускаемся на низ экрана и дальше движемся принудительно.
-                if from.y > 2 then
-                    insert(self:NP_MakeTempDropTask(from, { x = from.x, y = 0 }))
-
-                    local copy = self:NP_CopyPlanTask(task)
-                    copy.nspFallDepth = depth + 1
-                    copy.nspAllowNoSupport = true
-                    insert(copy)
-
-                    return inserted
-                end
-
-                task.nspAllowNoSupport = true
-            end
-        end
-
-        local function insertRoute(fromPoint, toPoint, dragMode, plan)
-            local route = self:NP_BuildRoute(fromPoint, toPoint)
-
-            -- Если маршрута нет, пробуем сначала спуститься на нижний край экрана.
-            if (not route or not route.points or #route.points < 2) and (fromPoint.y or 0) > 2 then
-                local drop = self:NP_MakeTempDropTask(fromPoint, { x = fromPoint.x, y = 0 })
-                if dragMode then
-                    drop.nspDuringDrag = true
-                end
-
-                insert(drop)
-
-                fromPoint = { x = fromPoint.x, y = 0 }
-                route = self:NP_BuildRoute(fromPoint, toPoint)
             end
 
-            local made = 0
+            local target = task.p2 and { x = task.p2.x, y = task.p2.y } or { x = from.x, y = from.y }
+            local dragMode = S.nspDrag ~= nil
+
+            local route = self:NP_BuildRoute(from, target)
 
             if route and route.points and #route.points >= 2 then
                 for i = 1, #route.points - 1 do
-                    local ct = self:NP_MakeCrawlTask(route.points[i], route.points[i + 1], plan)
+                    local ct = self:NP_MakeCrawlTask(route.points[i], route.points[i + 1], task)
+
                     if dragMode then
                         ct.nspDuringDrag = true
                     end
 
                     insert(ct)
-                    made = made + 1
                 end
 
                 if route.dropToTarget then
-                    local dropFrom = route.dropFrom or { x = toPoint.x, y = S.SH or 0 }
-                    local dropDist = math.abs((dropFrom.y or 0) - toPoint.y)
+                    local dropFrom = route.dropFrom or { x = target.x, y = S.SH or 0 }
+                    local dropDist = math.abs((dropFrom.y or 0) - target.y)
 
                     if dropDist > 2 then
-                        local drop = self:NP_MakeTempDropTask(dropFrom, toPoint)
+                        local drop = self:NP_MakeTempDropTask(dropFrom, target)
+
                         if dragMode then
                             drop.nspDuringDrag = true
                         end
 
                         insert(drop)
-                        made = made + 1
                     else
-                        local ct = self:NP_MakeCrawlTask(dropFrom, toPoint, plan)
+                        local ct = self:NP_MakeCrawlTask(dropFrom, target, task)
+
                         if dragMode then
                             ct.nspDuringDrag = true
                         end
 
                         insert(ct)
-                        made = made + 1
                     end
                 end
             else
-                -- Крайний fallback, чтобы не застрять.
-                local direct = self:NP_MakeCrawlTask(fromPoint, toPoint, plan)
+                local direct = self:NP_MakeCrawlTask(from, target, task)
                 direct.nspNoSupportCheck = true
 
                 if dragMode then
@@ -13567,36 +13809,9 @@ do
                 end
 
                 insert(direct)
-                made = made + 1
             end
 
-            return made
-        end
-
-        if task.nspDrag then
-            self:NP_ClearGlobalDrag(false)
-
-            local anchor = (task.finalThread and task.finalThread.p0) or task.p0
-            local target = (task.finalThread and task.finalThread.p2) or task.p2
-
-            anchor = { x = anchor.x or 0, y = anchor.y or 0 }
-            target = { x = target.x or 0, y = target.y or 0 }
-
-            -- Сначала дойти до p0 без натянутой нити.
-            local dx = from.x - anchor.x
-            local dy = from.y - anchor.y
-
-            if dx * dx + dy * dy > 9 then
-                insertRoute(from, anchor, false, task)
-            end
-
-            -- Затем включить перетаскивание.
-            insert(self:NP_MakeStartDragTask(task, anchor))
-
-            -- Затем тащить нить к p2.
-            insertRoute(anchor, target, true, task)
-
-            if inserted > 0 then
+            if dragMode and inserted > 0 and task.nspDragEnd then
                 local last = S.tasks[insertIndex - 1]
                 if last then
                     last.nspDragEnd = true
@@ -13607,16 +13822,295 @@ do
             return inserted
         end
 
-        -- Обычный travel-plan.
-        local to = task.p2 and { x = task.p2.x, y = task.p2.y } or { x = from.x, y = from.y }
-        insertRoute(from, to, false, task)
+        -- Обычный план: сначала свежая проверка опоры.
+        if task.nspPlan and not task.nspTempThread then
+            local insertIndex = S.taskIdx
+            local inserted = 0
 
-        return inserted
+            local function insert(t)
+                if t then
+                    table.insert(S.tasks, insertIndex, t)
+                    insertIndex = insertIndex + 1
+                    inserted = inserted + 1
+                end
+            end
+
+            local depth = tonumber(task.nspFallDepth) or 0
+
+            if not task.nspAllowNoSupport and not self:NP_FreshHasSupportAt(from.x, from.y) then
+                if depth < 3 then
+                    local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+                    insert(fall)
+
+                    local copy = self:NP_CopyPlanTask(task)
+                    copy.nspFallDepth = depth + 1
+                    copy.nspAllowNoSupport = nil
+                    insert(copy)
+
+                    return inserted
+                else
+                    task.nspAllowNoSupport = true
+                end
+            end
+        end
+
+        S.nspSupportCache = nil
+
+        if OLD_NP_ExecutePlan then
+            return OLD_NP_ExecutePlan(self, task)
+        end
+
+        return 0
     end
 
+    ---------------------------------------------------------------------------
+    -- AdvanceTask:
+    -- 1. если текущая crawl-задача потеряла опору, сразу падать;
+    -- 2. если новая задача начинается без опоры, сначала падать;
+    -- 3. после падения продолжать прежнюю цель.
+    ---------------------------------------------------------------------------
+
+    function NSPauk:AdvanceTask()
+        local S = self.S
+        local old = S.currentTask
+        local gap = self:NP_GetGap()
+
+        local function makeContinueTask(task, fromPoint)
+            local to = task.p2 and { x = task.p2.x, y = task.p2.y } or { x = fromPoint.x, y = fromPoint.y }
+
+            local cont = self:NP_MakePlanTask("travel", fromPoint, to, task.conn, task.owner)
+            cont.nspFallDepth = task.nspFallDepth or 0
+
+            if task.nspDuringDrag and S.nspDrag then
+                cont.nspDrag = true
+                cont.nspContinueDrag = true
+                cont.finalThread = S.nspDrag.finalThread
+                cont.owner = S.nspDrag.owner or task.owner
+                cont.nspDragEnd = task.nspDragEnd
+            end
+
+            return cont
+        end
+
+        -- Если текущая задача ползла и вдруг потеряла опору.
+        if old
+            and old.nspCrawl
+            and not old.nspNoSupportCheck
+            and not old.nspSupportLostHandled then
+
+            local ownerAlive = not (old.owner and not old.owner.alive)
+
+            local dragOwnerAlive = not (
+                old.nspDuringDrag
+                and S.nspDrag
+                and S.nspDrag.owner
+                and not S.nspDrag.owner.alive
+            )
+
+            if ownerAlive
+                and dragOwnerAlive
+                and not self:NP_NearSupportWithin(S.lastSpiderX, S.lastSpiderY, gap * 1.5) then
+
+                old.nspSupportLostHandled = true
+
+                local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+                local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+
+                if old.nspDuringDrag then
+                    fall.nspDuringDrag = true
+                end
+
+                table.insert(S.tasks, S.taskIdx, fall)
+
+                local cont = makeContinueTask(old, { x = fall.p2.x, y = fall.p2.y })
+                table.insert(S.tasks, S.taskIdx + 1, cont)
+            end
+        end
+
+        -- Завершение или очистка перетаскивания.
+        if old and old.nspDuringDrag and not old.nspSupportLostHandled then
+            if old.nspDragEnd then
+                if S.moveT and S.moveT >= 1 and self:IsTaskValid(old) then
+                    self:NP_FinishGlobalDrag(old)
+                else
+                    self:NP_ClearGlobalDrag(true)
+                end
+            else
+                if not self:IsTaskValid(old) then
+                    self:NP_ClearGlobalDrag(true)
+                end
+            end
+        end
+
+        if old and old.nspPlan then
+            S.currentTask = nil
+        end
+
+        if S.limitReturnPending or S.phase == "limitWait" then
+            if S.limitReturnPending then
+                S.limitReturnPending = false
+                S.phase = "limitWait"
+                S.limitWaitTimer = 0
+                S.completeTimer = 0
+            end
+            return
+        end
+
+        while S.taskIdx <= #S.tasks do
+            local task = S.tasks[S.taskIdx]
+
+            if self:IsTaskValid(task) then
+                -- Проверка появления: если задача обычная, а под пауком нет опоры,
+                -- сначала быстро падаем.
+                if S.spider
+                    and S.spider:IsShown()
+                    and not task.nspPlan
+                    and not task.nspFall
+                    and not task.nspNoSupportCheck
+                    and not task.nspPreFallInserted
+                    and not self:NP_FreshHasSupportAt(S.lastSpiderX, S.lastSpiderY) then
+
+                    task.nspPreFallInserted = true
+
+                    local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+                    local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+
+                    table.insert(S.tasks, S.taskIdx, fall)
+
+                elseif task.nspPlan then
+                    S.taskIdx = S.taskIdx + 1
+                    self:NP_ExecutePlan(task)
+
+                    if S.limitReturnPending or S.phase == "limitWait" then
+                        return
+                    end
+                else
+                    if S.spider and S.spider:IsShown() and not task.nspNoInsert then
+                        local dx = task.p0.x - S.lastSpiderX
+                        local dy = task.p0.y - S.lastSpiderY
+
+                        if dx * dx + dy * dy > 100 then
+                            local plan = self:NP_MakePlanTask(
+                                "travel",
+                                { x = S.lastSpiderX, y = S.lastSpiderY },
+                                { x = task.p0.x, y = task.p0.y },
+                                task.conn,
+                                task.owner
+                            )
+
+                            table.insert(S.tasks, S.taskIdx, plan)
+                        else
+                            S.currentTask = task
+                            S.taskIdx = S.taskIdx + 1
+                            self:StartTask(task)
+                            return
+                        end
+                    else
+                        S.currentTask = task
+                        S.taskIdx = S.taskIdx + 1
+                        self:StartTask(task)
+                        return
+                    end
+                end
+            else
+                local ownerAlive = not (task.owner and not task.owner.alive)
+
+                local dragOwnerAlive = not (
+                    task.nspDuringDrag
+                    and S.nspDrag
+                    and S.nspDrag.owner
+                    and not S.nspDrag.owner.alive
+                )
+
+                if task
+                    and task.nspCrawl
+                    and not task.nspNoSupportCheck
+                    and not task.nspSupportLostConsumed
+                    and ownerAlive
+                    and dragOwnerAlive
+                    and not self:NP_NearSupportWithin(S.lastSpiderX, S.lastSpiderY, gap * 1.5) then
+
+                    task.nspSupportLostConsumed = true
+
+                    local from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+                    local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+
+                    if task.nspDuringDrag then
+                        fall.nspDuringDrag = true
+                    end
+
+                    table.insert(S.tasks, S.taskIdx, fall)
+
+                    local cont = makeContinueTask(task, { x = fall.p2.x, y = fall.p2.y })
+                    table.insert(S.tasks, S.taskIdx + 1, cont)
+
+                    -- Следующий цикл обработает fall, затем cont.
+                else
+                    if task
+                        and task.nspDuringDrag
+                        and not task.nspTempThread
+                        and not task.nspSupportLostConsumed then
+                        self:NP_ClearGlobalDrag(true)
+                    end
+
+                    S.taskIdx = S.taskIdx + 1
+                end
+            end
+        end
+
+        if S.limitReturnPending then
+            S.limitReturnPending = false
+            S.phase = "limitWait"
+            S.limitWaitTimer = 0
+            S.completeTimer = 0
+            return
+        end
+
+        S.phase = "instanceComplete"
+        S.completeTimer = 0
+    end
+
+    ---------------------------------------------------------------------------
+    -- Очистка кэшей
+    ---------------------------------------------------------------------------
+
+    local OLD_ClearAllVisuals = NSPauk.ClearAllVisuals
+
+    function NSPauk:ClearAllVisuals()
+        self.S.nspNearCache = nil
+        self.S.nspSupportCache = nil
+
+        if OLD_ClearAllVisuals then
+            OLD_ClearAllVisuals(self)
+        end
+    end
+
+    local OLD_OnSpiderClick = NSPauk.OnSpiderClick
+
+    function NSPauk:OnSpiderClick(button)
+        self.S.nspNearCache = nil
+        self.S.nspSupportCache = nil
+
+        if OLD_OnSpiderClick then
+            OLD_OnSpiderClick(self, button)
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Установка
+    ---------------------------------------------------------------------------
+
     if NSPauk.BaseMethods then
+        NSPauk.BaseMethods.NP_MakeFallTask = NSPauk.NP_MakeFallTask
+        NSPauk.BaseMethods.NP_MakeTempDropTask = NSPauk.NP_MakeTempDropTask
         NSPauk.BaseMethods.NP_FreshHasSupportAt = NSPauk.NP_FreshHasSupportAt
         NSPauk.BaseMethods.NP_FindFallTarget = NSPauk.NP_FindFallTarget
+        NSPauk.BaseMethods.NP_NearSupportWithin = NSPauk.NP_NearSupportWithin
+        NSPauk.BaseMethods.IsTaskValid = NSPauk.IsTaskValid
+        NSPauk.BaseMethods.StartTask = NSPauk.StartTask
         NSPauk.BaseMethods.NP_ExecutePlan = NSPauk.NP_ExecutePlan
+        NSPauk.BaseMethods.AdvanceTask = NSPauk.AdvanceTask
+        NSPauk.BaseMethods.ClearAllVisuals = NSPauk.ClearAllVisuals
+        NSPauk.BaseMethods.OnSpiderClick = NSPauk.OnSpiderClick
     end
 end
