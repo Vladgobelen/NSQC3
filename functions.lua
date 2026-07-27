@@ -7763,36 +7763,142 @@ function NSPauk:AddInterCrossTasks(tasks, inst, cursor)
     end
 end
 
+function NSPauk:MakeTopDownDrawThread(thread, cursorPoint)
+    if not thread or not thread.p0 or not thread.p2 then
+        return nil
+    end
+
+    local p0 = thread.p0
+    local p2 = thread.p2
+    local p1 = thread.p1 or {
+        x = (p0.x + p2.x) / 2,
+        y = (p0.y + p2.y) / 2,
+    }
+
+    local reverse = false
+    local yTol = 0.01
+
+    -- В координатах WoW UI чем больше Y, тем выше точка на экране.
+    -- Если логический конец p0 ниже, чем p2, рисуем в обратную сторону.
+    if p0.y < p2.y - yTol then
+        reverse = true
+    elseif math.abs(p0.y - p2.y) <= yTol and cursorPoint then
+        -- Если точки почти на одной высоте, выбираем ближайшую к пауку,
+        -- чтобы не делать лишнее перемещение.
+        local d0x = p0.x - cursorPoint.x
+        local d0y = p0.y - cursorPoint.y
+        local d0 = d0x * d0x + d0y * d0y
+
+        local d2x = p2.x - cursorPoint.x
+        local d2y = p2.y - cursorPoint.y
+        local d2 = d2x * d2x + d2y * d2y
+
+        if d2 < d0 then
+            reverse = true
+        end
+    end
+
+    local drawThread
+    if reverse then
+        drawThread = {
+            p0 = { x = p2.x, y = p2.y },
+            p1 = { x = p1.x, y = p1.y },
+            p2 = { x = p0.x, y = p0.y },
+        }
+    else
+        drawThread = {
+            p0 = { x = p0.x, y = p0.y },
+            p1 = { x = p1.x, y = p1.y },
+            p2 = { x = p2.x, y = p2.y },
+        }
+    end
+
+    drawThread.ownerRef = thread.ownerRef
+
+    return drawThread, reverse
+end
+
+function NSPauk:AddMainThreadTasks(inst, tasks, cursorPoint)
+    if not inst or not inst.conns or #inst.conns == 0 then
+        return cursorPoint
+    end
+
+    local pending = {}
+    for i, conn in ipairs(inst.conns) do
+        pending[i] = conn
+    end
+
+    while #pending > 0 do
+        local bestIndex = nil
+        local bestDraw = nil
+        local bestScore = math.huge
+
+        for i, conn in ipairs(pending) do
+            local drawThread = self:MakeTopDownDrawThread(conn.thread, cursorPoint)
+
+            if drawThread then
+                local score
+
+                if cursorPoint then
+                    -- Ищем ближайшую верхнюю стартовую точку к текущему положению паука.
+                    local dx = drawThread.p0.x - cursorPoint.x
+                    local dy = drawThread.p0.y - cursorPoint.y
+                    score = dx * dx + dy * dy
+                else
+                    -- Если паук еще не создан, начинаем с самой верхней точки.
+                    score = -drawThread.p0.y
+                end
+
+                if score < bestScore then
+                    bestScore = score
+                    bestIndex = i
+                    bestDraw = drawThread
+                end
+            end
+        end
+
+        if not bestIndex or not bestDraw then
+            break
+        end
+
+        local conn = pending[bestIndex]
+        table.remove(pending, bestIndex)
+
+        if cursorPoint then
+            self:AddTravelPointTask(tasks, cursorPoint, bestDraw.p0, conn, conn)
+        end
+
+        local task = self:AddThreadTask(tasks, conn, bestDraw)
+        task.isMain = true
+
+        -- После рисования паук оказывается в нижней точке этой нити.
+        cursorPoint = {
+            x = bestDraw.p2.x,
+            y = bestDraw.p2.y,
+        }
+    end
+
+    return cursorPoint
+end
+
 function NSPauk:BuildInstanceTasks(inst)
     local S = self.S
     local C = self.C
-
     local tasks = {}
 
     inst.crossRowsList = {}
-
     if not inst.interSegs then
         inst.interSegs = {}
     end
 
     local cursorPoint = nil
-
     if S.spider and S.spider:IsShown() then
         cursorPoint = { x = S.lastSpiderX, y = S.lastSpiderY }
     end
 
-    for _, conn in ipairs(inst.conns) do
-        if cursorPoint then
-            self:AddTravelPointTask(tasks, cursorPoint, conn.thread.p0, conn, conn)
-        end
-
-        local task = self:AddThreadTask(tasks, conn, conn.thread)
-        task.isMain = true
-
-        self:AddTravelThreadTask(tasks, conn, 1, 0, conn)
-
-        cursorPoint = { x = conn.thread.p0.x, y = conn.thread.p0.y }
-    end
+    -- Основные нити теперь рисуются не в порядке создания,
+    -- а в порядке "ближайшая верхняя точка -> нижняя точка".
+    cursorPoint = self:AddMainThreadTasks(inst, tasks, cursorPoint)
 
     local N = #inst.conns
 
@@ -7804,7 +7910,6 @@ function NSPauk:BuildInstanceTasks(inst)
         end
 
         local sectorAllowed, sectorAngleDeg = self:ComputeCrossSectors(inst)
-
         inst.sectorAllowed = sectorAllowed
         inst.sectorAngleDeg = sectorAngleDeg
 
@@ -7819,10 +7924,8 @@ function NSPauk:BuildInstanceTasks(inst)
 
         for i = 1, N do
             local j = (i % N) + 1
-
             local lenA = inst.conns[i].arcLength or 0
             local lenB = inst.conns[j].arcLength or 0
-
             local pairMin = math.min(lenA, lenB)
 
             if sectorAllowed[i] then
@@ -7851,7 +7954,6 @@ function NSPauk:BuildInstanceTasks(inst)
                 end
 
                 local key = math.floor(d + 0.5)
-
                 if not seen[key] then
                     seen[key] = true
                     distances[#distances + 1] = d
@@ -7864,7 +7966,6 @@ function NSPauk:BuildInstanceTasks(inst)
             end
 
             local rows = math.floor(maxPairLen / spacing + 0.0001)
-
             if rows > maxRows then
                 rows = maxRows
             end
@@ -7893,7 +7994,13 @@ function NSPauk:BuildInstanceTasks(inst)
                 local px, py = self:BzThread(inst.conns[1].thread, 0)
 
                 if cursorPoint then
-                    self:AddTravelPointTask(tasks, cursorPoint, { x = px, y = py }, inst.conns[1], inst.conns[1])
+                    self:AddTravelPointTask(
+                        tasks,
+                        cursorPoint,
+                        { x = px, y = py },
+                        inst.conns[1],
+                        inst.conns[1]
+                    )
                 end
 
                 local cursor = {
@@ -7907,7 +8014,13 @@ function NSPauk:BuildInstanceTasks(inst)
                 end
 
                 if cursor.t and cursor.t > 0.001 and cursor.idx >= 1 and cursor.idx <= N then
-                    self:AddTravelThreadTask(tasks, inst.conns[cursor.idx], cursor.t, 0, inst.conns[cursor.idx])
+                    self:AddTravelThreadTask(
+                        tasks,
+                        inst.conns[cursor.idx],
+                        cursor.t,
+                        0,
+                        inst.conns[cursor.idx]
+                    )
                 end
 
                 self:AddInterCrossTasks(tasks, inst, { point = { x = px, y = py } })
@@ -7915,6 +8028,8 @@ function NSPauk:BuildInstanceTasks(inst)
         else
             inst.crossRows = 0
         end
+    else
+        inst.crossRows = 0
     end
 
     inst.tasks = tasks
