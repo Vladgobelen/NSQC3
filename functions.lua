@@ -15908,8 +15908,8 @@ local NSPauk_Moth = {
         STICK_NSPNOINSERT = true,
         STICK_NSPDURINGDRAG = true,
 
-        RESPAWN_MIN_SECONDS = 0.5 * 60,
-        RESPAWN_MAX_SECONDS = 1 * 60,
+        RESPAWN_MIN_SECONDS = 10 * 60,
+        RESPAWN_MAX_SECONDS = 30 * 60,
     },
 
     state = {
