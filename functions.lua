@@ -15382,7 +15382,283 @@ end
 
 
 
+---------------------------------------------------------------------------
+-- Пересборка задач паутины после возврата из охоты на мотылька.
+--
+-- Важно:
+-- - не создаёт новые conn / crossSeg;
+-- - использует уже существующие владельцы;
+-- - пропускает уже нарисованные нити;
+-- - дорисовывает живые, но ещё не нарисованные нити;
+-- - убивает владельцев, чьи родители мертвы или не будут нарисованы.
+---------------------------------------------------------------------------
 
+function NSPauk:NP_RebuildInstanceTasks(inst)
+    local S = self.S
+
+    if not inst or inst.torn then
+        return nil
+    end
+
+    local tasks = {}
+    local added = {}
+
+    local cursor = nil
+    if S.spider and S.spider:IsShown() then
+        cursor = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+    end
+
+    local function isDrawn(owner)
+        return owner
+            and owner.alive
+            and owner.textures
+            and #owner.textures > 0
+    end
+
+    local function isScheduled(owner)
+        return owner and added[owner] == true
+    end
+
+    local function isAvailable(owner)
+        if not owner or not owner.alive then
+            return false
+        end
+
+        if isDrawn(owner) then
+            return true
+        end
+
+        if isScheduled(owner) then
+            return true
+        end
+
+        return false
+    end
+
+    local function killOwner(owner)
+        if not owner or not owner.alive then
+            return
+        end
+
+        if self.NP_KillOwnerHard then
+            self:NP_KillOwnerHard(owner)
+        else
+            owner.alive = false
+        end
+    end
+
+    local function addOwner(owner, thread, isMain)
+        if not owner or not owner.alive then
+            return false
+        end
+
+        if added[owner] then
+            return false
+        end
+
+        -- Уже нарисованные нити не трогаем.
+        if isDrawn(owner) then
+            return false
+        end
+
+        if not thread or not thread.p0 or not thread.p2 then
+            killOwner(owner)
+            return false
+        end
+
+        -- Основная нить должна иметь живой валидный anchor.
+        if owner.target then
+            if not self:ValidateConnection(inst, owner) then
+                return false
+            end
+        end
+
+        -- Перемычка может быть нарисована только если обе основные нити
+        -- либо уже нарисованы, либо запланированы к рисованию.
+        if owner.connA or owner.connB then
+            if not isAvailable(owner.connA) or not isAvailable(owner.connB) then
+                killOwner(owner)
+                return false
+            end
+        end
+
+        -- Inter-cross может быть нарисован только если родительские
+        -- перемычки живы и либо нарисованы, либо запланированы.
+        if owner.parentSegA and not isAvailable(owner.parentSegA) then
+            killOwner(owner)
+            return false
+        end
+
+        if owner.parentSegB and not isAvailable(owner.parentSegB) then
+            killOwner(owner)
+            return false
+        end
+
+        if cursor then
+            self:AddTravelPointTask(
+                tasks,
+                cursor,
+                { x = thread.p0.x, y = thread.p0.y },
+                owner.connA or owner,
+                owner
+            )
+        end
+
+        local task = self:AddThreadTask(tasks, owner, thread)
+        if not task then
+            return false
+        end
+
+        if isMain then
+            task.isMain = true
+        end
+
+        added[owner] = true
+        cursor = { x = thread.p2.x, y = thread.p2.y }
+
+        return true
+    end
+
+    -----------------------------------------------------------------------
+    -- 1. Сначала дорисовываем живые, но ещё не нарисованные основные нити.
+    -----------------------------------------------------------------------
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.alive and not isDrawn(conn) then
+            local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
+            if drawThread then
+                addOwner(conn, drawThread, true)
+            else
+                killOwner(conn)
+            end
+        end
+    end
+
+    -----------------------------------------------------------------------
+    -- 2. Потом дорисовываем перемычки по существующим рядам.
+    -----------------------------------------------------------------------
+    local N = inst.conns and #inst.conns or 0
+
+    if inst.crossRowsList then
+        for _, row in ipairs(inst.crossRowsList) do
+            if type(row) == "table" then
+                for idx = 1, N do
+                    local seg = row[idx]
+                    if seg then
+                        addOwner(seg, seg.thread, false)
+                    end
+                end
+            end
+        end
+    end
+
+    -----------------------------------------------------------------------
+    -- 3. Если вдруг есть обычные crossSeg вне crossRowsList, пробуем их.
+    -----------------------------------------------------------------------
+    if inst.crossSegs then
+        for _, seg in ipairs(inst.crossSegs) do
+            if not seg.isInterCross then
+                addOwner(seg, seg.thread, false)
+            end
+        end
+    end
+
+    -----------------------------------------------------------------------
+    -- 4. Затем inter-cross.
+    -----------------------------------------------------------------------
+    if inst.interSegs then
+        for _, seg in ipairs(inst.interSegs) do
+            addOwner(seg, seg.thread, false)
+        end
+    end
+
+    self:CheckInstanceDead(inst)
+
+    if inst.torn then
+        return {}
+    end
+
+    inst.tasks = tasks
+    return tasks
+end
+
+---------------------------------------------------------------------------
+-- Обновлённая RestoreMothStateImmediate.
+--
+-- После восстановления состояния, если это обычная паутина,
+-- пересобираем список задач по фактическому состоянию instance.
+---------------------------------------------------------------------------
+
+function NSPauk:RestoreMothStateImmediate(saved)
+    local S = self.S
+
+    if not saved then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+        return
+    end
+
+    S.phase = saved.phase or "watch"
+    S.currentInstance = saved.currentInstance
+    S.tasks = saved.tasks or {}
+    S.taskIdx = saved.taskIdx or 1
+    S.currentTask = nil
+    S.cocoon = saved.cocoon
+    S.completeTimer = saved.completeTimer or 0
+    S.moveDur = saved.moveDur or 1
+    S.moveT = 0
+    S.lastTaskT = 0
+    S.speedTimer = 0
+    S.stillTimer = saved.stillTimer or 0
+    S.limitReached = saved.limitReached
+    S.limitReturnPending = saved.limitReturnPending
+    S.limitCocoonPending = saved.limitCocoonPending
+    S.limitWaitTimer = saved.limitWaitTimer or 0
+    S.limitHomePoint = saved.limitHomePoint
+
+    -----------------------------------------------------------------------
+    -- Для обычной паутины после мотылька делаем реальный пересчёт задач.
+    --
+    -- Не делаем это для:
+    -- - кокона;
+    -- - moth-кокона;
+    -- - порванной паутины.
+    -----------------------------------------------------------------------
+    if (S.phase == "task" or S.phase == "instanceComplete")
+        and S.currentInstance
+        and not S.currentInstance.torn
+        and not S.currentInstance.isCocoon
+        and not S.currentInstance.isMoth then
+
+        local rebuilt = self:NP_RebuildInstanceTasks(S.currentInstance)
+
+        if rebuilt then
+            S.tasks = rebuilt
+            S.taskIdx = 1
+            S.currentTask = nil
+
+            if #rebuilt == 0 then
+                S.phase = "instanceComplete"
+                S.completeTimer = 0
+            else
+                S.phase = "task"
+            end
+        end
+    end
+
+    if S.phase == "dissolve" and not S.cocoon then
+        S.phase = "watch"
+    end
+end
+
+---------------------------------------------------------------------------
+-- Обновить BaseMethods, если патч вставлен после инициализации.
+---------------------------------------------------------------------------
+
+if type(NSPauk.BaseMethods) == "table" then
+    NSPauk.BaseMethods.NP_RebuildInstanceTasks = NSPauk.NP_RebuildInstanceTasks
+    NSPauk.BaseMethods.RestoreMothStateImmediate = NSPauk.RestoreMothStateImmediate
+end
 
 
 
@@ -15632,8 +15908,8 @@ local NSPauk_Moth = {
         STICK_NSPNOINSERT = true,
         STICK_NSPDURINGDRAG = true,
 
-        RESPAWN_MIN_SECONDS = 10 * 60,
-        RESPAWN_MAX_SECONDS = 30 * 60,
+        RESPAWN_MIN_SECONDS = 0.5 * 60,
+        RESPAWN_MAX_SECONDS = 1 * 60,
     },
 
     state = {
@@ -18911,6 +19187,326 @@ if not NSPauk_Moth._distCommandPatch then
 
         if oldSlashDist then
             oldSlashDist(msg)
+        else
+            NSPauk_Moth:Print("unknown command:", msg)
+        end
+    end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------------
+-- Why-no-stick debug: /nsmoth why
+---------------------------------------------------------------------------
+
+if not NSPauk_Moth._whyCommandPatch then
+    NSPauk_Moth._whyCommandPatch = true
+
+    function NSPauk_Moth:DebugWhy()
+        local c = self.cfg
+        local s = self.state
+
+        if not c or not s then
+            self:Print("cfg or state is nil")
+            return
+        end
+
+        local now = GetTime and GetTime() or 0
+
+        self:Print("=== why no stick ===")
+
+        self:Print(
+            "inited=", tostring(self.inited),
+            "destroyed=", tostring(self.destroyed),
+            "frozen=", tostring(s.frozen),
+            "dead=", tostring(s.dead)
+        )
+
+        if self.frame then
+            self:Print(
+                "frame shown=", tostring(self.frame:IsShown()),
+                "visible=", tostring(self.frame.IsVisible and self.frame:IsVisible() or "?")
+            )
+        else
+            self:Print("frame= nil")
+        end
+
+        self:Print(
+            "cfg conns=", tostring(c.STICK_CONNS),
+            "crossSegs=", tostring(c.STICK_CROSSSEGS),
+            "chance=", tostring(c.STICK_CHANCE),
+            "strict=", tostring(c.STICK_ONLY_VISIBLE_TEXTURE),
+            "radius=", tostring(c.STICK_VISIBLE_RADIUS),
+            "stickDist=", tostring(c.STICK_DIST)
+        )
+
+        self:Print(
+            "filters travel=", tostring(c.STICK_KIND_TRAVEL),
+            "crawl=", tostring(c.STICK_NSPCRAWL),
+            "noInsert=", tostring(c.STICK_NSPNOINSERT),
+            "duringDrag=", tostring(c.STICK_NSPDURINGDRAG)
+        )
+
+        self:Print(
+            "clickImmunity=", string.format("%.2f", s.clickImmunity or 0),
+            "webFailActive=", tostring(s.webFailActive),
+            "webFailUntilIn=", string.format("%.2f", (s.webFailUntil or 0) - now),
+            "requireLeave=", tostring(c.STICK_FAIL_REQUIRE_LEAVE)
+        )
+
+        if self.lastWebInfo then
+            self:Print(
+                "lastWeb source=", tostring(self.lastWebInfo.source),
+                "dist=", string.format("%.2f", self.lastWebInfo.dist or 0),
+                "visible=", tostring(self.lastWebInfo.visibleTexture),
+                "rejected=", tostring(self.lastWebInfo.rejected)
+            )
+        else
+            self:Print("lastWeb= nil")
+        end
+
+        if type(NSPauk) ~= "table" then
+            self:Print("NSPauk= nil")
+            return
+        end
+
+        local S = NSPauk.S
+
+        if type(S) ~= "table" or type(S.instances) ~= "table" then
+            self:Print("NSPauk.S.instances= nil")
+            return
+        end
+
+        local stickDist = c.STICK_DIST or 9
+        local stick2 = stickDist * stickDist
+        local pad = stickDist + 4
+
+        local near = 0
+        local filterPass = 0
+        local visiblePass = 0
+
+        local best = nil
+        local bestD2 = math.huge
+
+        local function consider(source, instIndex, index, obj)
+            if type(obj) ~= "table" then
+                return
+            end
+
+            if obj.alive
+                and obj.hidden ~= true
+                and obj.visible ~= false
+                and self:ThreadIsValid(obj.thread) then
+
+                if self:ThreadNearBox(obj.thread, s.x, s.y, pad) then
+                    local t, d2 = self:NearestThreadT(obj.thread, s.x, s.y)
+
+                    if d2 <= stick2 then
+                        near = near + 1
+
+                        if self:IsStickyTarget(obj, obj.thread) then
+                            filterPass = filterPass + 1
+
+                            local baseX, baseY = self:ThreadPointAt(obj.thread, t)
+
+                            local visible = true
+
+                            if c.STICK_ONLY_VISIBLE_TEXTURE ~= false
+                                and self.HasVisibleWebTextureNear then
+
+                                local okVisible, visibleTexture = pcall(function()
+                                    return self:HasVisibleWebTextureNear(
+                                        baseX,
+                                        baseY,
+                                        c.STICK_VISIBLE_RADIUS
+                                    )
+                                end)
+
+                                visible = okVisible and visibleTexture or false
+                            end
+
+                            if visible then
+                                visiblePass = visiblePass + 1
+
+                                if d2 < bestD2 then
+                                    bestD2 = d2
+
+                                    best = {
+                                        source = source,
+                                        inst = tostring(instIndex),
+                                        index = tostring(index),
+                                        d2 = d2,
+                                        dist = math.sqrt(d2),
+                                        t = t,
+                                        baseX = baseX,
+                                        baseY = baseY,
+                                    }
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        for instIndex, inst in pairs(S.instances) do
+            if type(inst) == "table"
+                and inst.alive ~= false
+                and inst.hidden ~= true
+                and inst.visible ~= false then
+
+                if c.STICK_CONNS ~= false and type(inst.conns) == "table" then
+                    for connIndex, conn in pairs(inst.conns) do
+                        consider("conns", instIndex, connIndex, conn)
+                    end
+                end
+
+                if c.STICK_CROSSSEGS ~= false and type(inst.crossSegs) == "table" then
+                    for segIndex, seg in pairs(inst.crossSegs) do
+                        consider("crossSegs", instIndex, segIndex, seg)
+                    end
+                end
+            end
+        end
+
+        self:Print(
+            "near threads=", near,
+            "filterPass=", filterPass,
+            "visiblePass=", visiblePass
+        )
+
+        if best then
+            self:Print(
+                "best stickable:",
+                "source=", tostring(best.source),
+                "inst=", best.inst,
+                "index=", best.index,
+                "dist=", string.format("%.2f", best.dist),
+                "t=", string.format("%.3f", best.t),
+                "base=", string.format("%.1f,%.1f", best.baseX or 0, best.baseY or 0)
+            )
+        end
+
+        if near == 0 then
+            self:Print("reason: no alive thread within STICK_DIST")
+        elseif filterPass == 0 then
+            self:Print("reason: threads are near, but filters block them")
+        elseif visiblePass == 0 then
+            self:Print("reason: threads pass filters, but no visible texture within STICK_VISIBLE_RADIUS")
+        else
+            self:Print("reason: stickable threads exist; check chance / webFailActive / clickImmunity")
+        end
+
+        if s.webFailActive and c.STICK_FAIL_REQUIRE_LEAVE ~= false then
+            self:Print("note: webFailActive + requireLeave blocks re-stick until moth leaves web")
+        end
+
+        if (s.clickImmunity or 0) > 0 then
+            self:Print("note: clickImmunity is active and blocks web checks")
+        end
+    end
+
+    local oldSlashWhy = SlashCmdList["NSPAUKMOTH"]
+
+    SlashCmdList["NSPAUKMOTH"] = function(msg)
+        local m = msg or ""
+
+        m = m:gsub("^%s+", "")
+        m = m:gsub("%s+$", "")
+        m = m:lower()
+
+        if m == "why" then
+            NSPauk_Moth:DebugWhy()
+            return
+        end
+
+        if m == "" or m == "help" then
+            if oldSlashWhy then
+                oldSlashWhy(msg)
+            end
+
+            NSPauk_Moth:Print("/nsmoth why -- diagnose why moth does not stick")
+            return
+        end
+
+        if oldSlashWhy then
+            oldSlashWhy(msg)
         else
             NSPauk_Moth:Print("unknown command:", msg)
         end
