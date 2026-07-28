@@ -17368,3 +17368,414 @@ end)
 if IsLoggedIn and IsLoggedIn() then
     NSPauk_Moth:Init()
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------------
+-- Distance check command: /nsmoth dist
+---------------------------------------------------------------------------
+
+if not NSPauk_Moth._distCommandPatch then
+    NSPauk_Moth._distCommandPatch = true
+
+    local function DbgPoint(p)
+        if type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" then
+            return string.format("%.1f,%.1f", p.x, p.y)
+        end
+
+        return "invalid"
+    end
+
+    local function DbgDist2(px, py, ax, ay, bx, by)
+        local dx = bx - ax
+        local dy = by - ay
+
+        local len2 = dx * dx + dy * dy
+
+        if len2 <= 0.0001 then
+            local ex = px - ax
+            local ey = py - ay
+            return ex * ex + ey * ey
+        end
+
+        local t = ((px - ax) * dx + (py - ay) * dy) / len2
+
+        if t < 0 then
+            t = 0
+        elseif t > 1 then
+            t = 1
+        end
+
+        local cx = ax + t * dx
+        local cy = ay + t * dy
+
+        local ex = px - cx
+        local ey = py - cy
+
+        return ex * ex + ey * ey
+    end
+
+    local function DbgAnchor(relPoint, parentW, parentH)
+        if relPoint == "BOTTOMLEFT" then
+            return 0, 0
+        elseif relPoint == "BOTTOM" then
+            return parentW / 2, 0
+        elseif relPoint == "BOTTOMRIGHT" then
+            return parentW, 0
+        elseif relPoint == "LEFT" then
+            return 0, parentH / 2
+        elseif relPoint == "CENTER" then
+            return parentW / 2, parentH / 2
+        elseif relPoint == "RIGHT" then
+            return parentW, parentH / 2
+        elseif relPoint == "TOPLEFT" then
+            return 0, parentH
+        elseif relPoint == "TOP" then
+            return parentW / 2, parentH
+        elseif relPoint == "TOPRIGHT" then
+            return parentW, parentH
+        end
+
+        return 0, 0
+    end
+
+    local function DbgCenter(point, absX, absY, w, h)
+        if point == "CENTER" then
+            return absX, absY
+        elseif point == "BOTTOMLEFT" then
+            return absX + w / 2, absY + h / 2
+        elseif point == "BOTTOM" then
+            return absX, absY + h / 2
+        elseif point == "BOTTOMRIGHT" then
+            return absX - w / 2, absY + h / 2
+        elseif point == "LEFT" then
+            return absX + w / 2, absY
+        elseif point == "RIGHT" then
+            return absX - w / 2, absY
+        elseif point == "TOPLEFT" then
+            return absX + w / 2, absY - h / 2
+        elseif point == "TOP" then
+            return absX, absY - h / 2
+        elseif point == "TOPRIGHT" then
+            return absX - w / 2, absY - h / 2
+        end
+
+        return absX, absY
+    end
+
+    local function CalcTexDistance(pts, w, h, x, y)
+        if #pts == 0 then
+            return nil
+        end
+
+        if #pts == 1 then
+            local cx, cy = DbgCenter(pts[1].point, pts[1].x, pts[1].y, w, h)
+
+            local dx = cx - x
+            local dy = cy - y
+
+            return math.sqrt(dx * dx + dy * dy)
+        end
+
+        local bestD2 = math.huge
+
+        for i = 1, #pts - 1 do
+            local d2 = DbgDist2(
+                x, y,
+                pts[i].x, pts[i].y,
+                pts[i + 1].x, pts[i + 1].y
+            )
+
+            if d2 < bestD2 then
+                bestD2 = d2
+            end
+        end
+
+        local d2 = DbgDist2(
+            x, y,
+            pts[#pts].x, pts[#pts].y,
+            pts[1].x, pts[1].y
+        )
+
+        if d2 < bestD2 then
+            bestD2 = d2
+        end
+
+        return math.sqrt(bestD2)
+    end
+
+    function NSPauk_Moth:DebugDistance()
+        local s = self.state
+
+        if not s then
+            self:Print("state is nil")
+            return
+        end
+
+        self:Print("=== distance check ===")
+
+        self:Print(
+            "cfg STICK_DIST=", tostring(self.cfg.STICK_DIST),
+            "STICK_VISIBLE_RADIUS=", tostring(self.cfg.STICK_VISIBLE_RADIUS),
+            "strict=", tostring(self.cfg.STICK_ONLY_VISIBLE_TEXTURE)
+        )
+
+        self:Print(
+            "state pos=", string.format("%.1f,%.1f", s.x, s.y),
+            "stuck=", tostring(s.stuckOwner ~= nil),
+            "dead=", tostring(s.dead)
+        )
+
+        local info = self.stuckInfo
+
+        local baseX = s.x
+        local baseY = s.y
+
+        if info and info.stuck and info.baseX and info.baseY then
+            baseX = info.baseX
+            baseY = info.baseY
+
+            local dx = s.x - baseX
+            local dy = s.y - baseY
+
+            self:Print(
+                "stuckInfo base=", string.format("%.1f,%.1f", baseX, baseY),
+                "pos->base=", string.format("%.2f", math.sqrt(dx * dx + dy * dy)),
+                "webDist=", tostring(info.webDist),
+                "t=", tostring(info.t),
+                "source=", tostring(info.source),
+                "visibleTexture=", tostring(info.visibleTexture)
+            )
+        else
+            self:Print("stuckInfo: not stuck")
+        end
+
+        if self.lastWebInfo then
+            self:Print(
+                "lastWeb source=", tostring(self.lastWebInfo.source),
+                "dist=", string.format("%.2f", self.lastWebInfo.dist or 0),
+                "visible=", tostring(self.lastWebInfo.visibleTexture),
+                "rejected=", tostring(self.lastWebInfo.rejected),
+                "base=", string.format(
+                    "%.1f,%.1f",
+                    self.lastWebInfo.baseX or 0,
+                    self.lastWebInfo.baseY or 0
+                )
+            )
+        end
+
+        if s.stuckOwner and s.stuckOwner.thread then
+            local th = s.stuckOwner.thread
+
+            self:Print(
+                "owner thread p0=", DbgPoint(th.p0),
+                "p1=", DbgPoint(th.p1),
+                "p2=", DbgPoint(th.p2)
+            )
+
+            local minD2 = math.huge
+            local bestT = 0
+
+            for i = 0, 64 do
+                local t = i / 64
+                local px, py = self:ThreadPointAt(th, t)
+
+                local dx = px - s.x
+                local dy = py - s.y
+                local d2 = dx * dx + dy * dy
+
+                if d2 < minD2 then
+                    minD2 = d2
+                    bestT = t
+                end
+            end
+
+            self:Print(
+                "current min dist to thread=", string.format("%.2f", math.sqrt(minD2)),
+                "bestT=", string.format("%.3f", bestT),
+                "stuckT=", string.format("%.3f", s.stuckT or 0)
+            )
+        end
+
+        local web = self:GetWebFrame()
+
+        if not web then
+            self:Print("web frame unavailable")
+            return
+        end
+
+        local parentW = web.GetWidth and web:GetWidth() or 0
+        local parentH = web.GetHeight and web:GetHeight() or 0
+
+        local regions = self:GetWebRegions(web)
+
+        if not regions or #regions == 0 then
+            self:Print("web frame has no regions")
+            return
+        end
+
+        local visibleTexCount = 0
+
+        local bestPosD = math.huge
+        local bestPosTex = nil
+
+        local bestBaseD = math.huge
+        local bestBaseTex = nil
+
+        for _, reg in ipairs(regions) do
+            if reg.GetObjectType and reg:GetObjectType() == "Texture" then
+                local shown = reg.IsShown and reg:IsShown() or false
+                local alpha = reg.GetAlpha and reg:GetAlpha() or 1
+
+                if shown and alpha > 0.01 then
+                    local w = reg.GetWidth and reg:GetWidth() or 0
+                    local h = reg.GetHeight and reg:GetHeight() or 0
+
+                    local isFullScreenish = w > parentW * 0.8 and h > parentH * 0.8
+
+                    if not isFullScreenish then
+                        visibleTexCount = visibleTexCount + 1
+
+                        local pts = {}
+
+                        if reg.GetNumPoints then
+                            local n = reg:GetNumPoints()
+
+                            for i = 1, n do
+                                local point, relTo, relPoint, ox, oy = reg:GetPoint(i)
+
+                                if ox and oy then
+                                    local relName = nil
+
+                                    if type(relTo) == "string" then
+                                        relName = relTo
+                                    elseif relTo and relTo.GetName then
+                                        relName = relTo:GetName()
+                                    end
+
+                                    local okRel = (relTo == nil)
+                                        or (relTo == web)
+                                        or (relTo == UIParent)
+                                        or relName == "NSPauk_WebHigh"
+                                        or relName == "UIParent"
+
+                                    if okRel then
+                                        local bx, by = DbgAnchor(relPoint, parentW, parentH)
+
+                                        pts[#pts + 1] = {
+                                            x = bx + ox,
+                                            y = by + oy,
+                                            point = point,
+                                        }
+                                    end
+                                end
+                            end
+                        end
+
+                        if #pts > 0 then
+                            local dPos = CalcTexDistance(pts, w, h, s.x, s.y)
+                            local dBase = CalcTexDistance(pts, w, h, baseX, baseY)
+
+                            local texName = reg.GetTexture and reg:GetTexture() or "?"
+
+                            if dPos and dPos < bestPosD then
+                                bestPosD = dPos
+
+                                bestPosTex = {
+                                    tex = texName,
+                                    alpha = alpha,
+                                    w = w,
+                                    h = h,
+                                    d = dPos,
+                                }
+                            end
+
+                            if dBase and dBase < bestBaseD then
+                                bestBaseD = dBase
+
+                                bestBaseTex = {
+                                    tex = texName,
+                                    alpha = alpha,
+                                    w = w,
+                                    h = h,
+                                    d = dBase,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        self:Print("visible textures scanned=", visibleTexCount)
+
+        if bestPosTex then
+            self:Print(
+                "nearest visible texture to POS=", string.format("%.2f", bestPosD),
+                "tex=", tostring(bestPosTex.tex),
+                "alpha=", string.format("%.2f", bestPosTex.alpha),
+                "size=", string.format("%.1fx%.1f", bestPosTex.w, bestPosTex.h)
+            )
+        else
+            self:Print("nearest visible texture to POS= none")
+        end
+
+        if bestBaseTex then
+            self:Print(
+                "nearest visible texture to BASE=", string.format("%.2f", bestBaseD),
+                "tex=", tostring(bestBaseTex.tex),
+                "alpha=", string.format("%.2f", bestBaseTex.alpha),
+                "size=", string.format("%.1fx%.1f", bestBaseTex.w, bestBaseTex.h)
+            )
+        else
+            self:Print("nearest visible texture to BASE= none")
+        end
+    end
+
+    local oldSlashDist = SlashCmdList["NSPAUKMOTH"]
+
+    SlashCmdList["NSPAUKMOTH"] = function(msg)
+        local m = msg or ""
+
+        m = m:gsub("^%s+", "")
+        m = m:gsub("%s+$", "")
+        m = m:lower()
+
+        if m == "dist" or m == "distance" or m == "check" then
+            NSPauk_Moth:DebugDistance()
+            return
+        end
+
+        if m == "" or m == "help" then
+            if oldSlashDist then
+                oldSlashDist(msg)
+            end
+
+            NSPauk_Moth:Print("/nsmoth dist -- distance check")
+            return
+        end
+
+        if oldSlashDist then
+            oldSlashDist(msg)
+        else
+            NSPauk_Moth:Print("unknown command:", msg)
+        end
+    end
+end
