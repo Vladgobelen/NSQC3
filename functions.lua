@@ -14543,7 +14543,7 @@ local NSPauk_Moth = {
         DEBUG_WEB_RADIUS = 120,
 
         STICK_ONLY_VISIBLE_TEXTURE = true,
-        STICK_VISIBLE_RADIUS = 26,
+        STICK_VISIBLE_RADIUS = 6,
 
         STICK_CHANCE = 1 / 3,
         STICK_FAIL_IMMUNITY_MIN = 0.75,
