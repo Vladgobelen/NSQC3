@@ -5836,7 +5836,7 @@ end
 
 function NSPauk:Print(message)
     if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
-        DEFAULT_CHAT_FRAME:AddMessage(message)
+        --DEFAULT_CHAT_FRAME:AddMessage(message)
     end
 end
 
@@ -15982,7 +15982,7 @@ function NSPauk_Moth:Print(...)
 
     local chat = DEFAULT_CHAT_FRAME or ChatFrame1
     if chat and chat.AddMessage then
-        chat:AddMessage("|cff66ccffNSMoth:|r " .. table.concat(parts, " "))
+        --chat:AddMessage("|cff66ccffNSMoth:|r " .. table.concat(parts, " "))
     end
 end
 
