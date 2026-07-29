@@ -5625,6 +5625,79 @@ NSPauk.DefaultConstants = {
     WEB_THREAD_MIN_SEPARATION = 20,
     WEB_HUB_IGNORE_DIST = 100,
     WEB_TARGET_REROLL_ATTEMPTS = 8,
+    SURVIVAL_CHANCE = 0,
+}
+
+NSPauk.ConstantDescriptions = {
+    DELAY_AFTER_LOGIN = "Задержка старта после входа (сек)",
+    STILL_WAIT = "Ожидание покоя до новой паутины (сек)",
+    SPEED_CHECK = "Интервал проверки движения (сек)",
+    SPEED_THRESHOLD = "Порог скорости: бег/стояние",
+    WEB_SIZE = "Размер точек паутины",
+    WEB_ALPHA = "Прозрачность паутины (0..1)",
+    SPIDER_SIZE = "Размер паука",
+    FAST_MODE = "Общий множитель скорости",
+    MAX_WEB_SEGS = "Лимит живых точек паутины",
+    FADE_DURATION = "Растворение паутины после клика (сек)",
+    DISABLE_TIME = "Отключение паука после клика (сек)",
+    MIN_ANCHOR_SIZE = "Мин. размер фрейма-опоры",
+    MIN_INNER_SIZE = "Мин. размер зоны крепления",
+    MIN_WEB_GAP = "Мин. длина нити",
+    MIN_CROSS_LEN = "Мин. длина перемычки",
+    MAX_VISIBLE_RECTS = "Макс. фреймов-целей",
+    TARGET_COUNT_MIN = "Мин. нитей в паутине",
+    TARGET_COUNT_MAX = "Макс. нитей в паутине",
+    MAX_INSTANCES = "Макс. одновременных паутин",
+    CROSS_ROW_SPACING = "Шаг рядов перемычек",
+    MAX_CROSS_ROWS = "Макс. рядов перемычек",
+    ARC_SAMPLES = "Точность расчёта дуги",
+    MAIN_SAG_MIN = "Мин. провис основных нитей",
+    MAIN_SAG_MAX = "Макс. провис основных нитей",
+    CROSS_SAG_MIN = "Мин. провис перемычек",
+    CROSS_SAG_MAX = "Макс. провис перемычек",
+    INTERCROSS_SAG_MIN = "Мин. провис диагоналей",
+    INTERCROSS_SAG_MAX = "Макс. провис диагоналей",
+    INTERCROSS_SPACING = "Шаг диагоналей",
+    SPIDER_SPEED_MIN = "Мин. скорость паука",
+    SPIDER_SPEED_MAX = "Макс. скорость паука",
+    TRAVEL_SPEED_MULT = "Множитель скорости переходов",
+    CROSS_SPEED_MULT = "Множитель скорости на перемычках",
+    MAIN_SPEED_MULT = "Множитель скорости на основных нитях",
+    WEB_POINT_SPACING_MAX = "Шаг точек паутины",
+    MAX_DROPS_PER_FRAME = "Макс. точек за кадр",
+    COMPLETE_PAUSE = "Пауза после паутины (сек)",
+    MONITOR_CHECK = "Интервал проверки сдвига фреймов (сек)",
+    MOVEMENT_TOLERANCE = "Допуск сдвига фреймов",
+    TEAR_FADE_DURATION = "Обрыв нити (сек)",
+    COCOON_CHANCE = "Шанс кокона (0..1)",
+    COCOON_WRAPS_MIN = "Мин. витков кокона",
+    COCOON_WRAPS_MAX = "Макс. витков кокона",
+    COCOON_LOOP_SEGS = "Сегментов в витке кокона",
+    COCOON_DIAG_MIN = "Мин. диагоналей кокона",
+    COCOON_DIAG_MAX = "Макс. диагоналей кокона",
+    COCOON_MIN_WIDTH = "Мин. ширина жертвы кокона",
+    COCOON_MIN_AREA = "Мин. площадь жертвы кокона",
+    COCOON_MAX_AREA = "Макс. площадь жертвы кокона",
+    DISSOLVE_DURATION_MIN = "Мин. время растворения жертвы (сек)",
+    DISSOLVE_DURATION_MAX = "Макс. время растворения жертвы (сек)",
+    MIN_COCOON_ALPHA = "Мин. прозрачность жертвы",
+    MAX_INTERCROSS_SEGS = "Макс. диагоналей всего",
+    MAX_INTERCROSS_PER_PAIR = "Макс. диагоналей на пару рядов",
+    MOUSE_CHECK = "Интервал проверки мыши (сек)",
+    MOUSE_THREAD_DIST = "Дистанция обрыва нити мышью",
+    MOUSE_HOVER_LIMIT = "Наведений мыши для обрыва нити",
+    MOUSE_STREAK_RESET = "Сброс счётчика наведений (сек)",
+    POINTS_PER_LEVEL = "Точек паутины на уровень",
+    SESSION_FULL_POINTS = "Точек для полного опыта сессии",
+    SESSION_EXP_PERCENT_MAX = "Макс. доля опыта сессии (0..1)",
+    COCOON_EXP_PERCENT = "Доля опыта за кокон (0..1)",
+    LIMIT_COCOON_INTERVAL = "Интервал кокона при лимите (сек)",
+    LIMIT_COCOON_RETRY = "Повтор кокона при лимите (сек)",
+    CROSS_MAX_SECTOR_ANGLE = "Макс. угол сектора перемычек",
+    WEB_THREAD_MIN_SEPARATION = "Мин. расстояние между нитями",
+    WEB_HUB_IGNORE_DIST = "Игнор-дистанция у центра паутины",
+    WEB_TARGET_REROLL_ATTEMPTS = "Попыток подбора цели нити",
+    SURVIVAL_CHANCE = "Выживаемость: шанс избежать смерти",
 }
 
 NSPauk.S = {
@@ -6085,11 +6158,12 @@ end
 function NSPauk:ShowProgress()
     local S = self.S
     local C = self.C
+
     local db = self:EnsureDB()
     local progress = db.progress
-    local perLevel = C.POINTS_PER_LEVEL or 60000
 
-    if perLevel <= 0 then
+    local perLevel = C.POINTS_PER_LEVEL or 60000
+    if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
     end
 
@@ -6101,9 +6175,14 @@ function NSPauk:ShowProgress()
         left = 0
     end
 
-    local currentThreads = S.currentInstance and #S.currentInstance.conns or 0
+    local currentThreads = 0
+    if S.currentInstance and type(S.currentInstance.conns) == "table" then
+        currentThreads = #S.currentInstance.conns
+    end
+
     local session = S.session or { bestPoints = 0, bestExpAwarded = 0 }
 
+    -- 1. Уровень и прогресс
     self:SendOfficer(string.format(
         "Павук: уровень %d, всего точек %d, до уровня %d",
         level,
@@ -6111,6 +6190,7 @@ function NSPauk:ShowProgress()
         left
     ))
 
+    -- 2. Краткая текущая статистика
     self:SendOfficer(string.format(
         "Скорость %s-%s, размер %s, целей %s-%s, сейчас %d",
         tostring(C.SPIDER_SPEED_MIN),
@@ -6121,20 +6201,98 @@ function NSPauk:ShowProgress()
         currentThreads
     ))
 
-    self:SendOfficer(string.format(
-        "Шаг точек %s, шаг перемычек %s, шанс кокона %s",
-        tostring(C.WEB_POINT_SPACING_MAX),
-        tostring(C.CROSS_ROW_SPACING),
-        tostring(C.COCOON_CHANCE)
-    ))
+    -- 3. Только те параметры, которые пользователь менял при лвлапе.
+    -- Считаем изменёнными те, что отличаются от DefaultConstants.
+    local descriptions = self.ConstantDescriptions
+    local changed = {}
+
+    for key, defValue in pairs(self.DefaultConstants) do
+        -- Выживаемость выводим отдельной строкой ниже,
+        -- чтобы не дублировать её в общем списке изменений.
+        if key ~= "SURVIVAL_CHANCE" then
+            local curValue = C[key]
+
+            if type(curValue) == "number"
+                and curValue == curValue
+                and type(defValue) == "number"
+                and defValue == defValue then
+
+                local diff = curValue - defValue
+
+                if math.abs(diff) > 1e-9 then
+                    local label = key
+
+                    if type(descriptions) == "table"
+                        and type(descriptions[key]) == "string"
+                        and descriptions[key] ~= "" then
+                        label = descriptions[key]
+                    end
+
+                    local valueText
+
+                    if type(self.FormatConstantValue) == "function" then
+                        valueText = self:FormatConstantValue(key, curValue)
+                    else
+                        valueText = tostring(curValue)
+                    end
+
+                    changed[#changed + 1] = {
+                        key = key,
+                        text = label .. ": " .. valueText,
+                    }
+                end
+            end
+        end
+    end
+
+    table.sort(changed, function(a, b)
+        return a.key < b.key
+    end)
+
+    if #changed > 0 then
+        local prefix = "Павук: изменено: "
+        local line = prefix
+        local limit = 190
+
+        for _, item in ipairs(changed) do
+            local addition = item.text
+
+            if line == prefix then
+                line = prefix .. addition
+            else
+                if #line + #addition + 2 > limit then
+                    self:SendOfficer(line)
+                    line = prefix .. addition
+                else
+                    line = line .. ", " .. addition
+                end
+            end
+        end
+
+        if line ~= prefix then
+            self:SendOfficer(line)
+        end
+    end
+
+    -- 4. Выживаемость паучка
+    local survival = tonumber(C.SURVIVAL_CHANCE) or 0
+
+    if type(survival) ~= "number" or survival ~= survival then
+        survival = 0
+    end
+
+    if survival < 0 then
+        survival = 0
+    elseif survival > 1 then
+        survival = 1
+    end
 
     self:SendOfficer(string.format(
-        "Живых точек: %d/%s, лимит: %s",
-        S.webAliveCount or 0,
-        tostring(C.MAX_WEB_SEGS),
-        S.limitReached and "достигнут" or "нет"
+        "Выживаемость: %.1f%%",
+        survival * 100
     ))
 
+    -- 5. Рекорд сессии и опыт за рекорды
     self:SendOfficer(string.format(
         "Рекорд сессии: %d точек, учтено опыта за рекорды: %d",
         session.bestPoints or 0,
@@ -13022,41 +13180,12 @@ end
 
 function NSPauk:OnSpiderClick(button)
     local S = self.S
-    local C = self.C
-
     S.nspNearCache = nil
     S.nspSupportCache = nil
-
-    if button ~= "RightButton" then
-        self:NP_ClearGlobalDrag(false)
-        self:NP_ClearTempOwners()
-
-        if S.currentTask and S.currentTask.nspDragTextures then
-            self:RecycleTextures(S.currentTask.nspDragTextures)
-            S.currentTask.nspDragTextures = nil
-        end
-
-        for _, task in ipairs(S.tasks) do
-            if task.nspDragTextures then
-                self:RecycleTextures(task.nspDragTextures)
-                task.nspDragTextures = nil
-            end
-        end
-
-        S.nspFrameCache = nil
-        S.nspSupportCache = nil
-        S.nspLastRoute = nil
-    end
-
     if button == "RightButton" then
         self:ShowProgress()
         return
     end
-
-    if S.moth and S.moth.active then
-        self:AbortMothHunt(true, true, true)
-    end
-
     if S.phase ~= "task"
         and S.phase ~= "instanceComplete"
         and S.phase ~= "dissolve"
@@ -13064,27 +13193,58 @@ function NSPauk:OnSpiderClick(button)
         and S.phase ~= "mothEat" then
         return
     end
+    -- Выживаемость: с шансом из константы паук получает право на пощаду
+    local surv = tonumber(self.C.SURVIVAL_CHANCE) or 0
+    if surv > 0 and math.random() < surv then
+        self:ShowKillConfirm()
+        return
+    end
+    self:KillSpider(button)
+end
 
+function NSPauk:KillSpider(button)
+    local S = self.S
+    local C = self.C
+    self:NP_ClearGlobalDrag(false)
+    self:NP_ClearTempOwners()
+    if S.currentTask and S.currentTask.nspDragTextures then
+        self:RecycleTextures(S.currentTask.nspDragTextures)
+        S.currentTask.nspDragTextures = nil
+    end
+    for _, task in ipairs(S.tasks) do
+        if task.nspDragTextures then
+            self:RecycleTextures(task.nspDragTextures)
+            task.nspDragTextures = nil
+        end
+    end
+    S.nspFrameCache = nil
+    S.nspSupportCache = nil
+    S.nspLastRoute = nil
+    if S.moth and S.moth.active then
+        self:AbortMothHunt(true, true, true)
+    end
+    if S.phase ~= "task"
+        and S.phase ~= "instanceComplete"
+        and S.phase ~= "dissolve"
+        and S.phase ~= "limitWait"
+        and S.phase ~= "mothEat" then
+        return
+    end
     if PlaySoundFile then
         PlaySoundFile(C.CLICK_SOUND)
     end
-
     S.suppressSettle = true
-
     self:AnnounceSpiderKill()
     self:ResetProgress()
     self:ResetConstants()
     self:AbortCocoon()
     self:RestoreDigestedFrames()
-
     S.limitReached = false
     S.limitReturnPending = false
     S.limitCocoonPending = false
     S.limitWaitTimer = 0
     S.limitHomePoint = nil
-
     local textures = {}
-
     local function addList(list)
         for _, texture in ipairs(list) do
             if texture and texture:IsShown() then
@@ -13092,35 +13252,28 @@ function NSPauk:OnSpiderClick(button)
             end
         end
     end
-
     for _, inst in ipairs(S.instances) do
         for _, conn in ipairs(inst.conns) do
             addList(conn.textures)
         end
-
         for _, seg in ipairs(inst.crossSegs) do
             addList(seg.textures)
         end
     end
-
     for _, fade in ipairs(S.fades) do
         addList(fade.textures)
     end
-
     for _, inst in ipairs(S.instances) do
         for _, conn in ipairs(inst.conns) do
             conn.textures = {}
         end
-
         for _, seg in ipairs(inst.crossSegs) do
             seg.textures = {}
         end
     end
-
     for i = #S.fades, 1, -1 do
         S.fades[i] = nil
     end
-
     local pxxx = S.activeFrame:CreateTexture(nil, "OVERLAY")
     pxxx:SetTexture(C.CLICK_TEX)
     pxxx:SetWidth(C.SPIDER_SIZE * 4)
@@ -13128,11 +13281,8 @@ function NSPauk:OnSpiderClick(button)
     pxxx:SetPoint("CENTER", UIParent, "BOTTOMLEFT", S.lastSpiderX, S.lastSpiderY)
     pxxx:SetDrawLayer("OVERLAY")
     pxxx:SetAlpha(1)
-
     S.webCreated = S.webCreated + 1
-
     textures[#textures + 1] = pxxx
-
     S.instances = {}
     S.currentInstance = nil
     S.tasks = {}
@@ -13140,16 +13290,122 @@ function NSPauk:OnSpiderClick(button)
     S.currentTask = nil
     S.mouseOnThread = nil
     S.webPoints = 0
-
     self:HideSpider()
-
     self:AddFade(textures, C.FADE_DURATION, function(addon)
         addon:FinishClickFade()
     end)
-
     S.phase = "fade"
     S.speedTimer = 0
     S.suppressSettle = false
+end
+
+function NSPauk:CreateKillConfirmFrame()
+    if self.killConfirmFrame then
+        return
+    end
+    local f = CreateFrame("Frame", "NSPauk_KillConfirmFrame", UIParent)
+    f:SetWidth(360)
+    f:SetHeight(140)
+    f:SetPoint("CENTER")
+    -- TOOLTIP-страта с высоким уровнем, чтобы кнопки были выше
+    -- кликабельной кнопки паука (NSPauk_ClickHigh, level 102)
+    f:SetFrameStrata("TOOLTIP")
+    f:SetFrameLevel(200)
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:SetClampedToScreen(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(frame)
+        frame:StartMoving()
+    end)
+    f:SetScript("OnDragStop", function(frame)
+        frame:StopMovingOrSizing()
+    end)
+    f:Hide()
+    if type(UISpecialFrames) == "table" and f:GetName() then
+        table.insert(UISpecialFrames, f:GetName())
+    end
+    local function setColor(tex, r, g, b, a)
+        if not tex then
+            return
+        end
+        if tex.SetColorTexture then
+            tex:SetColorTexture(r, g, b, a or 1)
+        else
+            tex:SetTexture(1, 1, 1, 1)
+            tex:SetVertexColor(r, g, b, a or 1)
+        end
+    end
+    local border = f:CreateTexture(nil, "BACKGROUND")
+    border:SetAllPoints(f)
+    setColor(border, 0.50, 0.20, 0.20, 1)
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetDrawLayer("BACKGROUND", 1)
+    bg:SetPoint("TOPLEFT", 2, -2)
+    bg:SetPoint("BOTTOMRIGHT", -2, 2)
+    setColor(bg, 0.10, 0.07, 0.07, 0.96)
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    title:SetPoint("TOP", 0, -22)
+    title:SetText("Убить паука?")
+    local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sub:SetPoint("TOP", title, "BOTTOM", 0, -8)
+    sub:SetText("Это обнулит его прогресс.")
+    local yesBtn = CreateFrame("Button", nil, f)
+    yesBtn:SetWidth(120)
+    yesBtn:SetHeight(30)
+    yesBtn:SetPoint("BOTTOMLEFT", 30, 18)
+    yesBtn:EnableMouse(true)
+    local yesBg = yesBtn:CreateTexture(nil, "BACKGROUND")
+    yesBg:SetAllPoints(yesBtn)
+    setColor(yesBg, 0.45, 0.14, 0.14, 1)
+    local yesText = yesBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    yesText:SetPoint("CENTER")
+    yesText:SetText("Да")
+    yesBtn:SetScript("OnEnter", function()
+        setColor(yesBg, 0.58, 0.20, 0.20, 1)
+    end)
+    yesBtn:SetScript("OnLeave", function()
+        setColor(yesBg, 0.45, 0.14, 0.14, 1)
+    end)
+    yesBtn:SetScript("OnClick", function()
+        self:HideKillConfirm()
+        self:KillSpider("LeftButton")
+    end)
+    local noBtn = CreateFrame("Button", nil, f)
+    noBtn:SetWidth(120)
+    noBtn:SetHeight(30)
+    noBtn:SetPoint("BOTTOMRIGHT", -30, 18)
+    noBtn:EnableMouse(true)
+    local noBg = noBtn:CreateTexture(nil, "BACKGROUND")
+    noBg:SetAllPoints(noBtn)
+    setColor(noBg, 0.16, 0.36, 0.18, 1)
+    local noText = noBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    noText:SetPoint("CENTER")
+    noText:SetText("Нет")
+    noBtn:SetScript("OnEnter", function()
+        setColor(noBg, 0.22, 0.48, 0.24, 1)
+    end)
+    noBtn:SetScript("OnLeave", function()
+        setColor(noBg, 0.16, 0.36, 0.18, 1)
+    end)
+    noBtn:SetScript("OnClick", function()
+        self:HideKillConfirm()
+    end)
+    self.killConfirmFrame = f
+end
+
+function NSPauk:ShowKillConfirm()
+    self:CreateKillConfirmFrame()
+    if not self.killConfirmFrame then
+        return
+    end
+    self.killConfirmFrame:Show()
+end
+
+function NSPauk:HideKillConfirm()
+    if self.killConfirmFrame then
+        self.killConfirmFrame:Hide()
+    end
 end
 
 function NSPauk:OnUpdate(dt)
@@ -13492,6 +13748,13 @@ function NSPauk:OnUpdate(dt)
 end
 
 function NSPauk:FormatConstantValue(key, value)
+    if key == "SURVIVAL_CHANCE" then
+        if type(value) ~= "number" or value ~= value then
+            return "0%"
+        end
+        return string.format("%.1f%%", value * 100)
+    end
+
     if type(value) ~= "number" then
         return tostring(value)
     end
@@ -13501,6 +13764,33 @@ function NSPauk:FormatConstantValue(key, value)
     end
 
     return string.format("%.3f", value)
+end
+
+function NSPauk:FormatConstantDelta(key, delta)
+    if type(delta) ~= "number" or delta ~= delta then
+        return "?"
+    end
+
+    if math.abs(delta) < 1e-9 then
+        return "без изменений"
+    end
+
+    local sign = delta > 0 and "+" or "-"
+    local abs = math.abs(delta)
+
+    if key == "SURVIVAL_CHANCE" then
+        return string.format("%s%.1f п.п.", sign, abs * 100)
+    end
+
+    if math.floor(abs) == abs then
+        return string.format("%s%d", sign, math.floor(abs))
+    end
+
+    if abs >= 100 then
+        return string.format("%s%.1f", sign, abs)
+    end
+
+    return string.format("%s%.3f", sign, abs)
 end
 
 function NSPauk:ClampConstant(key, old, new)
@@ -13568,31 +13858,42 @@ end
 function NSPauk:AdjustConstant(key, direction)
     local db = self:EnsureDB()
     local C = self.C
-    local old = C[key]
 
-    if type(old) ~= "number" then
+    local old = C[key]
+    if type(old) ~= "number" or old ~= old then
         return
     end
 
-    local pct = self:RandomFloat(0.001, 0.05)
-    local base = math.abs(old)
+    local new
 
-    if base == 0 then
-        base = 1
-    end
+    if key == "SURVIVAL_CHANCE" then
+        -- Выживаемость меняется фиксированным шагом 1-5%
+        local step = self:RandomFloat(0.01, 0.05)
 
-    local delta = base * pct
-
-    if delta == 0 then
-        delta = 0.001
-    end
-
-    local new = old
-
-    if direction > 0 then
-        new = old + delta
+        if direction > 0 then
+            new = old + step
+        else
+            new = old - step
+        end
     else
-        new = old - delta
+        local pct = self:RandomFloat(0.001, 0.05)
+        local base = math.abs(old)
+
+        if base == 0 then
+            base = 1
+        end
+
+        local delta = base * pct
+
+        if delta == 0 then
+            delta = 0.001
+        end
+
+        if direction > 0 then
+            new = old + delta
+        else
+            new = old - delta
+        end
     end
 
     new = self:ClampConstant(key, old, new)
@@ -13604,6 +13905,26 @@ function NSPauk:AdjustConstant(key, direction)
     end
 
     self:ApplyRuntimeConstants()
+
+    local label = key
+
+    if type(self.ConstantDescriptions) == "table"
+        and type(self.ConstantDescriptions[key]) == "string"
+        and self.ConstantDescriptions[key] ~= "" then
+        label = self.ConstantDescriptions[key]
+    end
+
+    local choice = direction > 0 and "плюс" or "минус"
+    local delta = new - old
+
+    self:SendOfficer(string.format(
+        "Павук: выбрано «%s» (%s): %s -> %s (%s)",
+        label,
+        choice,
+        self:FormatConstantValue(key, old),
+        self:FormatConstantValue(key, new),
+        self:FormatConstantDelta(key, delta)
+    ))
 end
 
 function NSPauk:HideLevelUpFrame()
@@ -13636,9 +13957,7 @@ function NSPauk:CreateLevelUpFrame()
     if self.levelUpFrame then
         return
     end
-
     local f = CreateFrame("Frame", "NSPauk_LevelUpFrame", UIParent)
-
     f:SetWidth(460)
     f:SetHeight(420)
     f:SetPoint("CENTER")
@@ -13648,26 +13967,20 @@ function NSPauk:CreateLevelUpFrame()
     f:SetMovable(true)
     f:SetClampedToScreen(true)
     f:RegisterForDrag("LeftButton")
-
     f:SetScript("OnDragStart", function(frame)
         frame:StartMoving()
     end)
-
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
     end)
-
     f:Hide()
-
     if type(UISpecialFrames) == "table" and f:GetName() then
         table.insert(UISpecialFrames, f:GetName())
     end
-
     local function setColor(tex, r, g, b, a)
         if not tex then
             return
         end
-
         if tex.SetColorTexture then
             tex:SetColorTexture(r, g, b, a or 1)
         else
@@ -13675,135 +13988,122 @@ function NSPauk:CreateLevelUpFrame()
             tex:SetVertexColor(r, g, b, a or 1)
         end
     end
-
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
     setColor(bg, 0.06, 0.06, 0.10, 0.94)
-
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
     title:SetPoint("TOP", 0, -12)
     title:SetText("Павук: новый уровень!")
-
     local closeBtn = CreateFrame("Button", nil, f)
     closeBtn:SetWidth(24)
     closeBtn:SetHeight(24)
     closeBtn:SetPoint("TOPRIGHT", -8, -8)
     closeBtn:EnableMouse(true)
-
     local closeBg = closeBtn:CreateTexture(nil, "BACKGROUND")
     closeBg:SetAllPoints(closeBtn)
     setColor(closeBg, 0.35, 0.10, 0.10, 1)
-
     local closeText = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     closeText:SetPoint("CENTER")
     closeText:SetText("X")
-
     closeBtn:SetScript("OnClick", function()
         self:HideLevelUpFrame()
     end)
-
+    closeBtn:SetScript("OnEnter", function()
+        setColor(closeBg, 0.50, 0.16, 0.16, 1)
+    end)
+    closeBtn:SetScript("OnLeave", function()
+        setColor(closeBg, 0.35, 0.10, 0.10, 1)
+    end)
     local scroll = CreateFrame("ScrollFrame", nil, f)
     scroll:SetPoint("TOPLEFT", 14, -42)
     scroll:SetPoint("BOTTOMRIGHT", -18, 14)
-
     local child = CreateFrame("Frame", nil, scroll)
     child:SetWidth(410)
-
     scroll:SetScrollChild(child)
     scroll:EnableMouseWheel(true)
-
     scroll:SetScript("OnMouseWheel", function(frame, delta)
         local current = frame:GetVerticalScroll()
         local maxScroll = frame:GetVerticalScrollRange()
         local newScroll = current - (delta * 20)
-
         if newScroll < 0 then
             newScroll = 0
         end
-
         if newScroll > maxScroll then
             newScroll = maxScroll
         end
-
         frame:SetVerticalScroll(newScroll)
     end)
-
     self.levelUpFrame = f
     self.levelUpScroll = scroll
     self.levelUpChild = child
     self.levelUpRows = {}
-
     local keys = {}
-
     for key in pairs(self.DefaultConstants) do
         keys[#keys + 1] = key
     end
-
     table.sort(keys)
-
     local rowHeight = 22
-
     for i, key in ipairs(keys) do
         local row = CreateFrame("Frame", nil, child)
         row:SetHeight(rowHeight)
         row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -((i - 1) * rowHeight))
         row:SetPoint("RIGHT", child, "RIGHT", 0, 0)
-
         local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         nameText:SetPoint("LEFT", 0, 0)
         nameText:SetJustifyH("LEFT")
         nameText:SetWidth(240)
-        nameText:SetText(key)
-
+        local desc = self.ConstantDescriptions and self.ConstantDescriptions[key]
+        nameText:SetText(desc or key)
         local minus = CreateFrame("Button", nil, row)
         minus:SetWidth(22)
         minus:SetHeight(22)
         minus:SetPoint("RIGHT", row, "RIGHT", 0, 0)
         minus:EnableMouse(true)
-
         local minusBg = minus:CreateTexture(nil, "BACKGROUND")
         minusBg:SetAllPoints(minus)
         setColor(minusBg, 0.22, 0.22, 0.28, 1)
-
         local minusText = minus:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         minusText:SetPoint("CENTER")
         minusText:SetText("-")
-
+        minus:SetScript("OnEnter", function()
+            setColor(minusBg, 0.32, 0.32, 0.40, 1)
+        end)
+        minus:SetScript("OnLeave", function()
+            setColor(minusBg, 0.22, 0.22, 0.28, 1)
+        end)
         local plus = CreateFrame("Button", nil, row)
         plus:SetWidth(22)
         plus:SetHeight(22)
         plus:SetPoint("RIGHT", minus, "LEFT", -4, 0)
         plus:EnableMouse(true)
-
         local plusBg = plus:CreateTexture(nil, "BACKGROUND")
         plusBg:SetAllPoints(plus)
         setColor(plusBg, 0.22, 0.30, 0.22, 1)
-
         local plusText = plus:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         plusText:SetPoint("CENTER")
         plusText:SetText("+")
-
+        plus:SetScript("OnEnter", function()
+            setColor(plusBg, 0.32, 0.44, 0.32, 1)
+        end)
+        plus:SetScript("OnLeave", function()
+            setColor(plusBg, 0.22, 0.30, 0.22, 1)
+        end)
         local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         valueText:SetPoint("RIGHT", plus, "LEFT", -8, 0)
         valueText:SetJustifyH("RIGHT")
         valueText:SetWidth(90)
-
         row.key = key
         row.value = valueText
-
         minus:SetScript("OnClick", function()
             self:AdjustConstant(key, -1)
             self:HideLevelUpFrame()
         end)
-
         plus:SetScript("OnClick", function()
             self:AdjustConstant(key, 1)
             self:HideLevelUpFrame()
         end)
-
         self.levelUpRows[#self.levelUpRows + 1] = row
     end
-
     child:SetHeight(#keys * rowHeight + 10)
 end
 
