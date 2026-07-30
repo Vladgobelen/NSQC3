@@ -9693,14 +9693,20 @@ end
 
 function NSPauk:NP_PostUpdate()
     local S = self.S
+    if type(S) ~= "table" then
+        return
+    end
 
-    if S and S.combatHide then
+    if not self.initialized or S.runtimeOff or S.phase == "off" then
+        return
+    end
+
+    if S.combatHide then
         return
     end
 
     if S.phase == "task" then
         local task = S.currentTask
-
         if task then
             if S.nspDrag and task.nspDuringDrag then
                 self:NP_UpdateGlobalDrag()
@@ -16118,20 +16124,118 @@ function NSPauk:NP_DebugSectors()
     end
 end
 
-function NSPauk:Init()
-    if self.initialized then
+function NSPauk:Echo(message)
+    if type(message) ~= "string" then
+        message = tostring(message)
+    end
+
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00NSPauk:|r " .. message)
+    elseif type(print) == "function" then
+        print("NSPauk: " .. message)
+    end
+end
+
+function NSPauk:IsPersistentlyDisabled()
+    if type(nsDbc) ~= "table" then
+        return false
+    end
+
+    local db = nsDbc["паук"]
+    if type(db) ~= "table" then
+        return false
+    end
+
+    return db.disabled == true
+end
+
+function NSPauk:SetPersistentDisabled(flag)
+    if type(nsDbc) ~= "table" then
+        nsDbc = {}
+    end
+
+    if type(nsDbc["паук"]) ~= "table" then
+        nsDbc["паук"] = {}
+    end
+
+    nsDbc["паук"].disabled = flag and true or false
+    return nsDbc["паук"].disabled
+end
+
+function NSPauk:OnUpdateGuarded(dt)
+    local S = self.S
+    if type(S) ~= "table" then
         return
     end
 
-    self.initialized = true
+    if not self.initialized or S.runtimeOff or S.phase == "off" then
+        return
+    end
 
-    self:LoadConstants()
+    if self:IsPersistentlyDisabled() then
+        return
+    end
 
-    local C = self.C
+    self:OnUpdate(dt)
+end
+
+function NSPauk:RuntimeShutdown()
     local S = self.S
+    if type(S) ~= "table" then
+        return
+    end
 
-    S.SW, S.SH = self:GetScreenSize()
-    S.webAliveCount = 0
+    local function safeCall(func, ...)
+        if type(func) ~= "function" then
+            return
+        end
+
+        if type(pcall) == "function" then
+            pcall(func, ...)
+        else
+            func(...)
+        end
+    end
+
+    local function hideAllRegions(frame)
+        if frame and frame.GetRegions then
+            for _, region in ipairs({ frame:GetRegions() }) do
+                if region and region.Hide then
+                    region:Hide()
+                end
+            end
+        end
+    end
+
+    self.initialized = false
+    S.runtimeOff = true
+    S.phase = "off"
+
+    if self.eventFrame then
+        self.eventFrame:UnregisterAllEvents()
+        self.eventFrame:SetScript("OnEvent", nil)
+    end
+
+    if self.F_HIGH then
+        self.F_HIGH:SetScript("OnUpdate", nil)
+        self.F_HIGH:Hide()
+    end
+
+    if self.F_SPIDER then
+        self.F_SPIDER:Hide()
+    end
+
+    if self.F_CLICK then
+        self.F_CLICK:Hide()
+    end
+
+    if self.killConfirmFrame then
+        self.killConfirmFrame:Hide()
+    end
+
+    if self.levelUpFrame then
+        self.levelUpFrame:Hide()
+    end
 
     S.limitReached = false
     S.limitReturnPending = false
@@ -16139,31 +16243,229 @@ function NSPauk:Init()
     S.limitWaitTimer = 0
     S.limitHomePoint = nil
 
-    self.F_HIGH = CreateFrame("Frame", C.ADDON .. "_WebHigh", UIParent)
-    self.F_HIGH:SetAllPoints(UIParent)
-    self.F_HIGH:SetFrameStrata("TOOLTIP")
-    self.F_HIGH:SetFrameLevel(100)
-    self.F_HIGH:EnableMouse(false)
-    self.F_HIGH:Show()
+    S.inCombat = false
+    S.combatHide = false
+    S.combatHideUntil = 0
 
+    S.suppressSettle = true
+    safeCall(self.NP_ClearGlobalDrag, self, false)
+    safeCall(self.NP_ClearTempOwners, self)
+    safeCall(self.AbortMothHunt, self, true, true, true)
+    safeCall(self.ClearAllVisuals, self)
+    safeCall(self.AbortCocoon, self)
+    safeCall(self.RestoreDigestedFrames, self)
+    S.suppressSettle = false
+
+    safeCall(self.ResetSessionRecord, self)
+
+    S.phase = "off"
+    S.runtimeOff = true
+    S.suppressSettle = false
+
+    S.initTimer = 0
+    S.speedTimer = 0
+    S.stillTimer = 0
+    S.completeTimer = 0
+    S.monitorTimer = 0
+    S.mouseTimer = 0
+    S.mouseIdle = 0
+    S.mouseOnThread = nil
+    S.disableTimer = 0
+    S.limitWaitTimer = 0
+    S.mothCheckTimer = 0
+    S.lastTaskT = 0
+    S.moveDur = 1
+    S.moveT = 0
+
+    S.lastSpiderX = 0
+    S.lastSpiderY = 0
+    S.lastDropX = 0
+    S.lastDropY = 0
+
+    S.webPoints = 0
+    S.webAliveCount = 0
+    S.webCreated = 0
+
+    S.nspFrameCache = nil
+    S.nspSupportCache = nil
+    S.nspNearCache = nil
+    S.nspLastRoute = nil
+    S.nspDrag = nil
+    S.nspTempOwners = {}
+
+    S.tasks = {}
+    S.taskIdx = 1
+    S.currentTask = nil
+    S.instances = {}
+    S.currentInstance = nil
+    S.cocoon = nil
+    S.moth = nil
+    S.digestedFrames = {}
+    S.fades = {}
+
+    S.limitReached = false
+    S.limitReturnPending = false
+    S.limitCocoonPending = false
+    S.limitHomePoint = nil
+
+    S.inCombat = false
+    S.combatHide = false
+    S.combatHideUntil = 0
+
+    self.nextInstanceId = 1
+
+    hideAllRegions(self.F_HIGH)
+    hideAllRegions(self.F_SPIDER)
+    hideAllRegions(self.F_CLICK)
+
+    if self.F_HIGH then
+        self.F_HIGH:Hide()
+    end
+
+    if self.F_SPIDER then
+        self.F_SPIDER:Hide()
+    end
+
+    if self.F_CLICK then
+        self.F_CLICK:Hide()
+    end
+
+    if S.spider and S.spider.Hide then
+        S.spider:Hide()
+    end
+
+    if S.clickBtn and S.clickBtn.Hide then
+        S.clickBtn:Hide()
+    end
+
+    safeCall(self.HideSpider, self)
+end
+
+function NSPauk:Activate()
+    if self:IsPersistentlyDisabled() then
+        return false
+    end
+
+    local S = self.S
+    if type(S) ~= "table" then
+        return false
+    end
+
+    S.runtimeOff = false
+    S.suppressSettle = false
+
+    if not self.initialized or not self.F_HIGH then
+        self.initialized = false
+        self:LoadConstants()
+        self:SetMode("base")
+        self:Init()
+        return self.initialized == true
+    end
+
+    self:LoadConstants()
+    self:SetMode("base")
+
+    if not self.eventFrame then
+        self.eventFrame = CreateFrame("Frame")
+    end
+
+    self.eventFrame:SetScript("OnEvent", function(_, event)
+        NSPauk:OnEvent(event)
+    end)
+
+    self.eventFrame:RegisterEvent("PLAYER_LOGIN")
+    self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+    if self.F_HIGH then
+        self.F_HIGH:SetScript("OnUpdate", function(_, dt)
+            NSPauk:OnUpdateGuarded(dt)
+        end)
+        self.F_HIGH:Show()
+    end
+
+    if self.F_SPIDER then
+        self.F_SPIDER:Show()
+    end
+
+    if self.F_CLICK then
+        self.F_CLICK:Show()
+    end
+
+    if S.phase == "off" then
+        S.phase = "watch"
+    end
+
+    S.initTimer = 0
+    S.stillTimer = 0
+    S.speedTimer = 0
+    S.completeTimer = 0
+    S.monitorTimer = 0
+    S.mouseTimer = 0
+    S.disableTimer = 0
+    S.limitWaitTimer = 0
+    S.mothCheckTimer = 0
+    S.SW, S.SH = self:GetScreenSize()
+
+    return true
+end
+
+function NSPauk:Init()
+    if self.initialized then
+        return
+    end
+
+    if self:IsPersistentlyDisabled() then
+        return
+    end
+
+    self.initialized = true
+    self:LoadConstants()
+
+    local C = self.C
+    local S = self.S
+
+    S.runtimeOff = false
+    if S.phase == "off" then
+        S.phase = "watch"
+    end
+
+    S.SW, S.SH = self:GetScreenSize()
+    S.webAliveCount = 0
+    S.limitReached = false
+    S.limitReturnPending = false
+    S.limitCocoonPending = false
+    S.limitWaitTimer = 0
+    S.limitHomePoint = nil
+
+    local function prepareFrame(field, name, strata, level)
+        local f = self[field]
+
+        if not f and _G then
+            f = _G[name]
+        end
+
+        if not f then
+            f = CreateFrame("Frame", name, UIParent)
+        end
+
+        f:ClearAllPoints()
+        f:SetAllPoints(UIParent)
+        f:SetFrameStrata(strata)
+        f:SetFrameLevel(level)
+        f:EnableMouse(false)
+        f:Show()
+
+        self[field] = f
+        return f
+    end
+
+    self.F_HIGH = prepareFrame("F_HIGH", C.ADDON .. "_WebHigh", "TOOLTIP", 100)
     S.activeFrame = self.F_HIGH
 
-    self.F_SPIDER = CreateFrame("Frame", C.ADDON .. "_SpiderHigh", UIParent)
-    self.F_SPIDER:SetAllPoints(UIParent)
-    self.F_SPIDER:SetFrameStrata("TOOLTIP")
-    self.F_SPIDER:SetFrameLevel(101)
-    self.F_SPIDER:EnableMouse(false)
-    self.F_SPIDER:Show()
-
+    self.F_SPIDER = prepareFrame("F_SPIDER", C.ADDON .. "_SpiderHigh", "TOOLTIP", 101)
     S.spiderFrame = self.F_SPIDER
 
-    self.F_CLICK = CreateFrame("Frame", C.ADDON .. "_ClickHigh", UIParent)
-    self.F_CLICK:SetAllPoints(UIParent)
-    self.F_CLICK:SetFrameStrata("TOOLTIP")
-    self.F_CLICK:SetFrameLevel(102)
-    self.F_CLICK:EnableMouse(false)
-    self.F_CLICK:Show()
-
+    self.F_CLICK = prepareFrame("F_CLICK", C.ADDON .. "_ClickHigh", "TOOLTIP", 102)
     S.clickFrame = self.F_CLICK
 
     if type(C.EXCLUDE_FRAMES) ~= "table" then
@@ -16174,21 +16476,25 @@ function NSPauk:Init()
     C.EXCLUDE_FRAMES[C.ADDON .. "_SpiderHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_ClickHigh"] = true
 
-    self.F_HIGH:SetScript("OnUpdate", function(frame, dt)
-        NSPauk:OnUpdate(dt)
+    self.F_HIGH:SetScript("OnUpdate", function(_, dt)
+        NSPauk:OnUpdateGuarded(dt)
     end)
 
-    if self.F_HIGH.HookScript then
+    if self.F_HIGH.HookScript and self.postUpdateHookedFrame ~= self.F_HIGH then
         self.F_HIGH:HookScript("OnUpdate", function()
             NSPauk:NP_PostUpdate()
         end)
+        self.postUpdateHookedFrame = self.F_HIGH
     end
 
-    self.eventFrame = CreateFrame("Frame")
+    if not self.eventFrame then
+        self.eventFrame = CreateFrame("Frame")
+    end
+
     self.eventFrame:RegisterEvent("PLAYER_LOGIN")
     self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
-    self.eventFrame:SetScript("OnEvent", function(frame, event)
+    self.eventFrame:SetScript("OnEvent", function(_, event)
         NSPauk:OnEvent(event)
     end)
 end
@@ -16248,9 +16554,12 @@ function NSPauk:CallBase(name, ...)
     end
 end
 
-NSPauk:LoadConstants()
 NSPauk:SetMode("base")
-NSPauk:Init()
+
+if not NSPauk:Activate() then
+    NSPauk.S.runtimeOff = true
+    NSPauk.S.phase = "off"
+end
 
 ---------------------------------------------------------------------------
 -- Slash commands
@@ -16261,6 +16570,11 @@ if type(SlashCmdList) == "table" then
 
     if not SlashCmdList[cmdName] then
         SlashCmdList[cmdName] = function()
+            if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
+                NSPauk:Echo("Паук выключен. Для включения используй /paukblock.")
+                return
+            end
+
             NSPauk:NP_DebugPrint()
         end
 
@@ -16276,6 +16590,11 @@ if type(SlashCmdList) == "table" then
 
     if not SlashCmdList[cmdName] then
         SlashCmdList[cmdName] = function(msg)
+            if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
+                NSPauk:Echo("Паук выключен. Для включения используй /paukblock.")
+                return
+            end
+
             msg = type(msg) == "string" and msg or ""
             msg = msg:gsub("^%s+", "")
             msg = msg:gsub("%s+$", "")
@@ -16300,12 +16619,12 @@ if type(SlashCmdList) == "table" then
                     NSPauk.DB.constants.CROSS_MAX_SECTOR_ANGLE = value
                 end
 
-                NSPauk:Print(string.format(
+                NSPauk:Echo(string.format(
                     "CROSS_MAX_SECTOR_ANGLE=%.1f. Для применения создай новую паутину.",
                     value
                 ))
             elseif cmd == "angle" then
-                NSPauk:Print("Использование: /nspsectors angle 160")
+                NSPauk:Echo("Использование: /nspsectors angle 160")
             else
                 NSPauk:NP_DebugSectors()
             end
@@ -16314,6 +16633,56 @@ if type(SlashCmdList) == "table" then
         if _G then
             _G["SLASH_" .. cmdName .. "1"] = "/nspsectors"
             _G["SLASH_" .. cmdName .. "2"] = "/pauksectors"
+        end
+    end
+end
+
+if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKOFF"
+
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function()
+            if NSPauk:IsPersistentlyDisabled() then
+                NSPauk:Echo("Паук уже выключен из сохранений. Для включения используй /paukblock.")
+                return
+            end
+
+            NSPauk:RuntimeShutdown()
+            NSPauk:Echo("Аварийное отключение выполнено. Все визуальные эффекты и таймеры убраны до перезахода. Сохранения не тронуты.")
+        end
+
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspoff"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukoff"
+        end
+    end
+end
+
+if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKBLOCK"
+
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function()
+            if NSPauk:IsPersistentlyDisabled() then
+                NSPauk:SetPersistentDisabled(false)
+
+                if NSPauk:Activate() then
+                    NSPauk:Echo("Сохранённое отключение снято. Паук запущен.")
+                else
+                    NSPauk:Echo("Сохранённое отключение снято, но запуск не удался. Попробуй /reload.")
+                end
+            else
+                NSPauk:SetPersistentDisabled(true)
+                NSPauk:RuntimeShutdown()
+                NSPauk:Echo("Паук полностью отключён и записан в сохранения. Повтори /paukblock для включения.")
+            end
+        end
+
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspblock"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukblock"
+            _G["SLASH_" .. cmdName .. "3"] = "/nspdisable"
+            _G["SLASH_" .. cmdName .. "4"] = "/paukdisable"
         end
     end
 end
