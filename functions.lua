@@ -7623,30 +7623,90 @@ function NSPauk:NP_EnsureThreadSamples(thread)
         return nil
     end
 
-    local count = getThreadTexCount(thread)
+    local count = -1
+    local ref = thread.ownerRef
+    if ref then
+        if ref.conn and ref.conn.textures then
+            count = #ref.conn.textures
+        elseif ref.seg and ref.seg.textures then
+            count = #ref.seg.textures
+        end
+    end
 
-    if thread._nspMapSamples and thread._nspMapTexCount ~= count then
+    local wantedN = 24
+
+    if thread._nspMapSamples
+        and (thread._nspMapTexCount ~= count or thread._nspMapSampleN ~= wantedN) then
         thread._nspMapSamples = nil
         thread._nspMapTexCount = nil
+        thread._nspMapSampleN = nil
         thread._nspColPts = nil
         thread._nspColIgnore = nil
     end
 
     if not thread._nspMapSamples then
         local pts = {}
-        local n = 16
 
-        for i = 0, n - 1 do
-            local t = i / (n - 1)
-            local x, y = self:BzThread(thread, t)
-            pts[#pts + 1] = { x = x, y = y }
+        local p0 = thread.p0
+        local p2 = thread.p2
+        local p1 = thread.p1
+
+        if not p1 and p0 and p2 then
+            p1 = {
+                x = (p0.x + p2.x) / 2,
+                y = (p0.y + p2.y) / 2,
+            }
+        end
+
+        if p0 and p1 and p2 then
+            for i = 0, wantedN - 1 do
+                local t = i / (wantedN - 1)
+                local x = self:Bz(t, p0.x, p1.x, p2.x)
+                local y = self:Bz(t, p0.y, p1.y, p2.y)
+                pts[#pts + 1] = { x = x, y = y }
+            end
         end
 
         thread._nspMapSamples = pts
+        thread._nspMapSampleN = wantedN
     end
 
     thread._nspMapTexCount = count
     return thread._nspMapSamples
+end
+
+function NSPauk:NP_NearestThreadT(thread, x, y)
+    if not thread or not thread.p0 or not thread.p2 then
+        return 0, math.huge
+    end
+
+    local p0 = thread.p0
+    local p2 = thread.p2
+    local p1 = thread.p1 or {
+        x = (p0.x + p2.x) / 2,
+        y = (p0.y + p2.y) / 2,
+    }
+
+    local bestT = 0
+    local bestD2 = math.huge
+    local n = 32
+
+    for i = 0, n do
+        local t = i / n
+        local px = self:Bz(t, p0.x, p1.x, p2.x)
+        local py = self:Bz(t, p0.y, p1.y, p2.y)
+
+        local dx = px - x
+        local dy = py - y
+        local d2 = dx * dx + dy * dy
+
+        if d2 < bestD2 then
+            bestD2 = d2
+            bestT = t
+        end
+    end
+
+    return bestT, math.sqrt(bestD2)
 end
 
 function NSPauk:NP_EnsureFrameCache()
@@ -7727,19 +7787,19 @@ end
 
 function NSPauk:NP_GetWebThreads(a, b, padOverride)
     local S = self.S
-    local pad = padOverride or 260
 
+    local pad = padOverride or 260
     local minX = math.min(a.x, b.x) - pad
     local maxX = math.max(a.x, b.x) + pad
     local minY = math.min(a.y, b.y) - pad
     local maxY = math.max(a.y, b.y) + pad
-
     local cx = (minX + maxX) / 2
     local cy = (minY + maxY) / 2
 
     local cand = {}
+    local seen = {}
 
-    local function consider(thread, owner)
+    local function consider(thread, owner, force)
         if not thread or not thread.p0 or not thread.p2 then
             return
         end
@@ -7747,6 +7807,12 @@ function NSPauk:NP_GetWebThreads(a, b, padOverride)
         if not owner or not owner.textures or #owner.textures == 0 then
             return
         end
+
+        if seen[thread] then
+            return
+        end
+
+        seen[thread] = true
 
         local minx = math.min(thread.p0.x, thread.p2.x)
         local maxx = math.max(thread.p0.x, thread.p2.x)
@@ -7757,21 +7823,18 @@ function NSPauk:NP_GetWebThreads(a, b, padOverride)
             if thread.p1.x < minx then
                 minx = thread.p1.x
             end
-
             if thread.p1.x > maxx then
                 maxx = thread.p1.x
             end
-
             if thread.p1.y < miny then
                 miny = thread.p1.y
             end
-
             if thread.p1.y > maxy then
                 maxy = thread.p1.y
             end
         end
 
-        if maxx < minX or minx > maxX or maxy < minY or miny > maxY then
+        if not force and (maxx < minX or minx > maxX or maxy < minY or miny > maxY) then
             return
         end
 
@@ -7780,14 +7843,28 @@ function NSPauk:NP_GetWebThreads(a, b, padOverride)
         local dx = mx - cx
         local dy = my - cy
 
-        cand[#cand + 1] = { thread = thread, d = dx * dx + dy * dy }
+        cand[#cand + 1] = {
+            thread = thread,
+            d = dx * dx + dy * dy,
+            force = force == true,
+        }
+    end
+
+    -- Основные нити текущей паутины важны для маршрута через хаб.
+    local current = S.currentInstance
+    if current and not current.torn and current.conns then
+        for _, conn in ipairs(current.conns) do
+            if conn.alive and conn.thread then
+                consider(conn.thread, conn, true)
+            end
+        end
     end
 
     for _, inst in ipairs(S.instances) do
         if inst.conns then
             for _, conn in ipairs(inst.conns) do
                 if conn.alive and conn.thread then
-                    consider(conn.thread, conn)
+                    consider(conn.thread, conn, false)
                 end
             end
         end
@@ -7795,7 +7872,7 @@ function NSPauk:NP_GetWebThreads(a, b, padOverride)
         if inst.crossSegs then
             for _, seg in ipairs(inst.crossSegs) do
                 if seg.alive and seg.thread then
-                    consider(seg.thread, seg)
+                    consider(seg.thread, seg, false)
                 end
             end
         end
@@ -7806,18 +7883,18 @@ function NSPauk:NP_GetWebThreads(a, b, padOverride)
     end)
 
     local out = {}
-    local limit = 35
+    local limit = 45
 
     for i = 1, #cand do
-        if i > limit then
-            break
-        end
-
-        local thread = cand[i].thread
-        local samples = self:NP_EnsureThreadSamples(thread)
-
-        if samples then
-            out[#out + 1] = { thread = thread, samples = samples }
+        local entry = cand[i]
+        if entry.force or i <= limit then
+            local samples = self:NP_EnsureThreadSamples(entry.thread)
+            if samples and #samples > 0 then
+                out[#out + 1] = {
+                    thread = entry.thread,
+                    samples = samples,
+                }
+            end
         end
     end
 
@@ -8128,10 +8205,34 @@ function NSPauk:NP_BuildRoute(from, to)
         return #nodes
     end
 
-    local EDGE_PENALTY = 1.45
-    local WEB_BONUS = 0.82
-    local FRAME_BONUS = 0.98
-    local GAP_PENALTY = 1.05
+    local function pointNearWeb(point)
+        if not point or type(point.x) ~= "number" or type(point.y) ~= "number" then
+            return false
+        end
+
+        local checkDist = gap * 1.5
+
+        for _, info in ipairs(threads) do
+            if info.thread then
+                local _, d = self:NP_NearestThreadT(info.thread, point.x, point.y)
+                if d <= checkDist then
+                    return true
+                end
+            end
+        end
+
+        return false
+    end
+
+    -- Если обе точки уже возле паутины, маршрутизатор должен сначала
+    -- пытаться идти по паутине, а не по фреймам/краям экрана.
+    local preferWeb = pointNearWeb(from) and pointNearWeb(to)
+
+    local EDGE_PENALTY = preferWeb and 2.40 or 1.60
+    local WEB_BONUS = preferWeb and 0.42 or 0.70
+    local FRAME_BONUS = preferWeb and 1.25 or 1.05
+    local GAP_PENALTY = preferWeb and 1.45 or 1.10
+    local HUB_BONUS = preferWeb and 0.30 or 0.55
 
     local function addEdge(a, b, w, kind)
         if a and b and a ~= b then
@@ -8147,6 +8248,8 @@ function NSPauk:NP_BuildRoute(from, to)
                 w = w * FRAME_BONUS
             elseif kind == "gap" then
                 w = w * GAP_PENALTY
+            elseif kind == "hub" then
+                w = w * HUB_BONUS
             end
 
             table.insert(edges[a], { to = b, w = w })
@@ -8155,7 +8258,12 @@ function NSPauk:NP_BuildRoute(from, to)
     end
 
     local function addEdgeNode(x, y, side)
-        addNode({ x = x, y = y, kind = "edge", edgeSide = side })
+        addNode({
+            x = x,
+            y = y,
+            kind = "edge",
+            edgeSide = side,
+        })
     end
 
     addEdgeNode(0, 0, "bottom")
@@ -8181,22 +8289,42 @@ function NSPauk:NP_BuildRoute(from, to)
         end
 
         if n.x <= gap then
-            local eid = addNode({ x = 0, y = n.y, kind = "edge", edgeSide = "left" })
+            local eid = addNode({
+                x = 0,
+                y = n.y,
+                kind = "edge",
+                edgeSide = "left",
+            })
             addEdge(id, eid, math.abs(n.x), "edge")
         end
 
         if n.x >= sw - gap then
-            local eid = addNode({ x = sw, y = n.y, kind = "edge", edgeSide = "right" })
+            local eid = addNode({
+                x = sw,
+                y = n.y,
+                kind = "edge",
+                edgeSide = "right",
+            })
             addEdge(id, eid, math.abs(sw - n.x), "edge")
         end
 
         if n.y <= gap then
-            local eid = addNode({ x = n.x, y = 0, kind = "edge", edgeSide = "bottom" })
+            local eid = addNode({
+                x = n.x,
+                y = 0,
+                kind = "edge",
+                edgeSide = "bottom",
+            })
             addEdge(id, eid, math.abs(n.y), "edge")
         end
 
         if n.y >= sh - gap then
-            local eid = addNode({ x = n.x, y = sh, kind = "edge", edgeSide = "top" })
+            local eid = addNode({
+                x = n.x,
+                y = sh,
+                kind = "edge",
+                edgeSide = "top",
+            })
             addEdge(id, eid, math.abs(sh - n.y), "edge")
         end
     end
@@ -8227,7 +8355,6 @@ function NSPauk:NP_BuildRoute(from, to)
                 name = rect.name,
                 frame = rect.frame,
             })
-
             ids[#ids + 1] = id
         end
 
@@ -8239,13 +8366,15 @@ function NSPauk:NP_BuildRoute(from, to)
                 local nb = nodes[ids[b]]
                 local dx = na.x - nb.x
                 local dy = na.y - nb.y
-
                 addEdge(ids[a], ids[b], math.sqrt(dx * dx + dy * dy), "frame")
             end
 
             addEdgeProjection(ids[a])
         end
     end
+
+    local threadNodeIdByThread = {}
+    local threadSamplesByThread = {}
 
     for wi, info in ipairs(threads) do
         local ids = {}
@@ -8266,7 +8395,6 @@ function NSPauk:NP_BuildRoute(from, to)
                 local pp = nodes[prevId]
                 local dx = pp.x - p.x
                 local dy = pp.y - p.y
-
                 addEdge(prevId, id, math.sqrt(dx * dx + dy * dy), "web")
             end
 
@@ -8275,6 +8403,94 @@ function NSPauk:NP_BuildRoute(from, to)
         end
 
         threads[wi].nodeIds = ids
+
+        if info.thread then
+            threadNodeIdByThread[info.thread] = ids
+            threadSamplesByThread[info.thread] = info.samples
+        end
+    end
+
+    local function nearestNodeIdTo(ids, samples, x, y)
+        if not ids or not samples then
+            return nil
+        end
+
+        local bestId = nil
+        local bestD2 = math.huge
+
+        for i, p in ipairs(samples) do
+            local id = ids[i]
+            if id then
+                local dx = p.x - x
+                local dy = p.y - y
+                local d2 = dx * dx + dy * dy
+
+                if d2 < bestD2 then
+                    bestD2 = d2
+                    bestId = id
+                end
+            end
+        end
+
+        return bestId, bestD2
+    end
+
+    -- Хаб-коннекторы.
+    -- Для живой паутины с реальным хаб-фреймом добавляем условную точку
+    -- в центре хаба и соединяем её с началами основных нитей.
+    -- Это позволяет маршруту идти: нить -> центр хаба -> другая нить.
+    for _, inst in ipairs(S.instances) do
+        if not inst.torn
+            and inst.hub
+            and inst.hub.frame
+            and inst.hub.rect
+            and inst.conns
+            and #inst.conns > 0 then
+            local hubX = inst.hub.rect.cx
+            local hubY = inst.hub.rect.cy
+
+            if type(hubX) == "number" and type(hubY) == "number" then
+                local hubId = addNode({
+                    x = hubX,
+                    y = hubY,
+                    kind = "hub",
+                    hubInstance = inst.id,
+                })
+
+                for _, conn in ipairs(inst.conns) do
+                    if conn.alive
+                        and conn.thread
+                        and conn.thread.p0
+                        and conn.textures
+                        and #conn.textures > 0 then
+                        local ids = threadNodeIdByThread[conn.thread]
+                        local samples = threadSamplesByThread[conn.thread]
+
+                        if ids and samples then
+                            local nodeId = nearestNodeIdTo(
+                                ids,
+                                samples,
+                                conn.thread.p0.x,
+                                conn.thread.p0.y
+                            )
+
+                            if nodeId then
+                                local n = nodes[nodeId]
+                                local dx = hubX - n.x
+                                local dy = hubY - n.y
+                                local d = math.sqrt(dx * dx + dy * dy)
+
+                                if d < 1 then
+                                    d = 1
+                                end
+
+                                addEdge(hubId, nodeId, d, "hub")
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 
     local supportCount = #nodes
@@ -8282,11 +8498,11 @@ function NSPauk:NP_BuildRoute(from, to)
     for i = 1, supportCount do
         local ni = nodes[i]
 
-        if ni.kind == "frame" or ni.kind == "web" then
+        if ni.kind == "frame" or ni.kind == "web" or ni.kind == "hub" then
             for j = i + 1, supportCount do
                 local nj = nodes[j]
 
-                if nj.kind == "frame" or nj.kind == "web" then
+                if nj.kind == "frame" or nj.kind == "web" or nj.kind == "hub" then
                     local same = false
 
                     if ni.kind == "frame" and nj.kind == "frame" and ni.frameId == nj.frameId then
@@ -8294,6 +8510,10 @@ function NSPauk:NP_BuildRoute(from, to)
                     end
 
                     if ni.kind == "web" and nj.kind == "web" and ni.webId == nj.webId then
+                        same = true
+                    end
+
+                    if ni.kind == "hub" and nj.kind == "hub" and ni.hubInstance == nj.hubInstance then
                         same = true
                     end
 
@@ -8311,7 +8531,12 @@ function NSPauk:NP_BuildRoute(from, to)
         end
     end
 
-    local sides = { bottom = {}, top = {}, left = {}, right = {} }
+    local sides = {
+        bottom = {},
+        top = {},
+        left = {},
+        right = {},
+    }
 
     for i, n in ipairs(nodes) do
         if n.kind == "edge" and n.edgeSide and sides[n.edgeSide] then
@@ -8325,13 +8550,11 @@ function NSPauk:NP_BuildRoute(from, to)
                 if nodes[a].x == nodes[b].x then
                     return nodes[a].y < nodes[b].y
                 end
-
                 return nodes[a].x < nodes[b].x
             else
                 if nodes[a].y == nodes[b].y then
                     return nodes[a].x < nodes[b].x
                 end
-
                 return nodes[a].y < nodes[b].y
             end
         end)
@@ -8341,7 +8564,6 @@ function NSPauk:NP_BuildRoute(from, to)
             local b = list[k + 1]
             local dx = nodes[a].x - nodes[b].x
             local dy = nodes[a].y - nodes[b].y
-
             addEdge(a, b, math.sqrt(dx * dx + dy * dy), "edge")
         end
     end
@@ -8367,8 +8589,17 @@ function NSPauk:NP_BuildRoute(from, to)
         end
     end
 
-    local startIdx = addNode({ x = from.x, y = from.y, kind = "start" })
-    local targetIdx = addNode({ x = to.x, y = to.y, kind = "target" })
+    local startIdx = addNode({
+        x = from.x,
+        y = from.y,
+        kind = "start",
+    })
+
+    local targetIdx = addNode({
+        x = to.x,
+        y = to.y,
+        kind = "target",
+    })
 
     local topX = to.x
     if topX < 0 then
@@ -8377,7 +8608,12 @@ function NSPauk:NP_BuildRoute(from, to)
         topX = sw
     end
 
-    local topIdx = addNode({ x = topX, y = sh, kind = "edge", edgeSide = "top" })
+    local topIdx = addNode({
+        x = topX,
+        y = sh,
+        kind = "edge",
+        edgeSide = "top",
+    })
 
     for i, n in ipairs(nodes) do
         if i ~= topIdx and n.kind == "edge" and n.edgeSide == "top" then
@@ -8397,8 +8633,13 @@ function NSPauk:NP_BuildRoute(from, to)
                     local n = nodes[nid]
                     local dx = point.x - n.x
                     local dy = point.y - n.y
+                    local d = math.sqrt(dx * dx + dy * dy)
 
-                    addEdge(idx, nid, math.sqrt(dx * dx + dy * dy), "frame")
+                    if d < 1 then
+                        d = 1
+                    end
+
+                    addEdge(idx, nid, d, "frame")
                 end
             elseif rect.nodeIds then
                 for _, nid in ipairs(rect.nodeIds) do
@@ -8414,25 +8655,94 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
 
-        local webPickGap = gap * 1.25
+        -- Если точка рядом с центром хаба, даём ей подключиться к хабу напрямую.
+        local hubPickGap = gap * 2.5
+        for i, n in ipairs(nodes) do
+            if n.kind == "hub" then
+                local dx = point.x - n.x
+                local dy = point.y - n.y
+                local d2 = dx * dx + dy * dy
+
+                if d2 <= hubPickGap * hubPickGap then
+                    local d = math.sqrt(d2)
+                    if d < 1 then
+                        d = 1
+                    end
+                    addEdge(idx, i, d, "hub")
+                end
+            end
+        end
+
+        -- Подключение к паутине.
+        -- Сначала пробуем найти ближайшую точку именно по кривой нити,
+        -- а уже затем подключаемся к соседним сэмплам этой нити.
+        local webPickGap = gap * 1.5
 
         for wi, info in ipairs(threads) do
-            if info.nodeIds then
-                for _, nid in ipairs(info.nodeIds) do
-                    local n = nodes[nid]
-                    local dx = point.x - n.x
-                    local dy = point.y - n.y
-                    local d2 = dx * dx + dy * dy
+            if info.nodeIds and info.thread and info.samples and #info.samples > 0 then
+                local attached = false
 
-                    if d2 <= webPickGap * webPickGap then
-                        addEdge(idx, nid, math.sqrt(d2), "web")
+                local _, curveDist = self:NP_NearestThreadT(info.thread, point.x, point.y)
+
+                if curveDist <= webPickGap then
+                    local bestSampleIdx = nil
+                    local bestD2 = math.huge
+
+                    for si, sp in ipairs(info.samples) do
+                        local dx = point.x - sp.x
+                        local dy = point.y - sp.y
+                        local d2 = dx * dx + dy * dy
+
+                        if d2 < bestD2 then
+                            bestD2 = d2
+                            bestSampleIdx = si
+                        end
+                    end
+
+                    if bestSampleIdx then
+                        for offset = -1, 1 do
+                            local nid = info.nodeIds[bestSampleIdx + offset]
+
+                            if nid then
+                                local n = nodes[nid]
+                                local dx = point.x - n.x
+                                local dy = point.y - n.y
+                                local d = math.sqrt(dx * dx + dy * dy)
+
+                                if d < 1 then
+                                    d = 1
+                                end
+
+                                addEdge(idx, nid, d, "web")
+                                attached = true
+                            end
+                        end
+                    end
+                end
+
+                if not attached then
+                    for _, nid in ipairs(info.nodeIds) do
+                        local n = nodes[nid]
+                        local dx = point.x - n.x
+                        local dy = point.y - n.y
+                        local d2 = dx * dx + dy * dy
+
+                        if d2 <= webPickGap * webPickGap then
+                            addEdge(idx, nid, math.sqrt(d2), "web")
+                        end
                     end
                 end
             end
         end
 
         local function connectEdgeProj(side, px, py, weight)
-            local eid = addNode({ x = px, y = py, kind = "edge", edgeSide = side })
+            local eid = addNode({
+                x = px,
+                y = py,
+                kind = "edge",
+                edgeSide = side,
+            })
+
             addEdge(idx, eid, weight, "edge")
 
             for i, n in ipairs(nodes) do
@@ -8489,7 +8799,6 @@ function NSPauk:NP_BuildRoute(from, to)
     end
 
     local fallbackLen = nil
-
     if topLen and topPath then
         fallbackLen = topLen + math.abs(sh - to.y)
     end
@@ -8520,7 +8829,10 @@ function NSPauk:NP_BuildRoute(from, to)
             length = actualLen(topPath) + math.abs(sh - to.y),
             kind = "drop",
             dropToTarget = true,
-            dropFrom = { x = topX, y = sh },
+            dropFrom = {
+                x = topX,
+                y = sh,
+            },
         }
     elseif directPath then
         route = {
@@ -9189,6 +9501,10 @@ end
 
 function NSPauk:NP_PostUpdate()
     local S = self.S
+
+    if S and S.combatHide then
+        return
+    end
 
     if S.phase == "task" then
         local task = S.currentTask
@@ -13412,6 +13728,10 @@ function NSPauk:OnUpdate(dt)
     local S = self.S
     local C = self.C
 
+    if self:NP_CombatHidePreUpdate(dt) then
+        return
+    end
+
     if S.phase == "init" then
         S.initTimer = S.initTimer + dt
 
@@ -14559,11 +14879,6 @@ do
         end
     end
 
-    ---------------------------------------------------------------------------
-    -- Замена NP_ClearGlobalDrag.
-    -- Если перетаскивание было очищено, а постоянная паутина так и не была
-    -- создана, владелец нити больше не должен считаться живым.
-    ---------------------------------------------------------------------------
     function NSPauk:NP_ClearGlobalDrag(fade)
         local S = self.S
         local drag = S.nspDrag
@@ -14596,6 +14911,146 @@ do
     end
 end
 
+function NSPauk:NP_CombatHideDuration()
+    -- 10 минут
+    return 600
+end
+
+function NSPauk:NP_ApplyCombatHiddenVisuals()
+    local S = self.S
+
+    if S.spider and S.spider:IsShown() then
+        S.spider:Hide()
+    end
+
+    if S.clickBtn and S.clickBtn:IsShown() then
+        S.clickBtn:Hide()
+    end
+end
+
+function NSPauk:NP_EnterCombatHide()
+    local S = self.S
+
+    S.inCombat = true
+
+    if S.combatHide then
+        return
+    end
+
+    S.combatHide = true
+    S.combatHideUntil = 0
+
+    if type(self.AbortMothHunt) == "function" and S.moth and S.moth.active then
+        self:AbortMothHunt(true, true, true)
+    end
+
+    if type(self.AbortCocoon) == "function" and S.cocoon then
+        self:AbortCocoon()
+    end
+
+    if type(self.NP_ClearGlobalDrag) == "function" then
+        self:NP_ClearGlobalDrag(true)
+    end
+
+    S.phase = "combatHide"
+
+    self:NP_ApplyCombatHiddenVisuals()
+end
+
+function NSPauk:NP_LeaveCombatHide()
+    local S = self.S
+
+    S.inCombat = false
+
+    if S.combatHide then
+        S.combatHideUntil = GetTime() + self:NP_CombatHideDuration()
+    end
+end
+
+function NSPauk:NP_ExitCombatHide()
+    local S = self.S
+
+    S.combatHide = false
+    S.combatHideUntil = 0
+
+    S.currentTask = nil
+    S.tasks = {}
+    S.taskIdx = 1
+    S.currentInstance = nil
+
+    S.completeTimer = 0
+    S.stillTimer = 0
+    S.speedTimer = 0
+
+    S.limitReached = false
+    S.limitReturnPending = false
+    S.limitCocoonPending = false
+    S.limitWaitTimer = 0
+    S.limitHomePoint = nil
+
+    if type(self.CheckInstancesMovement) == "function" then
+        self:CheckInstancesMovement()
+    end
+
+    S.phase = "watch"
+
+    self:NP_ApplyCombatHiddenVisuals()
+end
+
+function NSPauk:NP_UpdateCombatHide(dt)
+    local S = self.S
+
+    if not S.combatHide then
+        return
+    end
+
+    dt = tonumber(dt) or 0
+
+    self:NP_ApplyCombatHiddenVisuals()
+
+    if type(self.UpdateFades) == "function" then
+        self:UpdateFades(dt)
+    end
+
+    if not S.inCombat then
+        local now = GetTime()
+
+        if (S.combatHideUntil or 0) > 0 and now >= S.combatHideUntil then
+            self:NP_ExitCombatHide()
+        end
+    end
+end
+
+function NSPauk:NP_CombatHidePreUpdate(dt)
+    local S = self.S
+
+    local inCombat = false
+
+    if InCombatLockdown then
+        inCombat = InCombatLockdown()
+    end
+
+    if inCombat then
+        S.inCombat = true
+
+        if not S.combatHide then
+            self:NP_EnterCombatHide()
+        end
+    else
+        if S.inCombat then
+            self:NP_LeaveCombatHide()
+        end
+
+        S.inCombat = false
+    end
+
+    if S.combatHide then
+        self:NP_UpdateCombatHide(dt)
+        return true
+    end
+
+    return false
+end
 
 
 
@@ -15243,10 +15698,6 @@ function NSPauk:StartTask(task)
     end
 end
 
----------------------------------------------------------------------------
--- Если вставляешь патч в конец файла, обнови BaseMethods,
--- чтобы режимы не вернули старые версии функций.
----------------------------------------------------------------------------
 
 if type(NSPauk.BaseMethods) == "table" then
     NSPauk.BaseMethods.NP_GetAntiTeleportTolerance = NSPauk.NP_GetAntiTeleportTolerance
@@ -15959,7 +16410,6 @@ if type(NSPauk.BaseMethods) == "table" then
     NSPauk.BaseMethods.NP_RebuildInstanceTasks = NSPauk.NP_RebuildInstanceTasks
     NSPauk.BaseMethods.RestoreMothStateImmediate = NSPauk.RestoreMothStateImmediate
 end
-
 
 
 
