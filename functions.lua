@@ -5682,6 +5682,7 @@ local function getThreadTexCount(thread)
 end
 
 NSPauk.DefaultConstants = {
+    SPIDER_ANIM_INTERVAL = 0.18,
     DELAY_AFTER_LOGIN = 3,
     STILL_WAIT = 5,
     SPEED_CHECK = 1,
@@ -5716,6 +5717,11 @@ NSPauk.DefaultConstants = {
     EMPTY_SPEED_MULT = 4,
     WEB_POINT_SPACING_MAX = 1,
     MAX_DROPS_PER_FRAME = 140,
+    DRAG_FPS_TARGET = 40,
+    DRAG_FPS_RECOVER = 48,
+    DRAG_FPS_SAMPLE = 0.4,
+    DRAG_UPDATE_MIN = 0.016,
+    DRAG_UPDATE_MAX = 0.25,
     COMPLETE_PAUSE = 2.5,
     MONITOR_CHECK = 0.35,
     MOVEMENT_TOLERANCE = 2.0,
@@ -5750,6 +5756,7 @@ NSPauk.DefaultConstants = {
 }
 
 NSPauk.ConstantDescriptions = {
+    SPIDER_ANIM_INTERVAL = "Интервал смены кадров паука (сек)",
     DELAY_AFTER_LOGIN = "Задержка старта после входа (сек)",
     STILL_WAIT = "Ожидание покоя до новой паутины (сек)",
     SPEED_CHECK = "Интервал проверки движения (сек)",
@@ -5784,6 +5791,11 @@ NSPauk.ConstantDescriptions = {
     EMPTY_SPEED_MULT = "Множитель скорости пустых переходов (без плетения)",
     WEB_POINT_SPACING_MAX = "Шаг точек паутины",
     MAX_DROPS_PER_FRAME = "Макс. точек за кадр",
+    DRAG_FPS_TARGET = "Порог FPS для троттлинга нити",
+    DRAG_FPS_RECOVER = "FPS возврата к нормальной отрисовке",
+    DRAG_FPS_SAMPLE = "Интервал замера FPS (сек)",
+    DRAG_UPDATE_MIN = "Мин. интервал обновления нити (сек)",
+    DRAG_UPDATE_MAX = "Макс. интервал обновления нити (сек)",
     COMPLETE_PAUSE = "Пауза после паутины (сек)",
     MONITOR_CHECK = "Интервал проверки сдвига фреймов (сек)",
     MOVEMENT_TOLERANCE = "Допуск сдвига фреймов",
@@ -5867,6 +5879,29 @@ NSPauk.S = {
     limitHomePoint = nil,
 }
 
+---------------------------------------------------------------------------
+-- Профили текстур паука
+---------------------------------------------------------------------------
+NSPauk.SpiderTextureProfiles = {
+    default = {
+        label = "Классический",
+        textures = {
+            -- DEFAULT будет заменён на NSPauk.C.TEX_SPIDER
+            "DEFAULT",
+        },
+    },
+    
+    animated = {
+        label = "Анимация",
+        textures = {
+            "Interface\\AddOns\\NSQC3\\libs\\pauk1.tga",
+            "Interface\\AddOns\\NSQC3\\libs\\pauk2.tga",
+            "Interface\\AddOns\\NSQC3\\libs\\pauk3.tga",
+            "Interface\\AddOns\\NSQC3\\libs\\pauk4.tga",
+        },
+    },
+}
+
 NSPauk.C = {}
 NSPauk.DB = nil
 
@@ -5887,12 +5922,18 @@ function NSPauk:EnsureDB()
 
     for key, value in pairs(self.DefaultConstants) do
         local current = db.constants[key]
-
         if current == nil then
             db.constants[key] = value
         elseif type(value) == "number" and (type(current) ~= "number" or current ~= current) then
             db.constants[key] = value
         end
+    end
+
+    -- Страховка, если константа не была добавлена в DefaultConstants.
+    if type(db.constants.SPIDER_ANIM_INTERVAL) ~= "number"
+        or db.constants.SPIDER_ANIM_INTERVAL ~= db.constants.SPIDER_ANIM_INTERVAL
+        or db.constants.SPIDER_ANIM_INTERVAL <= 0 then
+        db.constants.SPIDER_ANIM_INTERVAL = 0.18
     end
 
     if type(db.progress) ~= "table" then
@@ -5919,68 +5960,123 @@ function NSPauk:EnsureDB()
     -- Больше не используется.
     db.progress.historyMigrated = nil
 
+    -- Профиль текстур паука.
+    if type(db.spiderProfile) ~= "string" or db.spiderProfile == "" then
+        db.spiderProfile = "default"
+    end
+
+    if type(self.SpiderTextureProfiles) == "table"
+        and not self.SpiderTextureProfiles[db.spiderProfile] then
+        db.spiderProfile = "default"
+    end
+
     return db
 end
 
 function NSPauk:ApplyRuntimeConstants()
     local C = self.C
+
     C.ADDON = "NSPauk"
     C.CLICK_SOUND = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\bzd.ogg"
     C.CLICK_TEX = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pxxx.tga"
     C.TEX_SPIDER = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pauk.tga"
-    C.TEX_WEB = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pautina.tga"
+    C.TEX_WEB = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pautina8.tga"
     C.LEVELUP_SOUND = "Interface\\AddOns\\NSQC3\\libs\\lvlUp.ogg"
+
     C.EXCLUDE_FRAMES = {
         MinimapCluster = true,
     }
     C.EXCLUDE_FRAMES[C.ADDON .. "_WebHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_SpiderHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_ClickHigh"] = true
+
     local function num(value, default)
         if type(value) ~= "number" or value ~= value then
             return default
         end
         return value
     end
+
     C.LIMIT_COCOON_INTERVAL = num(C.LIMIT_COCOON_INTERVAL, 1800)
     if C.LIMIT_COCOON_INTERVAL <= 0 then
         C.LIMIT_COCOON_INTERVAL = 1800
     end
+
     C.LIMIT_COCOON_RETRY = num(C.LIMIT_COCOON_RETRY, 60)
     if C.LIMIT_COCOON_RETRY <= 0 then
         C.LIMIT_COCOON_RETRY = 60
     end
+
     C.MAX_WEB_SEGS = math.floor(num(C.MAX_WEB_SEGS, self.DefaultConstants.MAX_WEB_SEGS) + 0.5)
     if C.MAX_WEB_SEGS < 0 then
         C.MAX_WEB_SEGS = self.DefaultConstants.MAX_WEB_SEGS
     end
+
     C.WEB_POINT_SPACING_MAX = num(C.WEB_POINT_SPACING_MAX, self.DefaultConstants.WEB_POINT_SPACING_MAX)
     if C.WEB_POINT_SPACING_MAX <= 0 then
         C.WEB_POINT_SPACING_MAX = self.DefaultConstants.WEB_POINT_SPACING_MAX
     end
+
     C.EMPTY_SPEED_MULT = num(C.EMPTY_SPEED_MULT, 4)
     if C.EMPTY_SPEED_MULT <= 0 then
         C.EMPTY_SPEED_MULT = 4
     end
+
     C.WEB_ALPHA = num(C.WEB_ALPHA, self.DefaultConstants.WEB_ALPHA)
     if C.WEB_ALPHA < 0 then
         C.WEB_ALPHA = 0
     elseif C.WEB_ALPHA > 1 then
         C.WEB_ALPHA = 1
     end
+
     C.WEB_SIZE = num(C.WEB_SIZE, self.DefaultConstants.WEB_SIZE)
     if C.WEB_SIZE < 1 then
         C.WEB_SIZE = self.DefaultConstants.WEB_SIZE
     end
+
     C.MAX_DROPS_PER_FRAME = math.floor(num(C.MAX_DROPS_PER_FRAME, self.DefaultConstants.MAX_DROPS_PER_FRAME) + 0.5)
     if C.MAX_DROPS_PER_FRAME < 0 then
         C.MAX_DROPS_PER_FRAME = self.DefaultConstants.MAX_DROPS_PER_FRAME
     end
+
+    C.DRAG_FPS_TARGET = num(C.DRAG_FPS_TARGET, 40)
+    if C.DRAG_FPS_TARGET < 5 then
+        C.DRAG_FPS_TARGET = 40
+    end
+
+    C.DRAG_FPS_RECOVER = num(C.DRAG_FPS_RECOVER, 48)
+    if C.DRAG_FPS_RECOVER < C.DRAG_FPS_TARGET then
+        C.DRAG_FPS_RECOVER = C.DRAG_FPS_TARGET + 8
+    end
+
+    C.DRAG_FPS_SAMPLE = num(C.DRAG_FPS_SAMPLE, 0.4)
+    if C.DRAG_FPS_SAMPLE < 0.1 then
+        C.DRAG_FPS_SAMPLE = 0.4
+    end
+
+    C.DRAG_UPDATE_MIN = num(C.DRAG_UPDATE_MIN, 0.016)
+    if C.DRAG_UPDATE_MIN < 0.005 then
+        C.DRAG_UPDATE_MIN = 0.016
+    end
+
+    C.DRAG_UPDATE_MAX = num(C.DRAG_UPDATE_MAX, 0.25)
+    if C.DRAG_UPDATE_MAX < C.DRAG_UPDATE_MIN then
+        C.DRAG_UPDATE_MAX = math.max(0.25, C.DRAG_UPDATE_MIN * 4)
+    end
+
     C.CROSS_MAX_SECTOR_ANGLE = num(C.CROSS_MAX_SECTOR_ANGLE, 160)
     C.WEB_THREAD_MIN_SEPARATION = num(C.WEB_THREAD_MIN_SEPARATION, 20)
     C.WEB_HUB_IGNORE_DIST = num(C.WEB_HUB_IGNORE_DIST, 100)
     C.WEB_TARGET_REROLL_ATTEMPTS = math.floor(num(C.WEB_TARGET_REROLL_ATTEMPTS, 8) + 0.5)
     C.COCOON_MIN_WIDTH = num(C.COCOON_MIN_WIDTH, 30)
+
+    -- Интервал анимации текстур паука.
+    C.SPIDER_ANIM_INTERVAL = num(C.SPIDER_ANIM_INTERVAL, 0.18)
+    if C.SPIDER_ANIM_INTERVAL < 0.05 then
+        C.SPIDER_ANIM_INTERVAL = 0.05
+    elseif C.SPIDER_ANIM_INTERVAL > 5 then
+        C.SPIDER_ANIM_INTERVAL = 5
+    end
 end
 
 function NSPauk:LoadConstants()
@@ -9549,17 +9645,13 @@ end
 
 function NSPauk:NP_StartDrag(task)
     local S = self.S
-
     if S.nspDrag and S.nspDrag.owner == task.owner then
         return
     end
-
     if S.nspDrag then
         self:NP_ClearGlobalDrag(false)
     end
-
     local finalThread = task.finalThread
-
     if not finalThread then
         finalThread = {
             p0 = copyPoint(task.p0),
@@ -9568,6 +9660,8 @@ function NSPauk:NP_StartDrag(task)
         }
     end
 
+    S.nspDragFps = nil
+    S.nspDragVisualAt = nil
     S.nspDrag = {
         anchor = copyPoint(task.p0),
         owner = task.owner,
@@ -9610,7 +9704,6 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
     if not S.activeFrame then
         return
     end
-
     local dx = current.x - anchor.x
     local dy = current.y - anchor.y
     local len = math.sqrt(dx * dx + dy * dy)
@@ -9620,38 +9713,24 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
         end
         return
     end
-
     local webSize = tonumber(C.WEB_SIZE) or 2
     local baseAlpha = tonumber(C.WEB_ALPHA) or 0.55
     local alpha = math.min(0.95, baseAlpha + 0.35)
-
     -----------------------------------------------------------------------
-    -- Старый алгоритм сплошной линии: считаем точки с прежним шагом.
+    -- Полная плотность линии: одна текстура на каждый шаг.
+    -- Нагрузка регулируется не прореживанием точек, а частотой
+    -- обновления (см. NP_UpdateDragThrottle).
     -----------------------------------------------------------------------
     local step = math.max(1, webSize * 0.65)
     local count = math.floor(len / step) + 1
     if count < 2 then
         count = 2
     end
-
     local cap = vertical and 700 or 2200
     if count > cap then
         count = cap
     end
-
-    -----------------------------------------------------------------------
-    -- Показываем каждую третью точку из старого набора.
-    -- Первая точка остаётся, чтобы нить была прикреплена к опоре.
-    -- Последняя точка добавляется принудительно, если она не попала
-    -- в шаг "каждая третья", чтобы нить доставала до паука.
-    -----------------------------------------------------------------------
-    local visibleCount = math.floor((count - 1) / 3) + 1
-    local lastShownIndex = (visibleCount - 1) * 3 + 1
-    local forceEndPoint = lastShownIndex ~= count
-    if forceEndPoint then
-        visibleCount = visibleCount + 1
-    end
-
+    local visibleCount = count
     -----------------------------------------------------------------------
     -- Если раньше было создано больше текстур, чем нужно теперь,
     -- возвращаем лишний хвост в пул.
@@ -9666,7 +9745,6 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
             list[i] = nil
         end
     end
-
     while #list < visibleCount do
         local tex
         if #S.webPool > 0 then
@@ -9691,17 +9769,14 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
         tex:SetHeight(webSize)
         list[#list + 1] = tex
     end
-
     if visibleCount < 1 then
         for i = 1, #list do
             list[i]:Hide()
         end
         return
     end
-
     local actualStep = len / (count - 1)
     local drawSize = math.max(webSize * 1.6, actualStep * 1.5)
-
     local p1
     if vertical then
         p1 = {
@@ -9718,27 +9793,17 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
             y = (anchor.y + current.y) / 2 - sag,
         }
     end
-
     for i = 1, #list do
         local tex = list[i]
         if i <= visibleCount then
-            local originalIndex
-            if forceEndPoint and i == visibleCount then
-                originalIndex = count
-            else
-                originalIndex = (i - 1) * 3 + 1
-            end
-
-            local t = (originalIndex - 1) / (count - 1)
+            local t = (i - 1) / (count - 1)
             if t < 0 then
                 t = 0
             elseif t > 1 then
                 t = 1
             end
-
             local x = self:Bz(t, anchor.x, p1.x, current.x)
             local y = self:Bz(t, anchor.y, p1.y, current.y)
-
             tex:ClearAllPoints()
             tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
             tex:SetWidth(drawSize)
@@ -9749,6 +9814,57 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
             tex:Hide()
         end
     end
+end
+
+local function readClientFps()
+    local fps = GetFramerate and GetFramerate() or 60
+    if type(fps) ~= "number" or fps ~= fps or fps <= 0 then
+        fps = 60
+    end
+    return fps
+end
+
+function NSPauk:NP_UpdateDragThrottle(now)
+    local S = self.S
+    local C = self.C
+    local st = S.nspDragFps
+    if not st then
+        st = {
+            smooth = 0,
+            lastSampleAt = 0,
+            interval = tonumber(C.DRAG_UPDATE_MIN) or 0.016,
+        }
+        S.nspDragFps = st
+    end
+    -- Первое измерение после старта нити: инициализируем без истории.
+    if st.smooth <= 0 then
+        st.smooth = readClientFps()
+        st.lastSampleAt = now
+        st.interval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
+        return st
+    end
+    local sampleEvery = tonumber(C.DRAG_FPS_SAMPLE) or 0.4
+    if sampleEvery < 0.1 then
+        sampleEvery = 0.1
+    end
+    if (now - (st.lastSampleAt or 0)) < sampleEvery then
+        return st
+    end
+    st.lastSampleAt = now
+    -- Сглаженный FPS, чтобы одиночный провал не включал троттлинг.
+    st.smooth = st.smooth * 0.55 + readClientFps() * 0.45
+    local target = tonumber(C.DRAG_FPS_TARGET) or 40
+    local recover = tonumber(C.DRAG_FPS_RECOVER) or 48
+    local minInterval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
+    local maxInterval = tonumber(C.DRAG_UPDATE_MAX) or 0.25
+    if st.smooth < target then
+        -- FPS ниже порога: рисуем всё реже и реже.
+        st.interval = math.min(st.interval * 1.7 + 0.01, maxInterval)
+    elseif st.smooth >= recover and st.interval > minInterval then
+        -- FPS выровнялся: плавно возвращаемся к нормальной отрисовке.
+        st.interval = math.max(st.interval * 0.65, minInterval)
+    end
+    return st
 end
 
 function NSPauk:NP_UpdateGlobalDrag()
@@ -9950,28 +10066,33 @@ function NSPauk:NP_PostUpdate()
     if S.combatHide then
         return
     end
-
     if S.phase == "task" then
         local task = S.currentTask
         if task then
-            local now = GetTime()
-            if S.nspDrag and task.nspDuringDrag then
-                if not S.nspDragVisualAt or (now - S.nspDragVisualAt) >= 0.016 then
-                    S.nspDragVisualAt = now
-                    self:NP_UpdateGlobalDrag()
+            local needDrag = S.nspDrag and task.nspDuringDrag
+            local needTemp = task.nspTempThread
+            if needDrag or needTemp then
+                local now = GetTime()
+                local st = self:NP_UpdateDragThrottle(now)
+                local interval = st and st.interval or 0.016
+                if needDrag then
+                    if not S.nspDragVisualAt or (now - S.nspDragVisualAt) >= interval then
+                        S.nspDragVisualAt = now
+                        self:NP_UpdateGlobalDrag()
+                    end
                 end
-            end
-            if task.nspTempThread then
-                if not S.nspTempVisualAt or (now - S.nspTempVisualAt) >= 0.016 then
-                    S.nspTempVisualAt = now
-                    self:NP_UpdateTempDrag(task)
+                if needTemp then
+                    if not S.nspTempVisualAt or (now - S.nspTempVisualAt) >= interval then
+                        S.nspTempVisualAt = now
+                        self:NP_UpdateTempDrag(task)
+                    end
                 end
             end
         end
     else
         if S.nspDrag
-            and S.phase ~= "instanceComplete"
-            and S.phase ~= "limitWait" then
+        and S.phase ~= "instanceComplete"
+        and S.phase ~= "limitWait" then
             self:NP_ClearGlobalDrag(true)
         end
     end
@@ -9979,30 +10100,22 @@ end
 
 function NSPauk:NP_DebugPrint()
     local S = self.S
-
     self:Print("NSPauk debug:")
-
     self:Print(string.format(
         "Фаза: %s, режим: %s",
         tostring(S.phase),
         tostring(S.mode)
     ))
-
     self:Print(string.format(
         "Паук: %.1f, %.1f",
         S.lastSpiderX or 0,
         S.lastSpiderY or 0
     ))
-
     local sup = self:NP_FindSupportAt(S.lastSpiderX or 0, S.lastSpiderY or 0)
-
     self:Print("Опора: " .. self:NP_SupportDescription(sup))
-
     local task = S.currentTask
-
     if task then
         local kind = "обычная"
-
         if task.nspPlan then
             kind = "plan"
         elseif task.nspTempThread then
@@ -10014,7 +10127,6 @@ function NSPauk:NP_DebugPrint()
         elseif task.kind then
             kind = tostring(task.kind)
         end
-
         self:Print(string.format(
             "Задача: %s, drop=%s, drag=%s, end=%s, t=%.2f",
             kind,
@@ -10023,7 +10135,6 @@ function NSPauk:NP_DebugPrint()
             tostring(task.nspDragEnd),
             S.moveT or 0
         ))
-
         if task.p0 and task.p2 then
             self:Print(string.format(
                 "  от %.1f,%.1f к %.1f,%.1f",
@@ -10036,10 +10147,8 @@ function NSPauk:NP_DebugPrint()
     else
         self:Print("Задача: нет")
     end
-
     if S.nspLastRoute then
         local r = S.nspLastRoute
-
         self:Print(string.format(
             "Маршрут: от %s к %s, точек %d, длина %.0f, тип %s",
             tostring(r.fromName or "?"),
@@ -10051,13 +10160,21 @@ function NSPauk:NP_DebugPrint()
     else
         self:Print("Маршрут: нет")
     end
-
     if S.nspDrag and S.nspDrag.anchor then
         self:Print(string.format(
             "Тянем нить от %.1f,%.1f",
             S.nspDrag.anchor.x or 0,
             S.nspDrag.anchor.y or 0
         ))
+    end
+    if S.nspDragFps then
+        self:Print(string.format(
+            "Троттлинг: fps=%.1f, интервал=%.3f сек",
+            S.nspDragFps.smooth or 0,
+            S.nspDragFps.interval or 0
+        ))
+    else
+        self:Print("Троттлинг: не активен")
     end
 end
 
@@ -12080,14 +12197,11 @@ end
 function NSPauk:MkSpider()
     local S = self.S
     local C = self.C
-
     local parent = S.spiderFrame or S.activeFrame
-
     local spider = S.spider
 
     if spider and spider:GetParent() ~= parent then
         spider:Hide()
-
         S.spider = nil
         spider = nil
     end
@@ -12097,7 +12211,25 @@ function NSPauk:MkSpider()
         S.spider = spider
     end
 
-    spider:SetTexture(C.TEX_SPIDER)
+    if type(S.spiderAnimIndex) ~= "number" then
+        S.spiderAnimIndex = 1
+    end
+
+    if type(S.spiderAnimTimer) ~= "number" then
+        S.spiderAnimTimer = 0
+    end
+
+    if type(S.spiderFacing) ~= "number" then
+        S.spiderFacing = 0
+    end
+
+    S.spiderAnimMoving = false
+    S.spiderAnimInitialized = false
+    S.spiderAnimLastX = S.spiderVisualX or S.lastSpiderX or 0
+    S.spiderAnimLastY = S.spiderVisualY or S.lastSpiderY or 0
+
+    self:ApplySpiderTexture(S.spiderAnimIndex)
+
     spider:SetWidth(C.SPIDER_SIZE)
     spider:SetHeight(C.SPIDER_SIZE)
     spider:SetDrawLayer("OVERLAY")
@@ -16600,16 +16732,21 @@ end
 
 function NSPauk:OnUpdateGuarded(dt)
     local S = self.S
+
     if type(S) ~= "table" then
         return
     end
+
     if not self.initialized or S.runtimeOff or S.phase == "off" then
         return
     end
+
     if self:IsPersistentlyDisabled() then
         return
     end
+
     self:OnUpdate(dt)
+    self:UpdateSpiderAnimation(dt)
     self:NP_PostUpdate()
 end
 
@@ -16996,6 +17133,435 @@ if not NSPauk:Activate() then
 end
 
 ---------------------------------------------------------------------------
+-- Spider texture profiles / animation / rotation
+---------------------------------------------------------------------------
+
+function NSPauk:GetSpiderProfileKey()
+    local db = self:EnsureDB()
+    local key = db.spiderProfile
+
+    if type(key) ~= "string"
+        or key == ""
+        or type(self.SpiderTextureProfiles) ~= "table"
+        or not self.SpiderTextureProfiles[key] then
+        key = "default"
+        db.spiderProfile = key
+    end
+
+    return key
+end
+
+function NSPauk:GetSpiderProfile()
+    local key = self:GetSpiderProfileKey()
+    local profile = self.SpiderTextureProfiles and self.SpiderTextureProfiles[key]
+
+    if not profile then
+        profile = self.SpiderTextureProfiles and self.SpiderTextureProfiles.default
+    end
+
+    if not profile or type(profile.textures) ~= "table" or #profile.textures == 0 then
+        return {
+            label = "default",
+            textures = {
+                (self.C and self.C.TEX_SPIDER) or "DEFAULT",
+            },
+        }
+    end
+
+    return profile
+end
+
+function NSPauk:SetSpiderProfile(key)
+    if type(key) ~= "string"
+        or type(self.SpiderTextureProfiles) ~= "table"
+        or not self.SpiderTextureProfiles[key] then
+        return false
+    end
+
+    local db = self:EnsureDB()
+    db.spiderProfile = key
+
+    local S = self.S
+    S.spiderAnimIndex = 1
+    S.spiderAnimTimer = 0
+    S.spiderAnimMoving = false
+
+    self:ApplySpiderTexture(1)
+
+    local profile = self.SpiderTextureProfiles[key]
+    self:Echo(string.format(
+        "Профиль паука: %s (%s), текстур: %d",
+        tostring(profile.label or key),
+        key,
+        profile.textures and #profile.textures or 0
+    ))
+
+    return true
+end
+
+function NSPauk:SetSpiderAnimInterval(value)
+    value = tonumber(value)
+
+    if not value or value ~= value or value <= 0 then
+        self:Echo("Использование: /nspider interval <сек>")
+        return false
+    end
+
+    if value < 0.05 then
+        value = 0.05
+    end
+
+    if value > 5 then
+        value = 5
+    end
+
+    local db = self:EnsureDB()
+    db.constants.SPIDER_ANIM_INTERVAL = value
+
+    if self.C then
+        self.C.SPIDER_ANIM_INTERVAL = value
+    end
+
+    self:Echo(string.format(
+        "Интервал смены кадров паука: %.3f сек.",
+        value
+    ))
+
+    return true
+end
+
+function NSPauk:ApplySpiderTexture(index)
+    local S = self.S
+    local C = self.C
+    local spider = S.spider
+
+    if not spider then
+        return
+    end
+
+    local profile = self:GetSpiderProfile()
+    local list = profile and profile.textures
+
+    if type(list) ~= "table" or #list == 0 then
+        list = { C.TEX_SPIDER }
+    end
+
+    if type(index) ~= "number" or index < 1 or index > #list then
+        index = 1
+    end
+
+    local path = list[index]
+    local fallback = C and C.TEX_SPIDER or ""
+
+    if type(path) ~= "string" or path == "" or path == "DEFAULT" then
+        path = fallback
+    end
+
+    spider:SetTexture(path)
+    spider:SetWidth(C.SPIDER_SIZE)
+    spider:SetHeight(C.SPIDER_SIZE)
+    spider:SetDrawLayer("OVERLAY")
+
+    self:SetSpiderRotation(spider, S.spiderFacing or 0)
+
+    S.spiderTextureIndex = index
+end
+
+function NSPauk:SetSpiderRotation(tex, angle)
+    if not tex or not tex.SetTexCoord then
+        return
+    end
+
+    angle = tonumber(angle) or 0
+
+    local c = math.cos(angle)
+    local s = math.sin(angle)
+
+    -- Поворот UV-координат.
+    -- Верх текстуры считается головой.
+    --
+    -- Если вдруг на диагоналях появляются артефакты из-за выхода UV
+    -- за пределы [0..1], можно заменить строку ниже на:
+    -- local fit = 1 / (math.abs(c) + math.abs(s))
+    --
+    -- Тогда повёрнутая текстура будет чуть вписываться в квадрат,
+    -- но на 45 градусах может слегка увеличиваться центральная часть.
+    local fit = 1.0
+
+    local function uv(px, py)
+        local rx = px * c + py * s
+        local ry = -px * s + py * c
+        return 0.5 + rx * fit, 0.5 + ry * fit
+    end
+
+    local ulx, uly = uv(-0.5, -0.5)
+    local llx, lly = uv(-0.5, 0.5)
+    local urx, ury = uv(0.5, -0.5)
+    local lrx, lry = uv(0.5, 0.5)
+
+    tex:SetTexCoord(
+        ulx, uly,
+        llx, lly,
+        urx, ury,
+        lrx, lry
+    )
+end
+
+function NSPauk:NormalizeAngle(a)
+    a = tonumber(a) or 0
+    local pi = math.pi
+
+    while a > pi do
+        a = a - 2 * pi
+    end
+
+    while a < -pi do
+        a = a + 2 * pi
+    end
+
+    return a
+end
+
+function NSPauk:SpiderAnimDebug()
+    local S = self.S
+    local profile = self:GetSpiderProfile()
+    local count = profile and profile.textures and #profile.textures or 0
+
+    self:Echo(string.format(
+        "anim index=%s, timer=%.3f, moving=%s, textures=%d, x=%.1f, y=%.1f",
+        tostring(S.spiderAnimIndex),
+        tonumber(S.spiderAnimTimer) or 0,
+        tostring(S.spiderAnimMoving),
+        count,
+        S.lastSpiderX or 0,
+        S.lastSpiderY or 0
+    ))
+end
+
+function NSPauk:UpdateSpiderAnimation(dt)
+    local S = self.S
+
+    if not self.initialized or S.runtimeOff or S.phase == "off" then
+        return
+    end
+
+    if S.combatHide then
+        return
+    end
+
+    local spider = S.spider
+    if not spider or not spider:IsShown() then
+        return
+    end
+
+    dt = tonumber(dt) or 0
+
+    if dt < 0 then
+        dt = 0
+    end
+
+    -- Защита от редких больших скачков dt.
+    if dt > 0.25 then
+        dt = 0.25
+    end
+
+    -- Используем реальные координаты паука, а не только визуально
+    -- обновлённые spiderVisualX/Y, иначе таймер анимации может
+    -- сбрасываться между редкими обновлениями визуала.
+    local x = S.lastSpiderX or 0
+    local y = S.lastSpiderY or 0
+
+    local lastX = S.spiderAnimLastX
+    local lastY = S.spiderAnimLastY
+
+    if type(lastX) ~= "number" or type(lastY) ~= "number" then
+        lastX = x
+        lastY = y
+    end
+
+    local dx = x - lastX
+    local dy = y - lastY
+    local dist2 = dx * dx + dy * dy
+
+    -- Паук реально движется.
+    -- 0.0001 примерно соответствует расстоянию 0.01 px.
+    if dist2 > 0.0001 then
+        local target = math.atan2(dx, dy)
+        local current = S.spiderFacing
+
+        if type(current) ~= "number" or current ~= current then
+            current = target
+        end
+
+        -- Если это первый кадр или резкий телепорт/сброс позиции,
+        -- поворачиваем сразу, иначе плавно доворачиваем.
+        if not S.spiderAnimInitialized or dist2 > 64 then
+            current = target
+        else
+            local diff = self:NormalizeAngle(target - current)
+            local smooth = math.min(1, dt * 12)
+
+            if smooth <= 0 then
+                smooth = 1
+            end
+
+            current = current + diff * smooth
+        end
+
+        S.spiderFacing = self:NormalizeAngle(current)
+        S.spiderAnimInitialized = true
+
+        self:SetSpiderRotation(spider, S.spiderFacing)
+
+        if not S.spiderAnimMoving then
+            S.spiderAnimMoving = true
+            S.spiderAnimIndex = 1
+            S.spiderAnimTimer = 0
+            self:ApplySpiderTexture(1)
+        end
+
+        local profile = self:GetSpiderProfile()
+        local count = profile and profile.textures and #profile.textures or 1
+
+        if count > 1 then
+            local interval = tonumber(self.C and self.C.SPIDER_ANIM_INTERVAL) or 0.18
+
+            if type(interval) ~= "number"
+                or interval ~= interval
+                or interval < 0.05 then
+                interval = 0.18
+            end
+
+            S.spiderAnimTimer = (S.spiderAnimTimer or 0) + dt
+
+            -- Если вдруг был лаг/большой dt, можем пропустить несколько кадров,
+            -- но не зависнуть.
+            while S.spiderAnimTimer >= interval do
+                S.spiderAnimTimer = S.spiderAnimTimer - interval
+                S.spiderAnimIndex = ((S.spiderAnimIndex or 1) % count) + 1
+                self:ApplySpiderTexture(S.spiderAnimIndex)
+            end
+        end
+    else
+        if S.spiderAnimMoving then
+            S.spiderAnimMoving = false
+            S.spiderAnimTimer = 0
+
+        end
+    end
+
+    S.spiderAnimLastX = x
+    S.spiderAnimLastY = y
+end
+
+function NSPauk:PrintSpiderProfiles()
+    local profiles = self.SpiderTextureProfiles or {}
+    local keys = {}
+
+    for key in pairs(profiles) do
+        keys[#keys + 1] = key
+    end
+
+    table.sort(keys)
+
+    local current = self:GetSpiderProfileKey()
+
+    self:Echo("Профили паука:")
+
+    for _, key in ipairs(keys) do
+        local p = profiles[key]
+        local mark = (key == current) and "*" or " "
+
+        self:Echo(string.format(
+            "%s %s — %s, текстур: %d",
+            mark,
+            key,
+            tostring(p.label or key),
+            p.textures and #p.textures or 0
+        ))
+    end
+
+    self:Echo("Выбор: /nspider profile <ключ>.")
+    self:Echo("Интервал: /nspider interval <сек>.")
+end
+
+function NSPauk:HandleSpiderCommand(msg)
+    msg = type(msg) == "string" and msg or ""
+    msg = msg:gsub("^%s+", "")
+    msg = msg:gsub("%s+$", "")
+
+    if msg == "" or msg == "help" then
+        self:Echo("Команды:")
+        self:Echo("/nspider list — список профилей")
+        self:Echo("/nspider current — текущий профиль и интервал")
+        self:Echo("/nspider profile <ключ> — выбрать профиль")
+        self:Echo("/nspider interval <сек> — интервал смены кадров")
+        self:Echo("Пример: /nspider interval 0.18")
+        return
+    end
+
+    if msg == "list" then
+        self:PrintSpiderProfiles()
+        return
+    end
+
+    if msg == "current" then
+        local key = self:GetSpiderProfileKey()
+        local profile = self:GetSpiderProfile()
+        local interval = tonumber(self.C and self.C.SPIDER_ANIM_INTERVAL) or 0.18
+
+        self:Echo(string.format(
+            "Текущий профиль: %s (%s), текстур: %d, интервал: %.3f сек.",
+            tostring(profile.label or key),
+            key,
+            profile.textures and #profile.textures or 0,
+            interval
+        ))
+        return
+    end
+
+    local cmd, arg = msg:match("^(%S+)%s+(.+)$")
+    if not cmd then
+        cmd = msg
+    end
+
+    if cmd == "profile" or cmd == "set" then
+        arg = type(arg) == "string" and arg:gsub("%s+$", "") or ""
+
+        if arg == "" then
+            self:Echo("Использование: /nspider profile <ключ>")
+            self:PrintSpiderProfiles()
+            return
+        end
+
+        if not self:SetSpiderProfile(arg) then
+            self:Echo(string.format("Неизвестный профиль: %s", arg))
+            self:PrintSpiderProfiles()
+        end
+
+        return
+    end
+
+    if cmd == "interval" then
+        arg = type(arg) == "string" and arg:gsub("%s+$", "") or ""
+
+        if arg == "" then
+            local interval = tonumber(self.C and self.C.SPIDER_ANIM_INTERVAL) or 0.18
+            self:Echo(string.format(
+                "Текущий интервал: %.3f сек. Изменить: /nspider interval <сек>",
+                interval
+            ))
+            return
+        end
+
+        self:SetSpiderAnimInterval(tonumber(arg))
+        return
+    end
+
+    self:Echo("Неизвестная команда. Используй /nspider help.")
+end
+
+---------------------------------------------------------------------------
 -- Slash commands
 ---------------------------------------------------------------------------
 
@@ -17015,6 +17581,21 @@ if type(SlashCmdList) == "table" then
         if _G then
             _G["SLASH_" .. cmdName .. "1"] = "/nspmap"
             _G["SLASH_" .. cmdName .. "2"] = "/paukmap"
+        end
+    end
+end
+
+if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKSPIDER"
+
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function(msg)
+            NSPauk:HandleSpiderCommand(msg)
+        end
+
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspider"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukspider"
         end
     end
 end
@@ -17481,7 +18062,7 @@ function NSPauk_Moth:GetTexturePath(name)
         and type(NSPauk.C.TEX_WEB) == "string" then
         local web = NSPauk.C.TEX_WEB
 
-        if #web >= 11 and web:lower():sub(-11) == "pautina.tga" then
+        if #web >= 11 and web:lower():sub(-11) == "pautina8.tga" then
             return web:sub(1, #web - 11) .. name
         end
     end
