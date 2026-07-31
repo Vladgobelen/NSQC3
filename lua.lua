@@ -1397,6 +1397,225 @@ playerLevel = 70
     requireKeywords = {"isAlive", "inCombat", "playerLevel", "and", "not", ">=", "60", "if", "then", "else", "end", "print"},
 }
 
+ns_llua['lua'][24] = {
+    type = "commenttest",
+    title = "Комбо-тест: переменные, типы и type",
+    helpModules = {4, 15},
+    instruction = [=[
+<h>Комбо-тест: переменные, типы и type</h>
+<t>Создай глобальные переменные:</t>
+<t><k>playerName</k> — любая непустая строка.</t>
+<t><k>playerLevel</k> — любое число.</t>
+<t><k>playerOnline</k> — любое логическое значение.</t>
+<t><k>playerType</k> — строка с типом переменной <k>playerLevel</k>. Используй функцию <k>type</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {"playerName", "playerLevel", "playerOnline", "playerType", "type"},
+    checkCode = function()
+        return type(_G.playerName) == "string"
+            and _G.playerName ~= ""
+            and type(_G.playerLevel) == "number"
+            and type(_G.playerOnline) == "boolean"
+            and _G.playerType == "number"
+    end,
+}
+
+ns_llua['lua'][25] = {
+    type = "printtest",
+    title = "Комбо-тест: print, математика и конкатенация",
+    helpModules = {7, 10},
+    content = [=[
+<h>Комбо-тест: print, математика и конкатенация</h>
+<t>Выполни задания по очереди через <k>/run</k>.</t>
+]=],
+    tasks = {
+        {
+            desc = "Выведи результат выражения 7 + 3 * 2",
+            pattern = "13",
+            requireKeywords = {"print", "7", "3", "2", "+", "*"},
+            forbidKeywords = {"13"},
+        },
+        {
+            desc = "Выведи фразу LEVEL 80, склеив три части: слово LEVEL, пробел и число 80",
+            pattern = "LEVEL 80",
+            requireConcat = true,
+            requiredConcatCount = 2,
+            requireKeywords = {"print", "LEVEL", "80", ".."},
+            forbidKeywords = {"LEVEL 80"},
+        },
+        {
+            desc = "Выведи остаток от деления 17 на 5",
+            pattern = "2",
+            requireKeywords = {"print", "17", "5", "%"},
+        },
+    },
+}
+
+ns_llua['lua'][26] = {
+    type = "commenttest",
+    title = "Комбо-тест: tonumber и string.format",
+    helpModules = {7, 10},
+    preloadVars = {
+        {var = "itemName", value = "Клинок", desc = "itemName = \"Клинок\""},
+        {var = "itemLevel", value = "25", desc = "itemLevel = \"25\""},
+        {var = "itemCount", value = 3, desc = "itemCount = 3"},
+    },
+    instruction = [=[
+<h>Комбо-тест: tonumber и string.format</h>
+<t>Уже созданы переменные:</t>
+<t><k>itemName</k> = "Клинок" (строка).</t>
+<t><k>itemLevel</k> = "25" (строка).</t>
+<t><k>itemCount</k> = 3 (число).</t>
+<t>Создай глобальную переменную <k>itemLevelNumber</k>: преобразуй <k>itemLevel</k> в число.</t>
+<t>Создай глобальную переменную <k>report</k> с помощью <k>string.format</k> по шаблону:</t>
+<s>"Предмет: %s, уровень: %d, количество: %d"</s>
+<t>В шаблон нужно подставить: имя предмета, числовой уровень и количество.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {"itemName", "itemLevel", "itemCount", "itemLevelNumber", "report", "tonumber", "string.format"},
+    checkCode = function()
+        return type(_G.itemLevelNumber) == "number"
+            and _G.itemLevelNumber == 25
+            and _G.report == "Предмет: Клинок, уровень: 25, количество: 3"
+    end,
+}
+
+ns_llua['lua'][27] = {
+    type = "commenttest",
+    title = "Комбо-тест: множественное присваивание",
+    helpModules = {11, 1},
+    preloadVars = {
+        {var = "a", value = 5, desc = "a = 5"},
+        {var = "b", value = 8, desc = "b = 8"},
+        {var = "c", value = 3, desc = "c = 3"},
+    },
+    instruction = [=[
+<h>Комбо-тест: множественное присваивание</h>
+<t>Уже созданы переменные:</t>
+<t><k>a</k> = 5, <k>b</k> = 8, <k>c</k> = 3.</t>
+<t>Напиши одну строку множественного присваивания, чтобы значения повернулись по кругу:</t>
+<t><k>a</k> должно стать 8, <k>b</k> должно стать 3, <k>c</k> должно стать 5.</t>
+<t>Нельзя использовать <k>local</k>, дополнительные переменные и несколько строк.</t>
+]=],
+    initialCode = [=[
+-- Напиши одну строку здесь
+]=],
+    requireKeywords = {"a", "b", "c", "=", ","},
+    singleLine = true,
+    checkCode = function()
+        return _G.a == 8 and _G.b == 3 and _G.c == 5
+    end,
+}
+
+ns_llua['lua'][28] = {
+    type = "commenttest",
+    title = "Комбо-тест: if, and, or, not",
+    helpModules = {17, 19, 21},
+    preloadVars = {
+        {var = "hp", value = 60, desc = "hp = 60"},
+        {var = "mana", value = 40, desc = "mana = 40"},
+        {var = "inCombat", value = false, desc = "inCombat = false"},
+    },
+    instruction = [=[
+<h>Комбо-тест: if, and, or, not</h>
+<t>Уже созданы переменные:</t>
+<t><k>hp</k> = 60, <k>mana</k> = 40, <k>inCombat</k> = false.</t>
+<t>Создай глобальную переменную <k>status</k> с помощью условия:</t>
+<t>Если <k>inCombat</k> или <k>hp</k> меньше 20, значение должно быть <s>"Бой"</s>.</t>
+<t>Иначе, если <k>mana</k> больше или равно 50 и персонаж не в бою, значение должно быть <s>"Магия"</s>.</t>
+<t>Иначе значение должно быть <s>"Ожидание"</s>.</t>
+<t>Используй <k>if</k>, <k>elseif</k>, <k>else</k> и <k>end</k>. Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {"hp", "mana", "inCombat", "status", "if", "elseif", "else", "end", "or", "and", "not"},
+    checkCode = function()
+        return _G.status == "Ожидание"
+    end,
+}
+
+ns_llua['lua'][29] = {
+    type = "commenttest",
+    title = "Комбо-тест: таблица, # и индексы",
+    helpModules = {4},
+    instruction = [=[
+<h>Оператор # для таблиц</h>
+<t>Оператор <k>#</k> можно применять к таблицам. Для таблицы-списка он возвращает количество элементов.</t>
+<code>
+local example = {"Меч", "Щит"}
+print(#example) -- 2
+</code>
+
+<w>Важно:</w> предупреждение про <k>#</k> и кириллицу касается строк.
+<t>В WoW 3.3.5 для строк <k>#</k> считает байты, а не символы. Поэтому длина строки с кириллицей может быть больше, чем количество букв.</t>
+<t>Но здесь мы применяем <k>#</k> к таблице, поэтому содержимое строк не влияет на количество элементов.</t>
+
+<h>Задание</h>
+<t>Создай глобальную таблицу <k>bag</k> с четырьмя строками по порядку:</t>
+<t>"Факел", "Верёвка", "Кремень", "Компас".</t>
+<t>Создай глобальную переменную <k>bagCount</k> с количеством элементов в таблице. Используй оператор <k>#</k>.</t>
+<t>Создай глобальную переменную <k>firstItem</k> с первым элементом таблицы.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {"bag", "bagCount", "firstItem", "#bag", "bag[1]", "Факел", "Верёвка", "Кремень", "Компас"},
+    checkCode = function()
+        return type(_G.bag) == "table"
+            and _G.bag[1] == "Факел"
+            and _G.bag[2] == "Верёвка"
+            and _G.bag[3] == "Кремень"
+            and _G.bag[4] == "Компас"
+            and _G.bagCount == 4
+            and _G.firstItem == "Факел"
+    end,
+}
+
+ns_llua['lua'][30] = {
+    type = "commenttest",
+    title = "Итоговый комбо-тест",
+    helpModules = {7, 10, 17, 19, 21},
+    preloadVars = {
+        {var = "playerLevel", value = 75, desc = "playerLevel = 75"},
+        {var = "maxLevel", value = 80, desc = "maxLevel = 80"},
+        {var = "isAlive", value = true, desc = "isAlive = true"},
+        {var = "gold", value = "1500", desc = "gold = \"1500\""},
+    },
+    instruction = [=[
+<h>Итоговый комбо-тест</h>
+<t>Уже созданы переменные:</t>
+<t><k>playerLevel</k> = 75, <k>maxLevel</k> = 80, <k>isAlive</k> = true, <k>gold</k> = "1500".</t>
+<t>Создай глобальную переменную <k>goldNumber</k>: преобразуй <k>gold</k> в число.</t>
+<t>Создай глобальную переменную <k>levelText</k> с помощью условия:</t>
+<t>Если <k>playerLevel</k> больше или равно <k>maxLevel</k>, значение должно быть <s>"Максимум"</s>, иначе <s>"Расти"</s>.</t>
+<t>Создай глобальную переменную <k>canTrade</k> с помощью условия:</t>
+<t>Если <k>isAlive</k> и <k>goldNumber</k> больше или равно 1000, значение должно быть <k>true</k>, иначе <k>false</k>.</t>
+<t>Создай глобальную переменную <k>summary</k> с помощью <k>string.format</k> по шаблону:</t>
+<s>"Уровень: %d, Золото: %d"</s>
+<t>В шаблон нужно подставить <k>playerLevel</k> и <k>goldNumber</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {"playerLevel", "maxLevel", "isAlive", "gold", "goldNumber", "levelText", "canTrade", "summary", "tonumber", "if", "then", "else", "end", "and", "string.format"},
+    checkCode = function()
+        return type(_G.goldNumber) == "number"
+            and _G.goldNumber == 1500
+            and _G.levelText == "Расти"
+            and _G.canTrade == true
+            and _G.summary == "Уровень: 75, Золото: 1500"
+    end,
+}
+
 -- ============================================================
 -- UI CLASS: MAIN WINDOW + HELP WINDOW + EDITOR
 -- ============================================================
