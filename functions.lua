@@ -5708,9 +5708,6 @@ NSPauk.DefaultConstants = {
     MAIN_SAG_MAX = 0.16,
     CROSS_SAG_MIN = 0.05,
     CROSS_SAG_MAX = 0.13,
-    INTERCROSS_SAG_MIN = 0.04,
-    INTERCROSS_SAG_MAX = 0.10,
-    INTERCROSS_SPACING = 20,
     SPIDER_SPEED_MIN = 30,
     SPIDER_SPEED_MAX = 65,
     TRAVEL_SPEED_MULT = 6,
@@ -5735,8 +5732,6 @@ NSPauk.DefaultConstants = {
     DISSOLVE_DURATION_MIN = 180,
     DISSOLVE_DURATION_MAX = 180,
     MIN_COCOON_ALPHA = 0.03,
-    MAX_INTERCROSS_SEGS = 12000,
-    MAX_INTERCROSS_PER_PAIR = 60,
     MOUSE_CHECK = 0.15,
     MOUSE_THREAD_DIST = 5,
     MOUSE_HOVER_LIMIT = 5,
@@ -5781,9 +5776,6 @@ NSPauk.ConstantDescriptions = {
     MAIN_SAG_MAX = "Макс. провис основных нитей",
     CROSS_SAG_MIN = "Мин. провис перемычек",
     CROSS_SAG_MAX = "Макс. провис перемычек",
-    INTERCROSS_SAG_MIN = "Мин. провис диагоналей",
-    INTERCROSS_SAG_MAX = "Макс. провис диагоналей",
-    INTERCROSS_SPACING = "Шаг диагоналей",
     SPIDER_SPEED_MIN = "Мин. скорость паука",
     SPIDER_SPEED_MAX = "Макс. скорость паука",
     TRAVEL_SPEED_MULT = "Множитель скорости переходов",
@@ -5808,8 +5800,6 @@ NSPauk.ConstantDescriptions = {
     DISSOLVE_DURATION_MIN = "Мин. время растворения жертвы (сек)",
     DISSOLVE_DURATION_MAX = "Макс. время растворения жертвы (сек)",
     MIN_COCOON_ALPHA = "Мин. прозрачность жертвы",
-    MAX_INTERCROSS_SEGS = "Макс. диагоналей всего",
-    MAX_INTERCROSS_PER_PAIR = "Макс. диагоналей на пару рядов",
     MOUSE_CHECK = "Интервал проверки мыши (сек)",
     MOUSE_THREAD_DIST = "Дистанция обрыва нити мышью",
     MOUSE_HOVER_LIMIT = "Наведений мыши для обрыва нити",
@@ -5934,72 +5924,58 @@ end
 
 function NSPauk:ApplyRuntimeConstants()
     local C = self.C
-
     C.ADDON = "NSPauk"
     C.CLICK_SOUND = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\bzd.ogg"
     C.CLICK_TEX = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pxxx.tga"
     C.TEX_SPIDER = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pauk.tga"
     C.TEX_WEB = "Interface\\AddOns\\" .. ADDON_FOLDER .. "\\libs\\pautina.tga"
     C.LEVELUP_SOUND = "Interface\\AddOns\\NSQC3\\libs\\lvlUp.ogg"
-
     C.EXCLUDE_FRAMES = {
         MinimapCluster = true,
     }
     C.EXCLUDE_FRAMES[C.ADDON .. "_WebHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_SpiderHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_ClickHigh"] = true
-
     local function num(value, default)
         if type(value) ~= "number" or value ~= value then
             return default
         end
         return value
     end
-
-    C.INTERCROSS_SPACING = num(C.INTERCROSS_SPACING, C.CROSS_ROW_SPACING)
-
     C.LIMIT_COCOON_INTERVAL = num(C.LIMIT_COCOON_INTERVAL, 1800)
     if C.LIMIT_COCOON_INTERVAL <= 0 then
         C.LIMIT_COCOON_INTERVAL = 1800
     end
-
     C.LIMIT_COCOON_RETRY = num(C.LIMIT_COCOON_RETRY, 60)
     if C.LIMIT_COCOON_RETRY <= 0 then
         C.LIMIT_COCOON_RETRY = 60
     end
-
     C.MAX_WEB_SEGS = math.floor(num(C.MAX_WEB_SEGS, self.DefaultConstants.MAX_WEB_SEGS) + 0.5)
     if C.MAX_WEB_SEGS < 0 then
         C.MAX_WEB_SEGS = self.DefaultConstants.MAX_WEB_SEGS
     end
-
     C.WEB_POINT_SPACING_MAX = num(C.WEB_POINT_SPACING_MAX, self.DefaultConstants.WEB_POINT_SPACING_MAX)
     if C.WEB_POINT_SPACING_MAX <= 0 then
         C.WEB_POINT_SPACING_MAX = self.DefaultConstants.WEB_POINT_SPACING_MAX
     end
-
     C.EMPTY_SPEED_MULT = num(C.EMPTY_SPEED_MULT, 4)
     if C.EMPTY_SPEED_MULT <= 0 then
         C.EMPTY_SPEED_MULT = 4
     end
-
     C.WEB_ALPHA = num(C.WEB_ALPHA, self.DefaultConstants.WEB_ALPHA)
     if C.WEB_ALPHA < 0 then
         C.WEB_ALPHA = 0
     elseif C.WEB_ALPHA > 1 then
         C.WEB_ALPHA = 1
     end
-
     C.WEB_SIZE = num(C.WEB_SIZE, self.DefaultConstants.WEB_SIZE)
     if C.WEB_SIZE < 1 then
         C.WEB_SIZE = self.DefaultConstants.WEB_SIZE
     end
-
     C.MAX_DROPS_PER_FRAME = math.floor(num(C.MAX_DROPS_PER_FRAME, self.DefaultConstants.MAX_DROPS_PER_FRAME) + 0.5)
     if C.MAX_DROPS_PER_FRAME < 0 then
         C.MAX_DROPS_PER_FRAME = self.DefaultConstants.MAX_DROPS_PER_FRAME
     end
-
     C.CROSS_MAX_SECTOR_ANGLE = num(C.CROSS_MAX_SECTOR_ANGLE, 160)
     C.WEB_THREAD_MIN_SEPARATION = num(C.WEB_THREAD_MIN_SEPARATION, 20)
     C.WEB_HUB_IGNORE_DIST = num(C.WEB_HUB_IGNORE_DIST, 100)
@@ -6915,20 +6891,15 @@ function NSPauk:MakeSag(thread, mode, hubX, hubY)
     if not thread or not thread.p0 or not thread.p2 then
         return
     end
-
     local C = self.C
     local D = self.DefaultConstants
-
     local p0 = thread.p0
     local p2 = thread.p2
-
     local dx = p2.x - p0.x
     local dy = p2.y - p0.y
     local len = math.sqrt(dx * dx + dy * dy)
-
     local mx = (p0.x + p2.x) / 2
     local my = (p0.y + p2.y) / 2
-
     if len < 1 then
         thread.p1 = {
             x = mx,
@@ -6936,44 +6907,33 @@ function NSPauk:MakeSag(thread, mode, hubX, hubY)
         }
         return
     end
-
     local minSag
     local maxSag
     local jitter
-
     if mode == "main" then
         minSag = C.MAIN_SAG_MIN or D.MAIN_SAG_MIN
         maxSag = C.MAIN_SAG_MAX or D.MAIN_SAG_MAX
         jitter = 0.06
-    elseif mode == "cross" then
+    else
         minSag = C.CROSS_SAG_MIN or D.CROSS_SAG_MIN
         maxSag = C.CROSS_SAG_MAX or D.CROSS_SAG_MAX
         jitter = 0.08
-    else
-        minSag = C.INTERCROSS_SAG_MIN or D.INTERCROSS_SAG_MIN
-        maxSag = C.INTERCROSS_SAG_MAX or D.INTERCROSS_SAG_MAX
-        jitter = 0.08
     end
-
     local ratio = self:RandomFloat(minSag, maxSag)
     if type(ratio) ~= "number" or ratio ~= ratio or ratio <= 0 then
         ratio = 0.10
     end
-
     local sag = len * ratio
     if type(sag) ~= "number" or sag ~= sag or sag <= 0 then
         sag = math.max(len * 0.10, 0.5)
     elseif sag < 0.5 then
         sag = 0.5
     end
-
     local offsetX = (math.random() - 0.5) * len * jitter
-
     thread.p1 = {
         x = mx + offsetX,
         y = my - sag,
     }
-
     if thread.p1.y >= my then
         thread.p1.y = my - sag
     end
@@ -9665,17 +9625,49 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
     local baseAlpha = tonumber(C.WEB_ALPHA) or 0.55
     local alpha = math.min(0.95, baseAlpha + 0.35)
 
+    -----------------------------------------------------------------------
+    -- Старый алгоритм сплошной линии: считаем точки с прежним шагом.
+    -----------------------------------------------------------------------
     local step = math.max(1, webSize * 0.65)
     local count = math.floor(len / step) + 1
     if count < 2 then
         count = 2
     end
+
     local cap = vertical and 700 or 2200
     if count > cap then
         count = cap
     end
 
-    while #list < count do
+    -----------------------------------------------------------------------
+    -- Показываем каждую третью точку из старого набора.
+    -- Первая точка остаётся, чтобы нить была прикреплена к опоре.
+    -- Последняя точка добавляется принудительно, если она не попала
+    -- в шаг "каждая третья", чтобы нить доставала до паука.
+    -----------------------------------------------------------------------
+    local visibleCount = math.floor((count - 1) / 3) + 1
+    local lastShownIndex = (visibleCount - 1) * 3 + 1
+    local forceEndPoint = lastShownIndex ~= count
+    if forceEndPoint then
+        visibleCount = visibleCount + 1
+    end
+
+    -----------------------------------------------------------------------
+    -- Если раньше было создано больше текстур, чем нужно теперь,
+    -- возвращаем лишний хвост в пул.
+    -----------------------------------------------------------------------
+    if #list > visibleCount then
+        local surplus = {}
+        for i = visibleCount + 1, #list do
+            surplus[#surplus + 1] = list[i]
+        end
+        self:RecycleTextures(surplus)
+        for i = #list, visibleCount + 1, -1 do
+            list[i] = nil
+        end
+    end
+
+    while #list < visibleCount do
         local tex
         if #S.webPool > 0 then
             tex = table.remove(S.webPool)
@@ -9689,7 +9681,7 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
             end
         end
         if not tex then
-            count = #list
+            visibleCount = #list
             break
         end
         tex:SetTexture(C.TEX_WEB)
@@ -9700,7 +9692,7 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
         list[#list + 1] = tex
     end
 
-    if count < 2 then
+    if visibleCount < 1 then
         for i = 1, #list do
             list[i]:Hide()
         end
@@ -9729,10 +9721,24 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
 
     for i = 1, #list do
         local tex = list[i]
-        if i <= count then
-            local t = (i - 1) / (count - 1)
+        if i <= visibleCount then
+            local originalIndex
+            if forceEndPoint and i == visibleCount then
+                originalIndex = count
+            else
+                originalIndex = (i - 1) * 3 + 1
+            end
+
+            local t = (originalIndex - 1) / (count - 1)
+            if t < 0 then
+                t = 0
+            elseif t > 1 then
+                t = 1
+            end
+
             local x = self:Bz(t, anchor.x, p1.x, current.x)
             local y = self:Bz(t, anchor.y, p1.y, current.y)
+
             tex:ClearAllPoints()
             tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
             tex:SetWidth(drawSize)
@@ -10785,55 +10791,41 @@ end
 function NSPauk:BuildInstanceTasks(inst)
     local S = self.S
     local C = self.C
-
     local tasks = {}
     inst.crossRowsList = {}
-
     if not inst.interSegs then
         inst.interSegs = {}
     end
-
     local cursorPoint = nil
-
     if S.spider and S.spider:IsShown() then
         cursorPoint = { x = S.lastSpiderX, y = S.lastSpiderY }
     end
-
     cursorPoint = self:AddMainThreadTasks(inst, tasks, cursorPoint)
-
     local N = #inst.conns
-
     if N >= 2 then
         for _, conn in ipairs(inst.conns) do
             local samples, total = self:BuildArcSamples(conn.thread)
             conn.arcSamples = samples
             conn.arcLength = total
         end
-
         local sectorAllowed, sectorAngleDeg = self:ComputeCrossSectors(inst)
         inst.sectorAllowed = sectorAllowed
         inst.sectorAngleDeg = sectorAngleDeg
-
         local spacing = C.CROSS_ROW_SPACING
         if not spacing or spacing < 0.5 then
             spacing = 0.5
         end
-
         local pairMinLens = {}
         local maxPairLen = 0
         local hasAllowed = false
-
         for i = 1, N do
             local j = (i % N) + 1
-
             local lenA = inst.conns[i].arcLength or 0
             local lenB = inst.conns[j].arcLength or 0
             local pairMin = math.min(lenA, lenB)
-
             if sectorAllowed[i] then
                 pairMinLens[i] = pairMin
                 hasAllowed = true
-
                 if pairMin > maxPairLen then
                     maxPairLen = pairMin
                 end
@@ -10841,60 +10833,47 @@ function NSPauk:BuildInstanceTasks(inst)
                 pairMinLens[i] = 0
             end
         end
-
         if hasAllowed then
             local distances = {}
             local seen = {}
-
             local function addDistance(d)
                 if type(d) ~= "number" or d < C.MIN_CROSS_LEN then
                     return
                 end
-
                 if d > maxPairLen then
                     d = maxPairLen
                 end
-
                 local key = math.floor(d + 0.5)
                 if not seen[key] then
                     seen[key] = true
                     distances[#distances + 1] = d
                 end
             end
-
             local maxRows = C.MAX_CROSS_ROWS or 0
             if maxRows < 0 then
                 maxRows = 0
             end
-
             local rows = math.floor(maxPairLen / spacing + 0.0001)
             if rows > maxRows then
                 rows = maxRows
             end
-
             for row = 1, rows do
                 addDistance(row * spacing)
             end
-
             for i = 1, N do
                 if sectorAllowed[i] then
                     addDistance(pairMinLens[i])
                 end
             end
-
             table.sort(distances)
-
             if #distances > maxRows then
                 for i = #distances, maxRows + 1, -1 do
                     distances[i] = nil
                 end
             end
-
             inst.crossRows = #distances
-
             if #distances > 0 then
                 local px, py = self:BzThread(inst.conns[1].thread, 0)
-
                 if cursorPoint then
                     self:AddTravelPointTask(
                         tasks,
@@ -10904,25 +10883,20 @@ function NSPauk:BuildInstanceTasks(inst)
                         inst.conns[1]
                     )
                 end
-
                 local cursor = {
                     idx = 1,
                     t = 0,
                     point = { x = px, y = py },
                 }
-
                 local rowDir = 1
-
                 for idx, arcLen in ipairs(distances) do
                     self:AddArcRowTasks(tasks, inst, cursor, arcLen, idx, rowDir)
                     rowDir = -rowDir
                 end
-
                 if cursor.t
                     and cursor.t > 0.001
                     and cursor.idx >= 1
                     and cursor.idx <= N then
-
                     self:AddTravelThreadTask(
                         tasks,
                         inst.conns[cursor.idx],
@@ -10931,8 +10905,6 @@ function NSPauk:BuildInstanceTasks(inst)
                         inst.conns[cursor.idx]
                     )
                 end
-
-                self:AddInterCrossTasks(tasks, inst, { point = { x = px, y = py } })
             end
         else
             inst.crossRows = 0
@@ -10940,7 +10912,6 @@ function NSPauk:BuildInstanceTasks(inst)
     else
         inst.crossRows = 0
     end
-
     inst.tasks = tasks
 end
 
@@ -14448,126 +14419,80 @@ function NSPauk:SaveMothState()
     }
 end
 
----------------------------------------------------------------------------
--- Пересборка задач паутины после возврата из охоты на мотылька.
---
--- Важно:
--- - не создаёт новые conn / crossSeg;
--- - использует уже существующие владельцы;
--- - пропускает уже нарисованные нити;
--- - дорисовывает живые, но ещё не нарисованные нити;
--- - убивает владельцев, чьи родители мертвы или не будут нарисованы.
----------------------------------------------------------------------------
-
 function NSPauk:NP_RebuildInstanceTasks(inst)
     local S = self.S
-
     if not inst or inst.torn then
         return nil
     end
-
     local tasks = {}
     local added = {}
-
     local cursor = nil
-
     if S.spider and S.spider:IsShown() then
         cursor = {
             x = S.lastSpiderX or 0,
             y = S.lastSpiderY or 0,
         }
     end
-
     local function isDrawn(owner)
         return owner
             and owner.alive
             and owner.textures
             and #owner.textures > 0
     end
-
     local function isScheduled(owner)
         return owner and added[owner] == true
     end
-
     local function isAvailable(owner)
         if not owner or not owner.alive then
             return false
         end
-
         if isDrawn(owner) then
             return true
         end
-
         if isScheduled(owner) then
             return true
         end
-
         return false
     end
-
     local function killOwner(owner)
         if not owner or not owner.alive then
             return
         end
-
         if self.NP_KillOwnerHard then
             self:NP_KillOwnerHard(owner)
         else
             owner.alive = false
         end
     end
-
     local function addOwner(owner, thread, isMain)
         if not owner or not owner.alive then
             return false
         end
-
         if added[owner] then
             return false
         end
-
         -- Уже нарисованные нити не трогаем.
         if isDrawn(owner) then
             return false
         end
-
         if not thread or not thread.p0 or not thread.p2 then
             killOwner(owner)
-
             return false
         end
-
         -- Основная нить должна иметь живой валидный anchor.
         if owner.target then
             if not self:ValidateConnection(inst, owner) then
                 return false
             end
         end
-
         -- Перемычка может быть нарисована только если обе основные нити
         -- либо уже нарисованы, либо запланированы к рисованию.
         if owner.connA or owner.connB then
             if not isAvailable(owner.connA) or not isAvailable(owner.connB) then
                 killOwner(owner)
-
                 return false
             end
         end
-
-        -- Inter-cross может быть нарисован только если родительские
-        -- перемычки живы и либо нарисованы, либо запланированы.
-        if owner.parentSegA and not isAvailable(owner.parentSegA) then
-            killOwner(owner)
-
-            return false
-        end
-
-        if owner.parentSegB and not isAvailable(owner.parentSegB) then
-            killOwner(owner)
-
-            return false
-        end
-
         if cursor then
             self:AddTravelPointTask(
                 tasks,
@@ -14577,35 +14502,26 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
                 owner
             )
         end
-
         local task = self:AddThreadTask(tasks, owner, thread)
-
         if not task then
             return false
         end
-
         if isMain then
             task.isMain = true
         end
-
         added[owner] = true
-
         cursor = {
             x = thread.p2.x,
             y = thread.p2.y,
         }
-
         return true
     end
-
     -----------------------------------------------------------------------
     -- 1. Сначала дорисовываем живые, но ещё не нарисованные основные нити.
     -----------------------------------------------------------------------
-
     for _, conn in ipairs(inst.conns or {}) do
         if conn.alive and not isDrawn(conn) then
             local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
-
             if drawThread then
                 addOwner(conn, drawThread, true)
             else
@@ -14613,19 +14529,15 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
             end
         end
     end
-
     -----------------------------------------------------------------------
     -- 2. Потом дорисовываем перемычки по существующим рядам.
     -----------------------------------------------------------------------
-
     local N = inst.conns and #inst.conns or 0
-
     if inst.crossRowsList then
         for _, row in ipairs(inst.crossRowsList) do
             if type(row) == "table" then
                 for idx = 1, N do
                     local seg = row[idx]
-
                     if seg then
                         addOwner(seg, seg.thread, false)
                     end
@@ -14633,11 +14545,9 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
             end
         end
     end
-
     -----------------------------------------------------------------------
     -- 3. Если вдруг есть обычные crossSeg вне crossRowsList, пробуем их.
     -----------------------------------------------------------------------
-
     if inst.crossSegs then
         for _, seg in ipairs(inst.crossSegs) do
             if not seg.isInterCross then
@@ -14645,34 +14555,13 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
             end
         end
     end
-
-    -----------------------------------------------------------------------
-    -- 4. Затем inter-cross.
-    -----------------------------------------------------------------------
-
-    if inst.interSegs then
-        for _, seg in ipairs(inst.interSegs) do
-            addOwner(seg, seg.thread, false)
-        end
-    end
-
     self:CheckInstanceDead(inst)
-
     if inst.torn then
         return {}
     end
-
     inst.tasks = tasks
-
     return tasks
 end
-
----------------------------------------------------------------------------
--- Финальный RestoreMothStateImmediate.
---
--- После восстановления состояния, если это обычная паутина,
--- пересобираем список задач по фактическому состоянию instance.
----------------------------------------------------------------------------
 
 function NSPauk:RestoreMothStateImmediate(saved)
     local S = self.S
@@ -17487,7 +17376,7 @@ local NSPauk_Moth = {
         STICK_ONLY_VISIBLE_TEXTURE = true,
         STICK_VISIBLE_RADIUS = 6,
 
-        STICK_CHANCE = 1 / 3,
+        STICK_CHANCE = 1 / 30,
         STICK_FAIL_IMMUNITY_MIN = 0.75,
         STICK_FAIL_IMMUNITY_MAX = 1.50,
         STICK_FAIL_REQUIRE_LEAVE = true,
