@@ -6107,7 +6107,146 @@ function NSPauk:ResetSessionRecord()
     self.S.session = {
         bestPoints = 0,
         bestExpAwarded = 0,
+        pendingBestPoints = nil,
+        sessionReportScheduled = false,
     }
+end
+
+function NSPauk:QueueSessionRecord(count)
+    if type(count) ~= "number" or count ~= count or count <= 0 then
+        return
+    end
+
+    count = math.floor(count + 0.5)
+    if count <= 0 then
+        return
+    end
+
+    local S = self.S
+    if type(S.session) ~= "table" then
+        self:ResetSessionRecord()
+    end
+
+    local session = S.session
+
+    local currentBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
+    local pendingBest = math.floor((tonumber(session.pendingBestPoints) or 0) + 0.5)
+
+    if count <= currentBest and count <= pendingBest then
+        return
+    end
+
+    if count > pendingBest then
+        session.pendingBestPoints = count
+    end
+
+    if session.sessionReportScheduled then
+        return
+    end
+
+    session.sessionReportScheduled = true
+
+    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+        C_Timer.After(0.25, function()
+            self:FlushSessionRecordQueue()
+        end)
+    else
+        self:FlushSessionRecordQueue()
+    end
+end
+
+function NSPauk:FlushSessionRecordQueue()
+    local S = self.S
+    if type(S.session) ~= "table" then
+        self:ResetSessionRecord()
+    end
+
+    local session = S.session
+    session.sessionReportScheduled = false
+
+    local count = math.floor((tonumber(session.pendingBestPoints) or 0) + 0.5)
+    session.pendingBestPoints = nil
+
+    if count <= 0 then
+        return
+    end
+
+    local oldBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
+    if count <= oldBest then
+        return
+    end
+
+    local oldExp = self:CalcWebExperience(oldBest)
+    local newExp = self:CalcWebExperience(count)
+
+    local expGain = math.floor((newExp - oldExp) + 0.5)
+    if expGain <= 0 then
+        expGain = 1
+    end
+
+    session.bestPoints = count
+    session.bestExpAwarded = (session.bestExpAwarded or 0) + expGain
+
+    local level
+    local left
+
+    local _, newLevel, newLeft = self:AddExperience(expGain)
+    level = newLevel
+    left = newLeft
+
+    if type(level) ~= "number" or level ~= level or level <= 0 then
+        level = self:GetSpiderLevel()
+    end
+
+    if type(left) ~= "number" or left ~= left then
+        local db = self:EnsureDB()
+
+        local perLevel = tonumber(self.C.POINTS_PER_LEVEL) or 60000
+        if perLevel <= 0 then
+            perLevel = 60000
+        end
+
+        local total = db.progress.totalPoints or 0
+        left = perLevel - (total % perLevel)
+
+        if left == perLevel then
+            left = 0
+        end
+    end
+
+    local C = self.C or {}
+
+    local perLevel = tonumber(C.POINTS_PER_LEVEL) or 60000
+    if perLevel <= 0 then
+        perLevel = 60000
+    end
+
+    local full = C.SESSION_FULL_POINTS
+    if type(full) ~= "number" or full ~= full or full <= 0 then
+        full = perLevel
+    end
+
+    local levelPct = 0
+    if perLevel > 0 then
+        levelPct = expGain / perLevel * 100
+    end
+
+    local countPct = 0
+    if full > 0 then
+        countPct = count / full * 100
+    end
+
+    self:SendOfficer(string.format(
+        "Рекорд сессии: %d (%.1f%% от %d), прошлый %d. Опыт +%d (%.2f%% уровня). Уровень %d, до уровня %d",
+        count,
+        countPct,
+        full,
+        oldBest,
+        expGain,
+        levelPct,
+        level,
+        left
+    ))
 end
 
 function NSPauk:ResetProgress()
@@ -6280,69 +6419,7 @@ function NSPauk:CalcWebExperience(count)
 end
 
 function NSPauk:SettleWebPoints(count)
-    if type(count) ~= "number" or count ~= count or count <= 0 then
-        return
-    end
-
-    count = math.floor(count + 0.5)
-    if count <= 0 then
-        return
-    end
-
-    local S = self.S
-    if type(S.session) ~= "table" then
-        self:ResetSessionRecord()
-    end
-
-    local session = S.session
-    local oldBest = session.bestPoints or 0
-    if count <= oldBest then
-        return
-    end
-
-    local expGain = self:CalcWebExperience(count)
-    if expGain <= 0 then
-        expGain = 1
-    end
-
-    session.bestPoints = count
-    session.bestExpAwarded = (session.bestExpAwarded or 0) + expGain
-
-    local _, level, left = self:AddExperience(expGain)
-
-    local C = self.C or {}
-
-    local perLevel = C.POINTS_PER_LEVEL or 60000
-    if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
-        perLevel = 60000
-    end
-
-    local full = C.SESSION_FULL_POINTS
-    if type(full) ~= "number" or full ~= full or full <= 0 then
-        full = perLevel
-    end
-
-    local levelPct = 0
-    if perLevel > 0 then
-        levelPct = expGain / perLevel * 100
-    end
-
-    local countPct = 0
-    if full > 0 then
-        countPct = count / full * 100
-    end
-
-    self:SendOfficer(string.format(
-        "Рекорд сессии: %d (%.1f%% от %d), прошлый %d. Опыт +%d (%.2f%% уровня). Уровень %d, до уровня %d",
-        count,
-        countPct,
-        full,
-        oldBest,
-        expGain,
-        levelPct,
-        level,
-        left
-    ))
+    self:QueueSessionRecord(count)
 end
 
 function NSPauk:RecordWebLength(count)
@@ -12916,6 +12993,162 @@ function NSPauk:NP_RecordRoute(from, to, route)
     return false, sig
 end
 
+function NSPauk:NP_ChooseLoopDetourPoint(from, to, variant)
+    local S = self.S
+    local gap = self:NP_GetGap()
+    local sw, sh = self:GetScreenSize()
+
+    from = from or {
+        x = S.lastSpiderX or 0,
+        y = S.lastSpiderY or 0,
+    }
+
+    to = to or {
+        x = from.x,
+        y = from.y,
+    }
+
+    variant = math.max(1, tonumber(variant) or 1)
+
+    local dx = (to.x or 0) - (from.x or 0)
+    local dy = (to.y or 0) - (from.y or 0)
+    local len = math.sqrt(dx * dx + dy * dy)
+
+    if len < 1 then
+        local ang = math.random() * 2 * math.pi
+        local radius = gap * (2 + variant)
+
+        local x = from.x + math.cos(ang) * radius
+        local y = from.y + math.sin(ang) * radius
+
+        if x < 0 then
+            x = 0
+        elseif x > sw then
+            x = sw
+        end
+
+        if y < 0 then
+            y = 0
+        elseif y > sh then
+            y = sh
+        end
+
+        return { x = x, y = y }
+    end
+
+    -- Перпендикуляр к направлению from -> to.
+    local nx = -dy / len
+    local ny = dx / len
+
+    -- Чередуем сторону обхода.
+    local sign = 1
+    if variant % 2 == 0 then
+        sign = -1
+    end
+
+    -- Немного меняем точку вдоль линии, чтобы обход был разным.
+    local ts = { 0.28, 0.52, 0.74, 0.38, 0.62 }
+    local t = ts[((variant - 1) % #ts) + 1]
+
+    local baseX = from.x + dx * t
+    local baseY = from.y + dy * t
+
+    local offset = gap * (2.0 + 1.35 * variant)
+    local maxOffset = math.min(
+        gap * 12,
+        math.min(sw, sh) * 0.22,
+        len * 0.45
+    )
+
+    if offset > maxOffset then
+        offset = maxOffset
+    end
+
+    if offset < gap then
+        offset = math.min(gap, maxOffset)
+    end
+
+    local candX = baseX + nx * sign * offset
+    local candY = baseY + ny * sign * offset
+
+    -- Сначала пробуем найти видимый фрейм рядом с желаемой точкой детура.
+    local rects = self:NP_EnsureFrameCache()
+    local best = nil
+    local bestD = math.huge
+
+    for _, r in ipairs(rects) do
+        local pad = gap * 2
+
+        if r.left - pad <= candX
+            and r.right + pad >= candX
+            and r.bottom - pad <= candY
+            and r.top + pad >= candY then
+
+            local ix = (r.right - r.left) * 0.15
+            local iy = (r.top - r.bottom) * 0.15
+
+            local left = r.left + ix
+            local right = r.right - ix
+            local bottom = r.bottom + iy
+            local top = r.top - iy
+
+            if right < left then
+                left = r.left
+                right = r.right
+            end
+
+            if top < bottom then
+                bottom = r.bottom
+                top = r.top
+            end
+
+            local x = candX
+            local y = candY
+
+            if x < left then
+                x = left
+            elseif x > right then
+                x = right
+            end
+
+            if y < bottom then
+                y = bottom
+            elseif y > top then
+                y = top
+            end
+
+            local d = (x - candX) * (x - candX) + (y - candY) * (y - candY)
+
+            local dFrom = (x - from.x) * (x - from.x) + (y - from.y) * (y - from.y)
+            local dTo = (x - to.x) * (x - to.x) + (y - to.y) * (y - to.y)
+
+            if d < bestD and dFrom > gap * gap * 4 and dTo > gap * gap * 4 then
+                bestD = d
+                best = { x = x, y = y }
+            end
+        end
+    end
+
+    if best then
+        return best
+    end
+
+    -- Если фрейм не нашли, просто клампаем точку к экрану.
+    if candX < 0 then
+        candX = 0
+    elseif candX > sw then
+        candX = sw
+    end
+
+    if candY < 0 then
+        candY = 0
+    elseif candY > sh then
+        candY = sh
+    end
+
+    return { x = candX, y = candY }
+end
+
 function NSPauk:NP_ChooseLoopFallbackPoint(from)
     local rects = self:NP_EnsureFrameCache()
 
@@ -12952,86 +13185,65 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
 
     self:NP_ResetRouteHistory()
 
+    if not task then
+        return 0
+    end
+
+    local variant = (tonumber(task.nspLoopVariant) or 0) + 1
+
+    -- Текущий drag лучше перезапустить, но сама задача не пропускается.
     if dragMode or S.nspDrag then
         self:NP_ClearGlobalDrag(true)
     end
 
-    if type(task) == "table" and task.nspDragTextures then
+    if task.nspDragTextures then
         self:RecycleTextures(task.nspDragTextures)
         task.nspDragTextures = nil
     end
 
-    -- Если зациклилась охота на мотылька, прерываем её.
-    if S.moth and S.moth.active then
-        self:AbortMothHunt(true, true, true)
-        S.phase = "watch"
-        S.stillTimer = 0
-        S.speedTimer = 0
-        S.currentTask = nil
-        return 0
+    local copy = self:NP_CopyPlanTask(task)
+
+    copy.nspLoopVariant = variant
+    copy.nspLoopReroute = true
+    copy.nspLoopDragDetour = dragMode and true or false
+
+    -- Сбрасываем старые рабочие флаги, чтобы копию не заклинило.
+    copy.nspFallDepth = 0
+    copy.nspAllowNoSupport = nil
+    copy.nspContinueDrag = nil
+    copy.nspDuringDrag = nil
+    copy.nspDragEnd = nil
+    copy.nspDragTextures = nil
+    copy.nspApproachInserted = 0
+    copy.nspApproachFailed = nil
+    copy.nspPreFallInserted = nil
+    copy.nspSupportLostHandled = nil
+    copy.nspSupportLostConsumed = nil
+
+    copy.nspLoopDetourPoint = self:NP_ChooseLoopDetourPoint(
+        from,
+        to or task.p2,
+        variant
+    )
+
+    -- После нескольких попыток разрешаем менее строгую опору,
+    -- чтобы паук не упёрся навсегда.
+    if variant >= 4 then
+        copy.nspAllowNoSupport = true
     end
 
-    -- Если вдруг цикл происходит в коконе, прерываем кокон.
-    if S.currentInstance and S.currentInstance.isCocoon then
-        self:AbortCocoon()
-
-        if not S.limitReturnPending and S.phase ~= "limitWait" then
-            S.phase = "watch"
-            S.stillTimer = 0
-            S.speedTimer = 0
-        end
-
-        S.currentTask = nil
-        return 0
+    -- Совсем аварийный режим: разрешаем анти-телепорт bypass.
+    if variant >= 7 then
+        copy.nspAllowTeleport = true
     end
-
-    -- Убиваем владельца текущей задачи, чтобы паук больше не пытался
-    -- идти по той же самой нити/перемычке.
-    if type(task) == "table" then
-        if task.owner and task.owner.alive then
-            self:NP_KillOwnerHard(task.owner)
-        end
-
-        if task.conn and task.conn.alive and task.conn ~= task.owner then
-            local inst = self:GetOwnerInstance(task.conn)
-            if inst then
-                self:KillConnection(inst, task.conn)
-            end
-        end
-    end
-
-    -- Если есть обычная паутина, полностью перестраиваем её задачи
-    -- с текущей позиции паука.
-    if S.currentInstance and not S.currentInstance.torn and not S.currentInstance.isCocoon then
-        local rebuilt = self:NP_RebuildInstanceTasks(S.currentInstance)
-
-        if rebuilt then
-            S.tasks = rebuilt
-            S.taskIdx = 1
-            S.currentTask = nil
-
-            if #rebuilt == 0 then
-                S.phase = "instanceComplete"
-                S.completeTimer = 0
-            else
-                S.phase = "task"
-            end
-
-            return 0
-        end
-    end
-
-    -- Запасной вариант: отправляем паука в случайную видимую область.
-    local alt = self:NP_ChooseLoopFallbackPoint(from)
-    local plan = self:NP_MakePlanTask("travel", from, alt, nil, nil)
-    plan.nspLoopFallback = true
 
     local pos = S.taskIdx
     if type(pos) ~= "number" or pos < 1 or pos > #S.tasks + 1 then
         pos = #S.tasks + 1
     end
 
-    table.insert(S.tasks, pos, plan)
+    table.insert(S.tasks, pos, copy)
+
     S.taskIdx = pos
     S.currentTask = nil
     S.phase = "task"
@@ -13050,6 +13262,8 @@ function NSPauk:NP_ExecutePlan(task)
         y = S.lastSpiderY or 0,
     }
     local gap = self:NP_GetGap()
+
+    local startInsertIndex = S.taskIdx
     local insertIndex = S.taskIdx
     local inserted = 0
     local loopHit = false
@@ -13059,6 +13273,16 @@ function NSPauk:NP_ExecutePlan(task)
             table.insert(S.tasks, insertIndex, t)
             insertIndex = insertIndex + 1
             inserted = inserted + 1
+        end
+    end
+
+    local function cleanupInserted()
+        if inserted > 0 then
+            for _ = 1, inserted do
+                table.remove(S.tasks, startInsertIndex)
+            end
+            insertIndex = startInsertIndex
+            inserted = 0
         end
     end
 
@@ -13112,140 +13336,43 @@ function NSPauk:NP_ExecutePlan(task)
         end
     end
 
-    if task.nspContinueDrag then
-        local depth = tonumber(task.nspFallDepth) or 0
-        local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y)
-            or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
-
-        if not fromSupported and depth < 3 then
-            local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
-            if S.nspDrag then
-                fall.nspDuringDrag = true
-            end
-            insert(fall)
-
-            local copy = self:NP_CopyPlanTask(task)
-            copy.nspFallDepth = depth + 1
-            insert(copy)
-
-            return inserted
-        end
-
-        local target = task.p2 and {
-            x = task.p2.x,
-            y = task.p2.y,
-        } or {
-            x = from.x,
-            y = from.y,
-        }
-
-        local dragMode = S.nspDrag ~= nil
-        local route = self:NP_BuildRoute(from, target)
-
-        local looped = self:NP_RecordRoute(from, target, route)
-        if looped then
-            return self:NP_HandleRouteLoop(task, from, target, true)
-        end
-
-        if route and route.points and #route.points >= 2 then
-            for i = 1, #route.points - 1 do
-                local ct = self:NP_MakeCrawlTask(route.points[i], route.points[i + 1], task)
-                if dragMode then
-                    ct.nspDuringDrag = true
-                end
-                insert(ct)
-            end
-
-            if route.dropToTarget then
-                local dropFrom = route.dropFrom or {
-                    x = target.x,
-                    y = S.SH or 0,
-                }
-                local dropDist = math.abs((dropFrom.y or 0) - target.y)
-
-                if dropDist > 2 then
-                    local drop = self:NP_MakeTempDropTask(dropFrom, target)
-                    if dragMode then
-                        drop.nspDuringDrag = true
-                    end
-                    insert(drop)
-                else
-                    local ct = self:NP_MakeCrawlTask(dropFrom, target, task)
-                    if dragMode then
-                        ct.nspDuringDrag = true
-                    end
-                    insert(ct)
-                end
-            end
-        else
-            local direct = self:NP_MakeCrawlTask(from, target, task)
-            direct.nspNoSupportCheck = true
-            if dragMode then
-                direct.nspDuringDrag = true
-            end
-            insert(direct)
-        end
-
-        if dragMode and inserted > 0 and task.nspDragEnd then
-            local last = S.tasks[insertIndex - 1]
-            if last then
-                last.nspDragEnd = true
-                last.nspDuringDrag = true
-            end
-        end
-
-        return inserted
-    end
-
-    local depth = tonumber(task.nspFallDepth) or 0
-    local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y)
-        or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
-
-    if task.nspPlan and not task.nspAllowNoSupport and not fromSupported then
-        if depth < 3 then
-            local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
-            insert(fall)
-
-            local copy = self:NP_CopyPlanTask(task)
-            copy.nspFallDepth = depth + 1
-            copy.nspAllowNoSupport = nil
-            insert(copy)
-
-            return inserted
-        else
-            task.nspAllowNoSupport = true
-        end
-    end
-
-    S.nspSupportCache = nil
-
     local function insertRoute(fromPoint, toPoint, dragMode, plan)
         local route = self:NP_BuildRoute(fromPoint, toPoint)
 
+        local pendingDrop = nil
+        local routeFrom = fromPoint
+
         if (not route or not route.points or #route.points < 2) and (fromPoint.y or 0) > 2 then
-            local drop = self:NP_MakeTempDropTask(fromPoint, {
+            pendingDrop = self:NP_MakeTempDropTask(fromPoint, {
                 x = fromPoint.x,
                 y = 0,
             })
-            if dragMode then
-                drop.nspDuringDrag = true
-            end
-            insert(drop)
 
-            fromPoint = {
+            if dragMode then
+                pendingDrop.nspDuringDrag = true
+            end
+
+            routeFrom = {
                 x = fromPoint.x,
                 y = 0,
             }
-            route = self:NP_BuildRoute(fromPoint, toPoint)
+
+            route = self:NP_BuildRoute(routeFrom, toPoint)
         end
 
-        local looped = self:NP_RecordRoute(fromPoint, toPoint, route)
+        local looped = self:NP_RecordRoute(routeFrom, toPoint, route)
         if looped then
             loopHit = true
             return 0
         end
 
         local made = 0
+
+        if pendingDrop then
+            insert(pendingDrop)
+            made = made + 1
+            fromPoint = routeFrom
+        end
 
         if route and route.points and #route.points >= 2 then
             for i = 1, #route.points - 1 do
@@ -13293,6 +13420,154 @@ function NSPauk:NP_ExecutePlan(task)
         return made
     end
 
+    local function insertDetouredRoute(fromPoint, toPoint, dragMode, plan)
+        local detour = plan and plan.nspLoopDetourPoint
+
+        if detour
+            and type(detour.x) == "number"
+            and type(detour.y) == "number" then
+
+            local d1x = (fromPoint.x or 0) - detour.x
+            local d1y = (fromPoint.y or 0) - detour.y
+            local d2x = detour.x - (toPoint.x or 0)
+            local d2y = detour.y - (toPoint.y or 0)
+
+            local minD2 = 16
+
+            if (d1x * d1x + d1y * d1y) > minD2
+                and (d2x * d2x + d2y * d2y) > minD2 then
+
+                insertRoute(fromPoint, detour, dragMode, plan)
+                if loopHit then
+                    return 0
+                end
+
+                insertRoute(detour, toPoint, dragMode, plan)
+                return 0
+            end
+        end
+
+        insertRoute(fromPoint, toPoint, dragMode, plan)
+        return 0
+    end
+
+    if task.nspContinueDrag then
+        local depth = tonumber(task.nspFallDepth) or 0
+        local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y)
+            or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
+
+        if not fromSupported and depth < 3 then
+            local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+            if S.nspDrag then
+                fall.nspDuringDrag = true
+            end
+            insert(fall)
+
+            local copy = self:NP_CopyPlanTask(task)
+            copy.nspFallDepth = depth + 1
+            insert(copy)
+
+            return inserted
+        end
+
+        local target = task.p2 and {
+            x = task.p2.x,
+            y = task.p2.y,
+        } or {
+            x = from.x,
+            y = from.y,
+        }
+
+        local dragMode = S.nspDrag ~= nil
+
+        if task.nspLoopDetourPoint then
+            insertDetouredRoute(from, target, dragMode, task)
+            if loopHit then
+                cleanupInserted()
+                return self:NP_HandleRouteLoop(task, from, target, dragMode)
+            end
+        else
+            local route = self:NP_BuildRoute(from, target)
+
+            local looped = self:NP_RecordRoute(from, target, route)
+            if looped then
+                cleanupInserted()
+                return self:NP_HandleRouteLoop(task, from, target, dragMode)
+            end
+
+            if route and route.points and #route.points >= 2 then
+                for i = 1, #route.points - 1 do
+                    local ct = self:NP_MakeCrawlTask(route.points[i], route.points[i + 1], task)
+                    if dragMode then
+                        ct.nspDuringDrag = true
+                    end
+                    insert(ct)
+                end
+
+                if route.dropToTarget then
+                    local dropFrom = route.dropFrom or {
+                        x = target.x,
+                        y = S.SH or 0,
+                    }
+                    local dropDist = math.abs((dropFrom.y or 0) - target.y)
+
+                    if dropDist > 2 then
+                        local drop = self:NP_MakeTempDropTask(dropFrom, target)
+                        if dragMode then
+                            drop.nspDuringDrag = true
+                        end
+                        insert(drop)
+                    else
+                        local ct = self:NP_MakeCrawlTask(dropFrom, target, task)
+                        if dragMode then
+                            ct.nspDuringDrag = true
+                        end
+                        insert(ct)
+                    end
+                end
+            else
+                local direct = self:NP_MakeCrawlTask(from, target, task)
+                direct.nspNoSupportCheck = true
+                if dragMode then
+                    direct.nspDuringDrag = true
+                end
+                insert(direct)
+            end
+        end
+
+        if dragMode and inserted > 0 and task.nspDragEnd then
+            local last = S.tasks[insertIndex - 1]
+            if last then
+                last.nspDragEnd = true
+                last.nspDuringDrag = true
+            end
+        end
+
+        return inserted
+    end
+
+    local depth = tonumber(task.nspFallDepth) or 0
+    local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y)
+        or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
+
+    if task.nspPlan and not task.nspAllowNoSupport and not fromSupported then
+        if depth < 3 then
+            local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+            insert(fall)
+
+            local copy = self:NP_CopyPlanTask(task)
+            copy.nspFallDepth = depth + 1
+            copy.nspAllowNoSupport = nil
+            insert(copy)
+
+            return inserted
+        else
+            task.nspAllowNoSupport = true
+        end
+    end
+
+    S.nspSupportCache = nil
+
     if task.nspDrag then
         self:NP_ClearGlobalDrag(false)
 
@@ -13310,18 +13585,41 @@ function NSPauk:NP_ExecutePlan(task)
 
         local dx = from.x - anchor.x
         local dy = from.y - anchor.y
+        local anchorDist2 = dx * dx + dy * dy
 
-        if dx * dx + dy * dy > 9 then
-            insertRoute(from, anchor, false, task)
+        local usePreAnchorDetour = task.nspLoopDetourPoint
+            and not task.nspLoopDragDetour
+            and anchorDist2 > 9
+
+        local useDragDetour = task.nspLoopDetourPoint
+            and (
+                task.nspLoopDragDetour
+                or anchorDist2 <= 9
+            )
+
+        if anchorDist2 > 9 then
+            if usePreAnchorDetour then
+                insertDetouredRoute(from, anchor, false, task)
+            else
+                insertRoute(from, anchor, false, task)
+            end
+
             if loopHit then
+                cleanupInserted()
                 return self:NP_HandleRouteLoop(task, from, anchor, false)
             end
         end
 
         insert(self:NP_MakeStartDragTask(task, anchor))
 
-        insertRoute(anchor, target, true, task)
+        if useDragDetour then
+            insertDetouredRoute(anchor, target, true, task)
+        else
+            insertRoute(anchor, target, true, task)
+        end
+
         if loopHit then
+            cleanupInserted()
             return self:NP_HandleRouteLoop(task, anchor, target, true)
         end
 
@@ -13344,8 +13642,14 @@ function NSPauk:NP_ExecutePlan(task)
         y = from.y,
     }
 
-    insertRoute(from, to, false, task)
+    if task.nspLoopDetourPoint then
+        insertDetouredRoute(from, to, false, task)
+    else
+        insertRoute(from, to, false, task)
+    end
+
     if loopHit then
+        cleanupInserted()
         return self:NP_HandleRouteLoop(task, from, to, false)
     end
 
