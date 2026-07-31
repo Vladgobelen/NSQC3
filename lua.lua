@@ -905,6 +905,498 @@ ns_llua['lua'][14] = {
     },
 }
 
+ns_llua['lua'][15] = {
+    type = "info",
+    title = "Сравнения и логические значения",
+    content = [=[
+<h>Сравнения и логические значения</h>
+<t>Операторы сравнения нужны, чтобы сравнивать значения между собой. Результатом сравнения всегда является <k>boolean</k> — <k>true</k> или <k>false</k>.</t>
+<code>
+local result = 10 > 3
+print(result)       -- true
+print(type(result)) -- boolean
+</code>
+
+<h>1. Оператор равно</h>
+<t>Записывается как <k>==</k>.</t>
+<t>Правило:</t> возвращает <k>true</k>, если левое и правое значения равны.
+<code>
+print(5 == 5)         -- true
+print(5 == 6)         -- false
+print("Меч" == "Меч") -- true
+print("Меч" == "Щит") -- false
+</code>
+<w>Важно:</w> один знак <k>=</k> — это присваивание, а два знака <k>==</k> — это сравнение.
+<code>
+local level = 80     -- присваивание
+print(level == 80)   -- сравнение, вернёт true
+</code>
+
+<h>2. Оператор не равно</h>
+<t>Записывается как <k>~=</k>.</t>
+<t>Правило:</t> возвращает <k>true</k>, если значения НЕ равны.
+<code>
+print(7 ~= 7)         -- false
+print(7 ~= 8)         -- true
+print("лук" ~= "меч") -- true
+</code>
+
+<h>3. Оператор больше</h>
+<t>Записывается как <k>></k>.</t>
+<t>Правило:</t> возвращает <k>true</k>, если левое значение больше правого.
+<code>
+print(10 > 3) -- true
+print(3 > 10) -- false
+print(5 > 5)  -- false
+</code>
+
+<h>4. Оператор меньше</h>
+<t>Записывается как <k><</k>.</t>
+<t>Правило:</t> возвращает <k>true</k>, если левое значение меньше правого.
+<code>
+print(3 < 10) -- true
+print(10 < 3) -- false
+print(5 < 5)  -- false
+</code>
+
+<h>5. Оператор больше или равно</h>
+<t>Записывается как <k>>=</k>.</t>
+<t>Правило:</t> возвращает <k>true</k>, если левое значение больше или равно правому.
+<code>
+print(8 >= 8) -- true
+print(9 >= 8) -- true
+print(7 >= 8) -- false
+</code>
+
+<h>6. Оператор меньше или равно</h>
+<t>Записывается как <k><=</k>.</t>
+<t>Правило:</t> возвращает <k>true</k>, если левое значение меньше или равно правому.
+<code>
+print(7 <= 8) -- true
+print(8 <= 8) -- true
+print(9 <= 8) -- false
+</code>
+
+<h>Шпаргалка по операторам сравнения</h>
+<c>== — равно</c>
+<c>~= — не равно</c>
+<c>> — больше</c>
+<c>< — меньше</c>
+<c>>= — больше или равно</c>
+<c><= — меньше или равно</c>
+
+<h>Логические значения</h>
+<t>Тип <k>boolean</k> имеет только два значения:</t>
+<t><k>true</k> — истина.</t>
+<t><k>false</k> — ложь.</t>
+<code>
+local isAlive = true
+local isDead = false
+print(type(isAlive)) -- boolean
+print(type(isDead))  -- boolean
+</code>
+
+<h>Оператор not</h>
+<t>Записывается как <k>not</k>.</t>
+<t>Правило:</t> оператор <k>not</k> переворачивает логическое значение.
+<t>Если значение ложное, то <k>not</k> вернёт <k>true</k>. Если значение истинное, то <k>not</k> вернёт <k>false</k>.</t>
+<code>
+print(not true)  -- false
+print(not false) -- true
+print(not nil)   -- true
+</code>
+<t>В Lua ложными считаются только <k>false</k> и <k>nil</k>. Поэтому числа, строки и таблицы дают <k>false</k> после <k>not</k>:</t>
+<code>
+print(not 0)   -- false
+print(not "")  -- false
+print(not {})  -- false
+</code>
+<w>Важно:</w> результат оператора <k>not</k> всегда имеет тип <k>boolean</k>.
+<code>
+local value = 0
+print(type(not value)) -- boolean
+</code>
+<t>Пример с условием:</t>
+<code>
+local isDead = false
+if not isDead then
+    print("Персонаж жив!")
+end
+</code>
+<t>Двойное отрицание можно использовать, чтобы превратить любое значение в <k>true</k> или <k>false</k>:</t>
+<code>
+print(not not 0)   -- true
+print(not not nil) -- false
+</code>
+
+<h>Шпаргалка по not</h>
+<c>not true = false</c>
+<c>not false = true</c>
+<c>not nil = true</c>
+<c>not 0 = false</c>
+<c>not "" = false</c>
+<c>not {} = false</c>
+
+<h>Что в Lua считается ложью</h>
+<w>Очень важно:</w> в Lua только <k>false</k> и <k>nil</k> считаются ложными. Всё остальное — <k>true</k>.
+<code>
+if 0 then
+    print("0 считается true")
+end
+
+if "" then
+    print("Пустая строка считается true")
+end
+
+if {} then
+    print("Пустая таблица считается true")
+end
+</code>
+
+<h>nil и false — не одно и то же</h>
+<t><k>nil</k> означает отсутствие значения, а <k>false</k> — логическую ложь. При сравнении они не равны.</t>
+<code>
+print(nil == false) -- false
+print(nil ~= false) -- true
+</code>
+
+<h>Сравнение чисел и строк</h>
+<t>Число и строка с таким же текстом — это разные значения.</t>
+<code>
+print(777 == "777") -- false
+print(type(777))    -- number
+print(type("777"))  -- string
+</code>
+<t>Если строку нужно сравнить как число, её можно преобразовать:</t>
+<code>
+print(tonumber("777") == 777) -- true
+</code>
+
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> использовать один знак <k>=</k> вместо <k>==</k> в условии.
+<code>
+-- неправильно
+if level = 80 then
+    print("Максимальный уровень")
+end
+
+-- правильно
+if level == 80 then
+    print("Максимальный уровень")
+end
+</code>
+
+<w>Ошибка 2:</w> думать, что <k>nil</k> и <k>false</k> — это одно и то же.
+<code>
+print(nil == false) -- false
+</code>
+
+<w>Ошибка 3:</w> сравнивать число со строкой без преобразования.
+<code>
+print(777 == "777")           -- false
+print(tonumber("777") == 777) -- true
+</code>
+
+<w>Ошибка 4:</w> ожидать, что <k>not 0</k> даст <k>true</k>.
+<t>В некоторых языках 0 считается ложью, но в Lua 0 — это <k>true</k>. Поэтому:</t>
+<code>
+print(not 0) -- false
+</code>
+
+<h>Где это используется</h>
+<t>Сравнения чаще всего используются внутри условий <k>if</k>:</t>
+<code>
+local hp = 85
+if hp > 60 then
+    print("Боеспособен")
+end
+</code>
+<t>Оператор <k>not</k> часто используется, чтобы проверить обратное условие:</t>
+<code>
+local inCombat = false
+if not inCombat then
+    print("Можно спокойно отдохнуть")
+end
+</code>
+]=],
+}
+
+ns_llua['lua'][16] = {
+    type = "printtest",
+    title = "Практика: Сравнения",
+    helpModules = {15, 4},
+    content = [=[
+<h>Практика: сравнения</h>
+<t>Выведи результат сравнения через <k>print</k>.</t>
+<t>Задания проверяются по очереди.</t>
+]=],
+    tasks = {
+        {
+            desc = "Выведи результат 5 == 5",
+            hint = "Используй /run print(5 == 5)",
+            pattern = "true",
+            requireKeywords = {"print", "5==5"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 7 ~= 7",
+            hint = "Используй /run print(7 ~= 7)",
+            pattern = "false",
+            requireKeywords = {"print", "7~=7"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 10 > 3",
+            hint = "Используй /run print(10 > 3)",
+            pattern = "true",
+            requireKeywords = {"print", "10>3"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 10 < 3",
+            hint = "Используй /run print(10 < 3)",
+            pattern = "false",
+            requireKeywords = {"print", "10<3"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 8 >= 8",
+            hint = "Используй /run print(8 >= 8)",
+            pattern = "true",
+            requireKeywords = {"print", "8>=8"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 8 <= 7",
+            hint = "Используй /run print(8 <= 7)",
+            pattern = "false",
+            requireKeywords = {"print", "8<=7"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+    },
+}
+
+ns_llua['lua'][17] = {
+    type = "info",
+    title = "Простые условия if",
+    content = [=[
+<h>Простые условия if</h>
+<t>Конструкция <k>if</k> выполняет код, если условие истинно.</t>
+<code>
+local hp = 80
+if hp > 60 then
+    print("Боеспособен")
+end
+</code>
+<t>Если нужно выбрать один из двух вариантов, используй <k>else</k>.</t>
+<code>
+local hp = 40
+if hp > 60 then
+    print("Боеспособен")
+else
+    print("Нужен отдых")
+end
+</code>
+<w>Важно:</w> Каждый <k>if</k> закрывается словом <k>end</k>.
+]=],
+}
+
+ns_llua['lua'][18] = {
+    type = "commenttest",
+    title = "Практика: Простое условие if",
+    helpModules = {17, 15},
+    preloadVars = {
+        {var = "playerMana", value = 40, desc = "playerMana = 40"},
+    },
+    instruction = [=[
+<h>Практика: простое условие if</h>
+<t>Переменная <k>playerMana</k> уже равна 40.</t>
+<t>Напиши условие: если <k>playerMana</k> больше или равно 30, выведи <s>"Достаточно маны"</s>.</t>
+<t>Иначе выведи <s>"Мало маны"</s>.</t>
+<t>Выведи только одну строку.</t>
+<w>Подсказка:</w> используй конструкцию if / then / else / end.
+]=],
+    initialCode = [=[
+-- Напиши условие здесь
+]=],
+    expectedOutput = "Достаточно маны",
+    requireKeywords = {"playerMana", ">=", "30", "if", "then", "else", "end", "print"},
+}
+
+ns_llua['lua'][19] = {
+    type = "info",
+    title = "Ветвление: if / elseif / else",
+    content = [=[
+<h>Ветвление: if / elseif / else</h>
+<t>Конструкция <k>if / elseif / else</k> позволяет выбрать один из нескольких путей.</t>
+<code>
+local percent = 25
+if percent >= 80 then
+    print("Здоровье отличное!")
+elseif percent >= 40 then
+    print("Нужно подлечиться")
+else
+    print("СРОЧНО ЛЕЧИСЬ!")
+end
+</code>
+<t>Как только одно условие сработало, остальные <k>elseif</k> и <k>else</k> пропускаются.</t>
+<w>Важно:</w> <k>else</k> должен быть последним, а весь блок закрывается словом <k>end</k>.
+]=],
+}
+
+ns_llua['lua'][20] = {
+    type = "commenttest",
+    title = "Практика: if / elseif / else",
+    helpModules = {19, 17},
+    preloadVars = {
+        {var = "arenaRating", value = 1450, desc = "arenaRating = 1450"},
+    },
+    instruction = [=[
+<h>Практика: if / elseif / else</h>
+<t>Переменная <k>arenaRating</k> уже равна 1450.</t>
+<t>Напиши условие с тремя ветками:</t>
+<t>Если <k>arenaRating</k> больше или равно 1500, выведи <s>"Высокий рейтинг"</s>.</t>
+<t>Иначе, если <k>arenaRating</k> больше или равно 1200, выведи <s>"Средний рейтинг"</s>.</t>
+<t>Иначе выведи <s>"Низкий рейтинг"</s>.</t>
+<t>Выведи только одну строку.</t>
+<w>Подсказка:</w> используй конструкцию if / elseif / else / end.
+]=],
+    initialCode = [=[
+-- Напиши условие здесь
+]=],
+    expectedOutput = "Средний рейтинг",
+    requireKeywords = {"arenaRating", ">=", "1500", "1200", "if", "elseif", "else", "end", "print"},
+}
+
+ns_llua['lua'][21] = {
+    type = "info",
+    title = "Логические операторы and / or / not",
+    content = [=[
+<h>Логические операторы and / or / not</h>
+<t>Оператор <k>and</k> возвращает <k>true</k>, только если оба условия истинны.</t>
+<code>
+local hp = 5000
+local mana = 3000
+if hp > 0 and mana > 1000 then
+    print("Можно атаковать и кастовать")
+end
+</code>
+<t>Оператор <k>or</k> возвращает <k>true</k>, если истинно хотя бы одно условие.</t>
+<code>
+local class = "Воин"
+if class == "Воин" or class == "Паладин" then
+    print("Можно носить латы!")
+end
+</code>
+<t>Оператор <k>not</k> переворачивает логическое значение.</t>
+<code>
+local isDead = false
+if not isDead then
+    print("Персонаж жив!")
+end
+</code>
+<h>Частая ошибка</h>
+<w>Неправильно:</w>
+<code>
+local class = "Маг"
+if class == "Воин" or "Паладин" then
+    print("Можно носить латы!")
+end
+</code>
+<t>Здесь вторая часть — просто строка <s>"Паладин"</s>, а любая строка в Lua считается <k>true</k>. Поэтому условие всегда будет истинным.</t>
+<ok>Правильно:</ok>
+<code>
+local class = "Маг"
+if class == "Воин" or class == "Паладин" then
+    print("Можно носить латы!")
+end
+</code>
+]=],
+}
+
+ns_llua['lua'][22] = {
+    type = "printtest",
+    title = "Практика: and / or / not",
+    helpModules = {21, 15},
+    content = [=[
+<h>Практика: and / or / not</h>
+<t>Выведи результат логического выражения через <k>print</k>.</t>
+<t>Задания проверяются по очереди.</t>
+]=],
+    tasks = {
+        {
+            desc = "Выведи результат 5 > 3 and 10 > 7",
+            hint = "Используй /run print(5 > 3 and 10 > 7)",
+            pattern = "true",
+            requireKeywords = {"print", "and", "5>3", "10>7"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 5 > 3 and 10 < 7",
+            hint = "Используй /run print(5 > 3 and 10 < 7)",
+            pattern = "false",
+            requireKeywords = {"print", "and", "5>3", "10<7"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 5 < 3 or 10 > 7",
+            hint = "Используй /run print(5 < 3 or 10 > 7)",
+            pattern = "true",
+            requireKeywords = {"print", "or", "5<3", "10>7"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат 5 < 3 or 10 < 7",
+            hint = "Используй /run print(5 < 3 or 10 < 7)",
+            pattern = "false",
+            requireKeywords = {"print", "or", "5<3", "10<7"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат not (5 < 3)",
+            hint = "Используй /run print(not (5 < 3))",
+            pattern = "true",
+            requireKeywords = {"print", "not", "5<3"},
+            forbidKeywords = {"true", "false", "nil"},
+        },
+        {
+            desc = "Выведи результат not nil",
+            hint = "Используй /run print(not nil)",
+            pattern = "true",
+            requireKeywords = {"print", "not", "nil"},
+            forbidKeywords = {"true", "false"},
+        },
+    },
+}
+
+ns_llua['lua'][23] = {
+    type = "commenttest",
+    title = "Практика: and / or / not в условии",
+    helpModules = {21, 19},
+    preloadVars = {
+        {var = "isAlive", value = true, desc = "isAlive = true"},
+        {var = "inCombat", value = false, desc = "inCombat = false"},
+        {var = "playerLevel", value = 70, desc = "playerLevel = 70"},
+    },
+    instruction = [=[
+<h>Практика: and / or / not в условии</h>
+<t>Переменные уже созданы:</t>
+<code>
+isAlive = true
+inCombat = false
+playerLevel = 70
+</code>
+<t>Напиши условие: если персонаж жив, не в бою и его уровень не меньше 60, выведи <s>"Готов к рейду"</s>. Иначе выведи <s>"Не готов"</s>.</t>
+<t>Используй <k>and</k>, <k>not</k> и сравнение <k>>=</k>.</t>
+
+]=],
+    initialCode = [=[
+-- Напиши условие здесь
+]=],
+    expectedOutput = "Готов к рейду",
+    requireKeywords = {"isAlive", "inCombat", "playerLevel", "and", "not", ">=", "60", "if", "then", "else", "end", "print"},
+}
+
 -- ============================================================
 -- UI CLASS: MAIN WINDOW + HELP WINDOW + EDITOR
 -- ============================================================
