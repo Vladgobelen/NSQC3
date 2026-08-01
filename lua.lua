@@ -513,6 +513,35 @@ print("5" + 2) -- 7
 print("Привет" + 2) -- ошибка
 </code>
 
+<h>tonumber: когда возвращает nil</h>
+<t>Функция <k>tonumber</k> пытается сделать из значения число. Важно не то, какого типа значение на входе, а то, получилось ли превращение.</t>
+<t>Если получилось — вернётся число. Если не получилось — вернётся <k>nil</k>.</t>
+
+<code>
+print(tonumber("25"))   -- 25: строку "25" можно прочитать как число
+print(tonumber("3.5"))  -- 3.5: дробная строка тоже превращается
+print(tonumber(7))      -- 7: на входе уже число, tonumber вернул его как есть
+print(tonumber("bad"))  -- nil: из "bad" число не сделать
+print(tonumber("abc"))  -- nil: из "abc" число не сделать
+</code>
+
+<w>Главное:</w> <k>nil</k> здесь — это ответ «это не число». Не ошибка, не ноль, не пустая строка — именно <k>nil</k>.
+
+<h>Зачем это нужно</h>
+<t>Так как число в условии — истина, а <k>nil</k> — ложь, результатом <k>tonumber</k> можно проверять «а это вообще число?».</t>
+
+<code>
+local price = tonumber(v)   -- превращаем: число или nil
+if price then               -- число = истина, nil = ложь
+    print("это число")      -- выполнится только если превращение удалось
+end                         -- закрываем условие
+</code>
+
+<t>Проверять саму строку через <k>if v then</k> бесполезно: любая строка, даже "bad", в Lua — истина. Разницу между "5" (цена текстом) и "bad" (мусор) видит только <k>tonumber</k>, потому что тип у обеих — <k>string</k>.</t>
+
+<h>Короткое правило</h>
+<t>Не гадай по типу, строка там или число. Скармливай значение <k>tonumber</k> и верь ответу: число — значит получилось, <k>nil</k> — значит нет. Один <k>tonumber</k> закрывает и строку-цену ("5"), и число-цену (7), и мусор ("bad").</t>
+
 <h>Преобразование числа в строку</h>
 <t>Для явного преобразования числа в строку используется <k>tostring</k>.</t>
 
@@ -541,7 +570,8 @@ print(type(str)) -- string
 <t>Основные ошибки:</t>
 - записать число в кавычках и ожидать числовое поведение;
 - ждать целое число после деления <k>/</k>;
-- пытаться сложить число со строкой, которая не является числом.
+- пытаться сложить число со строкой, которая не является числом;
+- проверять саму строку через <k>if v then</k> вместо результата <k>tonumber(v)</k>: строка всегда истина, а «это число или нет» решает только <k>tonumber</k>.
 ]=],
 }
 
@@ -2292,6 +2322,988 @@ ns_llua['lua'][43] = {
             and _G.bigGoldCount == 2
             and _G.bigGoldSum == 3200
             and _G.bigGoldReport == "Крупных сумм: 2, всего: 3200"
+    end,
+}
+
+ns_llua['lua'][44] = {
+    type = "info",
+    title = "Хэш-таблицы и массивы",
+    helpModules = {4},
+    content = [=[
+<h>Хэш-таблицы и массивы</h>
+<t>В Lua таблица может работать и как массив, и как словарь.</t>
+<t>Это не два разных типа данных. Это одна и та же <k>table</k>, которую используют по-разному.</t>
+
+<h>Массив</h>
+<t>Массив — это таблица с числовыми ключами подряд: 1, 2, 3 и так далее.</t>
+<code>
+local items = {"Меч", "Щит", "Зелье"} -- создаём список предметов
+print(items[1]) -- выводим первый элемент: "Меч"
+print(#items) -- выводим количество элементов: 3
+</code>
+<t>Массивы удобны, когда важен порядок элементов.</t>
+
+<h>Хэш-таблица, или словарь</h>
+<t>Хэш-таблица — это таблица, где ключами могут быть строки, числа и другие значения, кроме <k>nil</k>.</t>
+<code>
+local player = {name = "Артас", level = 80} -- создаём словарь
+print(player.name) -- читаем поле name: "Артас"
+print(player["level"]) -- читаем поле level: 80
+</code>
+<t>Хэш-таблицы удобны, когда данные имеют имена.</t>
+
+<h>Чем массив отличается от хэш-таблицы</h>
+<c>Массив:</c> доступ по номеру, порядок сохранён, можно использовать оператор <k>#</k>.
+<c>Хэш-таблица:</c> доступ по имени или другому ключу, порядок через <k>pairs</k> не гарантирован, оператор <k>#</k> обычно не используют.
+
+<h>Память</h>
+<t>Массивная часть таблицы хранится компактно, поэтому списки обычно занимают меньше памяти.</t>
+<t>Хэш-часть хранит ключи, значения и служебную информацию для быстрого поиска, поэтому словари обычно занимают больше памяти.</t>
+<w>Вывод:</w> если данные можно хранить как список — лучше хранить как список. Словарь нужен, когда нужны именованные поля или быстрый поиск по ключу.
+
+<h>Когда использовать хэш-таблицы</h>
+<t>- нужно найти значение по имени;</t>
+<t>- нужно хранить настройки;</t>
+<t>- нужно сопоставить предмет и цену;</t>
+<t>- нужно быстро проверить, есть ли ключ;</t>
+<t>- нужно описать объект с полями.</t>
+
+<h>Перебор</h>
+<t>Для массивов используют <k>ipairs</k>:</t>
+<code>
+local items = {"Меч", "Щит"} -- список
+for index, value in ipairs(items) do -- перебираем по порядку
+    print(index, value) -- выводим номер и значение
+end
+</code>
+<t>Для словарей используют <k>pairs</k>:</t>
+<code>
+local prices = {["Факел"] = 10, ["Компас"] = 100} -- словарь цен
+for key, value in pairs(prices) do -- перебираем ключи и значения
+    print(key, value) -- выводим ключ и значение
+end
+</code>
+<w>Важно:</w> порядок обхода через <k>pairs</k> не гарантирован.
+]=],
+}
+
+ns_llua['lua'][45] = {
+    type = "info",
+    title = "Функции",
+    helpModules = {44},
+    content = [=[
+<h>Функции</h>
+<t>Функция — это блок кода, который можно вызывать много раз.</t>
+<t>Функции помогают не повторять один и тот же код и разбивать программу на маленькие понятные части.</t>
+
+<h>Объявление функции</h>
+<code>
+local function sum(a, b) -- объявляем локальную функцию
+    return a + b -- возвращаем результат
+end
+print(sum(2, 3)) -- вызываем функцию и выводим 5
+</code>
+
+<h>Аргументы</h>
+<t>Функция может принимать значения внутри скобок.</t>
+<code>
+local function greet(name) -- функция принимает аргумент name
+    return "Привет, " .. name -- возвращаем строку
+end
+print(greet("Артас")) -- выводим: Привет, Артас
+</code>
+
+<h>return</h>
+<t>Оператор <k>return</k> возвращает значение из функции.</t>
+<code>
+local function isAdult(age) -- функция проверки возраста
+    if age >= 18 then -- если возраст подходит
+        return true -- возвращаем true
+    end
+    return false -- иначе возвращаем false
+end
+</code>
+
+<h>Несколько возвращаемых значений</h>
+<t>Некоторые функции WoW API возвращают сразу несколько значений.</t>
+<code>
+local className, classToken = UnitClass("player") -- получаем два значения от UnitClass
+print(className) -- выводим название класса, например "Воин"
+print(classToken) -- выводим код класса, например "WARRIOR"
+</code>
+
+<t>Здесь одна функция вернула сразу два результата:</t>
+<t>- <k>className</k> — понятное название класса;</t>
+<t>- <k>classToken</k> — технический код класса.</t>
+
+<t>Если первое значение не нужно, вместо него ставят <k>_</k>.</t>
+<code>
+local _, classToken = UnitClass("player") -- получаем только второй результат
+print(classToken) -- выводим код класса, например "WARRIOR"
+</code>
+
+<h>Локальные и глобальные функции</h>
+<code>
+local function localSum(a, b) -- локальная функция
+    return a + b -- возвращает сумму
+end
+function globalSum(a, b) -- глобальная функция
+    return a + b -- возвращает сумму
+end
+</code>
+<t>Локальные функции обычно лучше: они не засоряют глобальную область видимости и работают быстрее.</t>
+<w>Важно для курса:</w> если практическое задание просит создать функцию для проверки, делай её глобальной, чтобы система могла её вызвать.
+
+<h>Досрочный return</h>
+<t>Из функции можно выйти раньше времени.</t>
+<code>
+local function getPrice(list, key) -- функция получения цены
+    if type(list) ~= "table" then return 0 end -- если список не таблица, возвращаем 0
+    return list[key] or 0 -- если ключа нет, возвращаем 0
+end
+</code>
+
+<h>Зачем выносить логику в функции</h>
+<t>- код становится короче;</t>
+<t>- логику можно проверить отдельно;</t>
+<t>- одну функцию можно использовать с разными данными;</t>
+<t>- проще искать ошибки.</t>
+]=],
+}
+
+ns_llua['lua'][46] = {
+    type = "commenttest",
+    title = "Практика: функция sumStats",
+    helpModules = {44, 45, 4},
+    preloadVars = {
+        {var = "sumStats", desc = "sumStats очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+    },
+    instruction = [=[
+<h>Практика: функция sumStats</h>
+<t>Создай только глобальную функцию <k>sumStats(stats)</k>.</t>
+
+<t>Функция получает хэш-таблицу <k>stats</k>.</t>
+<t>Значения в таблице могут быть числами и не числами.</t>
+<t>Функция должна вернуть сумму только тех значений, у которых тип <k>number</k>.</t>
+
+<t>Используй:</t>
+<t>- <k>pairs</k>;</t>
+<t>- <k>type</k>;</t>
+<t>- <k>return</k>.</t>
+
+<w>Важно:</w>
+<t>Таблицу создавать не нужно.</t>
+<t>Система сама подставит свои таблицы в твою функцию во время проверки.</t>
+
+<t>После проверки в отчёте будет показано:</t>
+<t>- какая таблица подавалась в функцию;</t>
+<t>- какой результат вернула функция;</t>
+<t>- какой результат ожидался.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Создай глобальную функцию sumStats(stats)
+]=],
+    requireKeywords = {
+        "sumStats",
+        "function",
+        "pairs",
+        "type",
+        "return",
+    },
+    checkCode = function()
+        local function formatValue(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        local function serializeTable(t)
+            local keys = {}
+
+            for k in pairs(t) do
+                table.insert(keys, k)
+            end
+
+            table.sort(keys, function(a, b)
+                return tostring(a) < tostring(b)
+            end)
+
+            local parts = {}
+
+            for _, k in ipairs(keys) do
+                table.insert(parts, tostring(k) .. "=" .. formatValue(t[k]))
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local function copyTable(t)
+            local out = {}
+
+            for k, v in pairs(t) do
+                out[k] = v
+            end
+
+            return out
+        end
+
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+        _G.test3 = nil
+        _G.test4 = nil
+
+        if type(_G.sumStats) ~= "function" then
+            _G.checkError = "sumStats не является глобальной функцией"
+            return false
+        end
+
+        local tests = {
+            {
+                input = {
+                    strength = 20,
+                    agility = 15,
+                    intellect = 30,
+                },
+                expected = 65,
+            },
+            {
+                input = {
+                    hp = 100,
+                    name = "Герой",
+                    stamina = 25,
+                },
+                expected = 125,
+            },
+            {
+                input = {
+                    one = 7,
+                },
+                expected = 7,
+            },
+            {
+                input = {},
+                expected = 0,
+            },
+        }
+
+        local allOk = true
+
+        for i, test in ipairs(tests) do
+            local inputCopy = copyTable(test.input)
+            local ok, result = pcall(_G.sumStats, test.input)
+
+            local resultText
+
+            if ok then
+                resultText = formatValue(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            _G["test" .. i] = "Таблица: "
+                .. serializeTable(inputCopy)
+                .. " | Результат: "
+                .. resultText
+                .. " | Ожидалось: "
+                .. formatValue(test.expected)
+
+            if not ok or result ~= test.expected then
+                allOk = false
+            end
+        end
+
+        return allOk
+    end,
+}
+
+ns_llua['lua'][47] = {
+    type = "commenttest",
+    title = "Практика: чтение полей хэш-таблицы",
+    helpModules = {44},
+    preloadVars = {
+        {var = "hero", value = {name = "Тралл", level = 60, ["класс"] = "Шаман"}, desc = "hero = {name = \"Тралл\", level = 60, [\"класс\"] = \"Шаман\"}"},
+        {var = "key", value = "level", desc = "key = \"level\" (переменная с именем ключа)"},
+        {var = "heroName", desc = "heroName очищается перед проверкой"},
+        {var = "heroLevel", desc = "heroLevel очищается перед проверкой"},
+        {var = "heroClass", desc = "heroClass очищается перед проверкой"},
+        {var = "heroByKey", desc = "heroByKey очищается перед проверкой"},
+    },
+    reportVars = {"heroName", "heroLevel", "heroClass", "heroByKey", "hero", "key"},
+    instruction = [=[
+<h>Три способа обратиться к полю</h>
+<c>hero.name</c> — ключ написан руками, только латиница. Ищет буквально "name".
+<c>hero["name"]</c> — ключ написан руками в кавычках. То же самое, что точка, но работает и с кириллицей.
+<c>hero[key]</c> — ключ берётся из переменной. Кавычек НЕТ. Ищет то, что лежит в key.
+
+<w>Точка и ["строка"] ищут буквальный ключ. [переменная] подставляет значение переменной. Это разные вещи.</w>
+
+<h>Ловушка</h>
+<t>Если имя ключа лежит в переменной, точка не подойдёт:</t>
+<c>hero.key</c> — ищет строку "key".
+<c>hero[key]</c> — подставляет переменную key="level", ищет "level" = 60.
+
+<h>Задание</h>
+<t>Таблица <k>hero</k> и переменная <k>key</k> = "level" уже созданы. Прочитай поля четырьмя способами:</t>
+<t>- <k>heroName</k> = поле name через точку;</t>
+<t>- <k>heroLevel</k> = поле level через скобки со строкой;</t>
+<t>- <k>heroClass</k> = поле класс через скобки со строкой (кириллица, точка тут запрещена);</t>
+<t>- <k>heroByKey</k> = поле, имя которого в переменной key, через скобки с переменной (без кавычек).</t>
+<t>В скобках со строкой используй двойные кавычки. Таблицу не создавай. Ничего не выводи.</t>
+]=],
+    initialCode = [=[
+-- Прочитай поля таблицы hero четырьмя способами
+]=],
+    requireKeywords = {
+        "heroName",
+        "heroLevel",
+        "heroClass",
+        "heroByKey",
+        "hero.name",
+        'hero["level"]',
+        'hero["класс"]',
+        "hero[key]",
+    },
+    checkCode = function()
+        return type(_G.heroName) == "string"
+            and _G.heroName == "Тралл"
+            and type(_G.heroLevel) == "number"
+            and _G.heroLevel == 60
+            and type(_G.heroClass) == "string"
+            and _G.heroClass == "Шаман"
+            and type(_G.heroByKey) == "number"
+            and _G.heroByKey == 60
+    end,
+}
+
+ns_llua['lua'][48] = {
+    type = "commenttest",
+    title = "Практика: запись полей хэш-таблицы",
+    helpModules = {44},
+    preloadVars = {
+        {var = "item", value = {}, desc = "item = {} (пустая таблица)"},
+    },
+    reportVars = {"item"},
+    instruction = [=[
+<h>Практика: запись полей хэш-таблицы</h>
+<t>Глобальная таблица <k>item</k> уже создана, пока она пустая.</t>
+
+<t>Заполни её поля двумя разными способами:</t>
+<t>- поле <k>name</k> запиши через точку, значение <s>"Меч"</s>;</t>
+<t>- поле <k>quality</k> запиши через квадратные скобки, значение <s>"Эпический"</s>;</t>
+<t>- поле <k>price</k> запиши через квадратные скобки, значение <n>100</n>;</t>
+<t>- поле <k>stack</k> запиши через точку, значение <n>5</n>.</t>
+
+<h>Подсказка по синтаксису</h>
+<t>Запись через точку выглядит так: <c>имя.поле = значение</c></t>
+<t>Запись через скобки выглядит так: <c>имя["поле"] = значение</c></t>
+<w>Важно:</w> внутри квадратных скобок используй именно двойные кавычки.
+
+<t>Таблицу создавать не нужно, она уже есть. Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Заполни поля таблицы item двумя способами
+]=],
+    requireKeywords = {
+        "item.name",
+        'item["quality"]',
+        'item["price"]',
+        "item.stack",
+    },
+    checkCode = function()
+        return type(_G.item) == "table"
+            and _G.item.name == "Меч"
+            and _G.item.quality == "Эпический"
+            and _G.item.price == 100
+            and _G.item.stack == 5
+    end,
+}
+
+ns_llua['lua'][49] = {
+    type = "commenttest",
+    title = "Практика: чтение и запись двумя способами",
+    helpModules = {44, 47, 48},
+    preloadVars = {
+        {var = "source", value = {name = "Клинок", price = 100}, desc = "source = {name = \"Клинок\", price = 100}"},
+        {var = "copy", desc = "copy очищается перед проверкой"},
+    },
+    reportVars = {"copy", "source"},
+    instruction = [=[
+<h>Практика: чтение и запись двумя способами</h>
+<t>Глобальная таблица <k>source</k> уже создана. В ней поля <k>name</k> и <k>price</k>.</t>
+<w>Важно:</w> таблицу <k>source</k> менять нельзя. Мы только читаем из неё.</t>
+
+<t>Создай новую глобальную таблицу <k>copy</k> (пустую).</t>
+<t>Скопируй в неё данные из <k>source</k> и добавь свои поля, используя оба синтаксиса и на чтение, и на запись:</t>
+<t>- <k>copy.name</k> присвой значение <k>source.name</k> (чтение и запись через точку);</t>
+<t>- <k>copy["price"]</k> присвой значение <k>source["price"]</k> (чтение и запись через скобки);</t>
+<t>- добавь новое поле <k>copy["quality"]</k> со значением <s>"Редкий"</s> (запись через скобки);</t>
+<t>- добавь новое поле <k>copy.stack</k> со значением <n>1</n> (запись через точку).</t>
+
+<h>Подсказка по синтаксису</h>
+<t>Через точку: <c>copy.name = source.name</c></t>
+<t>Через скобки: <c>copy["price"] = source["price"]</c></t>
+<w>Важно:</w> внутри квадратных скобок используй именно двойные кавычки.
+
+<t>Смысл задания: оба способа работают с одними и теми же данными таблицы.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Создай таблицу copy и заполни её двумя способами
+]=],
+    requireKeywords = {
+        "copy",
+        "copy.name",
+        "source.name",
+        'copy["price"]',
+        'source["price"]',
+        'copy["quality"]',
+        "copy.stack",
+    },
+    checkCode = function()
+        return type(_G.copy) == "table"
+            and _G.copy.name == "Клинок"
+            and _G.copy.price == 100
+            and _G.copy.quality == "Редкий"
+            and _G.copy.stack == 1
+            and type(_G.source) == "table"
+            and _G.source.name == "Клинок"
+            and _G.source.price == 100
+    end,
+}
+
+ns_llua['lua'][50] = {
+    type = "commenttest",
+    title = "Практика: функция countRareItems",
+    helpModules = {44, 45, 31},
+    preloadVars = {
+        {var = "countRareItems", desc = "countRareItems очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+    },
+    instruction = [=[
+<h>Практика: функция countRareItems</h>
+<t>Создай только глобальную функцию <k>countRareItems(items)</k>.</t>
+
+<t>Функция получает массив таблиц. Каждый элемент массива — это маленький словарь с информацией о предмете.</t>
+<t>У предмета может быть поле <k>rare</k> со значением <k>true</k> или <k>false</k> (или его может не быть вовсе).</t>
+<t>Функция должна вернуть количество предметов, у которых <k>rare == true</k>.</t>
+
+<t>Используй:</t>
+<t>- <k>ipairs</k>;</t>
+<t>- <k>if</k>;</t>
+<t>- <k>return</k>.</t>
+
+<w>Важно:</w>
+<t>Таблицу создавать не нужно.</t>
+<t>Система сама подставит свои массивы предметов в твою функцию во время проверки.</t>
+
+<t>После проверки в отчёте будет показано:</t>
+<t>- какой массив подавался в функцию;</t>
+<t>- какой результат вернула функция;</t>
+<t>- какой результат ожидался.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Создай глобальную функцию countRareItems(items)
+]=],
+    requireKeywords = {
+        "countRareItems",
+        "function",
+        "ipairs",
+        "return",
+    },
+    checkCode = function()
+        local function isArray(t)
+            local n = #t
+            if n == 0 then
+                for _ in pairs(t) do
+                    return false
+                end
+                return true
+            end
+
+            local count = 0
+            for k in pairs(t) do
+                count = count + 1
+                if type(k) ~= "number" or k < 1 or k > n or k ~= math.floor(k) then
+                    return false
+                end
+            end
+
+            return count == n
+        end
+
+        local function fmt(v, depth)
+            depth = depth or 0
+            local t = type(v)
+
+            if t == "string" then
+                return '"' .. v .. '"'
+            elseif t == "number" or t == "boolean" then
+                return tostring(v)
+            elseif t == "nil" then
+                return "nil"
+            elseif t == "table" then
+                if depth >= 2 then
+                    return "{...}"
+                end
+
+                if isArray(v) then
+                    local parts = {}
+                    for i = 1, #v do
+                        parts[i] = fmt(v[i], depth + 1)
+                    end
+                    return "{" .. table.concat(parts, ", ") .. "}"
+                end
+
+                local keys = {}
+                for k in pairs(v) do
+                    table.insert(keys, k)
+                end
+                table.sort(keys, function(a, b)
+                    return tostring(a) < tostring(b)
+                end)
+
+                local parts = {}
+                for _, k in ipairs(keys) do
+                    local ks
+                    if type(k) == "string" then
+                        ks = '["' .. k .. '"]'
+                    else
+                        ks = "[" .. tostring(k) .. "]"
+                    end
+                    table.insert(parts, ks .. "=" .. fmt(v[k], depth + 1))
+                end
+
+                return "{" .. table.concat(parts, ", ") .. "}"
+            end
+
+            return "<" .. t .. ">"
+        end
+
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+        _G.test3 = nil
+        _G.test4 = nil
+
+        if type(_G.countRareItems) ~= "function" then
+            _G.checkError = "countRareItems не является глобальной функцией"
+            return false
+        end
+
+        local tests = {
+            {
+                input = {{rare = true}, {rare = false}, {rare = true}, {}},
+                expected = 2,
+            },
+            {
+                input = {},
+                expected = 0,
+            },
+            {
+                input = {{rare = false}, {rare = false}},
+                expected = 0,
+            },
+            {
+                input = {{rare = true}},
+                expected = 1,
+            },
+        }
+
+        local allOk = true
+
+        for i, test in ipairs(tests) do
+            local inputText = fmt(test.input)
+            local ok, result = pcall(_G.countRareItems, test.input)
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            _G["test" .. i] = "Массив: "
+                .. inputText
+                .. " | Результат: "
+                .. resultText
+                .. " | Ожидалось: "
+                .. fmt(test.expected)
+
+            if not ok or result ~= test.expected then
+                allOk = false
+            end
+        end
+
+        return allOk
+    end,
+}
+
+ns_llua['lua'][51] = {
+    type = "commenttest",
+    title = "Практика: функция countItemsByQuality",
+    helpModules = {44, 45, 33},
+    preloadVars = {
+        {var = "countItemsByQuality", desc = "countItemsByQuality очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+    },
+    instruction = [=[
+<h>Практика: функция countItemsByQuality</h>
+<t>Создай только глобальную функцию <k>countItemsByQuality(items, qualityText)</k>.</t>
+
+<t>Функция получает хэш-таблицу <k>items</k>, где ключ — название предмета, а значение — строка с качеством.</t>
+<t>Вторым аргументом идёт строка <k>qualityText</k>.</t>
+<t>Функция должна вернуть количество предметов, качество которых содержит подстроку <k>qualityText</k>.</t>
+
+<t>Используй:</t>
+<t>- <k>pairs</k>;</t>
+<t>- <k>string.find</k>;</t>
+<t>- <k>return</k>.</t>
+
+]=],
+    initialCode = [=[
+-- Создай глобальную функцию countItemsByQuality(items, qualityText)
+]=],
+    requireKeywords = {
+        "countItemsByQuality",
+        "function",
+        "pairs",
+        "string.find",
+        "return",
+    },
+    checkCode = function()
+        local function isArray(t)
+            local n = #t
+            if n == 0 then
+                for _ in pairs(t) do
+                    return false
+                end
+                return true
+            end
+
+            local count = 0
+            for k in pairs(t) do
+                count = count + 1
+                if type(k) ~= "number" or k < 1 or k > n or k ~= math.floor(k) then
+                    return false
+                end
+            end
+
+            return count == n
+        end
+
+        local function fmt(v, depth)
+            depth = depth or 0
+            local t = type(v)
+
+            if t == "string" then
+                return '"' .. v .. '"'
+            elseif t == "number" or t == "boolean" then
+                return tostring(v)
+            elseif t == "nil" then
+                return "nil"
+            elseif t == "table" then
+                if depth >= 2 then
+                    return "{...}"
+                end
+
+                if isArray(v) then
+                    local parts = {}
+                    for i = 1, #v do
+                        parts[i] = fmt(v[i], depth + 1)
+                    end
+                    return "{" .. table.concat(parts, ", ") .. "}"
+                end
+
+                local keys = {}
+                for k in pairs(v) do
+                    table.insert(keys, k)
+                end
+                table.sort(keys, function(a, b)
+                    return tostring(a) < tostring(b)
+                end)
+
+                local parts = {}
+                for _, k in ipairs(keys) do
+                    local ks
+                    if type(k) == "string" then
+                        ks = '["' .. k .. '"]'
+                    else
+                        ks = "[" .. tostring(k) .. "]"
+                    end
+                    table.insert(parts, ks .. "=" .. fmt(v[k], depth + 1))
+                end
+
+                return "{" .. table.concat(parts, ", ") .. "}"
+            end
+
+            return "<" .. t .. ">"
+        end
+
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+        _G.test3 = nil
+        _G.test4 = nil
+
+        if type(_G.countItemsByQuality) ~= "function" then
+            _G.checkError = "countItemsByQuality не является глобальной функцией"
+            return false
+        end
+
+        local tests = {
+            {
+                input = {{a = "Редкий", b = "Обычный", c = "Редкость"}, "Ред"},
+                expected = 2,
+            },
+            {
+                input = {{}, "Ред"},
+                expected = 0,
+            },
+            {
+                input = {{x = "Обычный", y = "Обычный"}, "Ред"},
+                expected = 0,
+            },
+            {
+                input = {{a = "Редкий"}, "Редкий"},
+                expected = 1,
+            },
+        }
+
+        local allOk = true
+
+        for i, test in ipairs(tests) do
+            local inputText = fmt(test.input[1]) .. ", " .. fmt(test.input[2])
+            local ok, result = pcall(_G.countItemsByQuality, test.input[1], test.input[2])
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            _G["test" .. i] = "Аргументы: "
+                .. inputText
+                .. " | Результат: "
+                .. resultText
+                .. " | Ожидалось: "
+                .. fmt(test.expected)
+
+            if not ok or result ~= test.expected then
+                allOk = false
+            end
+        end
+
+        return allOk
+    end,
+}
+
+ns_llua['lua'][52] = {
+    type = "commenttest",
+    title = "Итоговый комбо-тест: функция calculateTotalPrice",
+    helpModules = {44, 45, 31, 33, 10},
+    preloadVars = {
+        {var = "calculateTotalPrice", desc = "calculateTotalPrice очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+    },
+    instruction = [=[
+<h>Практика: функция calculateTotalPrice</h>
+<t>Создай глобальную функцию <k>calculateTotalPrice(priceList, cart)</k>.</t>
+<t><k>priceList</k> — таблица цен (ключ = название, значение = цена числом или строкой).</t>
+<t><k>cart</k> — массив названий выбранных предметов.</t>
+<t>Функция возвращает общую стоимость корзины.</t>
+<t>Предмета нет в <k>priceList</k> — не считай его.</t>
+<t>Цена строкой — преобразуй через <k>tonumber</k>.</t>
+<t><k>tonumber</k> дал <k>nil</k> — не считай эту цену.</t>
+<t>Таблицы создавать не надо — система подставит свои и покажет результат в отчёте.</t>
+]=],
+    initialCode = [=[
+-- Создай глобальную функцию calculateTotalPrice(priceList, cart)
+]=],
+    requireKeywords = {
+        "calculateTotalPrice",
+        "function",
+        "for",
+        "tonumber",
+        "return",
+    },
+    checkCode = function()
+        local function isArray(t)
+            local n = #t
+            if n == 0 then
+                for _ in pairs(t) do
+                    return false
+                end
+                return true
+            end
+
+            local count = 0
+            for k in pairs(t) do
+                count = count + 1
+                if type(k) ~= "number" or k < 1 or k > n or k ~= math.floor(k) then
+                    return false
+                end
+            end
+
+            return count == n
+        end
+
+        local function fmt(v, depth)
+            depth = depth or 0
+            local t = type(v)
+
+            if t == "string" then
+                return '"' .. v .. '"'
+            elseif t == "number" or t == "boolean" then
+                return tostring(v)
+            elseif t == "nil" then
+                return "nil"
+            elseif t == "table" then
+                if depth >= 2 then
+                    return "{...}"
+                end
+
+                if isArray(v) then
+                    local parts = {}
+                    for i = 1, #v do
+                        parts[i] = fmt(v[i], depth + 1)
+                    end
+                    return "{" .. table.concat(parts, ", ") .. "}"
+                end
+
+                local keys = {}
+                for k in pairs(v) do
+                    table.insert(keys, k)
+                end
+                table.sort(keys, function(a, b)
+                    return tostring(a) < tostring(b)
+                end)
+
+                local parts = {}
+                for _, k in ipairs(keys) do
+                    local ks
+                    if type(k) == "string" then
+                        ks = '["' .. k .. '"]'
+                    else
+                        ks = "[" .. tostring(k) .. "]"
+                    end
+                    table.insert(parts, ks .. "=" .. fmt(v[k], depth + 1))
+                end
+
+                return "{" .. table.concat(parts, ", ") .. "}"
+            end
+
+            return "<" .. t .. ">"
+        end
+
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+        _G.test3 = nil
+        _G.test4 = nil
+
+        if type(_G.calculateTotalPrice) ~= "function" then
+            _G.checkError = "calculateTotalPrice не является глобальной функцией"
+            return false
+        end
+
+        local tests = {
+            {
+                input = {{["X"] = "5", ["Y"] = 7, ["Z"] = "bad"}, {"X", "Y", "Z", "W"}},
+                expected = 12,
+            },
+            {
+                input = {{}, {"A"}},
+                expected = 0,
+            },
+            {
+                input = {{["A"] = "10"}, {}},
+                expected = 0,
+            },
+            {
+                input = {{["A"] = "abc"}, {"A"}},
+                expected = 0,
+            },
+        }
+
+        local allOk = true
+
+        for i, test in ipairs(tests) do
+            local inputText = fmt(test.input[1]) .. ", " .. fmt(test.input[2])
+            local ok, result = pcall(_G.calculateTotalPrice, test.input[1], test.input[2])
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            _G["test" .. i] = "Аргументы: "
+                .. inputText
+                .. " | Результат: "
+                .. resultText
+                .. " | Ожидалось: "
+                .. fmt(test.expected)
+
+            if not ok or result ~= test.expected then
+                allOk = false
+            end
+        end
+
+        return allOk
     end,
 }
 
@@ -5032,8 +6044,13 @@ function Logic:CheckCode(editorName, code)
         ok, runErr, rawOutput = ExecuteSource(code)
     end
 
-    _G.__ns_trace_loop = oldTraceLoop
-    _G.__ns_trace_while = oldTraceWhile
+    -- ВАЖНО: не удаляем служебные функции трассировки, а ставим заглушки.
+    -- Иначе если checkCode потом вызовет пользовательскую функцию,
+    -- в теле которой остался __ns_trace_loop, получим ошибку
+    -- "attempt to call global '__ns_trace_loop' (a nil value)".
+    -- Заглушка ничего не делает, но и выполнение не ломает.
+    _G.__ns_trace_loop = oldTraceLoop or function() end
+    _G.__ns_trace_while = oldTraceWhile or function() end
 
     local problems = {}
 

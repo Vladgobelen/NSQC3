@@ -10410,7 +10410,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
     end
 
     local inst = self:GetOwnerInstance(owner)
-
     if not inst and conn then
         inst = self:GetOwnerInstance(conn)
     end
@@ -10418,7 +10417,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
     ---------------------------------------------------------------------------
     -- Для кокона отключаем маршрутизацию полностью.
     ---------------------------------------------------------------------------
-
     if inst and inst.isCocoon then
         local task = {
             kind = "travel",
@@ -10430,6 +10428,7 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
             p2 = { x = to.x, y = to.y },
             nspNoInsert = true,
             nspNoSupportCheck = true,
+            nspCocoon = true,
         }
 
         tasks[#tasks + 1] = task
@@ -10440,7 +10439,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
     ---------------------------------------------------------------------------
     -- Обычная паутина продолжает использовать маршрутизацию.
     ---------------------------------------------------------------------------
-
     local task = {
         kind = "travel",
         conn = conn,
@@ -10499,7 +10497,6 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
     ---------------------------------------------------------------------------
     -- Для кокона отключаем маршрутизацию и динамическое перетаскивание.
     ---------------------------------------------------------------------------
-
     if inst and inst.isCocoon then
         local task = {
             kind = "thread",
@@ -10514,6 +10511,7 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
             isCross = owner.connA ~= nil,
             nspNoInsert = true,
             nspNoSupportCheck = true,
+            nspCocoon = true,
         }
 
         tasks[#tasks + 1] = task
@@ -10524,7 +10522,6 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
     ---------------------------------------------------------------------------
     -- Обычная паутина продолжает использовать nspPlan / nspDrag.
     ---------------------------------------------------------------------------
-
     local task = {
         kind = "thread",
         owner = owner,
@@ -12618,6 +12615,7 @@ end
 function NSPauk:CheckInstancesMovement()
     local S = self.S
     local now = GetTime()
+
     local killed = false
 
     local fullInterval = 1.0
@@ -12625,6 +12623,55 @@ function NSPauk:CheckInstancesMovement()
 
     if doFull then
         S.nspNextFullMonitorAt = now + fullInterval
+    end
+
+    ---------------------------------------------------------------------------
+    -- Кэш внутренних прямоугольников на одну проверку.
+    --
+    -- Один и тот же фрейм может быть опорой для десятков нитей кокона.
+    -- Раньше он мог пересчитываться через ComputeFrameVisibleInner
+    -- по числу conn, что было очень дорого.
+    ---------------------------------------------------------------------------
+    local innerCache = {}
+
+    local function getCachedInner(frame)
+        if not frame then
+            return nil
+        end
+
+        if innerCache[frame] == nil then
+            innerCache[frame] = self:ComputeFrameVisibleInner(frame) or false
+        end
+
+        local value = innerCache[frame]
+
+        if value == false then
+            return nil
+        end
+
+        return value
+    end
+
+    local function frameMovedCached(storedRect, frame)
+        if not frame then
+            return false
+        end
+
+        if not storedRect then
+            return true
+        end
+
+        local cur = getCachedInner(frame)
+        if not cur then
+            return true
+        end
+
+        local tol = self.C.MOVEMENT_TOLERANCE
+
+        return math.abs(cur.left - storedRect.left) > tol
+            or math.abs(cur.right - storedRect.right) > tol
+            or math.abs(cur.bottom - storedRect.bottom) > tol
+            or math.abs(cur.top - storedRect.top) > tol
     end
 
     local function handleHubMoved(inst)
@@ -12650,27 +12697,37 @@ function NSPauk:CheckInstancesMovement()
             return false
         end
 
-        local k = false
-
         local hubMoved = false
+
         if inst.hub.frame then
-            hubMoved = self:FrameMoved(inst.hub.rect, inst.hub.frame)
+            hubMoved = frameMovedCached(inst.hub.rect, inst.hub.frame)
         end
 
         if hubMoved then
             handleHubMoved(inst)
-            k = true
-        else
-            for _, conn in ipairs(inst.conns) do
-                if conn.alive and conn.target.frame then
-                    if full
-                        or inst == S.currentInstance
-                        or (S.cocoon and S.cocoon.inst == inst) then
+            return true
+        end
 
-                        if self:FrameMoved(conn.target.rect, conn.target.frame) then
-                            self:KillConnection(inst, conn)
-                            k = true
-                        end
+        -----------------------------------------------------------------------
+        -- Кокон: все нити прикреплены к одному и тому же объекту.
+        --
+        -- Проверять каждую conn отдельно бессмысленно и дорого.
+        -- Достаточно одной проверки объекта.
+        -----------------------------------------------------------------------
+        if inst.isCocoon then
+            return false
+        end
+
+        local k = false
+
+        for _, conn in ipairs(inst.conns) do
+            if conn.alive and conn.target.frame then
+                if full
+                    or inst == S.currentInstance
+                    or (S.cocoon and S.cocoon.inst == inst) then
+                    if frameMovedCached(conn.target.rect, conn.target.frame) then
+                        self:KillConnection(inst, conn)
+                        k = true
                     end
                 end
             end
@@ -12707,6 +12764,7 @@ function NSPauk:CheckInstancesMovement()
     end
 
     self:RemoveTornInstances()
+
     return killed
 end
 
@@ -14483,7 +14541,6 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
     local S = self.S
 
     local cur = self:NP_GetSpiderPointIfShown()
-
     if not cur or not task or not task.p0 then
         return false
     end
@@ -14492,6 +14549,48 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
         return false
     end
 
+    ---------------------------------------------------------------------------
+    -- Для кокона маршрутизация не нужна.
+    --
+    -- Если паук далеко от старта линии, вставляем прямой переход,
+    -- а не plan/Dijkstra.
+    ---------------------------------------------------------------------------
+    if task.nspCocoon then
+        local dx = task.p0.x - cur.x
+        local dy = task.p0.y - cur.y
+
+        if dx * dx + dy * dy <= 1 then
+            return false
+        end
+
+        local approach = {
+            kind = "travel",
+            nspCocoon = true,
+            nspCocoonApproach = true,
+            nspNoSupportCheck = true,
+            nspNoInsert = true,
+            nspAllowTeleport = true,
+            drop = false,
+            p0 = { x = cur.x, y = cur.y },
+            p1 = {
+                x = (cur.x + task.p0.x) / 2,
+                y = (cur.y + task.p0.y) / 2,
+            },
+            p2 = { x = task.p0.x, y = task.p0.y },
+            conn = task.conn,
+            owner = task.owner,
+        }
+
+        table.insert(S.tasks, S.taskIdx, approach)
+
+        task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
+
+        return true
+    end
+
+    ---------------------------------------------------------------------------
+    -- Для обычной паутины оставляем плановый подход.
+    ---------------------------------------------------------------------------
     local plan = self:NP_MakePlanTask(
         "travel",
         {
