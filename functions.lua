@@ -5882,16 +5882,11 @@ NSPauk.S = {
 ---------------------------------------------------------------------------
 -- Профили текстур паука
 ---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+-- Профили текстур паука
+---------------------------------------------------------------------------
 NSPauk.SpiderTextureProfiles = {
     default = {
-        label = "Классический",
-        textures = {
-            -- DEFAULT будет заменён на NSPauk.C.TEX_SPIDER
-            "DEFAULT",
-        },
-    },
-    
-    animated = {
         label = "Анимация",
         textures = {
             "Interface\\AddOns\\NSQC3\\libs\\pauk1.tga",
@@ -5922,6 +5917,7 @@ function NSPauk:EnsureDB()
 
     for key, value in pairs(self.DefaultConstants) do
         local current = db.constants[key]
+
         if current == nil then
             db.constants[key] = value
         elseif type(value) == "number" and (type(current) ~= "number" or current ~= current) then
@@ -5948,20 +5944,22 @@ function NSPauk:EnsureDB()
         db.progress.history = {}
     end
 
-    -- Чистим следы старой неправильной миграции.
-    -- Раньше миграция могла добавить фиктивный выбор за уже имеющийся уровень.
     for i = #db.progress.history, 1, -1 do
         local entry = db.progress.history[i]
+
         if type(entry) == "table" and entry.key == "MIGRATED" and entry.migrated then
             table.remove(db.progress.history, i)
         end
     end
 
-    -- Больше не используется.
     db.progress.historyMigrated = nil
 
-    -- Профиль текстур паука.
+
     if type(db.spiderProfile) ~= "string" or db.spiderProfile == "" then
+        db.spiderProfile = "default"
+    end
+
+    if db.spiderProfile == "animated" then
         db.spiderProfile = "default"
     end
 
@@ -17703,13 +17701,37 @@ end
 
 function NSPauk:GetSpiderProfileKey()
     local db = self:EnsureDB()
+
+    local profiles = self.SpiderTextureProfiles
+    if type(profiles) ~= "table" then
+        profiles = {}
+    end
+
     local key = db.spiderProfile
+
+    ---------------------------------------------------------------------------
+    -- Совместимость со старым ключом animated.
+    ---------------------------------------------------------------------------
+    if key == "animated" then
+        key = "default"
+        db.spiderProfile = key
+    end
 
     if type(key) ~= "string"
         or key == ""
-        or type(self.SpiderTextureProfiles) ~= "table"
-        or not self.SpiderTextureProfiles[key] then
-        key = "default"
+        or not profiles[key] then
+
+        if profiles.default then
+            key = "default"
+        else
+            local firstKey = next(profiles)
+            if firstKey then
+                key = firstKey
+            else
+                key = "default"
+            end
+        end
+
         db.spiderProfile = key
     end
 
@@ -17737,9 +17759,23 @@ function NSPauk:GetSpiderProfile()
 end
 
 function NSPauk:SetSpiderProfile(key)
-    if type(key) ~= "string"
-        or type(self.SpiderTextureProfiles) ~= "table"
-        or not self.SpiderTextureProfiles[key] then
+    if type(key) ~= "string" then
+        return false
+    end
+
+    local profiles = self.SpiderTextureProfiles or {}
+
+    ---------------------------------------------------------------------------
+    -- Совместимость со старой командой:
+    -- /nspider profile animated
+    --
+    -- Теперь она просто выбирает default, который является анимированным.
+    ---------------------------------------------------------------------------
+    if key == "animated" then
+        key = "default"
+    end
+
+    if not profiles[key] then
         return false
     end
 
@@ -17747,13 +17783,15 @@ function NSPauk:SetSpiderProfile(key)
     db.spiderProfile = key
 
     local S = self.S
+
     S.spiderAnimIndex = 1
     S.spiderAnimTimer = 0
     S.spiderAnimMoving = false
 
     self:ApplySpiderTexture(1)
 
-    local profile = self.SpiderTextureProfiles[key]
+    local profile = profiles[key]
+
     self:Echo(string.format(
         "Профиль паука: %s (%s), текстур: %d",
         tostring(profile.label or key),
