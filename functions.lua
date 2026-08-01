@@ -10985,16 +10985,22 @@ end
 function NSPauk:BuildInstanceTasks(inst)
     local S = self.S
     local C = self.C
+
     local tasks = {}
+
     inst.crossRowsList = {}
+
     if not inst.interSegs then
         inst.interSegs = {}
     end
+
     local cursorPoint = nil
     if S.spider and S.spider:IsShown() then
         cursorPoint = { x = S.lastSpiderX, y = S.lastSpiderY }
     end
+
     cursorPoint = self:AddMainThreadTasks(inst, tasks, cursorPoint)
+
     local N = #inst.conns
     if N >= 2 then
         for _, conn in ipairs(inst.conns) do
@@ -11002,24 +11008,39 @@ function NSPauk:BuildInstanceTasks(inst)
             conn.arcSamples = samples
             conn.arcLength = total
         end
+
         local sectorAllowed, sectorAngleDeg = self:ComputeCrossSectors(inst)
-        inst.sectorAllowed = sectorAllowed
         inst.sectorAngleDeg = sectorAngleDeg
+
         local spacing = C.CROSS_ROW_SPACING
         if not spacing or spacing < 0.5 then
             spacing = 0.5
         end
+
         local pairMinLens = {}
+        local pairMinAll = {}
+
         local maxPairLen = 0
+        local maxPairLenAll = 0
         local hasAllowed = false
+
         for i = 1, N do
             local j = (i % N) + 1
+
             local lenA = inst.conns[i].arcLength or 0
             local lenB = inst.conns[j].arcLength or 0
             local pairMin = math.min(lenA, lenB)
+
+            pairMinAll[i] = pairMin
+
+            if pairMin > maxPairLenAll then
+                maxPairLenAll = pairMin
+            end
+
             if sectorAllowed[i] then
                 pairMinLens[i] = pairMin
                 hasAllowed = true
+
                 if pairMin > maxPairLen then
                     maxPairLen = pairMin
                 end
@@ -11027,47 +11048,109 @@ function NSPauk:BuildInstanceTasks(inst)
                 pairMinLens[i] = 0
             end
         end
+
+        -----------------------------------------------------------------------
+        -- Если угловой фильтр оставил только короткие сектора, не даём им
+        -- оборвать общее плетение.
+        --
+        -- Например:
+        -- короткая нить 50 px и длинные 1000 px.
+        -- Если разрешён только сектор с короткой нитью, старый код строил
+        -- ряды только до 50 px.
+        --
+        -- Теперь длинные физически возможные сектора принудительно
+        -- разрешаются, если они заметно длиннее текущего разрешённого
+        -- максимума.
+        -----------------------------------------------------------------------
+        if hasAllowed then
+            local forceThreshold = maxPairLen + math.max(spacing, 1)
+
+            if maxPairLenAll > forceThreshold then
+                for i = 1, N do
+                    if (not sectorAllowed[i]) and pairMinAll[i] > forceThreshold then
+                        sectorAllowed[i] = true
+                        pairMinLens[i] = pairMinAll[i]
+
+                        if pairMinAll[i] > maxPairLen then
+                            maxPairLen = pairMinAll[i]
+                        end
+                    end
+                end
+            end
+        else
+            -------------------------------------------------------------------
+            -- Аварийный режим.
+            -- Если угол вообще запретил все сектора, плетём по всем
+            -- недегенеративным парам, иначе паутина останется без перемычек.
+            -------------------------------------------------------------------
+            for i = 1, N do
+                if pairMinAll[i] > 0 then
+                    sectorAllowed[i] = true
+                    pairMinLens[i] = pairMinAll[i]
+                    hasAllowed = true
+
+                    if pairMinAll[i] > maxPairLen then
+                        maxPairLen = pairMinAll[i]
+                    end
+                end
+            end
+        end
+
+        inst.sectorAllowed = sectorAllowed
+
         if hasAllowed then
             local distances = {}
             local seen = {}
+
             local function addDistance(d)
                 if type(d) ~= "number" or d < C.MIN_CROSS_LEN then
                     return
                 end
+
                 if d > maxPairLen then
                     d = maxPairLen
                 end
+
                 local key = math.floor(d + 0.5)
                 if not seen[key] then
                     seen[key] = true
                     distances[#distances + 1] = d
                 end
             end
+
             local maxRows = C.MAX_CROSS_ROWS or 0
             if maxRows < 0 then
                 maxRows = 0
             end
+
             local rows = math.floor(maxPairLen / spacing + 0.0001)
             if rows > maxRows then
                 rows = maxRows
             end
+
             for row = 1, rows do
                 addDistance(row * spacing)
             end
+
             for i = 1, N do
                 if sectorAllowed[i] then
                     addDistance(pairMinLens[i])
                 end
             end
+
             table.sort(distances)
+
             if #distances > maxRows then
                 for i = #distances, maxRows + 1, -1 do
                     distances[i] = nil
                 end
             end
+
             inst.crossRows = #distances
+
             if #distances > 0 then
                 local px, py = self:BzThread(inst.conns[1].thread, 0)
+
                 if cursorPoint then
                     self:AddTravelPointTask(
                         tasks,
@@ -11077,16 +11160,19 @@ function NSPauk:BuildInstanceTasks(inst)
                         inst.conns[1]
                     )
                 end
+
                 local cursor = {
                     idx = 1,
                     t = 0,
                     point = { x = px, y = py },
                 }
+
                 local rowDir = 1
                 for idx, arcLen in ipairs(distances) do
                     self:AddArcRowTasks(tasks, inst, cursor, arcLen, idx, rowDir)
                     rowDir = -rowDir
                 end
+
                 if cursor.t
                     and cursor.t > 0.001
                     and cursor.idx >= 1
@@ -11106,6 +11192,7 @@ function NSPauk:BuildInstanceTasks(inst)
     else
         inst.crossRows = 0
     end
+
     inst.tasks = tasks
 end
 
