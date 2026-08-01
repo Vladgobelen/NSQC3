@@ -1616,6 +1616,685 @@ ns_llua['lua'][30] = {
     end,
 }
 
+ns_llua['lua'][31] = {
+    type = "info",
+    title = "Циклы: for",
+    helpModules = {4, 7},
+    content = [=[
+<h>Цикл for</h>
+<t>Цикл <k>for</k> нужен, чтобы повторять код нужное количество раз.</t>
+<t>Он сам меняет переменную цикла и сам останавливается, когда диапазон закончится.</t>
+
+<h>Числовой for</h>
+<code>
+for i = 1, 5 do -- начинаем цикл: переменная i будет принимать значения 1, 2, 3, 4, 5
+    print(i) -- выводим текущее значение i в чат
+end -- закрываем цикл
+</code>
+
+<h>Обратный отсчёт</h>
+<t>Третье число в <k>for</k> — это шаг. Если шаг отрицательный, цикл идёт назад.</t>
+<code>
+for i = 5, 1, -1 do -- i меняется от 5 до 1 с шагом -1
+    print(i) -- выводим 5, 4, 3, 2, 1
+end -- закрываем цикл
+</code>
+
+<h>Накопление суммы</h>
+<t>Часто внутри цикла накапливают результат в отдельной переменной.</t>
+<code>
+local sum = 0 -- создаём переменную для накопления суммы
+for i = 1, 5 do -- проходим числа от 1 до 5
+    sum = sum + i -- прибавляем текущее значение i к сумме
+end -- завершаем цикл
+print(sum) -- выводим итоговую сумму: 15
+</code>
+
+<h>Накопление строки</h>
+<t>Точно так же можно собирать строку через конкатенацию.</t>
+<code>
+local text = "" -- создаём пустую строку для результата
+for i = 1, 3 do -- проходим числа от 1 до 3
+    text = text .. i .. " " -- приклеиваем число и пробел к строке
+end -- завершаем цикл
+print(text) -- выводим "1 2 3 "
+</code>
+
+<h>Перебор таблицы через ipairs</h>
+<t>Если у тебя таблица-список, её удобно перебирать через <k>ipairs</k>.</t>
+<code>
+local items = {"Меч", "Щит"} -- создаём таблицу-список из двух предметов
+for index, value in ipairs(items) do -- перебираем элементы по порядку
+    print(index) -- выводим номер элемента: сначала 1, потом 2
+    print(value) -- выводим значение: сначала "Меч", потом "Щит"
+end -- завершаем цикл
+</code>
+
+<h>Важно для практики</h>
+<t>В практических модулях курса проверяются глобальные переменные.</t>
+<t>Поэтому нужные переменные создавай без <k>local</k>, если задание просит сохранить результат для проверки.</t>
+]=],
+}
+
+ns_llua['lua'][32] = {
+    type = "info",
+    title = "Циклы: while",
+    helpModules = {31},
+    content = [=[
+<h>Цикл while</h>
+<t>Цикл <k>while</k> повторяет код, пока условие истинно.</t>
+<t>В отличие от числового <k>for</k>, здесь ты сам следишь за тем, когда цикл должен остановиться.</t>
+
+<h>Обычный while</h>
+<code>
+local count = 0 -- создаём переменную-счётчик
+while count < 3 do -- повторяем цикл, пока count меньше 3
+    print(count) -- выводим текущее значение счётчика
+    count = count + 1 -- увеличиваем счётчик на 1
+end -- закрываем цикл
+</code>
+
+<h>Бесконечный цикл</h>
+<t>Если условие всегда истинно, цикл будет выполняться бесконечно.</t>
+<code>
+while true do -- условие всегда равно true
+    print("Это будет повторяться бесконечно") -- выводим сообщение каждый раз
+end -- цикл не останавливается сам
+</code>
+<w>Опасность:</w> такой цикл может зависнуть, если внутри нет выхода через <k>break</k> или другого способа остановки.
+
+<h>Бесконечный цикл с break</h>
+<t>Иногда цикл делают бесконечным, но останавливают вручную через <k>break</k>.</t>
+<code>
+local count = 0 -- создаём переменную-счётчик
+while true do -- начинаем бесконечный цикл
+    count = count + 1 -- увеличиваем счётчик на 1
+    if count >= 3 then -- проверяем, пора ли остановиться
+        break -- выходим из цикла
+    end -- закрываем условие if
+end -- закрываем цикл while
+print(count) -- выводим 3
+</code>
+
+<h>Частая ошибка</h>
+<t>Если забыть изменить счётчик, цикл станет бесконечным.</t>
+<code>
+local count = 0 -- создаём переменную-счётчик
+while count < 3 do -- условие изначально истинно
+    print(count) -- выводим count
+    -- здесь забыли count = count + 1, поэтому цикл никогда не закончится
+end -- закрываем цикл
+</code>
+]=],
+}
+
+ns_llua['lua'][33] = {
+    type = "info",
+    title = "Поиск подстроки: string.find",
+    helpModules = {31, 32},
+    content = [=[
+<h>string.find</h>
+<t>Функция <k>string.find</k> ищет часть строки внутри другой строки.</t>
+<t>Если подстрока найдена, функция возвращает позицию.</t>
+<t>Если подстрока не найдена, функция возвращает <k>nil</k>.</t>
+
+<h>Простой пример</h>
+<code>
+local pos = string.find("molot", "ol") -- ищем "ol" внутри слова "molot"
+print(pos) -- выводим 2, потому что совпадение начинается со второго символа
+local notFound = string.find("shield", "ol") -- ищем "ol" внутри слова "shield"
+print(notFound) -- выводим nil, потому что совпадения нет
+</code>
+
+<h>string.find в условии</h>
+<t>Так как найденная позиция считается истиной, а <k>nil</k> — ложью, <k>string.find</k> удобно использовать в <k>if</k>.</t>
+<code>
+if string.find("kolco", "ol") then -- если внутри "kolco" есть "ol", условие истинно
+    print("Найдено") -- этот код выполнится
+end -- закрываем условие
+</code>
+
+<h>Поиск по таблице слов</h>
+<t>Можно пройтись циклом по таблице и проверить каждое слово.</t>
+<code>
+local items = {"Меч", "Молот", "Щит"} -- создаём таблицу со словами
+local found = "" -- создаём пустую строку для найденных слов
+for _, v in ipairs(items) do -- перебираем каждое слово из таблицы
+    if string.find(v, "ол") then -- если внутри текущего слова есть "ол"
+        found = found .. v .. " " -- добавляем слово в результат
+    end -- закрываем условие
+end -- закрываем цикл
+print(found) -- выводим "Молот "
+</code>
+
+<h>Важно про кириллицу</h>
+<t>В WoW 3.3.5 позиции в строке считаются в байтах, а не в символах.</t>
+<t>Поэтому для кириллицы номер позиции может быть больше, чем номер буквы.</t>
+<t>Но для проверки «найдено / не найдено» это не мешает: главное, что возвращается число или <k>nil</k>.</t>
+]=],
+}
+
+ns_llua['lua'][34] = {
+    type = "commenttest",
+    title = "Практика: for и сборка строки",
+    helpModules = {31, 7},
+    preloadVars = {
+        {var = "numberSequence", desc = "numberSequence очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: for и сборка строки</h>
+<t>Создай глобальную переменную <k>numberSequence</k>.</t>
+<t>Собери в неё числа от 10 до 15 через пробел.</t>
+<t>В конце строки тоже должен быть пробел.</t>
+
+<t>Ожидаемое значение:</t>
+<s>"10 11 12 13 14 15 "</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k>;</t>
+<t>- конкатенацию;</t>
+<t>- накопление результата в переменную <k>numberSequence</k>.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "numberSequence",
+        "for",
+        "do",
+        "end",
+        "10",
+        "15",
+        "numberSequence=numberSequence..",
+    },
+    checkCode = function()
+        return type(_G.numberSequence) == "string"
+            and _G.numberSequence == "10 11 12 13 14 15 "
+    end,
+}
+
+ns_llua['lua'][35] = {
+    type = "commenttest",
+    title = "Практика: for, условие и сумма",
+    helpModules = {31, 10, 17, 19},
+    preloadVars = {
+        {var = "totalSum", desc = "totalSum очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: for, условие и сумма</h>
+<t>Создай глобальную переменную <k>totalSum</k>.</t>
+<t>Посчитай сумму чисел от 1 до 10, которые больше 5.</t>
+
+<t>То есть нужно сложить:</t>
+<s>6 + 7 + 8 + 9 + 10</s>
+
+<t>Ожидаемое значение:</t>
+<s>40</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k>;</t>
+<t>- условие <k>if</k>;</t>
+<t>- прибавление к <k>totalSum</k>.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "totalSum",
+        "for",
+        "do",
+        "end",
+        "if",
+        "then",
+        ">",
+        "5",
+        "totalSum=totalSum+",
+    },
+    checkCode = function()
+        return type(_G.totalSum) == "number"
+            and _G.totalSum == 40
+    end,
+}
+
+ns_llua['lua'][36] = {
+    type = "commenttest",
+    title = "Практика: for и string.format",
+    helpModules = {31, 7, 14},
+    preloadVars = {
+        {var = "levelReport", desc = "levelReport очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: for и string.format</h>
+<t>Создай глобальную переменную <k>levelReport</k>.</t>
+<t>Собери строку для уровней 1, 2 и 3.</t>
+
+<t>Для каждого уровня нужно добавить фрагмент:</t>
+<s>"Уровень: %d "</s>
+
+<t>Ожидаемое значение:</t>
+<s>"Уровень: 1 Уровень: 2 Уровень: 3 "</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k> от 1 до 3;</t>
+<t>- <k>string.format</k>;</t>
+<t>- конкатенацию в переменную <k>levelReport</k>.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "levelReport",
+        "for",
+        "do",
+        "end",
+        "string.format",
+        "%d",
+        "Уровень:",
+        "levelReport=levelReport..",
+    },
+    checkCode = function()
+        return type(_G.levelReport) == "string"
+            and _G.levelReport == "Уровень: 1 Уровень: 2 Уровень: 3 "
+    end,
+}
+
+ns_llua['lua'][37] = {
+    type = "commenttest",
+    title = "Практика: while и счётчик",
+    helpModules = {32, 7},
+    preloadVars = {
+        {var = "whileResult", desc = "whileResult очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: while и счётчик</h>
+<t>Создай глобальную переменную <k>whileResult</k>.</t>
+<t>Собери в неё числа от 0 до 4 через пробел.</t>
+<t>В конце строки тоже должен быть пробел.</t>
+
+<t>Ожидаемое значение:</t>
+<s>"0 1 2 3 4 "</s>
+
+<t>Используй:</t>
+<t>- цикл <k>while</k>;</t>
+<t>- переменную-счётчик <k>count</k>;</t>
+<t>- условие <k>count < 5</k>;</t>
+<t>- увеличение счётчика на 1;</t>
+<t>- конкатенацию в переменную <k>whileResult</k>.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "whileResult",
+        "while",
+        "do",
+        "end",
+        "count",
+        "<",
+        "5",
+        "whileResult=whileResult..",
+        "count=count+1",
+    },
+    checkCode = function()
+        return type(_G.whileResult) == "string"
+            and _G.whileResult == "0 1 2 3 4 "
+    end,
+}
+
+ns_llua['lua'][38] = {
+    type = "commenttest",
+    title = "Практика: while, break и остаток от деления",
+    helpModules = {32, 10},
+    preloadVars = {
+        {var = "foundMultiple", desc = "foundMultiple очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: while, break и остаток от деления</h>
+<t>Создай глобальную переменную <k>foundMultiple</k>.</t>
+<t>Найди первое число от 1 до 30, которое делится на 7 без остатка.</t>
+
+<w>Важно:</w>
+<t>Переменная <k>foundMultiple</k> должна содержать само найденное число, а не остаток от деления.</t>
+
+<t>Ожидаемое значение:</t>
+<s>7</s>
+
+<t>Используй:</t>
+<t>- цикл <k>while</k>;</t>
+<t>- переменную <k>i</k>;</t>
+<t>- остаток от деления <k>%</k>;</t>
+<t>- условие;</t>
+<t>- выход через <k>break</k>;</t>
+<t>- увеличение <k>i</k> на 1.</t>
+
+<h>Подсказка</h>
+<t>Остаток от деления вычисляется оператором <k>%</k>.</t>
+<t>Если <k>i % 7</k> равно <n>0</n>, значит число <k>i</k> делится на 7 без остатка.</t>
+
+<code>
+print(14 % 7) -- 0: остатка нет, число делится без остатка
+print(15 % 7) -- 1: остаток есть, число не делится без остатка
+</code>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "foundMultiple",
+        "while",
+        "do",
+        "end",
+        "if",
+        "then",
+        "%",
+        "7",
+        "break",
+        "i%7==0",
+        "foundMultiple=i",
+        "i=i+1",
+    },
+    checkCode = function()
+        return type(_G.foundMultiple) == "number"
+            and _G.foundMultiple == 7
+    end,
+}
+
+ns_llua['lua'][39] = {
+    type = "commenttest",
+    title = "Практика: ipairs и подсчёт с условием",
+    helpModules = {31, 4, 17},
+    preloadVars = {
+        {var = "loot", desc = "loot очищается перед проверкой"},
+        {var = "lootCount", desc = "lootCount очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: ipairs и подсчёт с условием</h>
+<t>Создай глобальную таблицу <k>loot</k> с четырьмя строками по порядку:</t>
+<t>"Меч", "Щит", "Зелье", "Свиток".</t>
+
+<t>Создай глобальную переменную <k>lootCount</k>.</t>
+<t>Посчитай количество предметов, которые НЕ равны "Щит".</t>
+
+<t>Ожидаемое значение:</t>
+<s>3</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k>;</t>
+<t>- <k>ipairs</k>;</t>
+<t>- условие <k>if</k>;</t>
+<t>- сравнение <k>~=</k>;</t>
+<t>- увеличение <k>lootCount</k> на 1.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "loot",
+        "lootCount",
+        "for",
+        "ipairs",
+        "do",
+        "end",
+        "if",
+        "then",
+        "~=",
+        "Щит",
+        "lootCount=lootCount+1",
+        "Меч",
+        "Зелье",
+        "Свиток",
+    },
+    checkCode = function()
+        return type(_G.loot) == "table"
+            and _G.loot[1] == "Меч"
+            and _G.loot[2] == "Щит"
+            and _G.loot[3] == "Зелье"
+            and _G.loot[4] == "Свиток"
+            and _G.lootCount == 3
+    end,
+}
+
+ns_llua['lua'][40] = {
+    type = "commenttest",
+    title = "Практика: поиск в таблице и break",
+    helpModules = {31, 4, 17, 19},
+    preloadVars = {
+        {var = "pouch", desc = "pouch очищается перед проверкой"},
+        {var = "elixirIndex", desc = "elixirIndex очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: поиск в таблице и break</h>
+<t>Создай глобальную таблицу <k>pouch</k> с четырьмя строками по порядку:</t>
+<t>"Кинжал", "Эликсир", "Свиток", "Эликсир".</t>
+
+<t>Создай глобальную переменную <k>elixirIndex</k>.</t>
+<t>Найди индекс первого элемента "Эликсир" и сохрани его в <k>elixirIndex</k>.</t>
+
+<t>Ожидаемое значение:</t>
+<s>2</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k>;</t>
+<t>- <k>ipairs</k>;</t>
+<t>- переменные <k>i</k> и <k>v</k>;</t>
+<t>- условие <k>if</k>;</t>
+<t>- выход из цикла через <k>break</k>.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "pouch",
+        "elixirIndex",
+        "for",
+        "ipairs",
+        "do",
+        "end",
+        "if",
+        "then",
+        "break",
+        "Эликсир",
+        "elixirIndex=i",
+    },
+    checkCode = function()
+        return type(_G.pouch) == "table"
+            and _G.pouch[1] == "Кинжал"
+            and _G.pouch[2] == "Эликсир"
+            and _G.pouch[3] == "Свиток"
+            and _G.pouch[4] == "Эликсир"
+            and _G.elixirIndex == 2
+    end,
+}
+
+ns_llua['lua'][41] = {
+    type = "commenttest",
+    title = "Практика: обратный отсчёт",
+    helpModules = {31, 7},
+    preloadVars = {
+        {var = "launchSequence", desc = "launchSequence очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: обратный отсчёт</h>
+<t>Создай глобальную переменную <k>launchSequence</k>.</t>
+<t>Собери строку обратного отсчёта от 5 до 1.</t>
+<t>После цикла добавь в конец слово "СТАРТ!".</t>
+
+<t>Ожидаемое значение:</t>
+<s>"5... 4... 3... 2... 1... СТАРТ!"</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k> от 5 до 1;</t>
+<t>- шаг <k>-1</k>;</t>
+<t>- конкатенацию;</t>
+<t>- добавление финального слова после цикла.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "launchSequence",
+        "for",
+        "do",
+        "end",
+        "5",
+        "1",
+        "-1",
+        "launchSequence=launchSequence..",
+        "СТАРТ!",
+    },
+    checkCode = function()
+        return type(_G.launchSequence) == "string"
+            and _G.launchSequence == "5... 4... 3... 2... 1... СТАРТ!"
+    end,
+}
+
+ns_llua['lua'][42] = {
+    type = "commenttest",
+    title = "Практика: поиск по подстроке через string.find",
+    helpModules = {31, 33, 4, 7},
+    preloadVars = {
+        {var = "items", desc = "items очищается перед проверкой"},
+        {var = "found", desc = "found очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Практика: поиск по подстроке через string.find</h>
+<t>Создай глобальную таблицу <k>items</k> с пятью строками по порядку:</t>
+<t>"Меч", "Молот", "Кольцо", "Щит", "Плащ".</t>
+
+<t>Создай глобальную переменную <k>found</k>.</t>
+<t>Найди все предметы, в которых есть подстрока "ол".</t>
+<t>Собери их названия в строку через пробел.</t>
+<t>В конце строки тоже должен быть пробел.</t>
+
+<t>Ожидаемое значение:</t>
+<s>"Молот Кольцо "</s>
+
+<t>Используй:</t>
+<t>- цикл <k>for</k>;</t>
+<t>- <k>ipairs</k>;</t>
+<t>- <k>string.find</k>;</t>
+<t>- условие <k>if</k>;</t>
+<t>- конкатенацию.</t>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "items",
+        "found",
+        "for",
+        "ipairs",
+        "do",
+        "end",
+        "string.find",
+        "if",
+        "then",
+        "ол",
+        "found=found..",
+        "Меч",
+        "Молот",
+        "Кольцо",
+        "Щит",
+        "Плащ",
+    },
+    checkCode = function()
+        return type(_G.items) == "table"
+            and _G.items[1] == "Меч"
+            and _G.items[2] == "Молот"
+            and _G.items[3] == "Кольцо"
+            and _G.items[4] == "Щит"
+            and _G.items[5] == "Плащ"
+            and _G.found == "Молот Кольцо "
+    end,
+}
+
+ns_llua['lua'][43] = {
+    type = "commenttest",
+    title = "Итоговый комбо-тест: циклы, tonumber, if и string.format",
+    helpModules = {31, 32, 33, 4, 7, 10, 17, 19},
+    preloadVars = {
+        {var = "goldStrings", desc = "goldStrings очищается перед проверкой"},
+        {var = "bigGoldCount", desc = "bigGoldCount очищается перед проверкой"},
+        {var = "bigGoldSum", desc = "bigGoldSum очищается перед проверкой"},
+        {var = "bigGoldReport", desc = "bigGoldReport очищается перед проверкой"},
+    },
+    instruction = [=[
+<h>Итоговый комбо-тест</h>
+<t>Создай глобальную таблицу <k>goldStrings</k> с тремя строками:</t>
+<t>"1200", "850", "2000".</t>
+
+<t>Создай глобальные переменные:</t>
+<t><k>bigGoldCount</k> — количество сумм, которые больше или равны 1000;</t>
+<t><k>bigGoldSum</k> — сумма таких значений;</t>
+<t><k>bigGoldReport</k> — итоговый отчёт.</t>
+
+<t>Пройди по таблице <k>goldStrings</k> циклом <k>ipairs</k>.</t>
+<t>Каждую строку преобразуй в число через <k>tonumber</k>.</t>
+<t>Если число больше или равно 1000, увеличь <k>bigGoldCount</k> на 1 и прибавь число к <k>bigGoldSum</k>.</t>
+
+<t>После цикла создай <k>bigGoldReport</k> через <k>string.format</k> по шаблону:</t>
+<s>"Крупных сумм: %d, всего: %d"</s>
+
+<t>Ожидаемые значения:</t>
+<s>bigGoldCount = 2</s>
+<s>bigGoldSum = 3200</s>
+<s>bigGoldReport = "Крупных сумм: 2, всего: 3200"</s>
+
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "goldStrings",
+        "bigGoldCount",
+        "bigGoldSum",
+        "bigGoldReport",
+        "for",
+        "ipairs",
+        "do",
+        "end",
+        "tonumber",
+        "if",
+        "then",
+        ">=",
+        "1000",
+        "string.format",
+        "bigGoldCount=bigGoldCount+1",
+        "bigGoldSum=bigGoldSum+",
+        '"1200"',
+        '"850"',
+        '"2000"',
+    },
+    checkCode = function()
+        return type(_G.goldStrings) == "table"
+            and _G.goldStrings[1] == "1200"
+            and _G.goldStrings[2] == "850"
+            and _G.goldStrings[3] == "2000"
+            and _G.bigGoldCount == 2
+            and _G.bigGoldSum == 3200
+            and _G.bigGoldReport == "Крупных сумм: 2, всего: 3200"
+    end,
+}
+
 -- ============================================================
 -- UI CLASS: MAIN WINDOW + HELP WINDOW + EDITOR
 -- ============================================================
@@ -2811,7 +3490,6 @@ end
 
 function UI:SetEditorResult(name, result)
     local editor = self:GetEditor(name)
-
     if not editor then
         return
     end
@@ -2848,11 +3526,23 @@ function UI:SetEditorResult(name, result)
     end
 
     if current ~= "" then
-        editor._currentLabel:SetText("|cFFFFD700Текущий результат:|r")
-        editor._currentText:SetText(markupPlain(current))
+        if result.footerSuccess then
+            editor._currentLabel:SetText("|cFFFFD700Результат выполнения:|r")
+            editor._currentText:SetText(
+                "|cFFFFFFFF" .. escapePipes(current) .. "|r\n\n|cFF00FF00Задание выполнено!|r"
+            )
+        else
+            editor._currentLabel:SetText("|cFFFFD700Текущий результат:|r")
+            editor._currentText:SetText(markupPlain(current))
+        end
     else
-        editor._currentLabel:SetText("")
-        editor._currentText:SetText("")
+        if result.footerSuccess then
+            editor._currentLabel:SetText("")
+            editor._currentText:SetText("|cFF00FF00Задание выполнено!|r")
+        else
+            editor._currentLabel:SetText("")
+            editor._currentText:SetText("")
+        end
     end
 
     self.layoutDirty = true
@@ -3938,10 +4628,8 @@ function Logic:CheckCode(editorName, code)
         s = tostring(s or ""):gsub("\r\n", "\n")
 
         local lines = {}
-
         for line in s:gmatch("[^\n]+") do
             line = Trim(line)
-
             if line ~= "" then
                 table.insert(lines, line)
             end
@@ -3965,7 +4653,6 @@ function Logic:CheckCode(editorName, code)
     if m.preloadVars then
         for _, v in ipairs(m.preloadVars) do
             local var = Trim(v.var)
-
             if var ~= "" then
                 _G[var] = v.value
             end
@@ -3973,8 +4660,6 @@ function Logic:CheckCode(editorName, code)
     end
 
     -- Универсальная проверка ключевых слов для commenttest.
-    -- Используется, если в модуле указаны requireKeywords,
-    -- onlyCodePatterns / onlyKeywords или singleLine.
     if m.requireKeywords or m.onlyCodePatterns or m.onlyKeywords or m.singleLine then
         local keywordOk, keywordErr = CheckCodeKeywords(
             code,
@@ -3987,66 +4672,374 @@ function Logic:CheckCode(editorName, code)
             self.commentTestPassed = false
             self:SaveCommentTest(code, false)
             self.ui:SetNextEnabled(false)
-
             self.ui:SetEditorResult(editorName, {
                 status = "diff",
                 message = keywordErr or "Неверный код.",
                 expected = m.expectedCode or m.expectedOutput or "",
                 current = code,
             })
-
             return
         end
     end
 
-    local output = {}
-    local oldPrint = print
+    local keywords = {
+        ["and"] = true,
+        ["break"] = true,
+        ["do"] = true,
+        ["else"] = true,
+        ["elseif"] = true,
+        ["end"] = true,
+        ["false"] = true,
+        ["for"] = true,
+        ["function"] = true,
+        ["if"] = true,
+        ["in"] = true,
+        ["local"] = true,
+        ["nil"] = true,
+        ["not"] = true,
+        ["or"] = true,
+        ["repeat"] = true,
+        ["return"] = true,
+        ["then"] = true,
+        ["true"] = true,
+        ["until"] = true,
+        ["while"] = true,
+        ["print"] = true,
+        ["string"] = true,
+        ["table"] = true,
+        ["math"] = true,
+        ["pairs"] = true,
+        ["ipairs"] = true,
+        ["type"] = true,
+        ["tostring"] = true,
+        ["tonumber"] = true,
+        ["select"] = true,
+        ["unpack"] = true,
+        ["pcall"] = true,
+        ["loadstring"] = true,
+    }
 
-    print = function(...)
-        local args = {...}
+    local function FormatValue(value, depth)
+        depth = depth or 0
+
+        local valueType = type(value)
+
+        if valueType == "string" then
+            return '"' .. value .. '"'
+        elseif valueType == "number" then
+            return tostring(value)
+        elseif valueType == "boolean" then
+            return tostring(value)
+        elseif valueType == "nil" then
+            return "nil"
+        elseif valueType == "table" then
+            if depth >= 1 then
+                return "{...}"
+            end
+
+            local parts = {}
+            local arraySize = #value
+
+            if arraySize > 0 then
+                local maxSize = math.min(arraySize, 5)
+
+                for i = 1, maxSize do
+                    table.insert(parts, FormatValue(value[i], depth + 1))
+                end
+
+                if arraySize > 5 then
+                    table.insert(parts, "...")
+                end
+
+                return "{" .. table.concat(parts, ", ") .. "}"
+            end
+
+            local count = 0
+            for k, v in pairs(value) do
+                count = count + 1
+
+                if count > 5 then
+                    table.insert(parts, "...")
+                    break
+                end
+
+                table.insert(parts, tostring(k) .. "=" .. FormatValue(v, depth + 1))
+            end
+
+            if count == 0 then
+                return "{}"
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        return "<" .. valueType .. ">"
+    end
+
+    local iterationLines = {}
+    local iterationCount = 0
+    local traceOverflow = false
+    local MAX_TRACE_LINES = 100
+
+    local oldTraceLoop = _G.__ns_trace_loop
+    local oldTraceWhile = _G.__ns_trace_while
+
+    local function AddIterationLine(line)
+        if #iterationLines < MAX_TRACE_LINES then
+            table.insert(iterationLines, line)
+        elseif not traceOverflow then
+            traceOverflow = true
+            table.insert(iterationLines, "...")
+        end
+    end
+
+    _G.__ns_trace_loop = function(label, ...)
+        iterationCount = iterationCount + 1
+
+        local argCount = select("#", ...)
+
+        if argCount == 0 then
+            AddIterationLine("Итерация " .. iterationCount .. ": " .. tostring(label))
+            return
+        end
+
+        local parts = {}
+        for i = 1, argCount do
+            parts[i] = FormatValue(select(i, ...))
+        end
+
+        AddIterationLine(
+            "Итерация " .. iterationCount .. ": " .. tostring(label) .. " = " .. table.concat(parts, ", ")
+        )
+    end
+
+    _G.__ns_trace_while = function(condText, vars)
+        iterationCount = iterationCount + 1
+
         local parts = {}
 
-        for i = 1, #args do
-            table.insert(parts, tostring(args[i]))
+        if type(vars) == "table" then
+            local keys = {}
+
+            for k in pairs(vars) do
+                table.insert(keys, k)
+            end
+
+            table.sort(keys)
+
+            for _, k in ipairs(keys) do
+                if type(vars[k]) ~= "function" then
+                    table.insert(parts, tostring(k) .. " = " .. FormatValue(vars[k]))
+                end
+            end
         end
 
-        table.insert(output, table.concat(parts, " "))
-    end
-
-    local fn, compileErr
-
-    if type(loadstring) == "function" then
-        fn, compileErr = loadstring(code)
-    else
-        compileErr = "loadstring недоступен"
-    end
-
-    local ok, runErr = false, nil
-
-    if fn then
-        ok, runErr = pcall(fn)
-    else
-        runErr = compileErr
-    end
-
-    print = oldPrint
-
-    local current = table.concat(output, "\n")
-
-    if not ok then
-        if current ~= "" then
-            current = current .. "\nОшибка: " .. tostring(runErr)
+        if #parts > 0 then
+            AddIterationLine(
+                "Итерация " .. iterationCount .. ": while " .. tostring(condText) .. " | " .. table.concat(parts, ", ")
+            )
         else
-            current = "Ошибка: " .. tostring(runErr)
+            AddIterationLine("Итерация " .. iterationCount .. ": while " .. tostring(condText))
         end
     end
+
+    local function InstrumentCode(source)
+        local out = {}
+
+        for line in source:gmatch("[^\r\n]+") do
+            table.insert(out, line)
+
+            local indent = line:match("^%s*") or ""
+            local header = Trim(line)
+
+            -- Убираем однострочный комментарий из конца строки,
+            -- чтобы не реагировать на do внутри комментария.
+            header = Trim((header:gsub("%-%-.*$", "")))
+
+            if header ~= "" then
+                -- Generic for: for i, v in ipairs(t) do
+                local vars = header:match("^for%s+(.-)%s+in%s+.-%s+do%s*$")
+
+                if vars then
+                    local args = vars:gsub("%s+", "")
+                    table.insert(
+                        out,
+                        indent .. "    __ns_trace_loop(" .. string.format("%q", args) .. ", " .. args .. ")"
+                    )
+                else
+                    -- Numeric for: for i = 1, 10 do
+                    local numVar = header:match("^for%s+(%w+)%s*=%s*.-do%s*$")
+
+                    if numVar then
+                        table.insert(
+                            out,
+                            indent .. "    __ns_trace_loop(" .. string.format("%q", numVar) .. ", " .. numVar .. ")"
+                        )
+                    else
+                        -- while: while count < 5 do
+                        local cond = header:match("^while%s+(.-)%s+do%s*$")
+
+                        if cond then
+                            local names = {}
+                            local seen = {}
+
+                            for word in cond:gmatch("[%a_][%w_]*") do
+                                if not keywords[word] and not seen[word] then
+                                    seen[word] = true
+                                    table.insert(names, word)
+                                end
+                            end
+
+                            local varParts = {}
+                            for _, word in ipairs(names) do
+                                table.insert(varParts, word .. " = " .. word)
+                            end
+
+                            table.insert(
+                                out,
+                                indent .. "    __ns_trace_while("
+                                    .. string.format("%q", cond)
+                                    .. ", {" .. table.concat(varParts, ", ") .. "})"
+                            )
+                        end
+                    end
+                end
+            end
+        end
+
+        return table.concat(out, "\n")
+    end
+
+    local function ExecuteSource(source)
+        local output = {}
+
+        local oldPrint = print
+        print = function(...)
+            local parts = {}
+            for i = 1, select("#", ...) do
+                parts[i] = tostring(select(i, ...))
+            end
+
+            table.insert(output, table.concat(parts, " "))
+        end
+
+        local fn, compileErr
+        if type(loadstring) == "function" then
+            fn, compileErr = loadstring(source)
+        else
+            compileErr = "loadstring недоступен"
+        end
+
+        local ok, runErr = false, nil
+
+        if fn then
+            ok, runErr = pcall(fn)
+        else
+            runErr = compileErr
+        end
+
+        print = oldPrint
+
+        return ok, runErr, table.concat(output, "\n")
+    end
+
+    -- Собираем имена переменных, которые потом покажем в итоговом отчёте.
+    local candidateOrder = {}
+    local candidateSeen = {}
+
+    local function AddCandidate(name)
+        name = Trim(name)
+
+        if name == "" then
+            return
+        end
+
+        if candidateSeen[name] then
+            return
+        end
+
+        if keywords[name] then
+            return
+        end
+
+        if not name:match("^[%a_][%w_]*$") then
+            return
+        end
+
+        candidateSeen[name] = true
+        table.insert(candidateOrder, name)
+    end
+
+    if type(m.reportVars) == "table" then
+        for _, name in ipairs(m.reportVars) do
+            AddCandidate(name)
+        end
+    end
+
+    if type(m.preloadVars) == "table" then
+        for _, v in ipairs(m.preloadVars) do
+            AddCandidate(v.var)
+        end
+    end
+
+    local searchText = tostring(m.instruction or "") .. "\n" .. tostring(m.content or "")
+
+    for name in searchText:gmatch("<k>([%a_][%w_]*)</k>") do
+        AddCandidate(name)
+    end
+
+    if type(m.requireKeywords) == "table" then
+        for _, keyword in ipairs(m.requireKeywords) do
+            for name in tostring(keyword):gmatch("[%a_][%w_]*") do
+                AddCandidate(name)
+            end
+        end
+    end
+
+    local oldValues = {}
+    for _, name in ipairs(candidateOrder) do
+        oldValues[name] = _G[name]
+    end
+
+    local function ResetInputs()
+        if m.preloadVars then
+            for _, v in ipairs(m.preloadVars) do
+                local var = Trim(v.var)
+                if var ~= "" then
+                    _G[var] = v.value
+                end
+            end
+        end
+
+        for _, name in ipairs(candidateOrder) do
+            _G[name] = oldValues[name]
+        end
+    end
+
+    local instrumentedCode = InstrumentCode(code)
+
+    local ok, runErr, rawOutput = ExecuteSource(instrumentedCode)
+
+    -- Если инструментированный код вдруг не собрался или упал,
+    -- пробуем выполнить оригинальный код.
+    if not ok and instrumentedCode ~= code then
+        iterationLines = {}
+        iterationCount = 0
+        traceOverflow = false
+
+        ResetInputs()
+
+        ok, runErr, rawOutput = ExecuteSource(code)
+    end
+
+    _G.__ns_trace_loop = oldTraceLoop
+    _G.__ns_trace_while = oldTraceWhile
 
     local problems = {}
 
     local outputOk = true
-
     if m.expectedOutput then
-        outputOk = Normalize(current) == Normalize(m.expectedOutput)
+        outputOk = Normalize(rawOutput) == Normalize(m.expectedOutput)
 
         if not outputOk then
             table.insert(problems, "Неверный вывод.")
@@ -4063,7 +5056,6 @@ function Logic:CheckCode(editorName, code)
 
         while true do
             local startPos, endPos = codeForCheck:find("print", searchPos, true)
-
             if not startPos then
                 break
             end
@@ -4083,12 +5075,14 @@ function Logic:CheckCode(editorName, code)
 
         if printCount ~= needPrint then
             templateOk = false
-            table.insert(problems, ("В коде должно быть %d слов print. Найдено: %d."):format(needPrint, printCount))
+            table.insert(
+                problems,
+                ("В коде должно быть %d слов print. Найдено: %d."):format(needPrint, printCount)
+            )
         end
     end
 
     local runtimeOk = true
-
     if type(m.checkCode) == "function" then
         if not ok then
             runtimeOk = false
@@ -4113,29 +5107,69 @@ function Logic:CheckCode(editorName, code)
 
     local passed = outputOk and templateOk and runtimeOk and runOk
 
-    self.commentTestPassed = passed
-    self:SaveCommentTest(code, passed)
+    -- Собираем подробный отчёт.
+    local reportLines = {}
 
-    local displayCurrent = current
+    if #iterationLines > 0 then
+        table.insert(reportLines, "Итерации:")
 
-    if needPrint then
+        for _, line in ipairs(iterationLines) do
+            table.insert(reportLines, "  " .. line)
+        end
+    end
+
+    if rawOutput ~= "" then
+        table.insert(reportLines, "Вывод:")
+
+        for line in rawOutput:gmatch("[^\n]+") do
+            table.insert(reportLines, "  " .. line)
+        end
+    end
+
+    local finalLines = {}
+
+    for _, name in ipairs(candidateOrder) do
+        local newValue = _G[name]
+
+        if type(newValue) ~= "function" and newValue ~= nil then
+            table.insert(finalLines, name .. " = " .. FormatValue(newValue))
+        end
+    end
+
+    if #finalLines > 0 then
+        table.insert(reportLines, "Итог:")
+
+        for _, line in ipairs(finalLines) do
+            table.insert(reportLines, "  " .. line)
+        end
+    end
+
+    if #reportLines == 0 and ok then
+        table.insert(reportLines, "Код выполнен без ошибок.")
+    end
+
+    local reportText = table.concat(reportLines, "\n")
+
+    local displayCurrent = reportText
+
+    if not ok then
         if displayCurrent ~= "" then
-            displayCurrent = displayCurrent .. "\n"
+            displayCurrent = displayCurrent .. "\n\n"
         end
 
-        displayCurrent = displayCurrent .. ("Найдено print: %d из %d"):format(printCount, needPrint)
+        displayCurrent = displayCurrent .. "Ошибка: " .. tostring(runErr)
     end
 
-    if displayCurrent == "" and m.expectedCode then
-        displayCurrent = code
-    end
+    self.commentTestPassed = passed
+    self:SaveCommentTest(code, passed)
 
     if passed then
         self.ui:SetEditorResult(editorName, {
             status = "success",
-            message = "Задание выполнено!",
-            expected = m.expectedCode or m.expectedOutput or "",
-            current = displayCurrent,
+            message = "",
+            expected = "",
+            current = reportText,
+            footerSuccess = true,
         })
 
         self.ui:SetNextEnabled(true)

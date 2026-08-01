@@ -6981,11 +6981,155 @@ function NSPauk:MakeInnerRect(r)
 end
 
 function NSPauk:ComputeFrameVisibleInner(frame)
+    if type(self.C) ~= "table" or type(self.C.MIN_ANCHOR_SIZE) ~= "number" then
+        self:LoadConstants()
+    end
+
+    ---------------------------------------------------------------------------
+    -- UIParent обычно исключён из обычных видимых прямоугольников.
+    -- Но для хардкорного кокона мы разрешаем его как отдельную цель.
+    ---------------------------------------------------------------------------
+    if frame == UIParent then
+        local sw, sh = self:GetScreenSize()
+
+        if type(sw) ~= "number" or sw <= 0 then
+            sw = 1
+        end
+
+        if type(sh) ~= "number" or sh <= 0 then
+            sh = 1
+        end
+
+        local raw = {
+            name = "UIParent",
+            left = 0,
+            right = sw,
+            bottom = 0,
+            top = sh,
+            width = sw,
+            height = sh,
+            cx = sw / 2,
+            cy = sh / 2,
+        }
+
+        local inner = self:MakeInnerRect(raw)
+
+        if inner then
+            inner.frame = UIParent
+            inner.name = "UIParent"
+        end
+
+        return inner
+    end
+
     local rect = self:ComputeFrameVisibleRect(frame)
     if not rect then
         return nil
     end
+
     return self:MakeInnerRect(rect)
+end
+
+function NSPauk:MakeUIParentCocoonItem()
+    if not UIParent then
+        return nil
+    end
+
+    local inner = self:ComputeFrameVisibleInner(UIParent)
+
+    if inner then
+        inner.frame = UIParent
+        inner.name = "UIParent"
+        return inner
+    end
+
+    ---------------------------------------------------------------------------
+    -- Запасной вариант, если вдруг MakeInnerRect отказал.
+    ---------------------------------------------------------------------------
+    local sw, sh = self:GetScreenSize()
+
+    if type(sw) ~= "number" or sw <= 0 then
+        sw = 1
+    end
+
+    if type(sh) ~= "number" or sh <= 0 then
+        sh = 1
+    end
+
+    local left = sw * 0.10
+    local right = sw * 0.90
+    local bottom = sh * 0.10
+    local top = sh * 0.90
+
+    return {
+        name = "UIParent",
+        frame = UIParent,
+        left = left,
+        right = right,
+        bottom = bottom,
+        top = top,
+        width = right - left,
+        height = top - bottom,
+        cx = sw / 2,
+        cy = sh / 2,
+    }
+end
+
+function NSPauk:CollectCocoonCandidates(items, excludeActive)
+    local good = {}
+    local all = {}
+
+    for _, item in ipairs(items or {}) do
+        if item and item.frame then
+            local ok = true
+
+            if excludeActive and self:IsActiveAnchorFrame(item.frame) then
+                ok = false
+            end
+
+            if ok then
+                all[#all + 1] = item
+
+                if self:IsGoodAnchorName(item.name) then
+                    good[#good + 1] = item
+                end
+            end
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Тот же принцип, что и для хабов/целей:
+    -- если есть хорошие имена, используем их; иначе все видимые.
+    ---------------------------------------------------------------------------
+    local pool = good
+    if #pool == 0 then
+        pool = all
+    end
+
+    ---------------------------------------------------------------------------
+    -- Хардкорно добавляем UIParent.
+    -- Он участвует с тем же весом, что и любой другой кандидат.
+    ---------------------------------------------------------------------------
+    local ui = self:MakeUIParentCocoonItem()
+
+    if ui then
+        local hasUIParent = false
+
+        for _, item in ipairs(pool) do
+            if item.frame == UIParent then
+                hasUIParent = true
+                break
+            end
+        end
+
+        if not hasUIParent then
+            if not excludeActive or not self:IsActiveAnchorFrame(UIParent) then
+                pool[#pool + 1] = ui
+            end
+        end
+    end
+
+    return pool
 end
 
 function NSPauk:FrameMoved(storedRect, frame)
@@ -11331,23 +11475,13 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
 end
 
 function NSPauk:PickCocoonVictim(items)
-    local minWidth = tonumber(self.C.COCOON_MIN_WIDTH) or 30
+    local pool = self:CollectCocoonCandidates(items, false)
 
-    local cand = {}
-
-    for _, item in ipairs(items or {}) do
-        if item.frame
-            and self:IsGoodAnchorName(item.name)
-            and (item.width or 0) > minWidth then
-            cand[#cand + 1] = item
-        end
-    end
-
-    if #cand == 0 then
+    if #pool == 0 then
         return nil
     end
 
-    return cand[self:RandomInt(1, #cand)]
+    return pool[self:RandomInt(1, #pool)]
 end
 
 function NSPauk:EllipsePoint(cx, cy, a, b, ang)
@@ -11568,12 +11702,13 @@ function NSPauk:BeginDissolve(inst)
     local frame = inst.hub.frame
 
     local aliveCount = 0
-
     for _, conn in ipairs(inst.conns) do
         if conn.alive then
             aliveCount = aliveCount + 1
         end
     end
+
+    local isUIParent = frame == UIParent
 
     if not frame or not frame.SetAlpha or not frame.GetAlpha or aliveCount == 0 then
         self:TearInstance(inst)
@@ -11592,14 +11727,25 @@ function NSPauk:BeginDissolve(inst)
 
     local baseAlpha = frame:GetAlpha() or 1
 
+    local minAlpha
+    if isUIParent then
+        -----------------------------------------------------------------------
+        -- Для UIParent не делаем затухание всего интерфейса.
+        -----------------------------------------------------------------------
+        minAlpha = baseAlpha
+    else
+        minAlpha = math.min(C.MIN_COCOON_ALPHA, baseAlpha)
+    end
+
     S.cocoon = {
         inst = inst,
         frame = frame,
         baseAlpha = baseAlpha,
-        minAlpha = math.min(C.MIN_COCOON_ALPHA, baseAlpha),
+        minAlpha = minAlpha,
         duration = self:RandomFloat(C.DISSOLVE_DURATION_MIN, C.DISSOLVE_DURATION_MAX),
         timer = 0,
         digested = false,
+        isUIParent = isUIParent,
     }
 
     S.phase = "dissolve"
@@ -11761,7 +11907,6 @@ end
 
 function NSPauk:FinishCocoonDigestion()
     local S = self.S
-
     local c = S.cocoon
 
     if not c then
@@ -11787,13 +11932,43 @@ function NSPauk:FinishCocoonDigestion()
         victimName = c.frame:GetName()
     end
 
+    local isUIParent = c.isUIParent
+        or c.frame == UIParent
+        or victimName == "UIParent"
+
     if c.inst then
         self:SettleInstance(c.inst)
     end
 
-    self:AwardCocoonExperience(victimName)
+    ---------------------------------------------------------------------------
+    -- Что паук съел на самом деле, по-человечески.
+    ---------------------------------------------------------------------------
+    local victimDesc = self:DescribeVictim(c.frame, victimName)
 
-    if c.frame then
+    if isUIParent then
+        -----------------------------------------------------------------------
+        -- Хардкор: весь интерфейс исчезает.
+        -----------------------------------------------------------------------
+        if UIParent and UIParent.GetAlpha then
+            S.uiParentBaseAlpha = UIParent:GetAlpha() or 1
+        end
+
+        self:HideSpider()
+
+        if UIParent and UIParent.SetAlpha then
+            UIParent:SetAlpha(0)
+        end
+
+        self:AwardImmediateLevel(victimDesc)
+    else
+        self:AwardCocoonExperience(victimDesc)
+    end
+
+    ---------------------------------------------------------------------------
+    -- UIParent не прячем через SafeHideFrame и не заносим в digestedFrames:
+    -- его возвратом управляет цикл мерцания.
+    ---------------------------------------------------------------------------
+    if c.frame and not isUIParent then
         self:SafeHideFrame(c.frame)
         self:AddDigestedFrame(c.frame, c.baseAlpha or 1)
     end
@@ -11803,7 +11978,9 @@ function NSPauk:FinishCocoonDigestion()
         self:RemoveInstance(c.inst)
     end
 
-    self:BreakAnchoredToFrame(c.frame)
+    if not isUIParent then
+        self:BreakAnchoredToFrame(c.frame)
+    end
 
     S.cocoon = nil
 
@@ -11812,10 +11989,445 @@ function NSPauk:FinishCocoonDigestion()
     S.currentTask = nil
     S.completeTimer = 0
 
+    if isUIParent then
+        -----------------------------------------------------------------------
+        -- Интерфейс возвращается с мерцанием в течение 10 секунд.
+        -----------------------------------------------------------------------
+        self:StartUIParentRestore(10)
+        return
+    end
+
     if S.limitReached or S.limitCocoonPending then
         self:ReturnToLimitHome()
     else
         self:StartNewInstance(nil)
+    end
+end
+
+function NSPauk:AwardImmediateLevel(targetName)
+    local C = self.C
+    local db = self:EnsureDB()
+
+    local perLevel = tonumber(C.POINTS_PER_LEVEL) or 60000
+    if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
+        perLevel = 60000
+    end
+
+    local total = db.progress.totalPoints or 0
+    local need = perLevel - (total % perLevel)
+
+    if type(need) ~= "number"
+        or need ~= need
+        or need <= 0
+        or need > perLevel then
+        need = perLevel
+    end
+
+    local amount, level, left, levelsGained = self:AddExperience(need)
+
+    if type(level) ~= "number" or level ~= level then
+        level = math.floor((db.progress.totalPoints or 0) / perLevel)
+    end
+
+    if type(left) ~= "number" or left ~= left then
+        left = perLevel - ((db.progress.totalPoints or 0) % perLevel)
+
+        if left == perLevel then
+            left = 0
+        end
+    end
+
+    if type(levelsGained) ~= "number"
+        or levelsGained ~= levelsGained
+        or levelsGained < 1 then
+        levelsGained = 1
+    end
+
+    self:SendOfficer(string.format(
+        "Мой павук хардкорно съел %s! Немедленно получено %d опыта, уровней: %d. Уровень %d, до уровня %d",
+        tostring(targetName or "UIParent"),
+        amount or need,
+        levelsGained,
+        level,
+        left
+    ))
+end
+
+function NSPauk:DescribeVictim(frame, name)
+    if frame == UIParent or name == "UIParent" then
+        return "весь интерфейс целиком (UIParent)"
+    end
+
+    local n = ""
+
+    if type(name) == "string" and name ~= "" then
+        n = name
+    elseif frame and frame.GetName then
+        n = frame:GetName() or ""
+    end
+
+    if n == "" then
+        return "какой-то безымянный объект интерфейса"
+    end
+
+    local patterns = {
+        { "ChatFrame%d+EditBox", "строку ввода чата" },
+        { "ChatFrame%d+", "окно чата" },
+        { "Minimap", "миникарту" },
+        { "MiniMap", "кнопку у миникарты" },
+        { "PlayerFrame", "рамку игрока" },
+        { "TargetFrame", "рамку цели" },
+        { "FocusFrame", "рамку фокуса" },
+        { "PartyFrame", "рамку группы" },
+        { "RaidFrame", "рейдовые фреймы" },
+        { "CompactRaid", "рейдовые фреймы" },
+        { "Grid2", "рейдовую сетку Grid2" },
+        { "Grid", "рейдовую сетку" },
+        { "LibDBIcon", "иконку аддона у миникарты" },
+        { "FuBar", "плагин FuBar" },
+        { "TomTom", "стрелку TomTom" },
+        { "GameTimeFrame", "часы календаря" },
+        { "TimeManager", "часы" },
+        { "Bartender", "панели Bartender" },
+        { "Skada", "окно Skada" },
+        { "DBM", "полосу DBM" },
+        { "WorldMapFrame", "карту мира" },
+        { "QuestFrame", "окно заданий" },
+        { "CharacterFrame", "окно персонажа" },
+        { "SpellBookFrame", "книгу заклинаний" },
+        { "MailFrame", "почтовый ящик" },
+        { "MerchantFrame", "окно торговца" },
+        { "TradeFrame", "окно обмена" },
+        { "BankFrame", "окно банка" },
+        { "AuctionFrame", "окно аукциона" },
+        { "ContainerFrame", "сумку" },
+        { "MainMenuBar", "главную панель" },
+        { "MultiBar", "дополнительную панель" },
+        { "ActionButton", "кнопку заклинания" },
+        { "BuffFrame", "баффы" },
+        { "MySpellQueue", "очередь заклинаний" },
+    }
+
+    for _, entry in ipairs(patterns) do
+        if n:find(entry[1]) then
+            return entry[2]
+        end
+    end
+
+    return "«" .. n .. "»"
+end
+
+function NSPauk:UIFlickerAlphaAt(t, baseAlpha)
+    if type(t) ~= "number" or t ~= t or t < 0 then
+        return 0
+    end
+
+    if type(baseAlpha) ~= "number" or baseAlpha ~= baseAlpha or baseAlpha <= 0 then
+        baseAlpha = 1
+    end
+
+    local S = self.S
+
+    local duration = 10
+    if S
+        and S.uiFlicker
+        and type(S.uiFlicker.duration) == "number"
+        and S.uiFlicker.duration > 0 then
+        duration = S.uiFlicker.duration
+    end
+
+    if t >= duration then
+        return baseAlpha
+    end
+
+    local progress = t / duration
+
+    ---------------------------------------------------------------------------
+    -- Детерминированный псевдослучай по номеру среза.
+    -- Функция остаётся чистой: одинаковое t всегда даёт одинаковый результат,
+    -- поэтому мерцание не зависит от частоты вызовов.
+    ---------------------------------------------------------------------------
+    local function sliceRand(slice, salt)
+        local x = math.sin((slice + 1) * 127.1 + (salt or 0) * 311.7) * 43758.5453
+        return x - math.floor(x)
+    end
+
+    ---------------------------------------------------------------------------
+    -- Фаза 1: полный блэкаут с редкими тусклыми микро-вспышками.
+    -- Монитор ещё «мёртв».
+    ---------------------------------------------------------------------------
+    if progress < 0.12 then
+        local slice = math.floor(t / 0.05)
+
+        if sliceRand(slice, 1) < 0.10 then
+            return baseAlpha * 0.30
+        end
+
+        return 0
+    end
+
+    ---------------------------------------------------------------------------
+    -- Фаза 2: жёсткое мерцание — монитор «ловит» сигнал.
+    -- Очень частые переключения, доля горящих кадров быстро растёт.
+    -- Часть кадров горит вполсилы, как при частичном сигнале.
+    ---------------------------------------------------------------------------
+    if progress < 0.45 then
+        local localP = (progress - 0.12) / (0.45 - 0.12)
+        local slice = math.floor(t / 0.055)
+        local r = sliceRand(slice, 2)
+
+        local onChance = 0.18 + localP * 0.42
+
+        if r < onChance then
+            if sliceRand(slice, 3) < 0.30 then
+                return baseAlpha * 0.45
+            end
+
+            return baseAlpha
+        end
+
+        return 0
+    end
+
+    ---------------------------------------------------------------------------
+    -- Фаза 3: картинка «плавает».
+    -- Горящие кадры доминируют, но провалы ещё есть.
+    -- В паузах уже не полная темнота, а тусклый остаточный сигнал.
+    ---------------------------------------------------------------------------
+    if progress < 0.75 then
+        local localP = (progress - 0.45) / (0.75 - 0.45)
+        local slice = math.floor(t / 0.08)
+        local r = sliceRand(slice, 4)
+
+        local onChance = 0.60 + localP * 0.25
+        local offAlpha = baseAlpha * (0.10 + localP * 0.15)
+
+        if r < onChance then
+            return baseAlpha
+        end
+
+        return offAlpha
+    end
+
+    ---------------------------------------------------------------------------
+    -- Фаза 4: почти стабильное изображение с короткими провалами,
+    -- которые постепенно сходят на нет.
+    ---------------------------------------------------------------------------
+    if progress < 0.95 then
+        local localP = (progress - 0.75) / (0.95 - 0.75)
+        local slice = math.floor(t / 0.12)
+        local r = sliceRand(slice, 5)
+
+        local dropoutChance = 0.22 * (1 - localP)
+
+        if r < dropoutChance then
+            return baseAlpha * 0.25
+        end
+
+        return baseAlpha
+    end
+
+    ---------------------------------------------------------------------------
+    -- Фаза 5: сигнал полностью стабилизировался.
+    ---------------------------------------------------------------------------
+    return baseAlpha
+end
+
+function NSPauk:ApplyUIFlickerAt(t)
+    local S = self.S
+    local f = S.uiFlicker
+
+    if not f then
+        return
+    end
+
+    local alpha = self:UIFlickerAlphaAt(t, f.baseAlpha or 1)
+
+    if UIParent and UIParent.SetAlpha then
+        UIParent:SetAlpha(alpha)
+    end
+end
+
+function NSPauk:StartUIParentRestore(duration)
+    local S = self.S
+
+    duration = tonumber(duration)
+    if not duration or duration ~= duration or duration <= 0 then
+        duration = 10
+    end
+
+    local baseAlpha = 1
+
+    if type(S.uiParentBaseAlpha) == "number" and S.uiParentBaseAlpha > 0 then
+        baseAlpha = S.uiParentBaseAlpha
+    elseif UIParent and UIParent.GetAlpha then
+        local a = UIParent:GetAlpha()
+        if type(a) == "number" and a > 0 then
+            baseAlpha = a
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Гасим предыдущий цикл возврата, если он вдруг ещё идёт.
+    ---------------------------------------------------------------------------
+    if S.uiFlickerTicker then
+        S.uiFlickerTicker:Cancel()
+        S.uiFlickerTicker = nil
+    end
+
+    if S.uiFlickerFrame then
+        S.uiFlickerFrame:SetScript("OnUpdate", nil)
+        S.uiFlickerFrame:Hide()
+    end
+
+    S.uiFlicker = {
+        startTime = GetTime(),
+        duration = duration,
+        baseAlpha = baseAlpha,
+    }
+
+    S.phase = "uiRestore"
+
+    ---------------------------------------------------------------------------
+    -- Интерфейс исчезает сразу.
+    ---------------------------------------------------------------------------
+    if UIParent and UIParent.SetAlpha then
+        UIParent:SetAlpha(0)
+    end
+
+    ---------------------------------------------------------------------------
+    -- Для эффекта «сбоя монитора» важна высокая частота обновления,
+    -- поэтому основной драйвер — кадр с OnUpdate (каждый кадр рендера).
+    -- Кадр не привязан к UIParent, поэтому переживёт его сокрытие.
+    ---------------------------------------------------------------------------
+    local f = S.uiFlickerFrame
+    if not f then
+        f = CreateFrame("Frame")
+        S.uiFlickerFrame = f
+    end
+
+    f:SetScript("OnUpdate", function()
+        self:UpdateUIParentRestore()
+    end)
+    f:Show()
+
+    ---------------------------------------------------------------------------
+    -- Страховка: если OnUpdate-драйвер по какой-то причине встанет,
+    -- тикер всё равно завершит цикл.
+    ---------------------------------------------------------------------------
+    if type(C_Timer) == "table" and type(C_Timer.NewTicker) == "function" then
+        S.uiFlickerTicker = C_Timer.NewTicker(0.1, function()
+            if S.uiFlicker then
+                self:UpdateUIParentRestore()
+            end
+        end)
+    end
+end
+
+function NSPauk:UpdateUIParentRestore()
+    local S = self.S
+    local f = S.uiFlicker
+
+    if not f then
+        self:StopUIParentRestore()
+        return
+    end
+
+    ---------------------------------------------------------------------------
+    -- Если аддон экстренно выключили, сразу возвращаем интерфейс на место.
+    ---------------------------------------------------------------------------
+    if not self.initialized
+        or S.runtimeOff
+        or S.phase == "off"
+        or self:IsPersistentlyDisabled() then
+        self:CancelUIParentRestore(true)
+        return
+    end
+
+    local elapsed = GetTime() - (f.startTime or 0)
+
+    if elapsed >= (f.duration or 10) then
+        self:FinishUIParentRestore()
+        return
+    end
+
+    self:ApplyUIFlickerAt(elapsed)
+end
+
+function NSPauk:FinishUIParentRestore()
+    local S = self.S
+
+    local base = 1
+
+    if S.uiFlicker
+        and type(S.uiFlicker.baseAlpha) == "number"
+        and S.uiFlicker.baseAlpha > 0 then
+        base = S.uiFlicker.baseAlpha
+    elseif type(S.uiParentBaseAlpha) == "number" and S.uiParentBaseAlpha > 0 then
+        base = S.uiParentBaseAlpha
+    end
+
+    if UIParent then
+        if UIParent.Show then
+            UIParent:Show()
+        end
+
+        if UIParent.SetAlpha then
+            UIParent:SetAlpha(base)
+        end
+    end
+
+    self:StopUIParentRestore()
+
+    ---------------------------------------------------------------------------
+    -- Продолжаем обычную жизнь паука.
+    ---------------------------------------------------------------------------
+    if S.limitReached or S.limitCocoonPending then
+        self:ReturnToLimitHome()
+    else
+        self:StartNewInstance(nil)
+    end
+end
+
+function NSPauk:StopUIParentRestore()
+    local S = self.S
+
+    if S.uiFlickerTicker then
+        S.uiFlickerTicker:Cancel()
+        S.uiFlickerTicker = nil
+    end
+
+    if S.uiFlickerFrame then
+        S.uiFlickerFrame:SetScript("OnUpdate", nil)
+        S.uiFlickerFrame:Hide()
+    end
+
+    S.uiFlicker = nil
+end
+
+function NSPauk:CancelUIParentRestore(restoreNow)
+    local S = self.S
+
+    local base = nil
+
+    if S.uiFlicker
+        and type(S.uiFlicker.baseAlpha) == "number"
+        and S.uiFlicker.baseAlpha > 0 then
+        base = S.uiFlicker.baseAlpha
+    elseif type(S.uiParentBaseAlpha) == "number" and S.uiParentBaseAlpha > 0 then
+        base = S.uiParentBaseAlpha
+    end
+
+    self:StopUIParentRestore()
+
+    if restoreNow and UIParent then
+        if UIParent.Show then
+            UIParent:Show()
+        end
+
+        if UIParent.SetAlpha then
+            UIParent:SetAlpha(base or 1)
+        end
     end
 end
 
@@ -15525,6 +16137,11 @@ function NSPauk:ClearAllVisuals()
     self:AbortCocoon()
     self:RestoreDigestedFrames()
 
+    ---------------------------------------------------------------------------
+    -- Если идёт мерцание UIParent, немедленно возвращаем интерфейс.
+    ---------------------------------------------------------------------------
+    self:CancelUIParentRestore(true)
+
     for _, inst in ipairs(S.instances) do
         for _, conn in ipairs(inst.conns) do
             self:RecycleTextures(conn.textures)
@@ -16895,24 +17512,13 @@ function NSPauk:IsActiveAnchorFrame(frame)
 end
 
 function NSPauk:PickLimitCocoonVictim(items)
-    local minWidth = tonumber(self.C.COCOON_MIN_WIDTH) or 30
+    local pool = self:CollectCocoonCandidates(items, true)
 
-    local cand = {}
-
-    for _, item in ipairs(items or {}) do
-        if item.frame
-            and self:IsGoodAnchorName(item.name)
-            and not self:IsActiveAnchorFrame(item.frame)
-            and (item.width or 0) > minWidth then
-            cand[#cand + 1] = item
-        end
-    end
-
-    if #cand == 0 then
+    if #pool == 0 then
         return nil
     end
 
-    return cand[self:RandomInt(1, #cand)]
+    return pool[self:RandomInt(1, #pool)]
 end
 
 function NSPauk:ChooseLimitHomePoint()
@@ -17327,6 +17933,7 @@ end
 
 function NSPauk:RuntimeShutdown()
     local S = self.S
+
     if type(S) ~= "table" then
         return
     end
@@ -17335,6 +17942,7 @@ function NSPauk:RuntimeShutdown()
         if type(func) ~= "function" then
             return
         end
+
         if type(pcall) == "function" then
             pcall(func, ...)
         else
@@ -17382,12 +17990,19 @@ function NSPauk:RuntimeShutdown()
     S.combatHideUntil = 0
 
     S.suppressSettle = true
+
     safeCall(self.NP_ClearGlobalDrag, self, false)
     safeCall(self.NP_ClearTempOwners, self)
     safeCall(self.AbortMothHunt, self, true, true, true)
     safeCall(self.ClearAllVisuals, self)
     safeCall(self.AbortCocoon, self)
     safeCall(self.RestoreDigestedFrames, self)
+
+    ---------------------------------------------------------------------------
+    -- Интерфейс обязан вернуться даже при аварийном выключении.
+    ---------------------------------------------------------------------------
+    safeCall(self.CancelUIParentRestore, self, true)
+
     S.suppressSettle = false
 
     safeCall(self.ResetSessionRecord, self)
@@ -17404,6 +18019,7 @@ function NSPauk:RuntimeShutdown()
     S.phase = "off"
     S.runtimeOff = true
     S.suppressSettle = false
+
     S.initTimer = 0
     S.speedTimer = 0
     S.stillTimer = 0
@@ -17425,6 +18041,7 @@ function NSPauk:RuntimeShutdown()
     S.webPoints = 0
     S.webAliveCount = 0
     S.webCreated = 0
+
     S.nspFrameCache = nil
     S.nspSupportCache = nil
     S.nspNearCache = nil
@@ -17434,6 +18051,7 @@ function NSPauk:RuntimeShutdown()
     S.nspRouteHistory = {}
     S.nspRouteContext = nil
     S.nspRouteLoopHandled = nil
+
     S.tasks = {}
     S.taskIdx = 1
     S.currentTask = nil
@@ -17443,6 +18061,7 @@ function NSPauk:RuntimeShutdown()
     S.moth = nil
     S.digestedFrames = {}
     S.fades = {}
+
     S.limitReached = false
     S.limitReturnPending = false
     S.limitCocoonPending = false
@@ -17450,6 +18069,7 @@ function NSPauk:RuntimeShutdown()
     S.inCombat = false
     S.combatHide = false
     S.combatHideUntil = 0
+
     self.nextInstanceId = 1
 
     if self.F_HIGH then
@@ -17800,6 +18420,118 @@ function NSPauk:SetSpiderProfile(key)
     ))
 
     return true
+end
+
+function NSPauk:PrintCocoonCandidates(limit)
+    if type(self.C) ~= "table" or type(self.C.COCOON_MIN_WIDTH) ~= "number" then
+        self:LoadConstants()
+    end
+
+    local C = self.C
+
+    local minWidth = tonumber(C.COCOON_MIN_WIDTH) or 30
+    local minArea = tonumber(C.COCOON_MIN_AREA) or 0
+    local maxArea = tonumber(C.COCOON_MAX_AREA) or 0
+
+    local items = self:CollectVisibleItems()
+    local totalVisible = items and #items or 0
+
+    local candidates = {}
+
+    for _, item in ipairs(items or {}) do
+        if item.frame
+            and self:IsGoodAnchorName(item.name)
+            and (item.width or 0) > minWidth then
+
+            local w = item.width or 0
+            local h = item.height or 0
+            local area = w * h
+
+            local areaOK = true
+
+            if minArea > 0 and area < minArea then
+                areaOK = false
+            end
+
+            if maxArea > 0 and area > maxArea then
+                areaOK = false
+            end
+
+            candidates[#candidates + 1] = {
+                item = item,
+                w = w,
+                h = h,
+                area = area,
+                areaOK = areaOK,
+            }
+        end
+    end
+
+    table.sort(candidates, function(a, b)
+        if a.w == b.w then
+            return a.area > b.area
+        end
+
+        return a.w > b.w
+    end)
+
+    self:Echo(string.format(
+        "Видимых объектов: %d, подходит для кокона: %d",
+        totalVisible,
+        #candidates
+    ))
+
+    self:Echo(string.format(
+        "Фильтр: width > %.0f, minArea = %.0f, maxArea = %.0f",
+        minWidth,
+        minArea,
+        maxArea
+    ))
+
+    if #candidates == 0 then
+        self:Echo("Нет фреймов, которые проходят фильтр кокона.")
+        return
+    end
+
+    limit = tonumber(limit)
+
+    if not limit or limit <= 0 then
+        limit = #candidates
+    end
+
+    if limit > #candidates then
+        limit = #candidates
+    end
+
+    for i = 1, limit do
+        local entry = candidates[i]
+        local item = entry.item
+
+        local active = false
+        if type(self.IsActiveAnchorFrame) == "function" then
+            active = self:IsActiveAnchorFrame(item.frame)
+        end
+
+        local activeText = active and "active" or "-"
+
+        local areaMark = ""
+        if not entry.areaOK then
+            areaMark = " area!"
+        end
+
+        self:Echo(string.format(
+            "%02d. %s | w=%.0f h=%.0f area=%.0f%s | %s | x=%.0f y=%.0f",
+            i,
+            tostring(item.name),
+            entry.w,
+            entry.h,
+            entry.area,
+            areaMark,
+            activeText,
+            item.left or 0,
+            item.bottom or 0
+        ))
+    end
 end
 
 function NSPauk:SetSpiderAnimInterval(value)
