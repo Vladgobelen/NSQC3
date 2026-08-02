@@ -3307,6 +3307,2683 @@ ns_llua['lua'][52] = {
     end,
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ============================================================
+-- COURSE DATA: PART 2, MODULES 53-64
+-- ============================================================
+
+ns_llua = ns_llua or {}
+ns_llua['lua'] = ns_llua['lua'] or {}
+
+ns_llua['lua'][53] = {
+type = "info",
+title = "Мост Lua и WoW API",
+content = [=[
+<h>Мост Lua и WoW API</h>
+<t>Первая часть курса дала базу: переменные, типы, условия, циклы, таблицы и функции. Теперь мы будем применять эту базу к WoW API.</t>
+<t>WoW API — это набор готовых игровых функций. Они возвращают данные об игроке, цели, группе, сумках, заклинаниях, координатах и интерфейсе.</t>
+<h>Простой вызов API</h>
+<code>
+/run print(UnitName("player"))
+/run print(UnitHealth("player"))
+/run print(UnitLevel("player"))
+</code>
+<h>Несколько возвращаемых значений</h>
+<t>Некоторые API-функции возвращают сразу несколько значений. Для них используется множественное присваивание.</t>
+<code>
+/run local className, classToken = UnitClass("player"); print(className, classToken)
+</code>
+<t>Например, функция может вернуть локализованное название класса и технический токен:</t>
+<code>
+Воин   WARRIOR
+</code>
+<h>Сохраняем данные в таблицу</h>
+<code>
+/run playerInfo = { name = UnitName("player"), level = UnitLevel("player") }; print(playerInfo.name, playerInfo.level)
+</code>
+<w>Важно:</w> если задание курса будет проверять переменную, делай её глобальной, то есть без <k>local</k>.
+<h>Зачем это нужно</h>
+<t>Дальше мы будем:</t>
+<t>- получать данные о юнитах;</t>
+<t>- считать проценты здоровья и маны;</t>
+<t>- перебирать группу, рейд, сумки и баффы;</t>
+<t>- создавать простые элементы интерфейса.</t>
+]=],
+}
+
+ns_llua['lua'][54] = {
+type = "info",
+title = "Особенности WoW API 3.3.5",
+content = [=[
+<h>Особенности WoW API 3.3.5</h>
+<t>У WoW API есть несколько важных особенностей, которые нужно понимать с самого начала.</t>
+<h>1. Многие функции возвращают 1 или nil</h>
+<t>В старых версиях WoW многие проверки возвращают не <k>true</k> и <k>false</k>, а <k>1</k> или <k>nil</k>.</t>
+<code>
+/run print(UnitExists("player"), type(UnitExists("player")))
+</code>
+<t>Поэтому лучше писать так:</t>
+<code>
+/run if UnitExists("target") then print("Цель есть") end
+</code>
+<t>И не стоит писать так:</t>
+<code>
+/run if UnitExists("target") == true then print("Цель есть") end
+</code>
+<w>Причина:</w> если функция вернула <k>1</k>, то <k>1 == true</k> даст <k>false</k>.
+<h>2. nil означает отсутствие данных</h>
+<t>Если юнита нет, API часто возвращает <k>nil</k>.</t>
+<code>
+/run print(UnitName("target"))
+</code>
+<t>Если цели нет, вывод может быть <k>nil</k>.</t>
+<h>3. Локализованные имена и технические токены</h>
+<t>Некоторые функции возвращают два значения: понятное имя и технический код.</t>
+<code>
+/run local name, token = UnitClass("player"); print(name, token)
+</code>
+<t>Для вывода игроку лучше использовать <k>name</k>.</t>
+<t>Для логики лучше использовать <k>token</k>, потому что он одинаковый у всех клиентов.</t>
+<code>
+/run local _, token = UnitClass("player"); if token == "WARRIOR" then print("Это воин") end
+</code>
+<h>4. Отладка через /dump</h>
+<t>Если не знаешь, что возвращает функция, используй <k>/dump</k>.</t>
+<code>
+/dump UnitClass("player")
+/dump UnitHealth("player")
+/dump GetMoney()
+</code>
+<h>5. Не все данные доступны мгновенно</h>
+<t>Некоторые функции могут вернуть <k>nil</k>, если данные ещё не загрузились или кэш ещё не готов. Позже мы встретим это у предметов и гильдии.</t>
+]=],
+}
+
+ns_llua['lua'][55] = {
+type = "info",
+title = "Безопасные шаблоны API",
+content = [=[
+<h>Безопасные шаблоны API</h>
+<t>API часто может вернуть <k>nil</k>. Поэтому сразу учимся писать безопасный код.</t>
+<h>Проверка юнита</h>
+<code>
+/run if UnitExists("target") then print("Цель существует") else print("Цели нет") end
+</code>
+<h>Значение по умолчанию через or</h>
+<code>
+/run local name = UnitName("target") or "Нет цели"; print(name)
+</code>
+<t>Если <k>UnitName</k> вернул <k>nil</k>, переменная получит строку <s>"Нет цели"</s>.</t>
+<h>Число по умолчанию через or 0</h>
+<code>
+/run local hp = UnitHealth("player") or 0; print(hp)
+</code>
+<h>Защита от деления на ноль</h>
+<code>
+/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(math.floor(hp / hpMax * 100)) else print(0) end
+</code>
+<w>Важно:</w> нельзя делить на <k>0</k> и ожидать нормальный результат. Всегда проверяй знаменатель.
+<h>tonumber для странных значений</h>
+<t>Если значение может быть строкой, преобразуй его в число.</t>
+<code>
+/run local value = tonumber("1500") or 0; print(value + 1)
+</code>
+<h>Шаблон безопасной функции</h>
+<code>
+function GetSafeHealthPercent(unit)
+    local hp = UnitHealth(unit) or 0
+    local hpMax = UnitHealthMax(unit) or 0
+    if hpMax <= 0 then
+        return 0
+    end
+    return math.floor(hp / hpMax * 100)
+end
+</code>
+<t>Такой подход будет использоваться почти во всех модулях второй части.</t>
+]=],
+}
+
+ns_llua['lua'][56] = {
+type = "info",
+title = "UnitID: player, target, party, raid",
+content = [=[
+<h>UnitID: player, target, party, raid</h>
+<t>Большинство функций WoW API принимают аргумент <k>unit</k>. Это строка-идентификатор юнита.</t>
+<w>Важно:</w> UnitID пишется в кавычках, потому что это строка.
+<h>Основные UnitID</h>
+<c>"player"</c> — твой персонаж.
+<c>"target"</c> — текущая цель.
+<c>"mouseover"</c> — юнит под курсором мыши.
+<c>"focus"</c> — фокус.
+<c>"targettarget"</c> — цель твоей цели.
+<c>"playerpet"</c> — твой питомец.
+<c>"party1"</c> — первый участник группы.
+<c>"party2"</c> — второй участник группы.
+<c>"party3"</c> — третий участник группы.
+<c>"party4"</c> — четвёртый участник группы.
+<c>"raid1"</c> — первый участник рейда.
+<c>"raid40"</c> — сороковой участник рейда.
+<h>Примеры</h>
+<code>
+/run print(UnitName("player"))
+/run print(UnitName("target"))
+/run print(UnitName("mouseover"))
+</code>
+<h>Таблица юнитов</h>
+<code>
+/run local units = {"player", "target", "mouseover"}; for _, unit in ipairs(units) do print(unit, UnitExists(unit)) end
+</code>
+<t>Так можно быстро проверить, какие юниты сейчас существуют.</t>
+<h>Частая ошибка</h>
+<t>Неправильно:</t>
+<code>
+/run print(UnitName(player))
+</code>
+<t>Правильно:</t>
+<code>
+/run print(UnitName("player"))
+</code>
+<t>Без кавычек Lua будет искать переменную <k>player</k>, а она обычно равна <k>nil</k>.</t>
+]=],
+}
+
+ns_llua['lua'][57] = {
+type = "info",
+title = "Существование и идентификация юнита",
+content = [=[
+<h>Существование и идентификация юнита</h>
+<t>Перед тем как использовать данные юнита, полезно проверить, существует ли он.</t>
+<h>UnitExists</h>
+<code>
+/run print(UnitExists("player"))
+/run print(UnitExists("target"))
+</code>
+<t>Если юнит существует, функция вернёт истинное значение. Если нет — <k>nil</k>.</t>
+<h>UnitName</h>
+<code>
+/run print(UnitName("player"))
+</code>
+<t>Если юнита нет, функция вернёт <k>nil</k>.</t>
+<h>UnitGUID</h>
+<t>GUID — это уникальный идентификатор существа.</t>
+<code>
+/run print(UnitGUID("player"))
+</code>
+<h>UnitIsUnit</h>
+<t>Проверяет, указывают ли два UnitID на одного и того же юнита.</t>
+<code>
+/run print(UnitIsUnit("player", "target"))
+</code>
+<t>Если твоя цель — ты сам, результат будет истинным.</t>
+<h>UnitIsPlayer</h>
+<code>
+/run print(UnitIsPlayer("player"))
+/run print(UnitIsPlayer("target"))
+</code>
+<t>Полезно отличать игроков от NPC.</t>
+<h>UnitIsVisible</h>
+<code>
+/run print(UnitIsVisible("target"))
+</code>
+<t>Показывает, виден ли юнит клиенту.</t>
+<h>Безопасный шаблон</h>
+<code>
+/run if UnitExists("target") then local name = UnitName("target"); print("Цель:", name) else print("Нет цели") end
+</code>
+]=],
+}
+
+ns_llua['lua'][58] = {
+type = "info",
+title = "Здоровье и ресурсы юнита",
+content = [=[
+<h>Здоровье и ресурсы юнита</h>
+<t>Основные функции для здоровья:</t>
+<c>UnitHealth(unit)</c> — текущее здоровье.
+<c>UnitHealthMax(unit)</c> — максимальное здоровье.
+<code>
+/run print(UnitHealth("player"), UnitHealthMax("player"))
+</code>
+<h>Процент здоровья</h>
+<code>
+/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(math.floor(hp / hpMax * 100)) else print(0) end
+</code>
+<w>Важно:</w> всегда проверяй <k>hpMax > 0</k>, иначе можно получить деление на ноль.
+<h>Ресурсы: мана, ярость, энергия</h>
+<t>В WoW 3.3.5 часто используются функции:</t>
+<c>UnitMana(unit)</c> — текущий ресурс.
+<c>UnitManaMax(unit)</c> — максимальный ресурс.
+<code>
+/run print(UnitMana("player"), UnitManaMax("player"))
+</code>
+<t>В более новых версиях есть универсальные <k>UnitPower</k> и <k>UnitPowerMax</k>. В 3.3.5 можно встретить оба варианта, поэтому для маны часто надёжнее использовать <k>UnitMana</k>.</t>
+<h>Тип ресурса</h>
+<code>
+/run print(UnitPowerType("player"))
+</code>
+<t>Функция может вернуть числовой код и строковый токен типа ресурса.</t>
+<h>Пример отчёта</h>
+<code>
+/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; local percent = 0; if hpMax > 0 then percent = math.floor(hp / hpMax * 100) end; print(string.format("HP: %d/%d (%d%%)", hp, hpMax, percent))
+</code>
+<t>Здесь <k>%%</k> внутри <k>string.format</k> выводит обычный знак процента.</t>
+]=],
+}
+
+ns_llua['lua'][59] = {
+type = "info",
+title = "Состояние юнита",
+content = [=[
+<h>Состояние юнита</h>
+<t>WoW API позволяет проверять базовое состояние юнита: жив, мёртв, в бою, онлайн, AFK и так далее.</t>
+<h>Жив или мёртв</h>
+<code>
+/run print(UnitIsDead("player"))
+/run print(UnitIsGhost("player"))
+/run print(UnitIsDeadOrGhost("player"))
+</code>
+<t>Если функция возвращает <k>1</k> или <k>true</k>, условие сработает. Если <k>nil</k> или <k>false</k> — не сработает.</t>
+<h>Пример</h>
+<code>
+/run if UnitIsDeadOrGhost("player") then print("Мёртв или призрак") else print("Жив") end
+</code>
+<h>Бой</h>
+<code>
+/run print(UnitAffectingCombat("player"))
+</code>
+<t>Пример условия:</t>
+<code>
+/run if UnitAffectingCombat("player") then print("В бою") else print("Не в бою") end
+</code>
+<h>Подключение и статусы</h>
+<code>
+/run print(UnitIsConnected("player"))
+/run print(UnitIsAFK("player"))
+/run print(UnitIsDND("player"))
+</code>
+<c>UnitIsConnected</c> — юнит онлайн.
+<c>UnitIsAFK</c> — режим AFK.
+<c>UnitIsDND</c> — режим «не беспокоить».
+<h>Таблица статусов</h>
+<code>
+/run local status = { dead = UnitIsDead("player"), ghost = UnitIsGhost("player"), combat = UnitAffectingCombat("player") }; print(status.dead, status.ghost, status.combat)
+</code>
+<t>Такие таблицы удобно использовать для панелей и отчётов.</t>
+]=],
+}
+
+ns_llua['lua'][60] = {
+type = "info",
+title = "Отношения к юниту",
+content = [=[
+<h>Отношения к юниту</h>
+<t>Эти функции помогают понять, можно ли атаковать юнита, дружелюбен ли он, игрок ли это, PvP ли он.</t>
+<h>UnitCanAttack</h>
+<t>Проверяет, можешь ли ты атаковать юнита.</t>
+<code>
+/run print(UnitCanAttack("player", "target"))
+</code>
+<h>UnitIsEnemy</h>
+<code>
+/run print(UnitIsEnemy("player", "target"))
+</code>
+<h>UnitIsFriend</h>
+<code>
+/run print(UnitIsFriend("player", "target"))
+</code>
+<h>UnitCanCooperate</h>
+<t>Проверяет, можно ли взаимодействовать с юнитом, например лечить его.</t>
+<code>
+/run print(UnitCanCooperate("player", "target"))
+</code>
+<h>PvP и фракция</h>
+<code>
+/run print(UnitIsPVP("player"))
+/run print(UnitFactionGroup("player"))
+</code>
+<h>Безопасный пример</h>
+<code>
+/run if UnitExists("target") and UnitCanAttack("player", "target") then print("Цель можно атаковать") else print("Атаковать нельзя или цели нет") end
+</code>
+<w>Важно:</w> если цели нет, функции проверки цели могут вернуть <k>nil</k>. Поэтому сначала проверяй <k>UnitExists</k>.
+<h>Комбинированное условие</h>
+<code>
+/run if UnitExists("target") and UnitIsFriend("player", "target") then print("Дружественная цель") end
+</code>
+]=],
+}
+
+ns_llua['lua'][61] = {
+type = "info",
+title = "Описание юнита",
+content = [=[
+<h>Описание юнита</h>
+<t>Эти функции возвращают базовое описание юнита: уровень, расу, класс, пол, тип существа.</t>
+<h>UnitLevel</h>
+<code>
+/run print(UnitLevel("player"))
+/run print(UnitLevel("target"))
+</code>
+<w>Особенность:</w> уровень <k>-1</k> часто означает босса.
+<h>UnitRace</h>
+<code>
+/run local race, raceToken = UnitRace("player"); print(race, raceToken)
+</code>
+<h>UnitClass</h>
+<code>
+/run local className, classToken = UnitClass("player"); print(className, classToken)
+</code>
+<t>Для логики лучше использовать токен:</t>
+<code>
+/run local _, token = UnitClass("player"); if token == "MAGE" then print("Маг") end
+</code>
+<h>UnitSex</h>
+<code>
+/run print(UnitSex("player"))
+</code>
+<h>UnitClassification</h>
+<t>Возвращает тип сложности существа.</t>
+<code>
+/run print(UnitClassification("target"))
+</code>
+<t>Возможные значения:</t>
+<c>normal</c>
+<c>elite</c>
+<c>rare</c>
+<c>rareelite</c>
+<c>worldboss</c>
+<h>UnitCreatureType и UnitCreatureFamily</h>
+<code>
+/run print(UnitCreatureType("target"))
+/run print(UnitCreatureFamily("target"))
+</code>
+<h>Мини-досье</h>
+<code>
+/run local name = UnitName("target") or "Нет цели"; local level = UnitLevel("target") or 0; local class = UnitClass("target") or "Неизвестно"; print(string.format("%s, уровень %s, класс %s", name, level, class))
+</code>
+]=],
+}
+
+ns_llua['lua'][62] = {
+type = "info",
+title = "Баффы и дебаффы как данные",
+content = [=[
+<h>Баффы и дебаффы как данные</h>
+<t>Баффы и дебаффы в WoW API обычно перебираются по индексу: 1, 2, 3 и так далее.</t>
+<h>UnitBuff</h>
+<code>
+/run local name = UnitBuff("player", 1); print(name)
+</code>
+<t>Если баффа с таким индексом нет, функция вернёт <k>nil</k>.</t>
+<h>UnitDebuff</h>
+<code>
+/run local name = UnitDebuff("player", 1); print(name)
+</code>
+<h>UnitAura</h>
+<t>Более универсальная функция. Она может искать и баффы, и дебаффы.</t>
+<code>
+/run local name = UnitAura("player", 1, "HELPFUL"); print(name)
+</code>
+<c>"HELPFUL"</c> — баффы.
+<c>"HARMFUL"</c> — дебаффы.
+<h>Несколько возвращаемых значений</h>
+<t>Функции аур возвращают много данных: имя, иконку, количество стаков, тип, длительность и время окончания.</t>
+<code>
+/run local name, _, _, count = UnitBuff("player", 1); print(name, count)
+</code>
+<h>Подсчёт баффов</h>
+<code>
+/run local count = 0; local i = 1; while UnitBuff("player", i) do count = count + 1; i = i + 1 end; print("Баффов:", count)
+</code>
+<h>Поиск баффа по имени</h>
+<code>
+/run local found = false; for i = 1, 40 do local name = UnitBuff("player", i); if not name then break end; if string.find(name, "Бафф") then found = true end end; print(found)
+</code>
+<w>Важно:</w> точное имя баффа зависит от языка клиента. Поэтому в реальных аддонах часто используют spellID, если он доступен.
+]=],
+}
+
+ns_llua['lua'][63] = {
+type = "commenttest",
+title = "Практика: функция-досье на юнита",
+helpModules = {53, 54, 55, 56, 57, 58, 59, 60, 61, 62},
+preloadVars = {
+{var = "GetUnitReport", desc = "GetUnitReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "reportPlayer", desc = "reportPlayer очищается перед проверкой"},
+{var = "reportInvalid", desc = "reportInvalid очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"reportPlayer",
+"reportInvalid",
+},
+instruction = [=[
+<h>Практика: функция-досье на юнита</h>
+<t>Создай глобальную функцию <k>GetUnitReport(unit)</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>name</c> — имя юнита или <s>"Нет юнита"</s>, если юнита нет.
+<c>level</c> — уровень юнита или <n>0</n>, если юнита нет.
+<c>hp</c> — текущее здоровье или <n>0</n>.
+<c>hpMax</c> — максимальное здоровье или <n>0</n>.
+<c>hpPercent</c> — процент здоровья от <n>0</n> до <n>100</n>.
+<c>classToken</c> — токен класса или <k>nil</k>, если получить нельзя.
+<c>status</c> — строка состояния. Для живого юнита можно вернуть <s>"жив"</s>, для мёртвого <s>"мёртв"</s>, для несуществующего <s>"нет"</s>.
+<h>Требования</h>
+<t>- Используй <k>UnitExists</k>, <k>UnitName</k>, <k>UnitHealth</k>, <k>UnitHealthMax</k>, <k>UnitLevel</k>, <k>UnitClass</k>.</t>
+<t>- Для процента здоровья используй деление и <k>math.floor</k>.</t>
+<t>- Если <k>hpMax <= 0</k>, процент должен быть <n>0</n>.</t>
+<t>- Для несуществующего юнита функция не должна падать.</t>
+<t>- Для несуществующего юнита верни таблицу с <k>name = "Нет юнита"</k>, <k>level = 0</k>, <k>hp = 0</k>, <k>hpMax = 0</k>, <k>hpPercent = 0</k>, <k>status = "нет"</k>.</t>
+<h>Пример использования</h>
+<code>
+/run local report = GetUnitReport("player"); print(report.name, report.level, report.hpPercent)
+</code>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetUnitReport(unit)
+function GetUnitReport(unit)
+    local name = UnitName(unit) or "Нет юнита"
+    -- заполни таблицу и верни её через return
+end
+]=],
+requireKeywords = {
+"GetUnitReport",
+"function",
+"UnitName",
+"UnitHealth",
+"UnitHealthMax",
+"UnitLevel",
+"UnitClass",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+_G.reportPlayer = nil
+_G.reportInvalid = nil
+if type(_G.GetUnitReport) ~= "function" then
+    _G.checkError = "GetUnitReport не является глобальной функцией"
+    return false
+end
+local ok, playerReport = pcall(_G.GetUnitReport, "player")
+if not ok then
+    _G.checkError = "Ошибка вызова GetUnitReport('player'): " .. tostring(playerReport)
+    return false
+end
+_G.reportPlayer = playerReport
+if type(playerReport) ~= "table" then
+    _G.checkError = "GetUnitReport('player') должна вернуть таблицу"
+    return false
+end
+if type(playerReport.name) ~= "string" or playerReport.name == "" then
+    _G.checkError = "Поле name должно быть непустой строкой"
+    return false
+end
+local level = tonumber(playerReport.level)
+local hp = tonumber(playerReport.hp)
+local hpMax = tonumber(playerReport.hpMax)
+local hpPercent = tonumber(playerReport.hpPercent)
+if not level or not hp or not hpMax or not hpPercent then
+    _G.checkError = "Поля level, hp, hpMax и hpPercent должны быть числами"
+    return false
+end
+if level < 0 or hp < 0 or hpMax < 0 then
+    _G.checkError = "Поля hp и hpMax не должны быть отрицательными"
+    return false
+end
+if hpPercent < 0 or hpPercent > 100 then
+    _G.checkError = "Поле hpPercent должно быть от 0 до 100"
+    return false
+end
+if hpMax == 0 then
+    if hpPercent ~= 0 then
+        _G.checkError = "Если hpMax равно 0, то hpPercent тоже должен быть 0"
+        return false
+    end
+else
+    local expected = hp / hpMax * 100
+    if math.abs(hpPercent - expected) > 1.5 then
+        _G.checkError = "hpPercent не совпадает с hp / hpMax * 100"
+        return false
+    end
+end
+if playerReport.classToken ~= nil and type(playerReport.classToken) ~= "string" then
+    _G.checkError = "Поле classToken должно быть строкой или nil"
+    return false
+end
+if type(playerReport.status) ~= "string" or playerReport.status == "" then
+    _G.checkError = "Поле status должно быть непустой строкой"
+    return false
+end
+local ok2, invalidReport = pcall(_G.GetUnitReport, "ns_invalid_unit")
+if not ok2 then
+    _G.checkError = "GetUnitReport('ns_invalid_unit') не должна падать: " .. tostring(invalidReport)
+    return false
+end
+_G.reportInvalid = invalidReport
+if type(invalidReport) ~= "table" then
+    _G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
+    return false
+end
+if invalidReport.name ~= "Нет юнита" then
+    _G.checkError = "Для несуществующего юнита поле name должно быть 'Нет юнита'"
+    return false
+end
+if tonumber(invalidReport.level) ~= 0 then
+    _G.checkError = "Для несуществующего юнита поле level должно быть 0"
+    return false
+end
+if tonumber(invalidReport.hp) ~= 0 or tonumber(invalidReport.hpMax) ~= 0 or tonumber(invalidReport.hpPercent) ~= 0 then
+    _G.checkError = "Для несуществующего юнита hp, hpMax и hpPercent должны быть 0"
+    return false
+end
+if invalidReport.status ~= "нет" then
+    _G.checkError = "Для несуществующего юнита поле status должно быть 'нет'"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][64] = {
+type = "info",
+title = "Группа: party1-party4",
+content = [=[
+<h>Группа: party1-party4</h>
+<t>В группе может быть до четырёх других игроков. Их UnitID:</t>
+<c>"party1"</c>
+<c>"party2"</c>
+<c>"party3"</c>
+<c>"party4"</c>
+<h>Количество участников группы</h>
+<code>
+/run print(GetNumPartyMembers())
+</code>
+<t>Если ты не в группе, функция обычно возвращает <n>0</n>.</t>
+<h>Перебор группы</h>
+<code>
+/run for i = 1, 4 do local unit = "party" .. i; if UnitExists(unit) then print(UnitName(unit)) end end
+</code>
+<t>Здесь строка <s>"party"</s> склеивается с числом <k>i</k>, получаются <s>"party1"</s>, <s>"party2"</s> и так далее.</t>
+<h>Лидер группы</h>
+<code>
+/run print(GetPartyLeaderIndex())
+</code>
+<t>Если лидер — первый участник группы, функция может вернуть <n>1</n>.</t>
+<h>Проверка лидера</h>
+<code>
+/run local leader = GetPartyLeaderIndex(); if leader and leader > 0 then print("Лидер группы: party" .. leader) else print("Лидер не найден или ты один") end
+</code>
+<h>UnitInParty</h>
+<code>
+/run print(UnitInParty("player"))
+</code>
+<h>Таблица участников</h>
+<code>
+/run partyReport = {}; for i = 1, 4 do local unit = "party" .. i; if UnitExists(unit) then table.insert(partyReport, UnitName(unit)) end end; print("В группе:", #partyReport)
+</code>
+<w>Примечание:</w> если ты в рейде, используются UnitID <c>"raid1"</c> — <c>"raid40"</c>, а не <c>"party"</c>.
+]=],
+}
+
+-- ============================================================
+-- COURSE DATA: PART 2, MODULES 65-76
+-- ============================================================
+
+ns_llua = ns_llua or {}
+ns_llua['lua'] = ns_llua['lua'] or {}
+
+ns_llua['lua'][65] = {
+type = "info",
+title = "Рейд: raid1-raid40",
+content = [=[
+<h>Рейд: raid1-raid40</h>
+<t>Если игрок находится в рейде, участники доступны через UnitID:</t>
+<c>"raid1"</c>
+<c>"raid2"</c>
+<c>"raid3"</c>
+<c>...</c>
+<c>"raid40"</c>
+<h>Количество участников рейда</h>
+<code>
+/run print(GetNumRaidMembers())
+</code>
+<t>Если ты не в рейде, функция обычно возвращает <n>0</n>.</t>
+<h>Перебор рейда</h>
+<code>
+/run local count = GetNumRaidMembers(); for i = 1, count do local unit = "raid" .. i; if UnitExists(unit) then print(UnitName(unit)) end end
+</code>
+<t>Здесь строка <s>"raid"</s> склеивается с числом <k>i</k>, получаются <s>"raid1"</s>, <s>"raid2"</s> и так далее.</t>
+<h>GetRaidRosterInfo</h>
+<t>Функция возвращает информацию об участнике рейда по индексу.</t>
+<code>
+/run local name, rank, subgroup, level, class = GetRaidRosterInfo(1); print(name, subgroup, level, class)
+</code>
+<t>Если игрок не в рейде или индекс неверный, значения могут быть <k>nil</k>.</t>
+<h>Таблица имён рейда</h>
+<code>
+/run raidNames = {}; for i = 1, GetNumRaidMembers() do local name = GetRaidRosterInfo(i); if name then table.insert(raidNames, name) end end; print("В рейде:", #raidNames)
+</code>
+<w>Важно:</w> в рейде не нужно использовать <c>"party1"</c> — <c>"party4"</c>. Для рейда используются <c>"raid1"</c> — <c>"raid40"</c>.
+]=],
+}
+
+ns_llua['lua'][66] = {
+type = "info",
+title = "Лидерство, роли и лут",
+content = [=[
+<h>Лидерство, роли и лут</h>
+<t>Эти функции помогают понять, кто главный в группе или рейде, а также как распределяется добыча.</t>
+<h>Лидер группы</h>
+<code>
+/run print(GetPartyLeaderIndex())
+</code>
+<t>Если лидер группы — первый участник, функция может вернуть <n>1</n>. Если ты один, результат может быть <n>0</n> или <k>nil</k>.</t>
+<h>Лидер рейда</h>
+<code>
+/run print(GetRaidLeaderIndex())
+</code>
+<h>Проверка лидера</h>
+<code>
+/run local leader = GetPartyLeaderIndex(); if leader and leader > 0 then print("Лидер группы: party" .. leader) else print("Лидер не найден") end
+</code>
+<h>UnitIsPartyLeader</h>
+<code>
+/run print(UnitIsPartyLeader("player"))
+</code>
+<h>UnitIsRaidOfficer</h>
+<t>Проверяет, является ли юнит помощником лидера рейда.</t>
+<code>
+/run print(UnitIsRaidOfficer("player"))
+</code>
+<h>Метод распределения лута</h>
+<code>
+/run local method, master, threshold = GetLootMethod(); print(method, master, threshold)
+</code>
+<t>Первое значение — строка с методом лута, например:</t>
+<c>"freeforall"</c>
+<c>"roundrobin"</c>
+<c>"master"</c>
+<c>"group"</c>
+<c>"needbeforegreed"</c>
+<h>Порог качества лута</h>
+<code>
+/run local method, master, threshold = GetLootMethod(); print("Порог:", threshold)
+</code>
+<w>Примечание:</w> числовое значение порога связано с качеством предмета. Чем выше число, тем выше минимальное качество для розыгрыша.
+]=],
+}
+
+ns_llua['lua'][67] = {
+type = "info",
+title = "Гильдия",
+content = [=[
+<h>Гильдия</h>
+<t>WoW API позволяет получать информацию о гильдии игрока.</t>
+<h>GetGuildInfo</h>
+<code>
+/run local guildName, guildRankName = GetGuildInfo("player"); print(guildName or "Без гильдии", guildRankName or "")
+</code>
+<t>Если игрок не состоит в гильдии, <k>guildName</k> может быть <k>nil</k>.</t>
+<h>Количество участников гильдии</h>
+<code>
+/run local total, online = GetNumGuildMembers(); print(total, online)
+</code>
+<t>Первое значение — всего участников, второе — онлайн.</t>
+<w>Важно:</w> данные гильдии могут быть доступны не мгновенно. Иногда они подгружаются после открытия окна гильдии или после запроса ростера.
+<h>GetGuildRosterInfo</h>
+<code>
+/run local name, rank, rankIndex, level = GetGuildRosterInfo(1); print(name, rank, rankIndex, level)
+</code>
+<t>Функция возвращает данные участника гильдии по индексу.</t>
+<h>Безопасный пример</h>
+<code>
+/run local guildName = GetGuildInfo("player"); if guildName then print("Гильдия:", guildName) else print("Игрок без гильдии") end
+</code>
+<h>Таблица участников</h>
+<code>
+/run guildOnline = {}; local total, online = GetNumGuildMembers(); for i = 1, online do local name = GetGuildRosterInfo(i); if name then table.insert(guildOnline, name) end end; print("Онлайн:", #guildOnline)
+</code>
+<w>Примечание:</w> если ростер гильдии ещё не загружен, значения могут быть <k>nil</k>. Позже, в модуле событий, мы научимся обновлять такие данные по событию.
+]=],
+}
+
+ns_llua['lua'][68] = {
+type = "commenttest",
+title = "Практика: отчёт по группе и рейду",
+helpModules = {64, 65, 66, 67},
+preloadVars = {
+{var = "GetGroupReport", desc = "GetGroupReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "reportGroup", desc = "reportGroup очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"reportGroup",
+},
+instruction = [=[
+<h>Практика: отчёт по группе и рейду</h>
+<t>Создай глобальную функцию <k>GetGroupReport()</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>inParty</c> — <k>true</k>, если игрок в группе, иначе <k>false</k>.
+<c>inRaid</c> — <k>true</k>, если игрок в рейде, иначе <k>false</k>.
+<c>partyCount</c> — количество участников группы через <k>GetNumPartyMembers</k>.
+<c>raidCount</c> — количество участников рейда через <k>GetNumRaidMembers</k>.
+<c>memberCount</c> — итоговое количество участников.
+<h>Логика memberCount</h>
+<t>Если <k>raidCount</k> больше нуля, то <k>memberCount</k> должен быть равен <k>raidCount</k>.</t>
+<t>Иначе <k>memberCount</k> должен быть равен <k>partyCount</k>.</t>
+<h>Требования</h>
+<t>- Используй <k>GetNumPartyMembers</k> и <k>GetNumRaidMembers</k>.</t>
+<t>- Если API вернул <k>nil</k>, используй <k>or 0</k>.</t>
+<t>- Логические поля должны быть именно <k>true</k> или <k>false</k>.</t>
+<t>- Функция должна работать, даже если игрок один.</t>
+<h>Пример использования</h>
+<code>
+/run local report = GetGroupReport(); print(report.inParty, report.inRaid, report.memberCount)
+</code>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetGroupReport()
+function GetGroupReport()
+    local partyCount = GetNumPartyMembers() or 0
+    local raidCount = GetNumRaidMembers() or 0
+    -- заполни таблицу и верни её через return
+end
+]=],
+requireKeywords = {
+"GetGroupReport",
+"function",
+"GetNumPartyMembers",
+"GetNumRaidMembers",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+_G.reportGroup = nil
+if type(_G.GetGroupReport) ~= "function" then
+    _G.checkError = "GetGroupReport не является глобальной функцией"
+    return false
+end
+local ok, report = pcall(_G.GetGroupReport)
+if not ok then
+    _G.checkError = "Ошибка вызова GetGroupReport(): " .. tostring(report)
+    return false
+end
+_G.reportGroup = report
+if type(report) ~= "table" then
+    _G.checkError = "GetGroupReport должна вернуть таблицу"
+    return false
+end
+if type(report.inParty) ~= "boolean" then
+    _G.checkError = "Поле inParty должно быть true или false"
+    return false
+end
+if type(report.inRaid) ~= "boolean" then
+    _G.checkError = "Поле inRaid должно быть true или false"
+    return false
+end
+local partyCount = tonumber(report.partyCount)
+local raidCount = tonumber(report.raidCount)
+local memberCount = tonumber(report.memberCount)
+if not partyCount or not raidCount or not memberCount then
+    _G.checkError = "Поля partyCount, raidCount и memberCount должны быть числами"
+    return false
+end
+if partyCount < 0 or raidCount < 0 or memberCount < 0 then
+    _G.checkError = "Количество участников не может быть отрицательным"
+    return false
+end
+if (partyCount > 0) ~= report.inParty then
+    _G.checkError = "Поле inParty должно соответствовать partyCount > 0"
+    return false
+end
+if (raidCount > 0) ~= report.inRaid then
+    _G.checkError = "Поле inRaid должно соответствовать raidCount > 0"
+    return false
+end
+if raidCount > 0 then
+    if memberCount ~= raidCount then
+        _G.checkError = "Если игрок в рейде, memberCount должен быть равен raidCount"
+        return false
+    end
+else
+    if memberCount ~= partyCount then
+        _G.checkError = "Если игрок не в рейде, memberCount должен быть равен partyCount"
+        return false
+    end
+end
+return true
+end,
+}
+
+ns_llua['lua'][69] = {
+type = "info",
+title = "Координаты игрока",
+content = [=[
+<h>Координаты игрока</h>
+<t>Функция <k>GetPlayerMapPosition</k> возвращает координаты юнита на текущей карте.</t>
+<code>
+/run local x, y = GetPlayerMapPosition("player"); print(x, y)
+</code>
+<t>Координаты возвращаются как доли от 0 до 1.</t>
+<t>Чтобы получить привычные проценты, их нужно умножить на 100.</t>
+<code>
+/run local x, y = GetPlayerMapPosition("player"); if x and y then print(string.format("X: %.1f, Y: %.1f", x * 100, y * 100)) end
+</code>
+<h>SetMapToCurrentZone</h>
+<t>Иногда координаты могут быть <n>0, 0</n>, если текущая карта не соответствует зоне игрока.</t>
+<code>
+/run SetMapToCurrentZone(); local x, y = GetPlayerMapPosition("player"); if x and y then print(string.format("X: %.1f, Y: %.1f", x * 100, y * 100)) end
+</code>
+<w>Важно:</w> в некоторых местах, например в подземельях или на специальных картах, координаты могут быть недоступны.
+<h>Безопасный шаблон</h>
+<code>
+/run local x, y = GetPlayerMapPosition("player"); x = x or 0; y = y or 0; print(string.format("X: %.1f, Y: %.1f", x * 100, y * 100))
+</code>
+<h>Формат вывода</h>
+<t>В <k>string.format</k> метка <k>%.1f</k> означает число с одним знаком после запятой.</t>
+<code>
+print(string.format("%.1f", 12.345)) -- 12.3
+print(string.format("%.2f", 12.345)) -- 12.35
+</code>
+]=],
+}
+
+ns_llua['lua'][70] = {
+type = "info",
+title = "Направление и зоны",
+content = [=[
+<h>Направление и зоны</h>
+<t>Кроме координат, можно получить направление взгляда игрока и название зоны.</t>
+<h>GetPlayerFacing</h>
+<code>
+/run print(GetPlayerFacing())
+</code>
+<t>Функция возвращает направление в радианах.</t>
+<t>Чтобы перевести радианы в градусы, используй формулу:</t>
+<code>
+градусы = радианы * 180 / math.pi
+</code>
+<h>Пример перевода</h>
+<code>
+/run local facing = GetPlayerFacing() or 0; local degrees = math.floor(facing * 180 / math.pi + 0.5); print(degrees)
+</code>
+<t>Результат будет примерно от 0 до 360.</t>
+<h>Названия зон</h>
+<code>
+/run print(GetZoneText())
+/run print(GetRealZoneText())
+/run print(GetMinimapZoneText())
+/run print(GetSubZoneText())
+</code>
+<t>Разница:</t>
+<c>GetZoneText</c> — основная зона.
+<c>GetRealZoneText</c> — реальная зона, часто используется для континентов и крупных областей.
+<c>GetMinimapZoneText</c> — текст миникарты.
+<c>GetSubZoneText</c> — подзона, например конкретная улица, пещера или здание.
+<h>Пример отчёта</h>
+<code>
+/run local zone = GetZoneText() or "Неизвестно"; local sub = GetSubZoneText() or ""; print(string.format("Зона: %s, подзона: %s", zone, sub))
+</code>
+]=],
+}
+
+ns_llua['lua'][71] = {
+type = "info",
+title = "Скорость и перемещение",
+content = [=[
+<h>Скорость и перемещение</h>
+<t>WoW API позволяет получить скорость игрока и проверить, находится ли он верхом, летит или плывёт.</t>
+<h>GetPlayerSpeed</h>
+<code>
+/run local runSpeed, flightSpeed = GetPlayerSpeed(); print(runSpeed, flightSpeed)
+</code>
+<t>Функция возвращает скорость бега и скорость полёта.</t>
+<w>Примечание:</w> значения могут отличаться в зависимости от версии клиента и настроек. Их удобно смотреть через <k>/dump</k>.
+<code>
+/dump GetPlayerSpeed()
+</code>
+<h>GetUnitSpeed</h>
+<t>Если функция доступна, можно получить скорость конкретного юнита.</t>
+<code>
+/run print(GetUnitSpeed("player"))
+</code>
+<h>Состояния движения</h>
+<code>
+/run print(IsMounted())
+/run print(IsFlying())
+/run print(IsSwimming())
+/run print(IsIndoors())
+/run print(IsOutdoors())
+</code>
+<t>Как и многие функции WoW 3.3.5, они могут возвращать <k>1</k> или <k>nil</k>.</t>
+<h>Пример условия</h>
+<code>
+/run if IsMounted() then print("Верхом") else print("Пешком") end
+</code>
+<h>Мини-отчёт</h>
+<code>
+/run local state = "Пешком"; if IsFlying() then state = "Летит" elseif IsMounted() then state = "Верхом" elseif IsSwimming() then state = "Плывёт" end; print(state)
+</code>
+]=],
+}
+
+ns_llua['lua'][72] = {
+type = "info",
+title = "Время, FPS и пинг",
+content = [=[
+<h>Время, FPS и пинг</h>
+<t>Эти функции полезны для таймеров, измерений и диагностики.</t>
+<h>GetTime</h>
+<code>
+/run print(GetTime())
+</code>
+<t>Возвращает время в секундах. Обычно это время с момента загрузки интерфейса.</t>
+<h>Целые секунды</h>
+<code>
+/run print(math.floor(GetTime()))
+</code>
+<h>Минуты и секунды</h>
+<code>
+/run local t = math.floor(GetTime()); print(string.format("Прошло %d мин %d сек", math.floor(t / 60), t % 60))
+</code>
+<h>GetGameTime</h>
+<code>
+/run local hour, minute = GetGameTime(); print(hour, minute)
+</code>
+<h>GetFramerate</h>
+<code>
+/run print(math.floor(GetFramerate()))
+</code>
+<h>GetNetStats</h>
+<t>Функция возвращает статистику сети. Удобнее всего сначала посмотреть её через <k>/dump</k>.</t>
+<code>
+/dump GetNetStats()
+</code>
+<t>Пример получения домашнего пинга:</t>
+<code>
+/run local _, _, latencyHome = GetNetStats(); print("Пинг:", latencyHome)
+</code>
+<w>Примечание:</w> порядок возвращаемых значений может зависеть от версии клиента, поэтому при сомнениях используй <k>/dump</k>.
+]=],
+}
+
+ns_llua['lua'][73] = {
+type = "commenttest",
+title = "Практика: панель путешественника",
+helpModules = {69, 70, 71, 72},
+preloadVars = {
+{var = "GetTravelReport", desc = "GetTravelReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "reportTravel", desc = "reportTravel очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"reportTravel",
+},
+instruction = [=[
+<h>Практика: панель путешественника</h>
+<t>Создай глобальную функцию <k>GetTravelReport()</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>zone</c> — строка с названием зоны. Если <k>GetZoneText</k> вернул <k>nil</k>, используй <s>"Неизвестно"</s>.
+<c>x</c> — сырая координата X от 0 до 1. Если <k>nil</k>, используй <n>0</n>.
+<c>y</c> — сырая координата Y от 0 до 1. Если <k>nil</k>, используй <n>0</n>.
+<c>xPercent</c> — координата X в процентах от 0 до 100.
+<c>yPercent</c> — координата Y в процентах от 0 до 100.
+<c>facing</c> — направление игрока. Если <k>GetPlayerFacing</k> вернул <k>nil</k>, используй <n>0</n>.
+<h>Требования</h>
+<t>- Используй <k>GetZoneText</k>.</t>
+<t>- Используй <k>GetPlayerMapPosition("player")</k>.</t>
+<t>- Используй <k>GetPlayerFacing</k>.</t>
+<t>- Для отсутствующих значений используй <k>or 0</k> или <k>or "Неизвестно"</k>.</t>
+<t>- <k>xPercent</k> должен соответствовать <k>x * 100</k>. Можно округлить через <k>math.floor</k>.</t>
+<t>- <k>yPercent</k> должен соответствовать <k>y * 100</k>. Можно округлить через <k>math.floor</k>.</t>
+<h>Пример использования</h>
+<code>
+/run local report = GetTravelReport(); print(report.zone, report.xPercent, report.yPercent)
+</code>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTravelReport()
+function GetTravelReport()
+    local zone = GetZoneText() or "Неизвестно"
+    local x, y = GetPlayerMapPosition("player")
+    x = x or 0
+    y = y or 0
+    local facing = GetPlayerFacing() or 0
+    -- заполни таблицу и верни её через return
+end
+]=],
+requireKeywords = {
+"GetTravelReport",
+"function",
+"GetZoneText",
+"GetPlayerMapPosition",
+"GetPlayerFacing",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+_G.reportTravel = nil
+if type(_G.GetTravelReport) ~= "function" then
+    _G.checkError = "GetTravelReport не является глобальной функцией"
+    return false
+end
+local ok, report = pcall(_G.GetTravelReport)
+if not ok then
+    _G.checkError = "Ошибка вызова GetTravelReport(): " .. tostring(report)
+    return false
+end
+_G.reportTravel = report
+if type(report) ~= "table" then
+    _G.checkError = "GetTravelReport должна вернуть таблицу"
+    return false
+end
+if type(report.zone) ~= "string" or report.zone == "" then
+    _G.checkError = "Поле zone должно быть непустой строкой"
+    return false
+end
+local x = tonumber(report.x)
+local y = tonumber(report.y)
+local xPercent = tonumber(report.xPercent)
+local yPercent = tonumber(report.yPercent)
+local facing = tonumber(report.facing)
+if not x or not y or not xPercent or not yPercent or not facing then
+    _G.checkError = "Поля x, y, xPercent, yPercent и facing должны быть числами"
+    return false
+end
+if x < 0 or x > 1 then
+    _G.checkError = "Поле x должно быть от 0 до 1"
+    return false
+end
+if y < 0 or y > 1 then
+    _G.checkError = "Поле y должно быть от 0 до 1"
+    return false
+end
+if xPercent < 0 or xPercent > 100 then
+    _G.checkError = "Поле xPercent должно быть от 0 до 100"
+    return false
+end
+if yPercent < 0 or yPercent > 100 then
+    _G.checkError = "Поле yPercent должно быть от 0 до 100"
+    return false
+end
+if facing < 0 then
+    _G.checkError = "Поле facing не должно быть отрицательным"
+    return false
+end
+if math.abs(xPercent - x * 100) > 1.5 then
+    _G.checkError = "Поле xPercent не совпадает с x * 100"
+    return false
+end
+if math.abs(yPercent - y * 100) > 1.5 then
+    _G.checkError = "Поле yPercent не совпадает с y * 100"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][74] = {
+type = "info",
+title = "Деньги и опыт",
+content = [=[
+<h>Деньги и опыт</h>
+<t>Деньги в WoW хранятся в меди. 100 меди — 1 серебро. 100 серебра — 1 золото.</t>
+<h>GetMoney</h>
+<code>
+/run print(GetMoney())
+</code>
+<t>Функция возвращает общее количество меди.</t>
+<h>Ручное форматирование</h>
+<code>
+/run local copper = GetMoney(); local gold = math.floor(copper / 10000); local silver = math.floor((copper % 10000) / 100); local cop = copper % 100; print(string.format("%dз %dс %dм", gold, silver, cop))
+</code>
+<t>Здесь:</t>
+<c>copper / 10000</c> — золото.
+<c>(copper % 10000) / 100</c> — серебро.
+<c>copper % 100</c> — медь.
+<h>GetCoinTextureString</h>
+<t>Готовая функция для красивого вывода денег.</t>
+<code>
+/run print(GetCoinTextureString(GetMoney()))
+</code>
+<h>Опыт</h>
+<code>
+/run local xp = UnitXP("player"); local xpMax = UnitXPMax("player"); print(xp, xpMax)
+</code>
+<h>Процент опыта</h>
+<code>
+/run local xp = UnitXP("player") or 0; local xpMax = UnitXPMax("player") or 0; if xpMax > 0 then print(string.format("XP: %d%%", math.floor(xp / xpMax * 100))) else print("XP: 0%") end
+</code>
+<w>Важно:</w> на максимальном уровне <k>xpMax</k> может быть <n>0</n>, поэтому деление нужно проверять.
+<h>Отдых</h>
+<code>
+/run print(GetXPExhaustion())
+</code>
+<t>Функция возвращает количество накопленного отдыха, если оно доступно.</t>
+]=],
+}
+
+ns_llua['lua'][75] = {
+type = "info",
+title = "Сумки: ячейки и свободное место",
+content = [=[
+<h>Сумки: ячейки и свободное место</h>
+<t>В WoW 3.3.5 основные сумки имеют ID от 0 до 4.</t>
+<c>0</c> — рюкзак.
+<c>1</c> — первая дополнительная сумка.
+<c>2</c> — вторая дополнительная сумка.
+<c>3</c> — третья дополнительная сумка.
+<c>4</c> — четвёртая дополнительная сумка.
+<h>Количество ячеек</h>
+<code>
+/run print(GetContainerNumSlots(0))
+</code>
+<h>Свободные ячейки</h>
+<code>
+/run print(GetContainerNumFreeSlots(0))
+</code>
+<t>Функция может вернуть несколько значений. Первое — количество свободных ячеек.</t>
+<h>Цикл по сумкам</h>
+<code>
+/run local total = 0; for bag = 0, 4 do total = total + (GetContainerNumSlots(bag) or 0) end; print("Всего ячеек:", total)
+</code>
+<h>Свободное место</h>
+<code>
+/run local free = 0; for bag = 0, 4 do free = free + (GetContainerNumFreeSlots(bag) or 0) end; print("Свободно:", free)
+</code>
+<w>Важно:</w> конструкция <k>(GetContainerNumFreeSlots(bag) or 0)</k> нужна, чтобы заменить возможный <k>nil</k> на ноль.
+<h>Таблица отчёта</h>
+<code>
+/run bagReport = {}; for bag = 0, 4 do bagReport[bag] = { slots = GetContainerNumSlots(bag) or 0, free = GetContainerNumFreeSlots(bag) or 0 } end; print(bagReport[0].slots, bagReport[0].free)
+</code>
+]=],
+}
+
+ns_llua['lua'][76] = {
+type = "info",
+title = "Предметы в сумках",
+content = [=[
+<h>Предметы в сумках</h>
+<t>Чтобы получить предмет в сумке, нужны два аргумента: ID сумки и номер ячейки.</t>
+<h>GetContainerItemLink</h>
+<code>
+/run local link = GetContainerItemLink(0, 1); print(link or "Пусто")
+</code>
+<t>Если ячейка пустая, функция вернёт <k>nil</k>.</t>
+<h>GetContainerItemInfo</h>
+<code>
+/run local texture, count = GetContainerItemInfo(0, 1); print(texture, count)
+</code>
+<t>Функция возвращает текстуру, количество и другие данные предмета.</t>
+<h>GetContainerItemID</h>
+<code>
+/run print(GetContainerItemID(0, 1))
+</code>
+<t>Возвращает числовой ID предмета, если ячейка не пустая.</t>
+<h>Перебор первой сумки</h>
+<code>
+/run local slots = GetContainerNumSlots(0) or 0; for slot = 1, slots do local link = GetContainerItemLink(0, slot); if link then print(slot, link) end end
+</code>
+<h>Подсчёт занятых ячеек</h>
+<code>
+/run local slots = GetContainerNumSlots(0) or 0; local used = 0; for slot = 1, slots do if GetContainerItemLink(0, slot) then used = used + 1 end end; print("Занято:", used)
+</code>
+<w>Примечание:</w> ссылка на предмет может содержать цветовые коды и специальные символы. Это нормально: именно такие ссылки WoW использует для показа предметов в чате.
+]=],
+}
+
+-- ============================================================
+-- COURSE DATA: PART 2, MODULES 77-88
+-- ============================================================
+
+ns_llua = ns_llua or {}
+ns_llua['lua'] = ns_llua['lua'] or {}
+
+ns_llua['lua'][77] = {
+type = "info",
+title = "Информация о предмете",
+content = [=[
+<h>Информация о предмете</h>
+<t>Функция <k>GetItemInfo</k> возвращает много данных о предмете: название, ссылку, качество, уровень предмета и другое.</t>
+<code>
+/run local name, link, quality, itemLevel = GetItemInfo(6948); print(name, link, quality, itemLevel)
+</code>
+<t>Здесь <n>6948</n> — это ID камня возвращения.</t>
+<w>Важно:</w> если предмет ещё не загружен в кэш клиента, функция может вернуть <k>nil</k>.
+<h>Что возвращает GetItemInfo</h>
+<t>Основные значения:</t>
+<c>name</c> — название предмета.
+<c>link</c> — ссылка на предмет.
+<c>quality</c> — числовое качество.
+<c>itemLevel</c> — уровень предмета.
+<c>reqLevel</c> — требуемый уровень.
+<c>itemType</c> — тип предмета.
+<c>itemSubType</c> — подтип предмета.
+<c>stackCount</c> — максимальный размер стопки.
+<h>Качество предмета</h>
+<t>Качество обычно такое:</t>
+<c>0</c> — бедный.
+<c>1</c> — обычный.
+<c>2</c> — необычный.
+<c>3</c> — редкий.
+<c>4</c> — эпический.
+<c>5</c> — легендарный.
+<h>Цвет качества</h>
+<code>
+/run local name, link, quality = GetItemInfo(6948); if name and ITEM_QUALITY_COLORS[quality] then print(ITEM_QUALITY_COLORS[quality].hex .. name .. "|r") end
+</code>
+<h>Количество предметов</h>
+<code>
+/run print(GetItemCount(6948))
+</code>
+<t>Функция <k>GetItemCount</k> возвращает количество таких предметов в сумках.</t>
+<h>Безопасный шаблон</h>
+<code>
+/run local name, link, quality, itemLevel = GetItemInfo(6948); name = name or "Неизвестно"; itemLevel = itemLevel or 0; print(string.format("%s, ilvl %d", name, itemLevel))
+</code>
+]=],
+}
+
+ns_llua['lua'][78] = {
+type = "info",
+title = "Экипировка игрока",
+content = [=[
+<h>Экипировка игрока</h>
+<t>Экипировка доступна через слоты. У каждого слота есть строковое имя.</t>
+<h>Основные слоты</h>
+<c>"HeadSlot"</c> — голова.
+<c>"NeckSlot"</c> — шея.
+<c>"ShoulderSlot"</c> — плечи.
+<c>"BackSlot"</c> — спина.
+<c>"ChestSlot"</c> — грудь.
+<c>"WristSlot"</c> — запястья.
+<c>"HandsSlot"</c> — руки.
+<c>"WaistSlot"</c> — пояс.
+<c>"LegsSlot"</c> — ноги.
+<c>"FeetSlot"</c> — ступни.
+<c>"Finger0Slot"</c> — первое кольцо.
+<c>"Finger1Slot"</c> — второе кольцо.
+<c>"Trinket0Slot"</c> — первая бижутерия.
+<c>"Trinket1Slot"</c> — вторая бижутерия.
+<c>"MainHandSlot"</c> — правая рука.
+<c>"SecondaryHandSlot"</c> — левая рука.
+<h>GetInventorySlotInfo</h>
+<code>
+/run local slotId = GetInventorySlotInfo("HeadSlot"); print(slotId)
+</code>
+<t>Функция возвращает числовой ID слота.</t>
+<h>Предмет в слоте</h>
+<code>
+/run local slotId = GetInventorySlotInfo("HeadSlot"); local link = GetInventoryItemLink("player", slotId); print(link or "Пусто")
+</code>
+<h>Количество предметов в слоте</h>
+<code>
+/run local slotId = GetInventorySlotInfo("MainHandSlot"); print(GetInventoryItemCount("player", slotId))
+</code>
+<h>Текстура предмета</h>
+<code>
+/run local slotId = GetInventorySlotInfo("ChestSlot"); print(GetInventoryItemTexture("player", slotId))
+</code>
+<h>Перебор нескольких слотов</h>
+<code>
+/run local slots = {"HeadSlot", "ChestSlot", "MainHandSlot"}; for _, slotName in ipairs(slots) do local slotId = GetInventorySlotInfo(slotName); local link = GetInventoryItemLink("player", slotId); print(slotName, link or "пусто") end
+</code>
+]=],
+}
+
+ns_llua['lua'][79] = {
+type = "commenttest",
+title = "Практика: сводка по сумкам",
+helpModules = {75, 76, 77},
+preloadVars = {
+{var = "GetBagSummary", desc = "GetBagSummary очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "reportBag", desc = "reportBag очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"reportBag",
+},
+instruction = [=[
+<h>Практика: сводка по сумкам</h>
+<t>Создай глобальную функцию <k>GetBagSummary()</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>totalSlots</c> — всего ячеек во всех сумках 0-4.
+<c>freeSlots</c> — свободные ячейки во всех сумках 0-4.
+<c>usedSlots</c> — занятые ячейки.
+<c>bagCount</c> — количество проверенных сумок, всегда <n>5</n>.
+<h>Требования</h>
+<t>- Используй цикл по сумкам от <n>0</n> до <n>4</n>.</t>
+<t>- Используй <k>GetContainerNumSlots</k>.</t>
+<t>- Используй <k>GetContainerNumFreeSlots</k>.</t>
+<t>- Если API вернул <k>nil</k>, используй <k>or 0</k>.</t>
+<t>- Поле <k>usedSlots</k> должно быть равно <k>totalSlots - freeSlots</k>.</t>
+<t>- Если вдруг разница отрицательная, верни <n>0</n>.</t>
+<h>Пример использования</h>
+<code>
+/run local summary = GetBagSummary(); print(summary.totalSlots, summary.freeSlots, summary.usedSlots)
+</code>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetBagSummary()
+function GetBagSummary()
+    local totalSlots = 0
+    local freeSlots = 0
+    -- пройди цикл по сумкам от 0 до 4
+    -- верни таблицу через return
+end
+]=],
+requireKeywords = {
+"GetBagSummary",
+"function",
+"GetContainerNumSlots",
+"GetContainerNumFreeSlots",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+_G.reportBag = nil
+if type(_G.GetBagSummary) ~= "function" then
+    _G.checkError = "GetBagSummary не является глобальной функцией"
+    return false
+end
+local ok, summary = pcall(_G.GetBagSummary)
+if not ok then
+    _G.checkError = "Ошибка вызова GetBagSummary(): " .. tostring(summary)
+    return false
+end
+_G.reportBag = summary
+if type(summary) ~= "table" then
+    _G.checkError = "GetBagSummary должна вернуть таблицу"
+    return false
+end
+local totalSlots = tonumber(summary.totalSlots)
+local freeSlots = tonumber(summary.freeSlots)
+local usedSlots = tonumber(summary.usedSlots)
+local bagCount = tonumber(summary.bagCount)
+if not totalSlots or not freeSlots or not usedSlots or not bagCount then
+    _G.checkError = "Поля totalSlots, freeSlots, usedSlots и bagCount должны быть числами"
+    return false
+end
+if totalSlots < 0 or freeSlots < 0 or usedSlots < 0 or bagCount < 0 then
+    _G.checkError = "Значения не должны быть отрицательными"
+    return false
+end
+if bagCount ~= 5 then
+    _G.checkError = "Поле bagCount должно быть равно 5"
+    return false
+end
+if totalSlots == 0 then
+    _G.checkError = "Сумка игрока должна дать хотя бы несколько ячеек"
+    return false
+end
+if freeSlots > totalSlots then
+    _G.checkError = "freeSlots не может быть больше totalSlots"
+    return false
+end
+if usedSlots ~= math.max(0, totalSlots - freeSlots) then
+    _G.checkError = "usedSlots должно быть равно totalSlots - freeSlots"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][80] = {
+type = "info",
+title = "Информация о заклинаниях",
+content = [=[
+<h>Информация о заклинаниях</h>
+<t>Функция <k>GetSpellInfo</k> возвращает данные о заклинании по ID или названию.</t>
+<code>
+/run local name, rank, icon, cost, isFunnel, powerType, castTime = GetSpellInfo(6603); print(name, castTime)
+</code>
+<t>Здесь <n>6603</n> — ID базовой автоматической атаки.</t>
+<h>Что возвращает GetSpellInfo</h>
+<c>name</c> — название заклинания.
+<c>rank</c> — ранг.
+<c>icon</c> — путь к иконке.
+<c>cost</c> — стоимость.
+<c>isFunnel</c> — является ли заклинание канальным с поддержкой.
+<c>powerType</c> — тип ресурса.
+<c>castTime</c> — время каста в миллисекундах.
+<h>SpellID лучше названия</h>
+<t>Название заклинания зависит от языка клиента:</t>
+<code>
+/run print(GetSpellInfo(6603))
+</code>
+<t>ID заклинания одинаковый для всех клиентов.</t>
+<h>Иконка заклинания</h>
+<code>
+/run print(GetSpellTexture(6603))
+</code>
+<h>Поиск по названию</h>
+<code>
+/run local name = GetSpellInfo(6603); if name and string.find(name, "Атака") then print("Найдено слово Атака") end
+</code>
+<w>Примечание:</w> точное название зависит от локализации, поэтому для логики лучше использовать ID.
+]=],
+}
+
+ns_llua['lua'][81] = {
+type = "info",
+title = "Кулдауны заклинаний",
+content = [=[
+<h>Кулдауны заклинаний</h>
+<t>Функция <k>GetSpellCooldown</k> возвращает информацию о восстановлении заклинания.</t>
+<code>
+/run local start, duration = GetSpellCooldown(6603); print(start, duration)
+</code>
+<h>Что означают значения</h>
+<c>start</c> — момент начала кулдауна по <k>GetTime</k>.
+<c>duration</c> — длительность кулдауна в секундах.
+<c>enabled</c> — доступно ли заклинание.
+<h>Если заклинание готово</h>
+<t>Обычно если <k>start</k> равно <n>0</k>, кулдауна нет.</t>
+<code>
+/run local start, duration = GetSpellCooldown(6603); if start == 0 then print("Готово") else print("Кулдаун") end
+</code>
+<h>Остаток времени</h>
+<code>
+/run local start, duration = GetSpellCooldown(6603); local remaining = 0; if start and duration and start > 0 then remaining = start + duration - GetTime(); if remaining < 0 then remaining = 0 end end; print(string.format("Осталось: %.1f", remaining))
+</code>
+<h>Функция-обёртка</h>
+<code>
+function GetCooldownRemaining(spellID)
+    local start, duration = GetSpellCooldown(spellID)
+    if not start or start == 0 then
+        return 0
+    end
+    local remaining = start + duration - GetTime()
+    if remaining < 0 then
+        return 0
+    end
+    return remaining
+end
+</code>
+<t>Такую функцию можно использовать для панелей и трекеров.</t>
+]=],
+}
+
+ns_llua['lua'][82] = {
+type = "info",
+title = "Баффы и дебаффы глубже",
+content = [=[
+<h>Баффы и дебаффы глубже</h>
+<t>Раньше мы использовали <k>UnitBuff</k> и <k>UnitDebuff</k> для простого получения названия. Теперь добавим длительность и стаки.</t>
+<h>UnitAura</h>
+<code>
+/run local name, _, _, count, _, duration, expiration = UnitAura("player", 1, "HELPFUL"); print(name, count, duration, expiration)
+</code>
+<h>Основные возвращаемые значения</h>
+<c>name</c> — название ауры.
+<c>icon</c> — иконка.
+<c>count</c> — количество стаков.
+<c>debuffType</c> — тип дебаффа.
+<c>duration</c> — длительность в секундах.
+<c>expirationTime</c> — время окончания по <k>GetTime</k>.
+<h>Остаток времени баффа</h>
+<code>
+/run local name, _, _, _, _, duration, expiration = UnitBuff("player", 1); if name and expiration and expiration > 0 then print(name, math.floor(expiration - GetTime())) else print(name or "Нет баффа") end
+</code>
+<h>Если таймера нет</h>
+<t>У некоторых аур <k>duration</k> может быть <n>0</n>, а <k>expirationTime</k> — <n>0</n>. Это значит, что аура постоянная или таймер недоступен.</t>
+<h>Перебор дебаффов цели</h>
+<code>
+/run for i = 1, 40 do local name, _, _, count, _, duration, expiration = UnitDebuff("target", i); if not name then break end; print(i, name, count) end
+</code>
+<h>Фильтр</h>
+<c>"HELPFUL"</c> — баффы.
+<c>"HARMFUL"</c> — дебаффы.
+<c>"PLAYER"</c> — только свои ауры, если используется дополнительным фильтром.
+]=],
+}
+
+ns_llua['lua'][83] = {
+type = "info",
+title = "Каст, каналы и угроза",
+content = [=[
+<h>Каст, каналы и угроза</h>
+<t>WoW API позволяет проверить, кастует ли юнит заклинание или поддерживает канальное заклинание.</t>
+<h>UnitCastingInfo</h>
+<code>
+/run local name, _, _, startTime, endTime = UnitCastingInfo("player"); print(name, startTime, endTime)
+</code>
+<t>Если игрок ничего не кастует, функция вернёт <k>nil</k>.</t>
+<h>Время каста</h>
+<t>Значения <k>startTime</k> и <k>endTime</k> обычно возвращаются в миллисекундах.</t>
+<code>
+/run local name, _, _, startTime, endTime = UnitCastingInfo("player"); if name then local remaining = (endTime / 1000) - GetTime(); print(string.format("Осталось: %.1f", remaining)) end
+</code>
+<h>UnitChannelInfo</h>
+<t>Для канальных заклинаний используется <k>UnitChannelInfo</k>.</t>
+<code>
+/run local name, _, _, startTime, endTime = UnitChannelInfo("player"); print(name, startTime, endTime)
+</code>
+<h>UnitThreatSituation</h>
+<t>Возвращает примерный статус угрозы.</t>
+<code>
+/run print(UnitThreatSituation("player"))
+</code>
+<h>InCombatLockdown</h>
+<t>Показывает, находится ли игрок в состоянии боя с ограничениями интерфейса.</t>
+<code>
+/run if InCombatLockdown() then print("Блокировка боя") else print("Вне блокировки") end
+</code>
+<w>Важно:</w> в бою многие действия интерфейса защищены. Позже мы отдельно разберём защищённые кнопки.
+]=],
+}
+
+ns_llua['lua'][84] = {
+type = "commenttest",
+title = "Практика: остаток кулдауна",
+helpModules = {80, 81},
+preloadVars = {
+{var = "GetCooldownRemaining", desc = "GetCooldownRemaining очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "cooldownTest1", desc = "cooldownTest1 очищается перед проверкой"},
+{var = "cooldownTest2", desc = "cooldownTest2 очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"cooldownTest1",
+"cooldownTest2",
+},
+instruction = [=[
+<h>Практика: остаток кулдауна</h>
+<t>Создай глобальную функцию <k>GetCooldownRemaining(spellID)</k>.</t>
+<t>Функция должна вернуть остаток кулдауна в секундах.</t>
+<h>Логика</h>
+<t>1. Получи <k>start</k> и <k>duration</k> через <k>GetSpellCooldown(spellID)</k>.</t>
+<t>2. Если <k>start</k> отсутствует или равно <n>0</n>, верни <n>0</n>.</t>
+<t>3. Иначе посчитай: <k>start + duration - GetTime()</k>.</t>
+<t>4. Если результат отрицательный, верни <n>0</n>.</t>
+<t>5. Иначе верни результат.</t>
+<h>Требования</h>
+<t>- Используй <k>GetSpellCooldown</k>.</t>
+<t>- Используй <k>GetTime</k>.</t>
+<t>- Функция должна возвращать число.</t>
+<t>- Функция не должна падать на неизвестном spellID.</t>
+<h>Пример использования</h>
+<code>
+/run print(GetCooldownRemaining(6603))
+</code>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetCooldownRemaining(spellID)
+function GetCooldownRemaining(spellID)
+    local start, duration = GetSpellCooldown(spellID)
+    -- закончи функцию и верни число
+end
+]=],
+requireKeywords = {
+"GetCooldownRemaining",
+"function",
+"GetSpellCooldown",
+"GetTime",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+_G.cooldownTest1 = nil
+_G.cooldownTest2 = nil
+if type(_G.GetCooldownRemaining) ~= "function" then
+    _G.checkError = "GetCooldownRemaining не является глобальной функцией"
+    return false
+end
+local ok1, result1 = pcall(_G.GetCooldownRemaining, 6603)
+if not ok1 then
+    _G.checkError = "Ошибка вызова GetCooldownRemaining(6603): " .. tostring(result1)
+    return false
+end
+_G.cooldownTest1 = result1
+if type(result1) ~= "number" then
+    _G.checkError = "GetCooldownRemaining(6603) должна вернуть число"
+    return false
+end
+if result1 < 0 or result1 > 1000000 then
+    _G.checkError = "GetCooldownRemaining(6603) вернула некорректное значение"
+    return false
+end
+local ok2, result2 = pcall(_G.GetCooldownRemaining, 999999)
+if not ok2 then
+    _G.checkError = "Функция не должна падать на неизвестном spellID: " .. tostring(result2)
+    return false
+end
+_G.cooldownTest2 = result2
+if type(result2) ~= "number" then
+    _G.checkError = "Для неизвестного spellID функция должна вернуть число"
+    return false
+end
+if result2 < 0 or result2 > 1000000 then
+    _G.checkError = "Для неизвестного spellID функция вернула некорректное значение"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][85] = {
+type = "info",
+title = "Фреймы как объекты",
+content = [=[
+<h>Фреймы как объекты</h>
+<t>С этого момента мы начинаем работать с интерфейсом. Основной строительный блок интерфейса WoW — фрейм.</t>
+<t>Фрейм — это объект. У него есть методы.</t>
+<h>CreateFrame</h>
+<code>
+MyFirstFrame = CreateFrame("Frame", "MyFirstFrame", UIParent)
+</code>
+<t>Аргументы:</t>
+<c>"Frame"</c> — тип фрейма.
+<c>"MyFirstFrame"</c> — глобальное имя.
+<c>UIParent</c> — родитель.
+<h>Глобальное имя</h>
+<t>Если второй аргумент не <k>nil</k>, WoW создаст глобальную переменную с таким именем.</t>
+<code>
+print(type(MyFirstFrame))
+</code>
+<h>Методы через двоеточие</h>
+<t>Методы объекта вызываются через двоеточие:</t>
+<code>
+MyFirstFrame:SetSize(200, 100)
+MyFirstFrame:SetPoint("CENTER")
+MyFirstFrame:Show()
+MyFirstFrame:Hide()
+</code>
+<t>Запись через двоеточие примерно означает, что фрейм сам передаётся внутрь метода.</t>
+<code>
+MyFirstFrame.Show(MyFirstFrame)
+</code>
+<h>Показать и скрыть</h>
+<code>
+MyFirstFrame:Show()
+</code>
+<code>
+MyFirstFrame:Hide()
+</code>
+<code>
+print(MyFirstFrame:IsShown())
+</code>
+<w>Важно:</w> пока фрейму не заданы размер и позиция, он может быть невидим или находиться в неожиданном месте.
+]=],
+}
+
+ns_llua['lua'][86] = {
+type = "info",
+title = "Позиция, размер и перетаскивание",
+content = [=[
+<h>Позиция, размер и перетаскивание</h>
+<t>Чтобы фрейм было видно, ему нужны размер и точка крепления.</t>
+<h>Размер</h>
+<code>
+MyFirstFrame:SetSize(220, 140)
+</code>
+<h>Позиция</h>
+<code>
+MyFirstFrame:SetPoint("CENTER")
+</code>
+<t>Более точный вариант:</t>
+<code>
+MyFirstFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 100, -100)
+</code>
+<t>Это значит:</t>
+<c>TOPLEFT</c> фрейма крепится к <c>TOPLEFT</c> родителя.
+Смещение: <n>100</n> вправо и <n>-100</n> вниз.
+<h>Слой отображения</h>
+<code>
+MyFirstFrame:SetFrameStrata("HIGH")
+</code>
+<t>Возможные значения:</t>
+<c>"BACKGROUND"</c>
+<c>"LOW"</c>
+<c>"MEDIUM"</c>
+<c>"HIGH"</c>
+<c>"DIALOG"</c>
+<c>"TOOLTIP"</c>
+<h>Прозрачность и масштаб</h>
+<code>
+MyFirstFrame:SetAlpha(0.8)
+MyFirstFrame:SetScale(1.1)
+</code>
+<h>Перетаскивание</h>
+<code>
+MyDragFrame = CreateFrame("Frame", "MyDragFrame", UIParent)
+MyDragFrame:SetSize(160, 120)
+MyDragFrame:SetPoint("CENTER")
+MyDragFrame:EnableMouse(true)
+MyDragFrame:SetMovable(true)
+MyDragFrame:RegisterForDrag("LeftButton")
+MyDragFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+MyDragFrame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+MyDragFrame:Show()
+</code>
+<w>Примечание:</w> без текстуры или фона фрейм может быть прозрачным, но он всё равно может ловить мышь, если включён <k>EnableMouse</k>.
+]=],
+}
+
+ns_llua['lua'][87] = {
+type = "info",
+title = "Текстуры и текст",
+content = [=[
+<h>Текстуры и текст</h>
+<t>Сам по себе фрейм обычно невидим. Чтобы его увидеть, добавляют текстуры и текстовые слои.</t>
+<h>Фон</h>
+<code>
+MyCard = CreateFrame("Frame", "MyCard", UIParent)
+MyCard:SetSize(220, 120)
+MyCard:SetPoint("CENTER")
+local bg = MyCard:CreateTexture(nil, "BACKGROUND")
+bg:SetAllPoints(MyCard)
+bg:SetTexture(0.1, 0.1, 0.2, 0.9)
+MyCard:Show()
+</code>
+<t>Здесь цвет задаётся четырьмя числами:</t>
+<c>красный</c>
+<c>зелёный</c>
+<c>синий</c>
+<c>прозрачность</c>
+<h>Текст</h>
+<code>
+local title = MyCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+title:SetPoint("TOP", MyCard, "TOP", 0, -10)
+title:SetText("Моя карточка")
+</code>
+<h>Полезные шрифтовые объекты</h>
+<c>GameFontNormal</c>
+<c>GameFontNormalLarge</c>
+<c>GameFontHighlight</c>
+<c>GameFontDisable</c>
+<h>Цвет текста</h>
+<code>
+title:SetTextColor(1, 0.84, 0, 1)
+</code>
+<h>Полный пример</h>
+<code>
+MyCard = CreateFrame("Frame", "MyCard", UIParent)
+MyCard:SetSize(240, 140)
+MyCard:SetPoint("CENTER")
+local bg = MyCard:CreateTexture(nil, "BACKGROUND")
+bg:SetAllPoints(MyCard)
+bg:SetTexture(0.08, 0.08, 0.12, 0.95)
+local title = MyCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+title:SetPoint("TOP", MyCard, "TOP", 0, -10)
+title:SetText("Панель")
+title:SetTextColor(1, 0.84, 0, 1)
+local info = MyCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+info:SetPoint("CENTER", MyCard, "CENTER", 0, 0)
+info:SetText("Текст внутри фрейма")
+MyCard:Show()
+</code>
+]=],
+}
+
+ns_llua['lua'][88] = {
+type = "info",
+title = "Кнопки",
+content = [=[
+<h>Кнопки</h>
+<t>Кнопка создаётся так же через <k>CreateFrame</k>, но тип будет <c>"Button"</c>.</t>
+<h>Простая кнопка</h>
+<code>
+MyButton = CreateFrame("Button", "MyButton", UIParent, "UIPanelButtonTemplate")
+MyButton:SetSize(140, 24)
+MyButton:SetPoint("CENTER")
+MyButton:SetText("Нажми меня")
+MyButton:Show()
+</code>
+<t>Шаблон <c>"UIPanelButtonTemplate"</c> даёт стандартный внешний вид кнопки.</t>
+<h>Обработчик клика</h>
+<code>
+MyButton:SetScript("OnClick", function(self, button)
+    print("Кнопка нажата:", button)
+end)
+</code>
+<t>Внутри обработчика:</t>
+<c>self</c> — сама кнопка.
+<c>button</c> — кнопка мыши, например <s>"LeftButton"</s> или <s>"RightButton"</s>.
+<h>Кнопка показывает и скрывает фрейм</h>
+<code>
+MyToggleButton = CreateFrame("Button", "MyToggleButton", UIParent, "UIPanelButtonTemplate")
+MyToggleButton:SetSize(140, 24)
+MyToggleButton:SetPoint("CENTER", UIParent, "CENTER", 0, -40)
+MyToggleButton:SetText("Показать/скрыть")
+MyToggleButton:SetScript("OnClick", function()
+    if MyCard and MyCard:IsShown() then
+        MyCard:Hide()
+    elseif MyCard then
+        MyCard:Show()
+    end
+end)
+MyToggleButton:Show()
+</code>
+<h>Включение и отключение</h>
+<code>
+MyButton:Disable()
+MyButton:Enable()
+</code>
+<w>Важно:</w> отключённая кнопка не реагирует на клики.
+]=],
+}
+
+-- ============================================================
+-- COURSE DATA: PART 2, MODULES 89-102
+-- ============================================================
+
+ns_llua = ns_llua or {}
+ns_llua['lua'] = ns_llua['lua'] or {}
+
+ns_llua['lua'][89] = {
+type = "info",
+title = "StatusBar и Slider",
+content = [=[
+<h>StatusBar</h>
+<t>StatusBar — это полоса состояния. Её удобно использовать для здоровья, маны, опыта и прогресса.</t>
+<code>
+MyBar = CreateFrame("StatusBar", "MyBar", UIParent)
+MyBar:SetSize(200, 20)
+MyBar:SetPoint("CENTER")
+MyBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+MyBar:SetStatusBarColor(0.2, 0.8, 0.2, 1)
+MyBar:SetMinMaxValues(0, 100)
+MyBar:SetValue(65)
+MyBar:Show()
+</code>
+<h>Основные методы StatusBar</h>
+<c>SetStatusBarTexture</c> — текстура полосы.
+<c>SetStatusBarColor</c> — цвет.
+<c>SetMinMaxValues</c> — минимальное и максимальное значение.
+<c>SetValue</c> — текущее значение.
+<c>GetValue</c> — получить текущее значение.
+<h>Пример со здоровьем</h>
+<code>
+/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; MyBar:SetMinMaxValues(0, hpMax); MyBar:SetValue(hp)
+</code>
+<h>Slider</h>
+<t>Slider — это ползунок. Его используют для настроек громкости, прозрачности, масштаба.</t>
+<code>
+MySlider = CreateFrame("Slider", "MySlider", UIParent)
+MySlider:SetSize(180, 16)
+MySlider:SetPoint("CENTER", UIParent, "CENTER", 0, -60)
+MySlider:SetOrientation("HORIZONTAL")
+MySlider:SetMinMaxValues(0, 100)
+MySlider:SetValueStep(1)
+MySlider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+MySlider:SetValue(50)
+MySlider:Show()
+</code>
+<h>OnValueChanged</h>
+<code>
+MySlider:SetScript("OnValueChanged", function(self, value)
+    print("Значение:", value)
+end)
+</code>
+<w>Примечание:</w> если нужно реагировать только при отпускании ползунка, можно использовать <c>OnMouseUp</c> или сохранять значение в таблицу настроек.
+]=],
+}
+
+ns_llua['lua'][90] = {
+type = "info",
+title = "EditBox и CheckButton",
+content = [=[
+<h>EditBox</h>
+<t>EditBox — это поле ввода текста.</t>
+<code>
+MyEdit = CreateFrame("EditBox", "MyEdit", UIParent, "InputBoxTemplate")
+MyEdit:SetSize(180, 20)
+MyEdit:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+MyEdit:SetAutoFocus(false)
+MyEdit:SetText("Привет")
+MyEdit:Show()
+</code>
+<h>Получить текст</h>
+<code>
+/run print(MyEdit:GetText())
+</code>
+<h>Полезные скрипты</h>
+<code>
+MyEdit:SetScript("OnEnterPressed", function(self)
+    print("Ввод:", self:GetText())
+    self:ClearFocus()
+end)
+MyEdit:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+end)
+MyEdit:SetScript("OnTextChanged", function(self)
+    print("Текст меняется:", self:GetText())
+end)
+</code>
+<h>CheckButton</h>
+<t>CheckButton — это галочка.</t>
+<code>
+MyCheck = CreateFrame("CheckButton", "MyCheck", UIParent, "UICheckButtonTemplate")
+MyCheck:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+MyCheck:SetChecked(false)
+MyCheck:Show()
+</code>
+<h>Проверить состояние</h>
+<code>
+/run print(MyCheck:GetChecked())
+</code>
+<h>Обработчик клика</h>
+<code>
+MyCheck:SetScript("OnClick", function(self)
+    if self:GetChecked() then
+        print("Включено")
+    else
+        print("Выключено")
+    end
+end)
+</code>
+<w>Примечание:</w> шаблон <c>UICheckButtonTemplate</c> даёт стандартный внешний вид галочки.
+]=],
+}
+
+ns_llua['lua'][91] = {
+type = "commenttest",
+title = "Практика: простая панель",
+helpModules = {85, 86, 87, 88, 89, 90},
+preloadVars = {
+{var = "CoursePanel", desc = "CoursePanel очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "reportPanel", desc = "reportPanel очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"reportPanel",
+},
+instruction = [=[
+<h>Практика: простая панель</h>
+<t>Создай глобальный фрейм <k>CoursePanel</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"CoursePanel"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер не меньше 200 на 120;</t>
+<t>- позиция через <k>SetPoint("CENTER")</k>;</t>
+<t>- добавь фон через <k>CreateTexture</k>;</t>
+<t>- добавь текст через <k>CreateFontString</k>;</t>
+<t>- текст должен быть <s>"Моя панель"</s>;</t>
+<t>- покажи фрейм через <k>Show</k>.</t>
+<h>Пример использования</h>
+<code>
+/run print(CoursePanel:IsShown())
+</code>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CoursePanel
+CoursePanel = CreateFrame("Frame", "CoursePanel", UIParent)
+-- Задай размер, позицию, фон, текст и покажи фрейм
+]=],
+requireKeywords = {
+"CoursePanel",
+"CreateFrame",
+"SetSize",
+"SetPoint",
+"CreateTexture",
+"CreateFontString",
+"SetText",
+"Show",
+},
+checkCode = function()
+_G.checkError = nil
+_G.reportPanel = nil
+local f = _G.CoursePanel
+if not f or type(f.IsShown) ~= "function" then
+    _G.checkError = "CoursePanel не является фреймом"
+    return false
+end
+_G.reportPanel = tostring(f:GetName()) .. " shown=" .. tostring(f:IsShown())
+if f:GetName() ~= "CoursePanel" then
+    _G.checkError = "Фрейм должен иметь глобальное имя CoursePanel"
+    return false
+end
+if not f:IsShown() then
+    _G.checkError = "Фрейм должен быть показан через Show"
+    return false
+end
+local width = f:GetWidth() or 0
+local height = f:GetHeight() or 0
+if width < 100 or height < 80 then
+    _G.checkError = "Размер фрейма слишком маленький"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][92] = {
+type = "info",
+title = "Введение в события",
+content = [=[
+<h>Введение в события</h>
+<t>События позволяют интерфейсу реагировать на игровые действия: вход в игру, смену цели, изменение здоровья, получение денег и так далее.</t>
+<h>Как подписаться на событие</h>
+<code>
+MyEventFrame = CreateFrame("Frame", "MyEventFrame", UIParent)
+MyEventFrame:RegisterEvent("PLAYER_LOGIN")
+MyEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+MyEventFrame:SetScript("OnEvent", function(self, event, ...)
+    print("Событие:", event)
+end)
+</code>
+<h>Что здесь важно</h>
+<c>CreateFrame</c> — создаёт фрейм-слушатель.
+<c>RegisterEvent</c> — подписывает фрейм на событие.
+<c>SetScript("OnEvent", ...)</c> — назначает обработчик.
+<c>event</c> — имя события, которое пришло.
+<h>PLAYER_LOGIN и PLAYER_ENTERING_WORLD</h>
+<c>PLAYER_LOGIN</c> — срабатывает при входе персонажа в игру.
+<c>PLAYER_ENTERING_WORLD</c> — срабатывает при входе в мир, а также после загрузок.
+<w>Важно:</w> если создать фрейм после того, как <c>PLAYER_LOGIN</c> уже произошёл, это событие может не прийти. Поэтому для поздних тестов часто используют <c>PLAYER_ENTERING_WORLD</c>.
+<h>Пример ручного теста</h>
+<code>
+/run MyEventFrame:RegisterEvent("PLAYER_MONEY"); print("Подписка на PLAYER_MONEY выполнена")
+</code>
+]=],
+}
+
+ns_llua['lua'][93] = {
+type = "info",
+title = "События цели и юнитов",
+content = [=[
+<h>События цели и юнитов</h>
+<t>Эти события нужны для панелей цели, здоровья, маны и статуса юнитов.</t>
+<h>PLAYER_TARGET_CHANGED</h>
+<t>Срабатывает, когда игрок меняет цель.</t>
+<code>
+TargetFrame = CreateFrame("Frame", "TargetFrame", UIParent)
+TargetFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+TargetFrame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_TARGET_CHANGED" then
+        print("Цель изменена:", UnitName("target") or "нет цели")
+    end
+end)
+</code>
+<h>UNIT_HEALTH</h>
+<t>Срабатывает, когда меняется здоровье юнита.</t>
+<code>
+HealthFrame = CreateFrame("Frame", "HealthFrame", UIParent)
+HealthFrame:RegisterEvent("UNIT_HEALTH")
+HealthFrame:SetScript("OnEvent", function(self, event, unit)
+    if unit == "player" then
+        print("HP:", UnitHealth("player"))
+    end
+end)
+</code>
+<h>UNIT_MAXHEALTH</h>
+<t>Срабатывает, когда меняется максимальное здоровье.</t>
+<code>
+HealthFrame:RegisterEvent("UNIT_MAXHEALTH")
+</code>
+<h>Общий обработчик</h>
+<code>
+HealthFrame:SetScript("OnEvent", function(self, event, unit)
+    if event == "UNIT_HEALTH" and unit == "player" then
+        print("HP changed")
+    elseif event == "UNIT_MAXHEALTH" and unit == "player" then
+        print("Max HP changed")
+    end
+end)
+</code>
+<w>Примечание:</w> в 3.3.5 ресурсные события могут быть отдельными: <c>UNIT_MANA</c>, <c>UNIT_RAGE</c>, <c>UNIT_ENERGY</c>, <c>UNIT_RUNIC_POWER</c>.
+]=],
+}
+
+ns_llua['lua'][94] = {
+type = "info",
+title = "События игрока: бой, деньги, опыт",
+content = [=[
+<h>События игрока: бой, деньги, опыт</h>
+<t>Эти события полезны для трекеров боя, денег, опыта и уровня.</t>
+<h>Бой</h>
+<c>PLAYER_REGEN_DISABLED</c> — игрок вошёл в бой.
+<c>PLAYER_REGEN_ENABLED</c> — игрок вышел из боя.
+<code>
+CombatFrame = CreateFrame("Frame", "CombatFrame", UIParent)
+CombatFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+CombatFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+CombatFrame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_DISABLED" then
+        print("Начался бой")
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        print("Бой закончился")
+    end
+end)
+</code>
+<h>Деньги</h>
+<code>
+MoneyFrame = CreateFrame("Frame", "MoneyFrame", UIParent)
+MoneyFrame:RegisterEvent("PLAYER_MONEY")
+MoneyFrame:SetScript("OnEvent", function()
+    print("Деньги:", GetMoney())
+end)
+</code>
+<h>Опыт и уровень</h>
+<c>PLAYER_XP_UPDATE</c> — изменился опыт.
+<c>PLAYER_LEVEL_UP</c> — игрок получил уровень.
+<code>
+XpFrame = CreateFrame("Frame", "XpFrame", UIParent)
+XpFrame:RegisterEvent("PLAYER_XP_UPDATE")
+XpFrame:RegisterEvent("PLAYER_LEVEL_UP")
+XpFrame:SetScript("OnEvent", function(self, event)
+    print("Событие:", event)
+end)
+</code>
+<w>Важно:</w> некоторые события передают аргументы. Например, <c>PLAYER_LEVEL_UP</c> может передать новый уровень.
+]=],
+}
+
+ns_llua['lua'][95] = {
+type = "info",
+title = "События группы, рейда, сумок и аур",
+content = [=[
+<h>События группы, рейда, сумок и аур</h>
+<t>Эти события нужны для списков группы, рейда, трекеров сумок и баффов.</t>
+<h>Группа и рейд</h>
+<c>PARTY_MEMBERS_CHANGED</c> — изменился состав группы.
+<c>RAID_ROSTER_UPDATE</c> — изменился состав рейда.
+<code>
+GroupFrame = CreateFrame("Frame", "GroupFrame", UIParent)
+GroupFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
+GroupFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+GroupFrame:SetScript("OnEvent", function(self, event)
+    print("Событие группы:", event)
+end)
+</code>
+<h>Сумки</h>
+<c>BAG_UPDATE</c> — изменилась сумка.
+<code>
+BagFrame = CreateFrame("Frame", "BagFrame", UIParent)
+BagFrame:RegisterEvent("BAG_UPDATE")
+BagFrame:SetScript("OnEvent", function(self, event, bag)
+    print("Обновление сумки:", bag)
+end)
+</code>
+<h>Ауры</h>
+<c>UNIT_AURA</c> — изменились баффы или дебаффы юнита.
+<code>
+AuraFrame = CreateFrame("Frame", "AuraFrame", UIParent)
+AuraFrame:RegisterEvent("UNIT_AURA")
+AuraFrame:SetScript("OnEvent", function(self, event, unit)
+    if unit == "player" then
+        print("Ауры игрока изменились")
+    end
+end)
+</code>
+<w>Примечание:</w> данные гильдии могут обновляться через <c>GUILD_ROSTER_UPDATE</c>, но часто需要先 запросить ростер.
+]=],
+}
+
+ns_llua['lua'][96] = {
+type = "info",
+title = "OnUpdate и таймеры",
+content = [=[
+<h>OnUpdate и таймеры</h>
+<t>Скрипт <c>OnUpdate</c> выполняется каждый кадр. Он полезен для плавных обновлений, таймеров и анимаций.</t>
+<code>
+TickerFrame = CreateFrame("Frame", "TickerFrame", UIParent)
+TickerFrame:SetScript("OnUpdate", function(self, elapsed)
+    print("Кадр:", elapsed)
+end)
+</code>
+<w>Опасность:</w> если выводить что-то каждый кадр, чат и интерфейс могут сильно нагрузиться.
+<h>Throttle</h>
+<t>Обычно обновление делают не каждый кадр, а раз в 0.2-0.5 секунды.</t>
+<code>
+TickerFrame.nextUpdate = 0
+TickerFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.nextUpdate = self.nextUpdate - elapsed
+    if self.nextUpdate <= 0 then
+        self.nextUpdate = 0.5
+        print("Тик:", GetTime())
+    end
+end)
+</code>
+<h>Пример с координатами</h>
+<code>
+CoordTicker = CreateFrame("Frame", "CoordTicker", UIParent)
+CoordTicker.nextUpdate = 0
+CoordTicker:SetScript("OnUpdate", function(self, elapsed)
+    self.nextUpdate = self.nextUpdate - elapsed
+    if self.nextUpdate <= 0 then
+        self.nextUpdate = 0.5
+        local x, y = GetPlayerMapPosition("player")
+        x = x or 0
+        y = y or 0
+        print(string.format("X: %.1f, Y: %.1f", x * 100, y * 100))
+    end
+end)
+</code>
+<h>Остановка</h>
+<code>
+/run CoordTicker:SetScript("OnUpdate", nil)
+</code>
+<t>Если задать скрипт как <k>nil</k>, он перестанет выполняться.</t>
+]=],
+}
+
+ns_llua['lua'][97] = {
+type = "commenttest",
+title = "Практика: фрейм событий",
+helpModules = {92, 93, 94, 95},
+preloadVars = {
+{var = "CourseEventFrame", desc = "CourseEventFrame очищается перед проверкой"},
+{var = "lastCourseEvent", desc = "lastCourseEvent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "reportEvent", desc = "reportEvent очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"reportEvent",
+},
+instruction = [=[
+<h>Практика: фрейм событий</h>
+<t>Создай глобальный фрейм <k>CourseEventFrame</k>.</t>
+<t>Требования:</t>
+<t>- зарегистрируй событие <c>PLAYER_TARGET_CHANGED</c>;</t>
+<t>- зарегистрируй событие <c>PLAYER_MONEY</c>;</t>
+<t>- назначь обработчик <c>OnEvent</c>;</t>
+<t>- внутри обработчика создай глобальную переменную <k>lastCourseEvent</k> и запиши в неё <k>event</k>.</t>
+<h>Шаблон обработчика</h>
+<code>
+CourseEventFrame:SetScript("OnEvent", function(self, event)
+    lastCourseEvent = event
+end)
+</code>
+<t>События специально вызывать не нужно. Проверка посмотрит, что фрейм создан и подписан на нужные события.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseEventFrame
+CourseEventFrame = CreateFrame("Frame", "CourseEventFrame", UIParent)
+-- Зарегистрируй события и назначь OnEvent
+]=],
+requireKeywords = {
+"CourseEventFrame",
+"CreateFrame",
+"RegisterEvent",
+"SetScript",
+"OnEvent",
+"lastCourseEvent",
+},
+checkCode = function()
+_G.checkError = nil
+_G.reportEvent = nil
+local f = _G.CourseEventFrame
+if not f or type(f.RegisterEvent) ~= "function" then
+    _G.checkError = "CourseEventFrame не является фреймом"
+    return false
+end
+_G.reportEvent = tostring(f:GetName()) .. " event frame"
+if type(f.IsEventRegistered) ~= "function" then
+    _G.checkError = "Фрейм не поддерживает проверку событий"
+    return false
+end
+if not f:IsEventRegistered("PLAYER_TARGET_CHANGED") then
+    _G.checkError = "Фрейм не зарегистрирован на PLAYER_TARGET_CHANGED"
+    return false
+end
+if not f:IsEventRegistered("PLAYER_MONEY") then
+    _G.checkError = "Фрейм не зарегистрирован на PLAYER_MONEY"
+    return false
+end
+if f.GetScript and type(f:GetScript("OnEvent")) ~= "function" then
+    _G.checkError = "Фрейм должен иметь обработчик OnEvent"
+    return false
+end
+if _G.lastCourseEvent ~= nil and type(_G.lastCourseEvent) ~= "string" then
+    _G.checkError = "lastCourseEvent должна быть строкой или nil до события"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][98] = {
+type = "info",
+title = "Мышь, наведение и тултипы",
+content = [=[
+<h>Мышь, наведение и тултипы</h>
+<t>Интерфейс можно делать интерактивным: реагировать на наведение, клики и показывать подсказки.</t>
+<h>OnEnter и OnLeave</h>
+<code>
+MyBox = CreateFrame("Frame", "MyBox", UIParent)
+MyBox:SetSize(120, 80)
+MyBox:SetPoint("CENTER")
+MyBox:EnableMouse(true)
+local bg = MyBox:CreateTexture(nil, "BACKGROUND")
+bg:SetAllPoints(MyBox)
+bg:SetTexture(0.2, 0.2, 0.3, 1)
+MyBox:SetScript("OnEnter", function()
+    print("Курсор на фрейме")
+end)
+MyBox:SetScript("OnLeave", function()
+    print("Курсор ушёл")
+end)
+MyBox:Show()
+</code>
+<h>MouseIsOver</h>
+<code>
+/run print(MouseIsOver(MyBox))
+</code>
+<h>GetMouseFocus</h>
+<code>
+/run local focus = GetMouseFocus(); print(focus and focus.GetName and focus:GetName() or "нет фокуса")
+</code>
+<h>GameTooltip</h>
+<code>
+MyBox:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Моя панель")
+    GameTooltip:AddLine("Описание панели", 1, 1, 1)
+    GameTooltip:Show()
+end)
+MyBox:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+end)
+</code>
+<h>Тултип юнита</h>
+<code>
+/run GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR"); GameTooltip:SetUnit("target"); GameTooltip:Show()
+</code>
+<w>Примечание:</w> если цели нет, тултип может быть пустым или не показаться.
+]=],
+}
+
+ns_llua['lua'][99] = {
+type = "info",
+title = "Чат, цвета и сообщения",
+content = [=[
+<h>Чат, цвета и сообщения</h>
+<t>Кроме обычного <k>print</k>, можно писать напрямую в чат через <k>ChatFrame1:AddMessage</k>.</t>
+<code>
+/run ChatFrame1:AddMessage("Обычное сообщение")
+</code>
+<h>Цветовые коды</h>
+<t>WoW использует формат:</t>
+<c>|cAARRGGBB</c> — начало цвета.
+<c>|r</c> — сброс цвета.
+<t>Пример:</t>
+<code>
+/run ChatFrame1:AddMessage("|cFF00FF00Зелёный текст|r")
+/run ChatFrame1:AddMessage("|cFFFF8080Красный текст|r")
+/run ChatFrame1:AddMessage("|cFF66CCFFГолубой текст|r")
+</code>
+<h>Расшифровка цвета</h>
+<t>Для <c>|cFF00FF00</c>:</t>
+<c>FF</c> — прозрачность.
+<c>00</c> — красный.
+<c>FF</c> — зелёный.
+<c>00</c> — синий.
+<h>DEFAULT_CHAT_FRAME</h>
+<code>
+/run DEFAULT_CHAT_FRAME:AddMessage("|cFFFFD700Золотой текст|r")
+</code>
+<h>SendChatMessage</h>
+<t>Можно отправить сообщение в чат от имени игрока.</t>
+<code>
+/run SendChatMessage("Привет из курса Lua", "SAY")
+</code>
+<w>Важно:</w> у отправки сообщений есть ограничения и задержки. Не стоит спамить ими.
+]=],
+}
+
+ns_llua['lua'][100] = {
+type = "info",
+title = "Слэш-команды",
+content = [=[
+<h>Слэш-команды</h>
+<t>Слэш-команды позволяют управлять аддоном из чата.</t>
+<h>Простая команда</h>
+<code>
+SlashCmdList["COURSEDEMO"] = function(msg)
+    print("Команда получена:", msg)
+end
+SLASH_COURSEDEMO1 = "/coursedemo"
+</code>
+<t>После этого можно написать:</t>
+<code>
+/coursedemo привет
+</code>
+<h>Как это работает</h>
+<c>SlashCmdList["COURSEDEMO"]</c> — функция-обработчик.
+<c>SLASH_COURSEDEMO1</c> — текстовая команда.
+<c>msg</c> — текст после команды.
+<h>Несколько алиасов</h>
+<code>
+SLASH_COURSEDEMO2 = "/cdemo"
+</code>
+<h>Практический шаблон</h>
+<code>
+SlashCmdList["MY_PANEL"] = function(msg)
+    msg = string.lower(msg or "")
+    if msg == "show" and MyPanel then
+        MyPanel:Show()
+    elseif msg == "hide" and MyPanel then
+        MyPanel:Hide()
+    else
+        print("Использование: /mypanel show или hide")
+    end
+end
+SLASH_MY_PANEL1 = "/mypanel"
+</code>
+<w>Примечание:</w> имя в <c>SlashCmdList</c> и имя переменной <c>SLASH_...</c> должны быть связаны по смыслу и уникальны.
+]=],
+}
+
+ns_llua['lua'][101] = {
+type = "info",
+title = "Хранение настроек и позиций",
+content = [=[
+<h>Хранение настроек и позиций</h>
+<t>Чтобы интерфейс помнил положение и настройки, их нужно куда-то сохранять.</t>
+<h>Глобальная таблица настроек</h>
+<code>
+nsMyAddon = nsMyAddon or {}
+nsMyAddon.settings = nsMyAddon.settings or {}
+</code>
+<h>Сохранение позиции фрейма</h>
+<code>
+function SaveMyPanelPosition()
+    if not MyPanel then
+        return
+    end
+    local point, _, relativePoint, x, y = MyPanel:GetPoint(1)
+    nsMyAddon.settings.point = point
+    nsMyAddon.settings.relativePoint = relativePoint
+    nsMyAddon.settings.x = x
+    nsMyAddon.settings.y = y
+end
+</code>
+<h>Загрузка позиции</h>
+<code>
+function LoadMyPanelPosition()
+    if not MyPanel then
+        return
+    end
+    local s = nsMyAddon.settings
+    if not s or not s.point then
+        MyPanel:SetPoint("CENTER")
+        return
+    end
+    MyPanel:ClearAllPoints()
+    MyPanel:SetPoint(s.point, UIParent, s.relativePoint or s.point, s.x or 0, s.y or 0)
+end
+</code>
+<h>Когда сохранять</h>
+<code>
+MyPanel:RegisterForDrag("LeftButton")
+MyPanel:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    SaveMyPanelPosition()
+end)
+</code>
+<h>Настоящие SavedVariables</h>
+<t>Для настоящего аддона настройки обычно сохраняются через TOC-файл:</t>
+<code>
+## SavedVariables: nsMyAddon
+</code>
+<t>Тогда таблица <k>nsMyAddon</k> будет автоматически сохраняться между сессиями.</t>
+<w>Важно:</w> в рамках <k>/run</k> глобальные таблицы живут только до <k>/reload</k>, если нет настоящего аддона и SavedVariables.
+]=],
+}
+
+ns_llua['lua'][102] = {
+type = "info",
+title = "Финальный проект: мини-панель",
+content = [=[
+<h>Финальный проект: мини-панель</h>
+<t>Соберём простую панель, которая показывает координаты, деньги и количество участников группы.</t>
+<h>Полный пример</h>
+<code>
+CourseDashboard = CreateFrame("Frame", "CourseDashboard", UIParent)
+CourseDashboard:SetSize(240, 160)
+CourseDashboard:SetPoint("CENTER")
+CourseDashboard:EnableMouse(true)
+CourseDashboard:SetMovable(true)
+CourseDashboard:RegisterForDrag("LeftButton")
+CourseDashboard:SetScript("OnDragStart", function(self) self:StartMoving() end)
+CourseDashboard:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+local bg = CourseDashboard:CreateTexture(nil, "BACKGROUND")
+bg:SetAllPoints(CourseDashboard)
+bg:SetTexture(0.08, 0.08, 0.12, 0.95)
+local title = CourseDashboard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+title:SetPoint("TOP", CourseDashboard, "TOP", 0, -10)
+title:SetText("Моя панель")
+title:SetTextColor(1, 0.84, 0, 1)
+local info = CourseDashboard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+info:SetPoint("TOP", title, "BOTTOM", 0, -10)
+info:SetJustifyH("LEFT")
+info:SetWidth(210)
+local button = CreateFrame("Button", "CourseDashboardButton", CourseDashboard, "UIPanelButtonTemplate")
+button:SetSize(120, 24)
+button:SetPoint("BOTTOM", CourseDashboard, "BOTTOM", 0, 10)
+button:SetText("Обновить")
+local function UpdateDashboard()
+    local x, y = GetPlayerMapPosition("player")
+    x = x or 0
+    y = y or 0
+    local money = GetMoney() or 0
+    local gold = math.floor(money / 10000)
+    local party = GetNumPartyMembers() or 0
+    info:SetText(string.format("X: %.1f Y: %.1f\nЗолото: %d\nГруппа: %d", x * 100, y * 100, gold, party))
+end
+button:SetScript("OnClick", UpdateDashboard)
+CourseDashboard.nextUpdate = 0
+CourseDashboard:SetScript("OnUpdate", function(self, elapsed)
+    self.nextUpdate = self.nextUpdate - elapsed
+    if self.nextUpdate <= 0 then
+        self.nextUpdate = 1
+        UpdateDashboard()
+    end
+end)
+CourseDashboard:Show()
+UpdateDashboard()
+</code>
+<h>Что можно добавить дальше</h>
+<t>- здоровье игрока;</t>
+<t>- имя цели;</t>
+<t>- свободные ячейки в сумках;</t>
+<t>- кулдауны заклинаний;</t>
+<t>- баффы;</t>
+<t>- слэш-команду <c>/mypanel</c>;</t>
+<t>- сохранение позиции в <k>nsMyAddon</k>.</t>
+<h>Итог второй части</h>
+<t>Ты прошёл путь от простых API-запросов до собственного интерактивного интерфейса:</t>
+<c>UnitName, UnitHealth, GetMoney, GetPlayerMapPosition</c>
+<c>таблицы, циклы, функции</c>
+<c>фреймы, текстуры, кнопки</c>
+<c>события и OnUpdate</c>
+<c>чат, слэш-команды, настройки</c>
+]=],
+}
+
 -- ============================================================
 -- UI CLASS: MAIN WINDOW + HELP WINDOW + EDITOR
 -- ============================================================

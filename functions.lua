@@ -10046,43 +10046,294 @@ end
 function NSPauk:NP_UpdateDragThrottle(now)
     local S = self.S
     local C = self.C
+
+    local function readFps()
+        local fps = GetFramerate and GetFramerate() or 60
+        if type(fps) ~= "number" or fps ~= fps or fps <= 0 then
+            fps = 60
+        end
+        return fps
+    end
+
+    local minInterval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
+    local maxInterval = tonumber(C.DRAG_UPDATE_MAX) or 0.25
+    local targetFps = tonumber(C.DRAG_FPS_TARGET) or 40
+    local sampleEvery = tonumber(C.DRAG_FPS_SAMPLE) or 0.25
+
+    if minInterval < 0.005 then
+        minInterval = 0.016
+    end
+
+    if maxInterval < minInterval then
+        maxInterval = math.max(0.25, minInterval * 4)
+    end
+
+    if targetFps < 5 then
+        targetFps = 40
+    end
+
+    if sampleEvery < 0.1 then
+        sampleEvery = 0.1
+    end
+
+    ---------------------------------------------------------------------------
+    -- Делаем проверку чуть более частой, чем стартовые 0.4 секунды,
+    -- чтобы троттлинг реагировал живее.
+    ---------------------------------------------------------------------------
+    if sampleEvery > 0.25 then
+        sampleEvery = 0.25
+    end
+
+    ---------------------------------------------------------------------------
+    -- Стабильным считаем FPS чуть выше цели, чтобы не дёргаться
+    -- около порога 40.
+    ---------------------------------------------------------------------------
+    local stableFps = targetFps + 3
+
+    ---------------------------------------------------------------------------
+    -- Сколько держать найденный рабочий троттлинг перед восстановлением.
+    ---------------------------------------------------------------------------
+    local holdTime = 10
+
+    ---------------------------------------------------------------------------
+    -- Сколько времени плавно возвращаться к обычному режиму.
+    ---------------------------------------------------------------------------
+    local recoverTime = 10
+
     local st = S.nspDragFps
     if not st then
         st = {
             smooth = 0,
             lastSampleAt = 0,
-            interval = tonumber(C.DRAG_UPDATE_MIN) or 0.016,
+            interval = minInterval,
+            mode = "normal",
+            goodSamples = 0,
+            badSamples = 0,
+            holdUntil = 0,
+            recoverStart = 0,
+            recoverFrom = maxInterval,
         }
         S.nspDragFps = st
     end
-    -- Первое измерение после старта нити: инициализируем без истории.
-    if st.smooth <= 0 then
-        st.smooth = readClientFps()
+
+    now = tonumber(now) or GetTime()
+
+    ---------------------------------------------------------------------------
+    -- Если троттлинг долго не использовался, считаем, что прошлая
+    -- история FPS уже не актуальна.
+    ---------------------------------------------------------------------------
+    if type(st.lastSampleAt) ~= "number"
+        or st.lastSampleAt <= 0
+        or now - st.lastSampleAt > 3 then
+        st.smooth = readFps()
         st.lastSampleAt = now
-        st.interval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
+        st.interval = minInterval
+        st.mode = "normal"
+        st.goodSamples = 0
+        st.badSamples = 0
+        st.holdUntil = 0
+        st.recoverStart = 0
+        st.recoverFrom = maxInterval
         return st
     end
-    local sampleEvery = tonumber(C.DRAG_FPS_SAMPLE) or 0.4
-    if sampleEvery < 0.1 then
-        sampleEvery = 0.1
-    end
-    if (now - (st.lastSampleAt or 0)) < sampleEvery then
+
+    if now - st.lastSampleAt < sampleEvery then
         return st
     end
+
     st.lastSampleAt = now
-    -- Сглаженный FPS, чтобы одиночный провал не включал троттлинг.
-    st.smooth = st.smooth * 0.55 + readClientFps() * 0.45
-    local target = tonumber(C.DRAG_FPS_TARGET) or 40
-    local recover = tonumber(C.DRAG_FPS_RECOVER) or 48
-    local minInterval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
-    local maxInterval = tonumber(C.DRAG_UPDATE_MAX) or 0.25
-    if st.smooth < target then
-        -- FPS ниже порога: рисуем всё реже и реже.
-        st.interval = math.min(st.interval * 1.7 + 0.01, maxInterval)
-    elseif st.smooth >= recover and st.interval > minInterval then
-        -- FPS выровнялся: плавно возвращаемся к нормальной отрисовке.
-        st.interval = math.max(st.interval * 0.65, minInterval)
+
+    local fps = readFps()
+
+    if type(st.smooth) ~= "number" or st.smooth <= 0 then
+        st.smooth = fps
+    else
+        st.smooth = st.smooth * 0.60 + fps * 0.40
     end
+
+    if type(st.mode) ~= "string" then
+        st.mode = "normal"
+    end
+
+    if type(st.interval) ~= "number" or st.interval ~= st.interval then
+        st.interval = minInterval
+    end
+
+    if st.interval < minInterval then
+        st.interval = minInterval
+    elseif st.interval > maxInterval then
+        st.interval = maxInterval
+    end
+
+    ---------------------------------------------------------------------------
+    -- normal: обычный режим.
+    --
+    -- Если FPS стабильно ниже цели, входим в throttle.
+    ---------------------------------------------------------------------------
+    if st.mode == "normal" then
+        st.interval = minInterval
+
+        if st.smooth < targetFps then
+            st.badSamples = (st.badSamples or 0) + 1
+            st.goodSamples = 0
+
+            -------------------------------------------------------------------
+            -- При сильном провале реагируем сразу.
+            -- Иначе ждём пару сэмплов, чтобы не дёргаться от мгновенных
+            -- скачков FPS.
+            -------------------------------------------------------------------
+            if st.badSamples >= 2 or fps < targetFps * 0.80 then
+                st.mode = "throttle"
+                st.badSamples = 0
+                st.goodSamples = 0
+
+                st.interval = math.min(
+                    maxInterval,
+                    math.max(minInterval, st.interval) * 1.25 + 0.008
+                )
+            end
+        else
+            st.badSamples = 0
+            st.goodSamples = 0
+        end
+
+    ---------------------------------------------------------------------------
+    -- throttle: повышаем интервал, пока FPS не стабилизируется выше цели.
+    ---------------------------------------------------------------------------
+    elseif st.mode == "throttle" then
+        if st.smooth < targetFps then
+            st.goodSamples = 0
+            st.badSamples = (st.badSamples or 0) + 1
+
+            local factor = 1.18
+
+            if st.smooth < targetFps * 0.75 then
+                factor = 1.45
+            elseif st.smooth < targetFps * 0.90 then
+                factor = 1.28
+            end
+
+            st.interval = math.min(
+                maxInterval,
+                (st.interval or minInterval) * factor + 0.006
+            )
+
+            if st.badSamples > 8 then
+                st.badSamples = 8
+            end
+        else
+            st.badSamples = 0
+
+            if st.smooth >= stableFps then
+                st.goodSamples = (st.goodSamples or 0) + 1
+
+                ---------------------------------------------------------------
+                -- FPS должен быть хорошим не один сэмпл подряд.
+                ---------------------------------------------------------------
+                if st.goodSamples >= 3 then
+                    st.mode = "hold"
+                    st.holdUntil = now + holdTime
+                    st.goodSamples = 0
+                    st.badSamples = 0
+                end
+            else
+                st.goodSamples = 0
+            end
+        end
+
+    ---------------------------------------------------------------------------
+    -- hold: найден рабочий троттлинг.
+    --
+    -- Держим его 10 секунд без изменений.
+    ---------------------------------------------------------------------------
+    elseif st.mode == "hold" then
+        if st.smooth < targetFps then
+            st.mode = "throttle"
+            st.goodSamples = 0
+            st.badSamples = 0
+
+            st.interval = math.min(
+                maxInterval,
+                (st.interval or minInterval) * 1.35 + 0.010
+            )
+        elseif now >= (st.holdUntil or 0) then
+            st.mode = "recover"
+            st.recoverStart = now
+            st.recoverFrom = st.interval or maxInterval
+            st.goodSamples = 0
+            st.badSamples = 0
+        end
+
+    ---------------------------------------------------------------------------
+    -- recover: плавно возвращаемся к обычному режиму в течение 10 секунд.
+    --
+    -- Если FPS снова просел, возвращаемся в throttle.
+    ---------------------------------------------------------------------------
+    elseif st.mode == "recover" then
+        if st.smooth < targetFps then
+            st.badSamples = (st.badSamples or 0) + 1
+            st.goodSamples = 0
+
+            if st.badSamples >= 2 or fps < targetFps * 0.80 then
+                st.mode = "throttle"
+                st.badSamples = 0
+                st.goodSamples = 0
+
+                st.interval = math.min(
+                    maxInterval,
+                    (st.interval or minInterval) * 1.30 + 0.010
+                )
+            end
+        else
+            st.badSamples = 0
+
+            local elapsed = now - (st.recoverStart or now)
+            local progress = elapsed / recoverTime
+
+            if progress < 0 then
+                progress = 0
+            elseif progress > 1 then
+                progress = 1
+            end
+
+            local from = st.recoverFrom or maxInterval
+            local planned = from + (minInterval - from) * progress
+
+            -------------------------------------------------------------------
+            -- Не разрешаем слишком резкие скачки даже внутри плавного
+            -- восстановления.
+            -------------------------------------------------------------------
+            st.interval = (st.interval or from)
+                + (planned - (st.interval or from)) * 0.35
+
+            if st.interval < minInterval then
+                st.interval = minInterval
+            elseif st.interval > maxInterval then
+                st.interval = maxInterval
+            end
+
+            if progress >= 1 and st.interval <= minInterval * 1.05 then
+                st.mode = "normal"
+                st.interval = minInterval
+                st.goodSamples = 0
+                st.badSamples = 0
+            end
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Финальная страховка.
+    ---------------------------------------------------------------------------
+    if type(st.interval) ~= "number" or st.interval ~= st.interval then
+        st.interval = minInterval
+    end
+
+    if st.interval < minInterval then
+        st.interval = minInterval
+    elseif st.interval > maxInterval then
+        st.interval = maxInterval
+    end
+
     return st
 end
 
@@ -10404,7 +10655,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
 
     local dx = to.x - from.x
     local dy = to.y - from.y
-
     if (dx * dx + dy * dy) < 36 then
         return nil
     end
@@ -10416,6 +10666,12 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
 
     ---------------------------------------------------------------------------
     -- Для кокона отключаем маршрутизацию полностью.
+    --
+    -- Внутренние переходы кокона считаются частью плетения, поэтому:
+    -- - nspCrawl = true убирает TRAVEL_SPEED_MULT;
+    -- - IsEmptyMovementTask() ниже отключает EMPTY_SPEED_MULT для nspCocoon.
+    --
+    -- В итоге скорость такая же, как при обычном плетении нити.
     ---------------------------------------------------------------------------
     if inst and inst.isCocoon then
         local task = {
@@ -10429,10 +10685,10 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
             nspNoInsert = true,
             nspNoSupportCheck = true,
             nspCocoon = true,
+            nspCrawl = true,
         }
 
         tasks[#tasks + 1] = task
-
         return task
     end
 
@@ -10452,7 +10708,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
     }
 
     tasks[#tasks + 1] = task
-
     return task
 end
 
@@ -13578,11 +13833,6 @@ function NSPauk:GetWebPointSpacing()
     return spacing
 end
 
----------------------------------------------------------------------------
--- Пустой переход: паук движется между точками, но не плетёт нить.
--- Именно такие задачи нужно ускорять в EMPTY_SPEED_MULT раз.
----------------------------------------------------------------------------
-
 function NSPauk:IsEmptyMovementTask(task)
     if not task then
         return false
@@ -13596,6 +13846,11 @@ function NSPauk:IsEmptyMovementTask(task)
         or task.nspTempThread
         or task.nspStartDragTask
         or task.nspFall then
+        return false
+    end
+
+    ---------------------------------------------------------------------------
+    if task.nspCocoon and not task.nspCocoonApproach then
         return false
     end
 
@@ -14539,8 +14794,8 @@ end
 
 function NSPauk:NP_InsertApproachBeforeTask(task)
     local S = self.S
-
     local cur = self:NP_GetSpiderPointIfShown()
+
     if not cur or not task or not task.p0 then
         return false
     end
@@ -14550,10 +14805,11 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
     end
 
     ---------------------------------------------------------------------------
-    -- Для кокона маршрутизация не нужна.
+    -- Для кокона к первой точке кокона идём по обычным правилам маршрутизации,
+    -- как к любой другой точке, со скоростью пустого перехода.
     --
-    -- Если паук далеко от старта линии, вставляем прямой переход,
-    -- а не plan/Dijkstra.
+    -- Здесь не делаем прямой телепорт-перелёт и не включаем ускорение
+    -- TRAVEL_SPEED_MULT. Маршрут строится один раз перед началом кокона.
     ---------------------------------------------------------------------------
     if task.nspCocoon then
         local dx = task.p0.x - cur.x
@@ -14563,29 +14819,72 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
             return false
         end
 
-        local approach = {
-            kind = "travel",
-            nspCocoon = true,
-            nspCocoonApproach = true,
-            nspNoSupportCheck = true,
-            nspNoInsert = true,
-            nspAllowTeleport = true,
-            drop = false,
-            p0 = { x = cur.x, y = cur.y },
-            p1 = {
-                x = (cur.x + task.p0.x) / 2,
-                y = (cur.y + task.p0.y) / 2,
-            },
-            p2 = { x = task.p0.x, y = task.p0.y },
-            conn = task.conn,
-            owner = task.owner,
+        local target = {
+            x = task.p0.x,
+            y = task.p0.y,
         }
 
-        table.insert(S.tasks, S.taskIdx, approach)
+        local route = self:NP_BuildRoute(cur, target)
 
-        task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
+        local insertIndex = S.taskIdx
+        local inserted = 0
 
-        return true
+        local function insertCrawl(a, b)
+            if not a or not b then
+                return
+            end
+
+            if type(a.x) ~= "number"
+                or type(a.y) ~= "number"
+                or type(b.x) ~= "number"
+                or type(b.y) ~= "number" then
+                return
+            end
+
+            local ddx = b.x - a.x
+            local ddy = b.y - a.y
+
+            if ddx * ddx + ddy * ddy <= 1 then
+                return
+            end
+
+            local crawl = self:NP_MakeCrawlTask(a, b, nil)
+
+            crawl.nspCocoonApproach = true
+            crawl.nspNoSupportCheck = true
+            crawl.nspNoInsert = true
+            crawl.conn = task.conn
+            crawl.owner = task.owner
+
+            table.insert(S.tasks, insertIndex, crawl)
+            insertIndex = insertIndex + 1
+            inserted = inserted + 1
+        end
+
+        -----------------------------------------------------------------------
+        -- Если маршрутизатор нашёл прямой маршрут, идём по нему.
+        -- Если нет — делаем один прямой crawl-переход, но уже без
+        -- travel-ускорения и с нормальной пустой скоростью.
+        -----------------------------------------------------------------------
+        if route
+            and route.points
+            and #route.points >= 2
+            and route.kind == "direct" then
+            for i = 1, #route.points - 1 do
+                insertCrawl(route.points[i], route.points[i + 1])
+            end
+        end
+
+        if inserted == 0 then
+            insertCrawl(cur, target)
+        end
+
+        if inserted > 0 then
+            task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
+            return true
+        end
+
+        return false
     end
 
     ---------------------------------------------------------------------------
@@ -14608,12 +14907,10 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
     plan.nspApproachPlan = true
 
     table.insert(S.tasks, S.taskIdx, plan)
-
     task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
 
     return true
 end
-
 ---------------------------------------------------------------------------
 -- AdvanceTask: anti-teleport version
 ---------------------------------------------------------------------------
