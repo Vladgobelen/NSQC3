@@ -5504,6 +5504,7 @@ end)
 
 
 
+
 local ADDON_FOLDER = ...
 if type(ADDON_FOLDER) ~= "string" or ADDON_FOLDER == "" then
     ADDON_FOLDER = "NSPauk"
@@ -5682,6 +5683,11 @@ local function getThreadTexCount(thread)
 end
 
 NSPauk.DefaultConstants = {
+    ADAPTIVE_ENABLED = 1,
+    ADAPTIVE_FPS_MIN = 5,
+    ADAPTIVE_STEP = 0.05,
+    ADAPTIVE_CHECK = 1.0,
+    ADAPTIVE_MAX_INTERVAL = 0.5,
     SPIDER_ANIM_INTERVAL = 0.18,
     DELAY_AFTER_LOGIN = 3,
     STILL_WAIT = 5,
@@ -5756,77 +5762,57 @@ NSPauk.DefaultConstants = {
 }
 
 NSPauk.ConstantDescriptions = {
-    SPIDER_ANIM_INTERVAL = "Интервал смены кадров паука (сек)",
-    DELAY_AFTER_LOGIN = "Задержка старта после входа (сек)",
-    STILL_WAIT = "Ожидание покоя до новой паутины (сек)",
-    SPEED_CHECK = "Интервал проверки движения (сек)",
-    SPEED_THRESHOLD = "Порог скорости: бег/стояние",
-    WEB_SIZE = "Размер точек паутины",
-    WEB_ALPHA = "Прозрачность паутины (0..1)",
+    -----------------------------------------------------------------------
+    -- Внешний вид
+    -----------------------------------------------------------------------
     SPIDER_SIZE = "Размер паука",
-    FAST_MODE = "Общий множитель скорости",
-    MAX_WEB_SEGS = "Лимит живых точек паутины",
-    FADE_DURATION = "Растворение паутины после клика (сек)",
-    DISABLE_TIME = "Отключение паука после клика (сек)",
-    MIN_ANCHOR_SIZE = "Мин. размер фрейма-опоры",
-    MIN_INNER_SIZE = "Мин. размер зоны крепления",
-    MIN_WEB_GAP = "Мин. длина нити",
-    MIN_CROSS_LEN = "Мин. длина перемычки",
-    MAX_VISIBLE_RECTS = "Макс. фреймов-целей",
-    TARGET_COUNT_MIN = "Мин. нитей в паутине",
-    TARGET_COUNT_MAX = "Макс. нитей в паутине",
-    MAX_INSTANCES = "Макс. одновременных паутин",
-    CROSS_ROW_SPACING = "Шаг рядов перемычек",
-    MAX_CROSS_ROWS = "Макс. рядов перемычек",
-    ARC_SAMPLES = "Точность расчёта дуги",
-    MAIN_SAG_MIN = "Мин. провис основных нитей",
-    MAIN_SAG_MAX = "Макс. провис основных нитей",
-    CROSS_SAG_MIN = "Мин. провис перемычек",
-    CROSS_SAG_MAX = "Макс. провис перемычек",
-    SPIDER_SPEED_MIN = "Мин. скорость паука",
-    SPIDER_SPEED_MAX = "Макс. скорость паука",
-    TRAVEL_SPEED_MULT = "Множитель скорости переходов",
-    CROSS_SPEED_MULT = "Множитель скорости на перемычках",
-    MAIN_SPEED_MULT = "Множитель скорости на основных нитях",
-    EMPTY_SPEED_MULT = "Множитель скорости пустых переходов (без плетения)",
-    WEB_POINT_SPACING_MAX = "Шаг точек паутины",
-    MAX_DROPS_PER_FRAME = "Макс. точек за кадр",
-    DRAG_FPS_TARGET = "Порог FPS для троттлинга нити",
-    DRAG_FPS_RECOVER = "FPS возврата к нормальной отрисовке",
-    DRAG_FPS_SAMPLE = "Интервал замера FPS (сек)",
-    DRAG_UPDATE_MIN = "Мин. интервал обновления нити (сек)",
-    DRAG_UPDATE_MAX = "Макс. интервал обновления нити (сек)",
-    COMPLETE_PAUSE = "Пауза после паутины (сек)",
-    MONITOR_CHECK = "Интервал проверки сдвига фреймов (сек)",
-    MOVEMENT_TOLERANCE = "Допуск сдвига фреймов",
-    TEAR_FADE_DURATION = "Обрыв нити (сек)",
-    COCOON_CHANCE = "Шанс кокона (0..1)",
-    COCOON_WRAPS_MIN = "Мин. витков кокона",
-    COCOON_WRAPS_MAX = "Макс. витков кокона",
-    COCOON_LOOP_SEGS = "Сегментов в витке кокона",
-    COCOON_DIAG_MIN = "Мин. диагоналей кокона",
-    COCOON_DIAG_MAX = "Макс. диагоналей кокона",
-    COCOON_MIN_WIDTH = "Мин. ширина жертвы кокона",
-    COCOON_MIN_AREA = "Мин. площадь жертвы кокона",
-    COCOON_MAX_AREA = "Макс. площадь жертвы кокона",
-    DISSOLVE_DURATION_MIN = "Мин. время растворения жертвы (сек)",
-    DISSOLVE_DURATION_MAX = "Макс. время растворения жертвы (сек)",
-    MIN_COCOON_ALPHA = "Мин. прозрачность жертвы",
-    MOUSE_CHECK = "Интервал проверки мыши (сек)",
-    MOUSE_THREAD_DIST = "Дистанция обрыва нити мышью",
-    MOUSE_HOVER_LIMIT = "Наведений мыши для обрыва нити",
-    MOUSE_STREAK_RESET = "Сброс счётчика наведений (сек)",
-    POINTS_PER_LEVEL = "Точек паутины на уровень",
-    SESSION_FULL_POINTS = "Точек для полного опыта сессии",
-    SESSION_EXP_PERCENT_MAX = "Макс. доля опыта сессии (0..1)",
-    COCOON_EXP_PERCENT = "Доля опыта за кокон (0..1)",
-    LIMIT_COCOON_INTERVAL = "Интервал кокона при лимите (сек)",
-    LIMIT_COCOON_RETRY = "Повтор кокона при лимите (сек)",
-    CROSS_MAX_SECTOR_ANGLE = "Макс. угол сектора перемычек",
-    WEB_THREAD_MIN_SEPARATION = "Мин. расстояние между нитями",
-    WEB_HUB_IGNORE_DIST = "Игнор-дистанция у центра паутины",
-    WEB_TARGET_REROLL_ATTEMPTS = "Попыток подбора цели нити",
-    SURVIVAL_CHANCE = "Выживаемость: шанс избежать смерти",
+    WEB_SIZE = "Размер точек паутины",
+    WEB_ALPHA = "Прозрачность паутины",
+
+    -----------------------------------------------------------------------
+    -- Поведение
+    -----------------------------------------------------------------------
+    STILL_WAIT = "Сколько секунд ждать в покое перед новой паутиной",
+    COMPLETE_PAUSE = "Пауза после завершения паутины (сек)",
+    DISABLE_TIME = "На сколько секунд паук отключается после убийства",
+    MOUSE_HOVER_LIMIT = "Сколько наведений мыши нужно, чтобы порвать нить",
+
+    -----------------------------------------------------------------------
+    -- Скорость
+    -----------------------------------------------------------------------
+    FAST_MODE = "Общий множитель скорости паука",
+    SPIDER_SPEED_MIN = "Минимальная скорость паука",
+    SPIDER_SPEED_MAX = "Максимальная скорость паука",
+    TRAVEL_SPEED_MULT = "Ускорение переходов без плетения",
+    CROSS_SPEED_MULT = "Скорость на перемычках",
+    MAIN_SPEED_MULT = "Скорость на основных нитях",
+    EMPTY_SPEED_MULT = "Скорость пустых переходов",
+
+    -----------------------------------------------------------------------
+    -- Паутина
+    -----------------------------------------------------------------------
+    TARGET_COUNT_MIN = "Минимум основных нитей паутины",
+    TARGET_COUNT_MAX = "Максимум основных нитей паутины",
+    MAX_INSTANCES = "Сколько паутин может висеть одновременно",
+
+    -----------------------------------------------------------------------
+    -- Кокон
+    -----------------------------------------------------------------------
+    COCOON_CHANCE = "Шанс сделать кокон вместо обычной паутины",
+    COCOON_WRAPS_MIN = "Минимум витков кокона",
+    COCOON_WRAPS_MAX = "Максимум витков кокона",
+    COCOON_DIAG_MIN = "Минимум диагональных нитей кокона",
+    COCOON_DIAG_MAX = "Максимум диагональных нитей кокона",
+    DISSOLVE_DURATION_MIN = "Минимальное время поедания кокона (сек)",
+    DISSOLVE_DURATION_MAX = "Максимальное время поедания кокона (сек)",
+    MIN_COCOON_ALPHA = "Насколько прозрачной становится жертва кокона",
+
+    -----------------------------------------------------------------------
+    -- Прогресс и выживаемость
+    -----------------------------------------------------------------------
+    POINTS_PER_LEVEL = "Сколько точек паутины нужно для одного уровня",
+    COCOON_EXP_PERCENT = "Доля уровня за кокон",
+    SURVIVAL_CHANCE = "Шанс паука выжить после клика тапком",
 }
 
 NSPauk.S = {
@@ -5917,7 +5903,6 @@ function NSPauk:EnsureDB()
 
     for key, value in pairs(self.DefaultConstants) do
         local current = db.constants[key]
-
         if current == nil then
             db.constants[key] = value
         elseif type(value) == "number" and (type(current) ~= "number" or current ~= current) then
@@ -5946,14 +5931,12 @@ function NSPauk:EnsureDB()
 
     for i = #db.progress.history, 1, -1 do
         local entry = db.progress.history[i]
-
         if type(entry) == "table" and entry.key == "MIGRATED" and entry.migrated then
             table.remove(db.progress.history, i)
         end
     end
 
     db.progress.historyMigrated = nil
-
 
     if type(db.spiderProfile) ~= "string" or db.spiderProfile == "" then
         db.spiderProfile = "default"
@@ -5967,6 +5950,51 @@ function NSPauk:EnsureDB()
         and not self.SpiderTextureProfiles[db.spiderProfile] then
         db.spiderProfile = "default"
     end
+
+    -----------------------------------------------------------------------
+    -- Адаптивный режим хранится отдельно от constants,
+    -- чтобы ResetConstants() не сбрасывал найденный интервал.
+    -----------------------------------------------------------------------
+    if type(db.adaptive) ~= "table" then
+        db.adaptive = {}
+    end
+
+    local adaptive = db.adaptive
+
+    if type(adaptive.enabled) ~= "boolean" then
+        if adaptive.enabled == 0 or adaptive.enabled == false then
+            adaptive.enabled = false
+        else
+            adaptive.enabled = true
+        end
+    end
+
+    if type(adaptive.level) ~= "number"
+        or adaptive.level ~= adaptive.level
+        or adaptive.level < 0 then
+        adaptive.level = 0
+    end
+
+    adaptive.level = math.floor(adaptive.level + 0.5)
+
+    if type(adaptive.interval) ~= "number"
+        or adaptive.interval ~= adaptive.interval
+        or adaptive.interval < 0 then
+        adaptive.interval = 0
+    end
+
+    local maxInterval = self.DefaultConstants.ADAPTIVE_MAX_INTERVAL
+    if type(maxInterval) ~= "number"
+        or maxInterval ~= maxInterval
+        or maxInterval <= 0 then
+        maxInterval = 0.5
+    end
+
+    if adaptive.interval > maxInterval then
+        adaptive.interval = maxInterval
+    end
+
+    self.DB = db
 
     return db
 end
@@ -6062,10 +6090,44 @@ function NSPauk:ApplyRuntimeConstants()
         C.DRAG_UPDATE_MAX = math.max(0.25, C.DRAG_UPDATE_MIN * 4)
     end
 
+    -----------------------------------------------------------------------
+    -- Адаптивный режим
+    -----------------------------------------------------------------------
+    C.ADAPTIVE_ENABLED = math.floor(num(C.ADAPTIVE_ENABLED, 1) + 0.5)
+    if C.ADAPTIVE_ENABLED ~= 0 then
+        C.ADAPTIVE_ENABLED = 1
+    end
+
+    C.ADAPTIVE_FPS_MIN = num(C.ADAPTIVE_FPS_MIN, 29)
+    if C.ADAPTIVE_FPS_MIN < 5 then
+        C.ADAPTIVE_FPS_MIN = 29
+    end
+
+    C.ADAPTIVE_STEP = num(C.ADAPTIVE_STEP, 0.05)
+    if C.ADAPTIVE_STEP <= 0 then
+        C.ADAPTIVE_STEP = 0.05
+    end
+
+    C.ADAPTIVE_CHECK = num(C.ADAPTIVE_CHECK, 1.0)
+    if C.ADAPTIVE_CHECK < 0.25 then
+        C.ADAPTIVE_CHECK = 1.0
+    end
+
+    C.ADAPTIVE_MAX_INTERVAL = num(C.ADAPTIVE_MAX_INTERVAL, 0.5)
+    if C.ADAPTIVE_MAX_INTERVAL < 0.05 then
+        C.ADAPTIVE_MAX_INTERVAL = 0.5
+    end
+
+    if C.ADAPTIVE_MAX_INTERVAL < C.ADAPTIVE_STEP then
+        C.ADAPTIVE_MAX_INTERVAL = C.ADAPTIVE_STEP
+    end
+
     C.CROSS_MAX_SECTOR_ANGLE = num(C.CROSS_MAX_SECTOR_ANGLE, 160)
     C.WEB_THREAD_MIN_SEPARATION = num(C.WEB_THREAD_MIN_SEPARATION, 20)
     C.WEB_HUB_IGNORE_DIST = num(C.WEB_HUB_IGNORE_DIST, 100)
+
     C.WEB_TARGET_REROLL_ATTEMPTS = math.floor(num(C.WEB_TARGET_REROLL_ATTEMPTS, 8) + 0.5)
+
     C.COCOON_MIN_WIDTH = num(C.COCOON_MIN_WIDTH, 30)
 
     -- Интервал анимации текстур паука.
@@ -8127,6 +8189,27 @@ function NSPauk:NP_IsFrameSupportAlive(frame, x, y, tol)
         return false
     end
 
+    -----------------------------------------------------------------------
+    -- UIParent разрешаем как полную опору только для маршрутов кокона.
+    -- Это не делает его обычным якорем для паутины.
+    -----------------------------------------------------------------------
+    if frame == UIParent then
+        local sw, sh = self:GetScreenSize()
+
+        if type(x) == "number" and type(y) == "number" then
+            if type(tol) ~= "number" or tol ~= tol or tol < 0 then
+                tol = 0
+            end
+
+            return x >= -tol
+                and x <= sw + tol
+                and y >= -tol
+                and y <= sh + tol
+        end
+
+        return true
+    end
+
     local cur = self:ComputeFrameVisibleInner(frame)
     if not cur then
         return false
@@ -8322,6 +8405,49 @@ end
 
 function NSPauk:NP_GetVisibleFrameRects(a, b, padOverride)
     local all = self:NP_EnsureFrameCache()
+
+    -----------------------------------------------------------------------
+    -- Если текущий кокон сидит на UIParent, добавляем весь экран
+    -- как маршрутный фрейм. Это нужно только для маршрутизации,
+    -- а не для выбора обычных якорей паутины.
+    -----------------------------------------------------------------------
+    if self:NP_RouteNeedsUIParent() then
+        local hasUIParent = false
+
+        for _, r in ipairs(all) do
+            if r.frame == UIParent then
+                hasUIParent = true
+                break
+            end
+        end
+
+        if not hasUIParent then
+            local sw, sh = self:GetScreenSize()
+
+            if sw > 0 and sh > 0 then
+                local copy = {}
+
+                for _, r in ipairs(all) do
+                    copy[#copy + 1] = r
+                end
+
+                copy[#copy + 1] = {
+                    name = "UIParent",
+                    frame = UIParent,
+                    left = 0,
+                    right = sw,
+                    bottom = 0,
+                    top = sh,
+                    width = sw,
+                    height = sh,
+                    cx = sw / 2,
+                    cy = sh / 2,
+                }
+
+                all = copy
+            end
+        end
+    end
 
     local pad = padOverride or 280
 
@@ -9761,18 +9887,53 @@ function NSPauk:NP_DropPermanentThread(owner, thread)
     end
 
     local total = self:ApproxThreadLength(th)
+
     if total <= 0 then
         return
     end
 
-    local spacing = self:GetWebPointSpacing()
+    local spacing = self:GetWebPointSpacingForTask({ owner = owner })
+
+    if type(spacing) ~= "number" or spacing ~= spacing or spacing <= 0 then
+        spacing = 1
+    end
+
+    -----------------------------------------------------------------------
+    -- Гарантируем сплошную нить.
+    --
+    -- Максимальный шаг по центрам точек — 2.5 px.
+    -- Обычно шаг будет около 1 px, как и должно быть.
+    -----------------------------------------------------------------------
+    if spacing > 2.5 then
+        spacing = 2.5
+    end
 
     local count = math.floor(total / spacing) + 1
+
     if count < 2 then
         count = 2
     end
 
-    local hard = math.max(tonumber(self.C.MAX_DROPS_PER_FRAME) or 140, 1000)
+    local maxGap = 2.5
+    local minCount = math.floor(total / maxGap) + 2
+
+    if count < minCount then
+        count = minCount
+    end
+
+    -----------------------------------------------------------------------
+    -- Аварийный потолок.
+    --
+    -- Для обычных экранных нитей его хватает с запасом.
+    -- Если нить вдруг очень длинная, он не даст одному вызову
+    -- создать бесконечно много текстур за один кадр.
+    -----------------------------------------------------------------------
+    local hard = math.max(5000, minCount)
+
+    if hard > 12000 then
+        hard = 12000
+    end
+
     if count > hard then
         count = hard
     end
@@ -9784,6 +9945,7 @@ function NSPauk:NP_DropPermanentThread(owner, thread)
 
     for i = 0, count - 1 do
         local t = i / (count - 1)
+
         local x, y = self:BzThread(th, t)
 
         self:DropWebForTask(dropTask, x, y)
@@ -10046,294 +10208,43 @@ end
 function NSPauk:NP_UpdateDragThrottle(now)
     local S = self.S
     local C = self.C
-
-    local function readFps()
-        local fps = GetFramerate and GetFramerate() or 60
-        if type(fps) ~= "number" or fps ~= fps or fps <= 0 then
-            fps = 60
-        end
-        return fps
-    end
-
-    local minInterval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
-    local maxInterval = tonumber(C.DRAG_UPDATE_MAX) or 0.25
-    local targetFps = tonumber(C.DRAG_FPS_TARGET) or 40
-    local sampleEvery = tonumber(C.DRAG_FPS_SAMPLE) or 0.25
-
-    if minInterval < 0.005 then
-        minInterval = 0.016
-    end
-
-    if maxInterval < minInterval then
-        maxInterval = math.max(0.25, minInterval * 4)
-    end
-
-    if targetFps < 5 then
-        targetFps = 40
-    end
-
-    if sampleEvery < 0.1 then
-        sampleEvery = 0.1
-    end
-
-    ---------------------------------------------------------------------------
-    -- Делаем проверку чуть более частой, чем стартовые 0.4 секунды,
-    -- чтобы троттлинг реагировал живее.
-    ---------------------------------------------------------------------------
-    if sampleEvery > 0.25 then
-        sampleEvery = 0.25
-    end
-
-    ---------------------------------------------------------------------------
-    -- Стабильным считаем FPS чуть выше цели, чтобы не дёргаться
-    -- около порога 40.
-    ---------------------------------------------------------------------------
-    local stableFps = targetFps + 3
-
-    ---------------------------------------------------------------------------
-    -- Сколько держать найденный рабочий троттлинг перед восстановлением.
-    ---------------------------------------------------------------------------
-    local holdTime = 10
-
-    ---------------------------------------------------------------------------
-    -- Сколько времени плавно возвращаться к обычному режиму.
-    ---------------------------------------------------------------------------
-    local recoverTime = 10
-
     local st = S.nspDragFps
     if not st then
         st = {
             smooth = 0,
             lastSampleAt = 0,
-            interval = minInterval,
-            mode = "normal",
-            goodSamples = 0,
-            badSamples = 0,
-            holdUntil = 0,
-            recoverStart = 0,
-            recoverFrom = maxInterval,
+            interval = tonumber(C.DRAG_UPDATE_MIN) or 0.016,
         }
         S.nspDragFps = st
     end
-
-    now = tonumber(now) or GetTime()
-
-    ---------------------------------------------------------------------------
-    -- Если троттлинг долго не использовался, считаем, что прошлая
-    -- история FPS уже не актуальна.
-    ---------------------------------------------------------------------------
-    if type(st.lastSampleAt) ~= "number"
-        or st.lastSampleAt <= 0
-        or now - st.lastSampleAt > 3 then
-        st.smooth = readFps()
+    -- Первое измерение после старта нити: инициализируем без истории.
+    if st.smooth <= 0 then
+        st.smooth = readClientFps()
         st.lastSampleAt = now
-        st.interval = minInterval
-        st.mode = "normal"
-        st.goodSamples = 0
-        st.badSamples = 0
-        st.holdUntil = 0
-        st.recoverStart = 0
-        st.recoverFrom = maxInterval
+        st.interval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
         return st
     end
-
-    if now - st.lastSampleAt < sampleEvery then
+    local sampleEvery = tonumber(C.DRAG_FPS_SAMPLE) or 0.4
+    if sampleEvery < 0.1 then
+        sampleEvery = 0.1
+    end
+    if (now - (st.lastSampleAt or 0)) < sampleEvery then
         return st
     end
-
     st.lastSampleAt = now
-
-    local fps = readFps()
-
-    if type(st.smooth) ~= "number" or st.smooth <= 0 then
-        st.smooth = fps
-    else
-        st.smooth = st.smooth * 0.60 + fps * 0.40
+    -- Сглаженный FPS, чтобы одиночный провал не включал троттлинг.
+    st.smooth = st.smooth * 0.55 + readClientFps() * 0.45
+    local target = tonumber(C.DRAG_FPS_TARGET) or 40
+    local recover = tonumber(C.DRAG_FPS_RECOVER) or 48
+    local minInterval = tonumber(C.DRAG_UPDATE_MIN) or 0.016
+    local maxInterval = tonumber(C.DRAG_UPDATE_MAX) or 0.25
+    if st.smooth < target then
+        -- FPS ниже порога: рисуем всё реже и реже.
+        st.interval = math.min(st.interval * 1.7 + 0.01, maxInterval)
+    elseif st.smooth >= recover and st.interval > minInterval then
+        -- FPS выровнялся: плавно возвращаемся к нормальной отрисовке.
+        st.interval = math.max(st.interval * 0.65, minInterval)
     end
-
-    if type(st.mode) ~= "string" then
-        st.mode = "normal"
-    end
-
-    if type(st.interval) ~= "number" or st.interval ~= st.interval then
-        st.interval = minInterval
-    end
-
-    if st.interval < minInterval then
-        st.interval = minInterval
-    elseif st.interval > maxInterval then
-        st.interval = maxInterval
-    end
-
-    ---------------------------------------------------------------------------
-    -- normal: обычный режим.
-    --
-    -- Если FPS стабильно ниже цели, входим в throttle.
-    ---------------------------------------------------------------------------
-    if st.mode == "normal" then
-        st.interval = minInterval
-
-        if st.smooth < targetFps then
-            st.badSamples = (st.badSamples or 0) + 1
-            st.goodSamples = 0
-
-            -------------------------------------------------------------------
-            -- При сильном провале реагируем сразу.
-            -- Иначе ждём пару сэмплов, чтобы не дёргаться от мгновенных
-            -- скачков FPS.
-            -------------------------------------------------------------------
-            if st.badSamples >= 2 or fps < targetFps * 0.80 then
-                st.mode = "throttle"
-                st.badSamples = 0
-                st.goodSamples = 0
-
-                st.interval = math.min(
-                    maxInterval,
-                    math.max(minInterval, st.interval) * 1.25 + 0.008
-                )
-            end
-        else
-            st.badSamples = 0
-            st.goodSamples = 0
-        end
-
-    ---------------------------------------------------------------------------
-    -- throttle: повышаем интервал, пока FPS не стабилизируется выше цели.
-    ---------------------------------------------------------------------------
-    elseif st.mode == "throttle" then
-        if st.smooth < targetFps then
-            st.goodSamples = 0
-            st.badSamples = (st.badSamples or 0) + 1
-
-            local factor = 1.18
-
-            if st.smooth < targetFps * 0.75 then
-                factor = 1.45
-            elseif st.smooth < targetFps * 0.90 then
-                factor = 1.28
-            end
-
-            st.interval = math.min(
-                maxInterval,
-                (st.interval or minInterval) * factor + 0.006
-            )
-
-            if st.badSamples > 8 then
-                st.badSamples = 8
-            end
-        else
-            st.badSamples = 0
-
-            if st.smooth >= stableFps then
-                st.goodSamples = (st.goodSamples or 0) + 1
-
-                ---------------------------------------------------------------
-                -- FPS должен быть хорошим не один сэмпл подряд.
-                ---------------------------------------------------------------
-                if st.goodSamples >= 3 then
-                    st.mode = "hold"
-                    st.holdUntil = now + holdTime
-                    st.goodSamples = 0
-                    st.badSamples = 0
-                end
-            else
-                st.goodSamples = 0
-            end
-        end
-
-    ---------------------------------------------------------------------------
-    -- hold: найден рабочий троттлинг.
-    --
-    -- Держим его 10 секунд без изменений.
-    ---------------------------------------------------------------------------
-    elseif st.mode == "hold" then
-        if st.smooth < targetFps then
-            st.mode = "throttle"
-            st.goodSamples = 0
-            st.badSamples = 0
-
-            st.interval = math.min(
-                maxInterval,
-                (st.interval or minInterval) * 1.35 + 0.010
-            )
-        elseif now >= (st.holdUntil or 0) then
-            st.mode = "recover"
-            st.recoverStart = now
-            st.recoverFrom = st.interval or maxInterval
-            st.goodSamples = 0
-            st.badSamples = 0
-        end
-
-    ---------------------------------------------------------------------------
-    -- recover: плавно возвращаемся к обычному режиму в течение 10 секунд.
-    --
-    -- Если FPS снова просел, возвращаемся в throttle.
-    ---------------------------------------------------------------------------
-    elseif st.mode == "recover" then
-        if st.smooth < targetFps then
-            st.badSamples = (st.badSamples or 0) + 1
-            st.goodSamples = 0
-
-            if st.badSamples >= 2 or fps < targetFps * 0.80 then
-                st.mode = "throttle"
-                st.badSamples = 0
-                st.goodSamples = 0
-
-                st.interval = math.min(
-                    maxInterval,
-                    (st.interval or minInterval) * 1.30 + 0.010
-                )
-            end
-        else
-            st.badSamples = 0
-
-            local elapsed = now - (st.recoverStart or now)
-            local progress = elapsed / recoverTime
-
-            if progress < 0 then
-                progress = 0
-            elseif progress > 1 then
-                progress = 1
-            end
-
-            local from = st.recoverFrom or maxInterval
-            local planned = from + (minInterval - from) * progress
-
-            -------------------------------------------------------------------
-            -- Не разрешаем слишком резкие скачки даже внутри плавного
-            -- восстановления.
-            -------------------------------------------------------------------
-            st.interval = (st.interval or from)
-                + (planned - (st.interval or from)) * 0.35
-
-            if st.interval < minInterval then
-                st.interval = minInterval
-            elseif st.interval > maxInterval then
-                st.interval = maxInterval
-            end
-
-            if progress >= 1 and st.interval <= minInterval * 1.05 then
-                st.mode = "normal"
-                st.interval = minInterval
-                st.goodSamples = 0
-                st.badSamples = 0
-            end
-        end
-    end
-
-    ---------------------------------------------------------------------------
-    -- Финальная страховка.
-    ---------------------------------------------------------------------------
-    if type(st.interval) ~= "number" or st.interval ~= st.interval then
-        st.interval = minInterval
-    end
-
-    if st.interval < minInterval then
-        st.interval = minInterval
-    elseif st.interval > maxInterval then
-        st.interval = maxInterval
-    end
-
     return st
 end
 
@@ -10433,22 +10344,28 @@ function NSPauk:NP_NearSupportWithin(x, y, tol)
     end
 
     local now = GetTime()
+
     local rx = math.floor((x or 0) / 4 + 0.5)
     local ry = math.floor((y or 0) / 4 + 0.5)
     local rt = math.floor(tol + 0.5)
+
+    local needUI = self:NP_RouteNeedsUIParent() and 1 or 0
 
     local cache = S.nspNearCache
     if cache
         and now - (cache.t or 0) < 0.18
         and cache.x == rx
         and cache.y == ry
-        and cache.tol == rt then
+        and cache.tol == rt
+        and cache.ctx == needUI then
         return cache.ok
     end
 
     local ok = false
+
     local sw, sh = self:GetScreenSize()
     local gap = self:NP_GetGap()
+
     local edgeTol = math.min(tol, gap)
 
     if x <= edgeTol
@@ -10458,8 +10375,22 @@ function NSPauk:NP_NearSupportWithin(x, y, tol)
         ok = true
     end
 
+    -----------------------------------------------------------------------
+    -- Для кокона на UIParent считаем весь экран допустимой опорой.
+    -- Это нужно только для маршрутизации и проверок поддержки.
+    -----------------------------------------------------------------------
+    if not ok and needUI == 1 then
+        if x >= -tol
+            and x <= sw + tol
+            and y >= -tol
+            and y <= sh + tol then
+            ok = true
+        end
+    end
+
     if not ok then
         local rects = self:NP_EnsureFrameCache()
+
         for _, r in ipairs(rects) do
             if x >= r.left - tol
                 and x <= r.right + tol
@@ -10480,6 +10411,7 @@ function NSPauk:NP_NearSupportWithin(x, y, tol)
                 for _, conn in ipairs(inst.conns) do
                     if conn.alive and conn.thread then
                         checked = checked + 1
+
                         if self:NP_ThreadWithinDist(conn.thread, conn, x, y, tol) then
                             found = true
                             break
@@ -10496,6 +10428,7 @@ function NSPauk:NP_NearSupportWithin(x, y, tol)
                 for _, seg in ipairs(inst.crossSegs) do
                     if seg.alive and seg.thread then
                         checked = checked + 1
+
                         if self:NP_ThreadWithinDist(seg.thread, seg, x, y, tol) then
                             found = true
                             break
@@ -10519,40 +10452,457 @@ function NSPauk:NP_NearSupportWithin(x, y, tol)
         x = rx,
         y = ry,
         tol = rt,
+        ctx = needUI,
         ok = ok,
     }
 
     return ok
 end
 
-function NSPauk:NP_PostUpdate()
+---------------------------------------------------------------------------
+-- Адаптивный режим по FPS
+---------------------------------------------------------------------------
+function NSPauk:NP_GetAdaptiveDB()
+    local db = self.DB
+    if type(db) ~= "table" then
+        db = self:EnsureDB()
+    end
+    if type(db.adaptive) ~= "table" then
+        db.adaptive = {
+            enabled = true,
+            level = 0,
+            interval = 0,
+        }
+    end
+    return db.adaptive
+end
+
+function NSPauk:NP_IsAdaptiveEnabled()
+    local db = self:NP_GetAdaptiveDB()
+    if db.enabled == false then
+        return false
+    end
+    local C = self.C or {}
+    if tonumber(C.ADAPTIVE_ENABLED) == 0 then
+        return false
+    end
+    return true
+end
+
+function NSPauk:NP_GetAdaptiveInterval()
+    if not self:NP_IsAdaptiveEnabled() then
+        return 0
+    end
+
+    local db = self:NP_GetAdaptiveDB()
+    local C = self.C or {}
+
+    local interval = tonumber(db.interval) or 0
+    if interval < 0 then
+        interval = 0
+    end
+
+    local step = tonumber(C.ADAPTIVE_STEP) or 0.05
+    if step <= 0 then
+        step = 0.05
+    end
+
+    local maxInterval = tonumber(C.ADAPTIVE_MAX_INTERVAL) or 0.5
+    if maxInterval < step then
+        maxInterval = step
+    end
+
+    local level = math.floor(tonumber(db.level) or 0 + 0.5)
+    if level < 0 then
+        level = 0
+    end
+
+    if level > 0 then
+        local expected = math.min(level * step, maxInterval)
+        if interval < expected then
+            interval = expected
+        end
+    end
+
+    if interval > maxInterval then
+        interval = maxInterval
+    end
+
+    return interval
+end
+
+function NSPauk:NP_SaveAdaptive(level, interval)
+    local db = self:NP_GetAdaptiveDB()
+    local C = self.C or {}
+
+    local step = tonumber(C.ADAPTIVE_STEP) or 0.05
+    if step <= 0 then
+        step = 0.05
+    end
+
+    local maxInterval = tonumber(C.ADAPTIVE_MAX_INTERVAL) or 0.5
+    if maxInterval < step then
+        maxInterval = step
+    end
+
+    level = math.floor(tonumber(level) or 0 + 0.5)
+    interval = tonumber(interval) or 0
+
+    if level < 0 then
+        level = 0
+    end
+
+    local maxLevel = math.max(0, math.floor(maxInterval / step + 0.5))
+    if level > maxLevel then
+        level = maxLevel
+    end
+
+    interval = math.min(level * step, maxInterval)
+
+    if interval < 0 then
+        interval = 0
+    end
+
+    if db.level ~= level or db.interval ~= interval then
+        db.level = level
+        db.interval = interval
+    end
+end
+
+function NSPauk:NP_UpdateAdaptive(dt)
     local S = self.S
     if type(S) ~= "table" then
         return
     end
+
     if not self.initialized or S.runtimeOff or S.phase == "off" then
         return
     end
+
     if S.combatHide then
         return
     end
+
+    if not self:NP_IsAdaptiveEnabled() then
+        S.adaptive = nil
+        return
+    end
+
+    local C = self.C or {}
+
+    if type(S.adaptive) ~= "table" then
+        S.adaptive = {
+            timer = 0,
+            sum = 0,
+            min = math.huge,
+            samples = 0,
+        }
+    end
+
+    local st = S.adaptive
+
+    dt = tonumber(dt) or 0
+    if dt < 0 then
+        dt = 0
+    end
+    if dt > 0.25 then
+        dt = 0.25
+    end
+
+    local fps = GetFramerate and GetFramerate() or 60
+    if type(fps) ~= "number" or fps ~= fps or fps <= 0 then
+        fps = 60
+    end
+
+    st.sum = (st.sum or 0) + fps
+    st.samples = (st.samples or 0) + 1
+
+    if type(st.min) ~= "number" or st.min ~= st.min or fps < st.min then
+        st.min = fps
+    end
+
+    st.timer = (st.timer or 0) + dt
+
+    local checkEvery = tonumber(C.ADAPTIVE_CHECK) or 1.0
+    if checkEvery < 0.25 then
+        checkEvery = 1.0
+    end
+
+    if st.timer < checkEvery then
+        return
+    end
+
+    local avg = st.sum / math.max(1, st.samples)
+    local minFps = st.min
+
+    st.timer = 0
+    st.sum = 0
+    st.min = math.huge
+    st.samples = 0
+
+    local target = tonumber(C.ADAPTIVE_FPS_MIN) or 29
+    local step = tonumber(C.ADAPTIVE_STEP) or 0.05
+    local maxInterval = tonumber(C.ADAPTIVE_MAX_INTERVAL) or 0.5
+
+    if step <= 0 then
+        step = 0.05
+    end
+
+    if maxInterval < step then
+        maxInterval = step
+    end
+
+    local maxLevel = math.max(1, math.floor(maxInterval / step + 0.5))
+
+    local db = self:NP_GetAdaptiveDB()
+    local level = math.floor(tonumber(db.level) or 0 + 0.5)
+
+    if level < 0 then
+        level = 0
+    end
+
+    if level > maxLevel then
+        level = maxLevel
+    end
+
+    local lowFps = avg < target or minFps < (target - 3)
+
+    if lowFps then
+        if level < maxLevel then
+            level = level + 1
+        end
+
+        local interval = math.min(level * step, maxInterval)
+        self:NP_SaveAdaptive(level, interval)
+    else
+        local interval = 0
+        if level > 0 then
+            interval = math.min(level * step, maxInterval)
+        end
+        self:NP_SaveAdaptive(level, interval)
+    end
+end
+
+function NSPauk:HandleAdaptiveCommand(msg)
+    msg = type(msg) == "string" and msg or ""
+    msg = msg:gsub("^%s+", "")
+    msg = msg:gsub("%s+$", "")
+
+    local db = self:NP_GetAdaptiveDB()
+
+    if msg == "" or msg == "status" then
+        local fps = GetFramerate and GetFramerate() or 0
+
+        self:Echo(string.format(
+            "Адаптация: %s, FPS=%.1f, интервал=%.3f сек, уровень=%d, порог=%d, макс=%.2f",
+            db.enabled and "вкл" or "выкл",
+            fps,
+            tonumber(db.interval) or 0,
+            tonumber(db.level) or 0,
+            tonumber((self.C or {}).ADAPTIVE_FPS_MIN) or 29,
+            tonumber((self.C or {}).ADAPTIVE_MAX_INTERVAL) or 0.5
+        ))
+        return
+    end
+
+    if msg == "on" then
+        db.enabled = true
+        self:Echo("Адаптивный режим включён.")
+        return
+    end
+
+    if msg == "off" then
+        db.enabled = false
+        self:Echo("Адаптивный режим выключен.")
+        return
+    end
+
+    if msg == "reset" then
+        self:NP_SaveAdaptive(0, 0)
+        self.S.adaptive = nil
+        self:Echo("Адаптивный интервал сброшен.")
+        return
+    end
+
+    self:Echo("Команды: /nspadapt [status|on|off|reset]")
+end
+
+---------------------------------------------------------------------------
+-- Поддержка маршрутизации кокона на UIParent
+---------------------------------------------------------------------------
+function NSPauk:NP_RouteNeedsUIParent()
+    local S = self.S
+    if type(S) ~= "table" then
+        return false
+    end
+
+    local inst = S.currentInstance
+    if inst
+        and inst.isCocoon
+        and not inst.isMoth
+        and inst.hub
+        and inst.hub.frame == UIParent then
+        return true
+    end
+
+    if S.cocoon
+        and S.cocoon.isUIParent
+        and S.cocoon.inst
+        and not S.cocoon.inst.isMoth then
+        return true
+    end
+
+    return false
+end
+
+---------------------------------------------------------------------------
+-- Вход в кокон по общему маршруту
+---------------------------------------------------------------------------
+function NSPauk:NP_InsertCocoonEntryApproach(inst)
+    if not inst or not inst.isCocoon or inst.isMoth then
+        return
+    end
+
+    if type(inst.tasks) ~= "table" then
+        return
+    end
+
+    local first = inst.tasks[1]
+    if not first
+        or not first.p0
+        or type(first.p0.x) ~= "number"
+        or type(first.p0.y) ~= "number" then
+        return
+    end
+
+    local cur = self:NP_GetSpiderPointIfShown()
+    if not cur then
+        return
+    end
+
+    local tol = self:NP_GetAntiTeleportTolerance()
+    local dx = first.p0.x - cur.x
+    local dy = first.p0.y - cur.y
+
+    if dx * dx + dy * dy <= tol * tol then
+        return
+    end
+
+    local plan = self:NP_MakePlanTask(
+        "travel",
+        {
+            x = cur.x,
+            y = cur.y,
+        },
+        {
+            x = first.p0.x,
+            y = first.p0.y,
+        },
+        first.conn,
+        first.owner
+    )
+
+    plan.nspCocoonEntryPlan = true
+
+    table.insert(inst.tasks, 1, plan)
+end
+
+function NSPauk:GetWebPointSpacingForTask(task)
+    local C = self.C or {}
+
+    local spacing = self:GetWebPointSpacing()
+
+    if type(spacing) ~= "number" or spacing ~= spacing or spacing <= 0 then
+        spacing = 1
+    end
+
+    local webSize = tonumber(C.WEB_SIZE) or 2
+    if webSize < 1 then
+        webSize = 2
+    end
+
+
+    local maxVisual = math.min(2.5, webSize)
+
+    if maxVisual < 1 then
+        maxVisual = 1
+    end
+
+    if spacing > maxVisual then
+        spacing = maxVisual
+    end
+
+    return spacing
+end
+
+function NSPauk:GetMaxDropsPerFrame(task)
+    local C = self.C or {}
+
+    local base = math.floor(tonumber(C.MAX_DROPS_PER_FRAME) or 140)
+
+    if base < 1 then
+        base = 140
+    end
+
+
+    return math.max(base, 500)
+end
+
+function NSPauk:GetMaxDropsPerFrameForOwner(owner)
+    local C = self.C or {}
+
+    local base = math.floor(tonumber(C.MAX_DROPS_PER_FRAME) or 140)
+
+    if base < 1 then
+        base = 140
+    end
+
+    return math.max(base, 1000)
+end
+
+function NSPauk:NP_PostUpdate()
+    local S = self.S
+
+    if type(S) ~= "table" then
+        return
+    end
+
+    if not self.initialized or S.runtimeOff or S.phase == "off" then
+        return
+    end
+
+    if S.combatHide then
+        return
+    end
+
     if S.phase == "task" then
         local task = S.currentTask
+
         if task then
             local needDrag = S.nspDrag and task.nspDuringDrag
             local needTemp = task.nspTempThread
+
             if needDrag or needTemp then
                 local now = GetTime()
-                local st = self:NP_UpdateDragThrottle(now)
-                local interval = st and st.interval or 0.016
+                local interval = self:NP_GetAdaptiveInterval()
+
+                if type(interval) ~= "number" or interval < 0 then
+                    interval = 0
+                end
+
                 if needDrag then
-                    if not S.nspDragVisualAt or (now - S.nspDragVisualAt) >= interval then
+                    if interval <= 0
+                        or not S.nspDragVisualAt
+                        or (now - S.nspDragVisualAt) >= interval then
                         S.nspDragVisualAt = now
                         self:NP_UpdateGlobalDrag()
                     end
                 end
+
                 if needTemp then
-                    if not S.nspTempVisualAt or (now - S.nspTempVisualAt) >= interval then
+                    if interval <= 0
+                        or not S.nspTempVisualAt
+                        or (now - S.nspTempVisualAt) >= interval then
                         S.nspTempVisualAt = now
                         self:NP_UpdateTempDrag(task)
                     end
@@ -10561,8 +10911,8 @@ function NSPauk:NP_PostUpdate()
         end
     else
         if S.nspDrag
-        and S.phase ~= "instanceComplete"
-        and S.phase ~= "limitWait" then
+            and S.phase ~= "instanceComplete"
+            and S.phase ~= "limitWait" then
             self:NP_ClearGlobalDrag(true)
         end
     end
@@ -10655,6 +11005,7 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
 
     local dx = to.x - from.x
     local dy = to.y - from.y
+
     if (dx * dx + dy * dy) < 36 then
         return nil
     end
@@ -10666,12 +11017,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
 
     ---------------------------------------------------------------------------
     -- Для кокона отключаем маршрутизацию полностью.
-    --
-    -- Внутренние переходы кокона считаются частью плетения, поэтому:
-    -- - nspCrawl = true убирает TRAVEL_SPEED_MULT;
-    -- - IsEmptyMovementTask() ниже отключает EMPTY_SPEED_MULT для nspCocoon.
-    --
-    -- В итоге скорость такая же, как при обычном плетении нити.
     ---------------------------------------------------------------------------
     if inst and inst.isCocoon then
         local task = {
@@ -10685,10 +11030,10 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
             nspNoInsert = true,
             nspNoSupportCheck = true,
             nspCocoon = true,
-            nspCrawl = true,
         }
 
         tasks[#tasks + 1] = task
+
         return task
     end
 
@@ -10708,6 +11053,7 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
     }
 
     tasks[#tasks + 1] = task
+
     return task
 end
 
@@ -11924,13 +12270,24 @@ function NSPauk:StartCocoon(victim)
     self:AddInstance(inst)
 
     S.currentInstance = inst
+
+    -- Помечаем первую задачу кокона как входную.
+    -- Это нужно, чтобы анти-телепорт использовал общий маршрут.
+    if type(inst.tasks) == "table" and inst.tasks[1] then
+        inst.tasks[1].nspCocoonEntry = true
+    end
+
+    self:MkSpider()
+    self:MkClickBtn()
+
+    -- Сразу добавляем общий маршрутный подход к первой точке кокона.
+    self:NP_InsertCocoonEntryApproach(inst)
+
     S.tasks = inst.tasks
     S.taskIdx = 1
     S.currentTask = nil
     S.completeTimer = 0
 
-    self:MkSpider()
-    self:MkClickBtn()
     self:AdvanceTask()
 end
 
@@ -13483,7 +13840,11 @@ function NSPauk:DropAlongCurve(task, t0, t1)
         return
     end
 
-    local spacing = self:GetWebPointSpacing()
+    local spacing = self:GetWebPointSpacingForTask(task)
+
+    if type(spacing) ~= "number" or spacing ~= spacing or spacing <= 0 then
+        spacing = 1
+    end
 
     task.dropSpacing = spacing
 
@@ -13527,8 +13888,18 @@ function NSPauk:DropAlongCurve(task, t0, t1)
         planned = 1
     end
 
-    local maxDrops = tonumber(C.MAX_DROPS_PER_FRAME) or 0
-    local hard = math.max(maxDrops, 500)
+    local baseHard = math.max(tonumber(C.MAX_DROPS_PER_FRAME) or 140, 500)
+    local hard = baseHard
+
+    -----------------------------------------------------------------------
+    -- Если текущему кадру реально нужно поставить больше точек,
+    -- ставим их все, кроме аварийно огромных значений.
+    --
+    -- Это защищает от пунктира.
+    -----------------------------------------------------------------------
+    if planned > hard then
+        hard = math.min(planned, 5000)
+    end
 
     local span = t1 - t0
     local lastX, lastY
@@ -13833,6 +14204,11 @@ function NSPauk:GetWebPointSpacing()
     return spacing
 end
 
+---------------------------------------------------------------------------
+-- Пустой переход: паук движется между точками, но не плетёт нить.
+-- Именно такие задачи нужно ускорять в EMPTY_SPEED_MULT раз.
+---------------------------------------------------------------------------
+
 function NSPauk:IsEmptyMovementTask(task)
     if not task then
         return false
@@ -13846,11 +14222,6 @@ function NSPauk:IsEmptyMovementTask(task)
         or task.nspTempThread
         or task.nspStartDragTask
         or task.nspFall then
-        return false
-    end
-
-    ---------------------------------------------------------------------------
-    if task.nspCocoon and not task.nspCocoonApproach then
         return false
     end
 
@@ -14794,8 +15165,8 @@ end
 
 function NSPauk:NP_InsertApproachBeforeTask(task)
     local S = self.S
-    local cur = self:NP_GetSpiderPointIfShown()
 
+    local cur = self:NP_GetSpiderPointIfShown()
     if not cur or not task or not task.p0 then
         return false
     end
@@ -14804,14 +15175,52 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
         return false
     end
 
-    ---------------------------------------------------------------------------
-    -- Для кокона к первой точке кокона идём по обычным правилам маршрутизации,
-    -- как к любой другой точке, со скоростью пустого перехода.
+    local inst
+    if task.owner then
+        inst = self:GetOwnerInstance(task.owner)
+    end
+    if not inst and task.conn then
+        inst = self:GetOwnerInstance(task.conn)
+    end
+
+    -----------------------------------------------------------------------
+    -- Кокон.
     --
-    -- Здесь не делаем прямой телепорт-перелёт и не включаем ускорение
-    -- TRAVEL_SPEED_MULT. Маршрут строится один раз перед началом кокона.
-    ---------------------------------------------------------------------------
+    -- Для первой задачи кокона используем общий маршрутный подход.
+    -- Для внутренней обмотки и для мотылька оставляем быстрый прямой
+    -- подход, чтобы не ломать визуальную логику и не плодить Dijkstra.
+    -----------------------------------------------------------------------
     if task.nspCocoon then
+        local useCommonRoute = task.nspCocoonEntry
+            and inst
+            and inst.isCocoon
+            and not inst.isMoth
+
+        if useCommonRoute then
+            local plan = self:NP_MakePlanTask(
+                "travel",
+                {
+                    x = cur.x,
+                    y = cur.y,
+                },
+                {
+                    x = task.p0.x,
+                    y = task.p0.y,
+                },
+                task.conn,
+                task.owner
+            )
+
+            plan.nspCocoonEntryPlan = true
+            plan.nspApproachPlan = true
+
+            table.insert(S.tasks, S.taskIdx, plan)
+
+            task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
+
+            return true
+        end
+
         local dx = task.p0.x - cur.x
         local dy = task.p0.y - cur.y
 
@@ -14819,77 +15228,40 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
             return false
         end
 
-        local target = {
-            x = task.p0.x,
-            y = task.p0.y,
+        local approach = {
+            kind = "travel",
+            nspCocoon = true,
+            nspCocoonApproach = true,
+            nspNoSupportCheck = true,
+            nspNoInsert = true,
+            nspAllowTeleport = true,
+            drop = false,
+            p0 = {
+                x = cur.x,
+                y = cur.y,
+            },
+            p1 = {
+                x = (cur.x + task.p0.x) / 2,
+                y = (cur.y + task.p0.y) / 2,
+            },
+            p2 = {
+                x = task.p0.x,
+                y = task.p0.y,
+            },
+            conn = task.conn,
+            owner = task.owner,
         }
 
-        local route = self:NP_BuildRoute(cur, target)
+        table.insert(S.tasks, S.taskIdx, approach)
 
-        local insertIndex = S.taskIdx
-        local inserted = 0
+        task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
 
-        local function insertCrawl(a, b)
-            if not a or not b then
-                return
-            end
-
-            if type(a.x) ~= "number"
-                or type(a.y) ~= "number"
-                or type(b.x) ~= "number"
-                or type(b.y) ~= "number" then
-                return
-            end
-
-            local ddx = b.x - a.x
-            local ddy = b.y - a.y
-
-            if ddx * ddx + ddy * ddy <= 1 then
-                return
-            end
-
-            local crawl = self:NP_MakeCrawlTask(a, b, nil)
-
-            crawl.nspCocoonApproach = true
-            crawl.nspNoSupportCheck = true
-            crawl.nspNoInsert = true
-            crawl.conn = task.conn
-            crawl.owner = task.owner
-
-            table.insert(S.tasks, insertIndex, crawl)
-            insertIndex = insertIndex + 1
-            inserted = inserted + 1
-        end
-
-        -----------------------------------------------------------------------
-        -- Если маршрутизатор нашёл прямой маршрут, идём по нему.
-        -- Если нет — делаем один прямой crawl-переход, но уже без
-        -- travel-ускорения и с нормальной пустой скоростью.
-        -----------------------------------------------------------------------
-        if route
-            and route.points
-            and #route.points >= 2
-            and route.kind == "direct" then
-            for i = 1, #route.points - 1 do
-                insertCrawl(route.points[i], route.points[i + 1])
-            end
-        end
-
-        if inserted == 0 then
-            insertCrawl(cur, target)
-        end
-
-        if inserted > 0 then
-            task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
-            return true
-        end
-
-        return false
+        return true
     end
 
-    ---------------------------------------------------------------------------
+    -----------------------------------------------------------------------
     -- Для обычной паутины оставляем плановый подход.
-    ---------------------------------------------------------------------------
+    -----------------------------------------------------------------------
     local plan = self:NP_MakePlanTask(
         "travel",
         {
@@ -14907,10 +15279,12 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
     plan.nspApproachPlan = true
 
     table.insert(S.tasks, S.taskIdx, plan)
+
     task.nspApproachInserted = (task.nspApproachInserted or 0) + 1
 
     return true
 end
+
 ---------------------------------------------------------------------------
 -- AdvanceTask: anti-teleport version
 ---------------------------------------------------------------------------
@@ -15181,15 +15555,18 @@ function NSPauk:StartTask(task)
     if task.nspPlan then
         S.currentTask = nil
         self:NP_ExecutePlan(task)
+
         S.phase = "task"
         S.moveDur = 0.05
         S.moveT = 0
+
         return
     end
 
     if task.nspMothRestore then
         self:PutSpider(task.p0.x, task.p0.y)
         self:RestoreMothStateImmediate(task.nspSaved)
+
         return
     end
 
@@ -15200,12 +15577,10 @@ function NSPauk:StartTask(task)
             and task.p2
             and type(task.p2.x) == "number"
             and type(task.p2.y) == "number" then
-
             task.p0 = {
                 x = cur.x,
                 y = cur.y,
             }
-
             task.p1 = {
                 x = (cur.x + task.p2.x) / 2,
                 y = (cur.y + task.p2.y) / 2,
@@ -15239,6 +15614,7 @@ function NSPauk:StartTask(task)
         S.phase = "task"
 
         self:PutSpider(task.p0.x, task.p0.y)
+
         return
     end
 
@@ -15263,6 +15639,7 @@ function NSPauk:StartTask(task)
 
         S.currentTask = task
         task.drop = false
+
         S.moveDur = 0.2
         S.moveT = 0
         S.lastTaskT = 0
@@ -15270,6 +15647,7 @@ function NSPauk:StartTask(task)
         S.phase = "task"
 
         self:PutSpider(task.p0.x, task.p0.y)
+
         return
     end
 
@@ -15286,8 +15664,8 @@ function NSPauk:StartTask(task)
         and task.p0
         and type(task.p0.x) == "number"
         and type(task.p0.y) == "number" then
-
         local tol = self:NP_GetAntiTeleportTolerance()
+
         local dx = task.p0.x - cur.x
         local dy = task.p0.y - cur.y
 
@@ -15329,7 +15707,6 @@ function NSPauk:StartTask(task)
             and task.p2
             and type(task.p2.x) == "number"
             and type(task.p2.y) == "number" then
-
             local dx = task.p0.x - cur.x
             local dy = task.p0.y - cur.y
 
@@ -15338,7 +15715,6 @@ function NSPauk:StartTask(task)
                     x = cur.x,
                     y = cur.y,
                 }
-
                 task.p1 = {
                     x = (cur.x + task.p2.x) / 2,
                     y = (cur.y + task.p2.y) / 2,
@@ -15353,7 +15729,6 @@ function NSPauk:StartTask(task)
                 x = task.p0.x,
                 y = (task.p0.y + task.p2.y) / 2,
             }
-
             task.p2 = {
                 x = task.p0.x,
                 y = task.p2.y,
@@ -15407,14 +15782,16 @@ function NSPauk:StartTask(task)
     S.lastTaskT = 0
     S.speedTimer = 0
     S.phase = "task"
+
     S.lastDropX = task.p0.x
     S.lastDropY = task.p0.y
 
     self:PutSpider(task.p0.x, task.p0.y)
 
     if task.drop then
-        task.dropSpacing = self:GetWebPointSpacing()
+        task.dropSpacing = self:GetWebPointSpacingForTask(task)
         task.dropRemainder = 0
+
         self:DropWebForTask(task, task.p0.x, task.p0.y)
     else
         task.dropSpacing = nil
@@ -17675,8 +18052,7 @@ function NSPauk:CreateLevelUpFrame()
     end
 
     local f = CreateFrame("Frame", "NSPauk_LevelUpFrame", UIParent)
-
-    f:SetWidth(460)
+    f:SetWidth(560)
     f:SetHeight(420)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
@@ -17752,7 +18128,7 @@ function NSPauk:CreateLevelUpFrame()
     scroll:SetPoint("BOTTOMRIGHT", -18, 14)
 
     local child = CreateFrame("Frame", nil, scroll)
-    child:SetWidth(410)
+    child:SetWidth(510)
 
     scroll:SetScrollChild(child)
     scroll:EnableMouseWheel(true)
@@ -17779,19 +18155,70 @@ function NSPauk:CreateLevelUpFrame()
     self.levelUpChild = child
     self.levelUpRows = {}
 
+    -----------------------------------------------------------------------
+    -- Порядок строк в окне лвлапа.
+    --
+    -- Важно:
+    -- обычный pairs() по ConstantDescriptions не гарантирует порядок,
+    -- поэтому список ключей задаём явно.
+    -----------------------------------------------------------------------
+    local orderedKeys = {
+        -- Внешний вид
+        "SPIDER_SIZE",
+        "WEB_SIZE",
+        "WEB_ALPHA",
+
+        -- Поведение
+        "STILL_WAIT",
+        "COMPLETE_PAUSE",
+        "DISABLE_TIME",
+        "MOUSE_HOVER_LIMIT",
+
+        -- Скорость
+        "FAST_MODE",
+        "SPIDER_SPEED_MIN",
+        "SPIDER_SPEED_MAX",
+        "TRAVEL_SPEED_MULT",
+        "CROSS_SPEED_MULT",
+        "MAIN_SPEED_MULT",
+        "EMPTY_SPEED_MULT",
+
+        -- Паутина
+        "TARGET_COUNT_MIN",
+        "TARGET_COUNT_MAX",
+        "MAX_INSTANCES",
+
+        -- Кокон
+        "COCOON_CHANCE",
+        "COCOON_WRAPS_MIN",
+        "COCOON_WRAPS_MAX",
+        "COCOON_DIAG_MIN",
+        "COCOON_DIAG_MAX",
+        "DISSOLVE_DURATION_MIN",
+        "DISSOLVE_DURATION_MAX",
+        "MIN_COCOON_ALPHA",
+
+        -- Прогресс и выживаемость
+        "POINTS_PER_LEVEL",
+        "COCOON_EXP_PERCENT",
+        "SURVIVAL_CHANCE",
+    }
+
     local keys = {}
 
-    for key in pairs(self.DefaultConstants) do
-        keys[#keys + 1] = key
+    for _, key in ipairs(orderedKeys) do
+        if self.DefaultConstants[key] ~= nil
+            and type(self.ConstantDescriptions) == "table"
+            and type(self.ConstantDescriptions[key]) == "string"
+            and self.ConstantDescriptions[key] ~= "" then
+            keys[#keys + 1] = key
+        end
     end
-
-    table.sort(keys)
 
     local rowHeight = 22
 
     for i, key in ipairs(keys) do
         local row = CreateFrame("Frame", nil, child)
-
         row:SetHeight(rowHeight)
         row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -((i - 1) * rowHeight))
         row:SetPoint("RIGHT", child, "RIGHT", 0, 0)
@@ -17799,10 +18226,9 @@ function NSPauk:CreateLevelUpFrame()
         local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         nameText:SetPoint("LEFT", 0, 0)
         nameText:SetJustifyH("LEFT")
-        nameText:SetWidth(240)
+        nameText:SetWidth(330)
 
         local desc = self.ConstantDescriptions and self.ConstantDescriptions[key]
-
         nameText:SetText(desc or key)
 
         local minus = CreateFrame("Button", nil, row)
@@ -18322,6 +18748,7 @@ function NSPauk:OnUpdateGuarded(dt)
         return
     end
 
+    self:NP_UpdateAdaptive(dt)
     self:OnUpdate(dt)
     self:UpdateSpiderAnimation(dt)
     self:NP_PostUpdate()
@@ -19379,6 +19806,21 @@ if type(SlashCmdList) == "table" then
         if _G then
             _G["SLASH_" .. cmdName .. "1"] = "/nspsectors"
             _G["SLASH_" .. cmdName .. "2"] = "/pauksectors"
+        end
+    end
+end
+
+if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKADAPT"
+
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function(msg)
+            NSPauk:HandleAdaptiveCommand(msg)
+        end
+
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspadapt"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukadapt"
         end
     end
 end
