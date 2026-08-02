@@ -7895,14 +7895,15 @@ end
 function NSPauk:ComputeCrossSectors(inst)
     local allowed = {}
     local angleDeg = {}
+    local connLocalDeg = {}
 
     if not inst then
-        return allowed, angleDeg
+        return allowed, angleDeg, connLocalDeg
     end
 
     local N = #inst.conns
     if N < 2 then
-        return allowed, angleDeg
+        return allowed, angleDeg, connLocalDeg
     end
 
     local maxDeg = tonumber(self.C.CROSS_MAX_SECTOR_ANGLE)
@@ -7913,19 +7914,81 @@ function NSPauk:ComputeCrossSectors(inst)
     local twoPi = math.pi * 2
     local maxRad = maxDeg * math.pi / 180
 
+    -----------------------------------------------------------------------
+    -- Угол сектора считаем по локальному направлению нити у хаба:
+    -- берём точку на нити через SAMPLE_DIST пикселей дуги от старта
+    -- и смотрим направление из центра хаба в эту точку.
+    --
+    -- Это и есть реальный "внутренний" угол между линиями в зоне,
+    -- где появляются первые перемычки, а не направление к дальним
+    -- концам нитей, искажённое провисанием.
+    -----------------------------------------------------------------------
+    local SAMPLE_DIST = 100
+
+    local hubX = (inst.hub.rect and inst.hub.rect.cx) or 0
+    local hubY = (inst.hub.rect and inst.hub.rect.cy) or 0
+
+    local function localAngle(conn)
+        local thread = conn.thread
+        if not thread then
+            return 0
+        end
+
+        local total = conn.arcLength or 0
+        if total <= 0 then
+            local samples, len = self:BuildArcSamples(thread)
+            conn.arcSamples = samples
+            conn.arcLength = len
+            total = len
+        end
+
+        local angle = nil
+
+        if total > 1 then
+            local dist = SAMPLE_DIST
+            if dist > total * 0.5 then
+                dist = total * 0.5
+            end
+
+            local t = self:ThreadTAtLength(conn, dist)
+            if t then
+                local x, y = self:BzThread(thread, t)
+                local ax = x - hubX
+                local ay = y - hubY
+
+                if ax * ax + ay * ay > 0.01 then
+                    angle = math.atan2(ay, ax)
+                end
+            end
+        end
+
+        if not angle then
+            angle = thread.angle or 0
+        end
+
+        while angle < 0 do
+            angle = angle + twoPi
+        end
+        while angle >= twoPi do
+            angle = angle - twoPi
+        end
+
+        return angle
+    end
+
     for i = 1, N do
         local connA = inst.conns[i]
         local connB = inst.conns[(i % N) + 1]
 
-        local a = connA.thread and connA.thread.angle or 0
-        local b = connB.thread and connB.thread.angle or 0
+        local a = localAngle(connA)
+        local b = localAngle(connB)
+
+        connLocalDeg[i] = a * 180 / math.pi
 
         local delta = b - a
-
         while delta < 0 do
             delta = delta + twoPi
         end
-
         while delta >= twoPi do
             delta = delta - twoPi
         end
@@ -7939,7 +8002,7 @@ function NSPauk:ComputeCrossSectors(inst)
         allowed[i] = effective <= maxRad
     end
 
-    return allowed, angleDeg
+    return allowed, angleDeg, connLocalDeg
 end
 
 function NSPauk:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
@@ -18544,14 +18607,13 @@ function NSPauk:NP_DebugSectors()
     local inst = S.currentInstance
 
     if not inst then
-        self:Print("Нет текущей паутины: S.currentInstance = nil")
-
+        self:Echo("Нет текущей паутины: S.currentInstance = nil")
         return
     end
 
     local N = inst.conns and #inst.conns or 0
 
-    self:Print(string.format(
+    self:Echo(string.format(
         "Instance id=%s, isCocoon=%s, conns=%d, crossRows=%s, torn=%s",
         tostring(inst.id),
         tostring(inst.isCocoon),
@@ -18561,8 +18623,7 @@ function NSPauk:NP_DebugSectors()
     ))
 
     if N == 0 then
-        self:Print("В текущей паутине нет нитей.")
-
+        self:Echo("В текущей паутине нет нитей.")
         return
     end
 
@@ -18570,7 +18631,7 @@ function NSPauk:NP_DebugSectors()
     local crossSpacing = tonumber(C.CROSS_ROW_SPACING) or 0
     local minCrossLen = tonumber(C.MIN_CROSS_LEN) or 0
 
-    self:Print(string.format(
+    self:Echo(string.format(
         "CROSS_MAX_SECTOR_ANGLE=%.1f, CROSS_ROW_SPACING=%.1f, MIN_CROSS_LEN=%.1f",
         maxSectorAngle,
         crossSpacing,
@@ -18580,12 +18641,11 @@ function NSPauk:NP_DebugSectors()
     for i, conn in ipairs(inst.conns) do
         local angleRad = conn.thread and conn.thread.angle or 0
         local angleDeg = angleRad * 180 / math.pi
-
         local arcLength = conn.arcLength or 0
         local texCount = conn.textures and #conn.textures or 0
         local targetName = conn.target and conn.target.name or "?"
 
-        self:Print(string.format(
+        self:Echo(string.format(
             "conn %d: angle=%.1f, arcLength=%.1f, alive=%s, textures=%d, target=%s",
             i,
             angleDeg,
@@ -18596,23 +18656,31 @@ function NSPauk:NP_DebugSectors()
         ))
     end
 
-    local sectorAllowed, sectorAngleDeg = self:ComputeCrossSectors(inst)
+    local sectorAllowed, sectorAngleDeg, connLocalDeg = self:ComputeCrossSectors(inst)
+
+    if connLocalDeg then
+        for i = 1, N do
+            self:Echo(string.format(
+                "conn %d: локальный угол у хаба=%.1f",
+                i,
+                connLocalDeg[i] or 0
+            ))
+        end
+    end
 
     local sumAngles = 0
 
     for i = 1, N do
         local j = (i % N) + 1
-
         local deg = sectorAngleDeg and sectorAngleDeg[i] or 0
         local allowed = sectorAllowed and sectorAllowed[i]
-
         local lenA = inst.conns[i].arcLength or 0
         local lenB = inst.conns[j].arcLength or 0
         local pairMin = math.min(lenA, lenB)
 
         sumAngles = sumAngles + deg
 
-        self:Print(string.format(
+        self:Echo(string.format(
             "sector %d-%d: angle=%.1f, allowed=%s, pairMin=%.1f",
             i,
             j,
@@ -18622,14 +18690,12 @@ function NSPauk:NP_DebugSectors()
         ))
     end
 
-    self:Print(string.format("Сумма углов секторов: %.1f", sumAngles))
+    self:Echo(string.format("Сумма углов секторов: %.1f", sumAngles))
 
     if type(inst.crossRowsList) == "table" then
         local rows = #inst.crossRowsList
-
         local totalRowSegs = 0
         local aliveRowSegs = 0
-
         local sectorTotal = {}
         local sectorAlive = {}
 
@@ -18650,7 +18716,7 @@ function NSPauk:NP_DebugSectors()
             end
         end
 
-        self:Print(string.format(
+        self:Echo(string.format(
             "crossRowsList: rows=%d, rowSegs total=%d, alive=%d",
             rows,
             totalRowSegs,
@@ -18658,7 +18724,7 @@ function NSPauk:NP_DebugSectors()
         ))
 
         for i = 1, N do
-            self:Print(string.format(
+            self:Echo(string.format(
                 "sector %d rowSegs: total=%d, alive=%d",
                 i,
                 sectorTotal[i] or 0,
@@ -18666,7 +18732,7 @@ function NSPauk:NP_DebugSectors()
             ))
         end
     else
-        self:Print("crossRowsList: нет")
+        self:Echo("crossRowsList: нет")
     end
 
     if type(inst.crossSegs) == "table" then
@@ -18678,20 +18744,19 @@ function NSPauk:NP_DebugSectors()
             if seg.alive then
                 alive = alive + 1
             end
-
             if seg.isInterCross then
                 inter = inter + 1
             end
         end
 
-        self:Print(string.format(
+        self:Echo(string.format(
             "crossSegs: total=%d, alive=%d, interCross=%d",
             total,
             alive,
             inter
         ))
     else
-        self:Print("crossSegs: нет")
+        self:Echo("crossSegs: нет")
     end
 end
 
