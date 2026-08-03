@@ -10942,7 +10942,6 @@ end
 
 function NSPauk:NP_PostUpdate()
     local S = self.S
-
     if type(S) ~= "table" then
         return
     end
@@ -10957,7 +10956,6 @@ function NSPauk:NP_PostUpdate()
 
     if S.phase == "task" then
         local task = S.currentTask
-
         if task then
             local needDrag = S.nspDrag and task.nspDuringDrag
             local needTemp = task.nspTempThread
@@ -10965,7 +10963,6 @@ function NSPauk:NP_PostUpdate()
             if needDrag or needTemp then
                 local now = GetTime()
                 local interval = self:NP_GetAdaptiveInterval()
-
                 if type(interval) ~= "number" or interval < 0 then
                     interval = 0
                 end
@@ -10994,6 +10991,48 @@ function NSPauk:NP_PostUpdate()
             and S.phase ~= "instanceComplete"
             and S.phase ~= "limitWait" then
             self:NP_ClearGlobalDrag(true)
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Аудит плана паутины.
+    --
+    -- Он запускается:
+    -- 1) по флагу S.nspAuditPending — после первого рисования основной нити
+    --    или после каждой 10-й нарисованной перемычки;
+    -- 2) в фазе instanceComplete — чтобы паутина не считалась готовой,
+    --    если в ней ещё есть живые, но не нарисованные участки.
+    ---------------------------------------------------------------------------
+    if S.phase == "task" or S.phase == "instanceComplete" then
+        if S.nspAuditPending then
+            S.nspAuditPending = false
+            local inst = S.nspAuditPendingInst or S.currentInstance
+            S.nspAuditPendingInst = nil
+
+            if inst and inst == S.currentInstance then
+                self:NP_AuditWebPlan(inst)
+            end
+        end
+
+        if S.phase == "instanceComplete" then
+            local inst = S.currentInstance
+            if inst
+                and not inst.torn
+                and not inst.isCocoon
+                and not inst.isMoth
+                and not inst._nspAuditComplete then
+                local now = GetTime()
+                local interval = 0.75
+                if (inst._nspAuditFailCount or 0) >= 5 then
+                    interval = 3.0
+                end
+
+                if not S.nspLastCompletionAuditAt
+                    or (now - (S.nspLastCompletionAuditAt or 0)) >= interval then
+                    S.nspLastCompletionAuditAt = now
+                    self:NP_AuditWebPlan(inst)
+                end
+            end
         end
     end
 end
@@ -11238,7 +11277,6 @@ end
 function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
     local C = self.C
     local N = #inst.conns
-
     if N < 2 then
         return
     end
@@ -11246,20 +11284,19 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
     if not inst.crossRowsList then
         inst.crossRowsList = {}
     end
-
     if not rowIdx then
         rowIdx = #inst.crossRowsList + 1
     end
 
     local rowSegs = inst.crossRowsList[rowIdx] or {}
+    rowSegs.arcLen = arcLen
+    rowSegs.rowDir = rowDir
 
     local spacing = C.CROSS_ROW_SPACING
     if not spacing or spacing < 0.5 then
         spacing = 0.5
     end
-
     local eps = spacing * 0.5
-
     rowDir = (rowDir == -1) and -1 or 1
 
     local function getPoint(conn, len)
@@ -11267,17 +11304,14 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         if total <= 0 then
             return nil
         end
-
         local target = len
         if target > total then
             target = total
         end
-
         local t = self:ThreadTAtLength(conn, target)
         if not t then
             return nil
         end
-
         local x, y = self:BzThread(conn.thread, t)
         return t, x, y
     end
@@ -11290,7 +11324,6 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         else
             self:AddTravelPointTask(tasks, cursor.point, point, connA, owner)
         end
-
         cursor.idx = idxA
         cursor.t = tA
         cursor.point = point
@@ -11298,20 +11331,17 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
 
     local function makeDrawThread(seg, reverse)
         local th = seg.thread
-
         if not reverse then
             return th
         end
-
-        local p1 = th.p1 and copyPoint(th.p1) or {
+        local p1 = th.p1 and self:NP_CopyPoint(th.p1) or {
             x = (th.p0.x + th.p2.x) / 2,
             y = (th.p0.y + th.p2.y) / 2,
         }
-
         return {
-            p0 = copyPoint(th.p2),
+            p0 = self:NP_CopyPoint(th.p2),
             p1 = p1,
-            p2 = copyPoint(th.p0),
+            p2 = self:NP_CopyPoint(th.p0),
             ownerRef = th.ownerRef,
             angle = th.angle,
         }
@@ -11328,22 +11358,22 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
 
         local connA = inst.conns[1]
         local connB = inst.conns[2]
-
         local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
 
         if arcLen <= pairMin + eps then
             local tA, ax, ay = getPoint(connA, arcLen)
             local tB, bx, by = getPoint(connB, arcLen)
-
             if tA and tB then
                 local dx = bx - ax
                 local dy = by - ay
                 local minLen = C.MIN_CROSS_LEN
-
                 if (dx * dx + dy * dy) >= (minLen * minLen) then
                     local seg = self:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
-
                     if seg then
+                        seg.planArcLen = arcLen
+                        seg.planSector = 1
+                        seg.planRow = rowIdx
+
                         local reverse
                         if cursor and cursor.idx == 2 then
                             reverse = true
@@ -11361,13 +11391,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                             startT = tB
                             startX = bx
                             startY = by
-
                             endConn = connA
                             endIdx = 1
                             endT = tA
                             endX = ax
                             endY = ay
-
                             drawThread = makeDrawThread(seg, true)
                         else
                             startConn = connA
@@ -11375,13 +11403,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                             startT = tA
                             startX = ax
                             startY = ay
-
                             endConn = connB
                             endIdx = 2
                             endT = tB
                             endX = bx
                             endY = by
-
                             drawThread = makeDrawThread(seg, false)
                         end
 
@@ -11392,11 +11418,8 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                             { x = startX, y = startY },
                             seg
                         )
-
                         self:AddThreadTask(tasks, seg, drawThread)
-
                         rowSegs[1] = seg
-
                         cursor.idx = endIdx
                         cursor.t = endT
                         cursor.point = { x = endX, y = endY }
@@ -11426,7 +11449,6 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
 
     for k = 0, N - 1 do
         local i
-
         if rowDir > 0 then
             i = ((startI - 1 + k) % N) + 1
         else
@@ -11434,20 +11456,16 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         end
 
         local skip = inst.sectorAllowed and inst.sectorAllowed[i] == false
-
         if not skip then
             local aIdx = i
             local bIdx = (i % N) + 1
-
             local connA = inst.conns[aIdx]
             local connB = inst.conns[bIdx]
-
             local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
 
             if arcLen <= pairMin + eps then
                 local tA, ax, ay = getPoint(connA, arcLen)
                 local tB, bx, by = getPoint(connB, arcLen)
-
                 if tA and tB then
                     local dx = bx - ax
                     local dy = by - ay
@@ -11466,10 +11484,12 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                             tB,
                             minLen
                         )
-
                         if seg then
-                            local reverse = (rowDir < 0)
+                            seg.planArcLen = arcLen
+                            seg.planSector = aIdx
+                            seg.planRow = rowIdx
 
+                            local reverse = (rowDir < 0)
                             local startConn, startIdx, startT, startX, startY
                             local endConn, endIdx, endT, endX, endY
                             local drawThread
@@ -11480,13 +11500,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                                 startT = tB
                                 startX = bx
                                 startY = by
-
                                 endConn = connA
                                 endIdx = aIdx
                                 endT = tA
                                 endX = ax
                                 endY = ay
-
                                 drawThread = makeDrawThread(seg, true)
                             else
                                 startConn = connA
@@ -11494,13 +11512,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                                 startT = tA
                                 startX = ax
                                 startY = ay
-
                                 endConn = connB
                                 endIdx = bIdx
                                 endT = tB
                                 endX = bx
                                 endY = by
-
                                 drawThread = makeDrawThread(seg, false)
                             end
 
@@ -11511,11 +11527,8 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                                 { x = startX, y = startY },
                                 seg
                             )
-
                             self:AddThreadTask(tasks, seg, drawThread)
-
                             rowSegs[aIdx] = seg
-
                             cursor.idx = endIdx
                             cursor.t = endT
                             cursor.point = { x = endX, y = endY }
@@ -14111,7 +14124,6 @@ end
 function NSPauk:DropWebForTask(task, x, y)
     local S = self.S
     local C = self.C
-
     local owner = task.owner
 
     if not owner or not owner.alive then
@@ -14119,16 +14131,13 @@ function NSPauk:DropWebForTask(task, x, y)
     end
 
     local maxSegs = tonumber(C.MAX_WEB_SEGS) or 0
-
     if maxSegs > 0 and (S.webAliveCount or 0) >= maxSegs then
         return
     end
 
     local texture
-
     if #S.webPool > 0 then
         texture = table.remove(S.webPool)
-
         if texture then
             texture._nspInPool = false
         end
@@ -14161,12 +14170,16 @@ function NSPauk:DropWebForTask(task, x, y)
     end
 
     local inst = self:GetOwnerInstance(owner)
-
     if inst then
         inst.drawnPoints = (inst.drawnPoints or 0) + 1
     end
 
     S.webPoints = S.webPoints + 1
+
+    if owner.textures and #owner.textures == 1 and not owner._nspFirstDrawNotified then
+        owner._nspFirstDrawNotified = true
+        self:NP_OnOwnerFirstDrawn(inst, owner)
+    end
 end
 
 function NSPauk:DropAlongLine(task, fx, fy, tx, ty)
@@ -18916,11 +18929,9 @@ end
 ---------------------------------------------------------------------------
 -- Диагностика секторов перемычек
 ---------------------------------------------------------------------------
-
 function NSPauk:NP_DebugSectors()
     local S = self.S
     local C = self.C
-
     local inst = S.currentInstance
 
     if not inst then
@@ -18931,12 +18942,14 @@ function NSPauk:NP_DebugSectors()
     local N = inst.conns and #inst.conns or 0
 
     self:Echo(string.format(
-        "Instance id=%s, isCocoon=%s, conns=%d, crossRows=%s, torn=%s",
+        "Instance id=%s, isCocoon=%s, isMoth=%s, conns=%d, crossRows=%s, torn=%s, phase=%s",
         tostring(inst.id),
         tostring(inst.isCocoon),
+        tostring(inst.isMoth),
         N,
         tostring(inst.crossRows),
-        tostring(inst.torn)
+        tostring(inst.torn),
+        tostring(S.phase)
     ))
 
     if N == 0 then
@@ -18955,126 +18968,100 @@ function NSPauk:NP_DebugSectors()
         minCrossLen
     ))
 
+    local hubValid = self:ValidateAnchorRect(inst.hub and inst.hub.rect)
+    self:Echo(string.format(
+        "Хаб: %s, anchor valid=%s",
+        tostring(inst.hub and inst.hub.name or "?"),
+        tostring(hubValid)
+    ))
+
+    local computedAllowed, sectorAngleDeg, connLocalDeg = self:ComputeCrossSectors(inst)
+    local actualAllowed = inst.sectorAllowed or computedAllowed
+
+    -----------------------------------------------------------------------
+    -- Основные нити
+    -----------------------------------------------------------------------
     for i, conn in ipairs(inst.conns) do
-        local angleRad = conn.thread and conn.thread.angle or 0
-        local angleDeg = angleRad * 180 / math.pi
-        local arcLength = conn.arcLength or 0
-        local texCount = conn.textures and #conn.textures or 0
         local targetName = conn.target and conn.target.name or "?"
+        local anchorValid = false
+        if conn.target then
+            anchorValid = self:ValidateAnchorRect(conn.target.rect)
+        end
+
+        local drawn = conn.textures and #conn.textures or 0
+        local localAng = connLocalDeg and connLocalDeg[i] or 0
 
         self:Echo(string.format(
-            "conn %d: angle=%.1f, arcLength=%.1f, alive=%s, textures=%d, target=%s",
+            "Нить %d: цель=%s, alive=%s, drawn=%d, arcLen=%.1f, угол у хаба=%.1f, anchor=%s",
             i,
-            angleDeg,
-            arcLength,
+            tostring(targetName),
             tostring(conn.alive),
-            texCount,
-            tostring(targetName)
+            drawn,
+            conn.arcLength or 0,
+            localAng,
+            tostring(anchorValid)
         ))
     end
 
-    local sectorAllowed, sectorAngleDeg, connLocalDeg = self:ComputeCrossSectors(inst)
+    -----------------------------------------------------------------------
+    -- Сектора между основными нитями
+    -----------------------------------------------------------------------
+    local indices = self:NP_GetSectorIndices(inst)
 
-    if connLocalDeg then
-        for i = 1, N do
-            self:Echo(string.format(
-                "conn %d: локальный угол у хаба=%.1f",
-                i,
-                connLocalDeg[i] or 0
-            ))
-        end
-    end
-
-    local sumAngles = 0
-
-    for i = 1, N do
+    for _, i in ipairs(indices) do
         local j = (i % N) + 1
-        local deg = sectorAngleDeg and sectorAngleDeg[i] or 0
-        local allowed = sectorAllowed and sectorAllowed[i]
-        local lenA = inst.conns[i].arcLength or 0
-        local lenB = inst.conns[j].arcLength or 0
-        local pairMin = math.min(lenA, lenB)
-
-        sumAngles = sumAngles + deg
+        local info = self:NP_GetSectorDebugInfo(
+            inst,
+            i,
+            actualAllowed,
+            sectorAngleDeg,
+            connLocalDeg
+        )
 
         self:Echo(string.format(
-            "sector %d-%d: angle=%.1f, allowed=%s, pairMin=%.1f",
+            "Сектор %d-%d: угол=%.1f, разрешён=%s, pairMin=%.1f, рядов=%d, план=%d, нарисовано=%d, ожидает=%d, мертво=%d, пропущено=%d",
             i,
             j,
-            deg,
-            tostring(allowed),
-            pairMin
-        ))
-    end
-
-    self:Echo(string.format("Сумма углов секторов: %.1f", sumAngles))
-
-    if type(inst.crossRowsList) == "table" then
-        local rows = #inst.crossRowsList
-        local totalRowSegs = 0
-        local aliveRowSegs = 0
-        local sectorTotal = {}
-        local sectorAlive = {}
-
-        for _, row in ipairs(inst.crossRowsList) do
-            if type(row) == "table" then
-                for idx, seg in pairs(row) do
-                    if type(idx) == "number" and type(seg) == "table" then
-                        totalRowSegs = totalRowSegs + 1
-
-                        if seg.alive then
-                            aliveRowSegs = aliveRowSegs + 1
-                            sectorAlive[idx] = (sectorAlive[idx] or 0) + 1
-                        end
-
-                        sectorTotal[idx] = (sectorTotal[idx] or 0) + 1
-                    end
-                end
-            end
-        end
-
-        self:Echo(string.format(
-            "crossRowsList: rows=%d, rowSegs total=%d, alive=%d",
-            rows,
-            totalRowSegs,
-            aliveRowSegs
+            info.angle,
+            tostring(info.allowed),
+            info.pairMin,
+            info.expectedRows,
+            info.planned,
+            info.drawn,
+            info.pending,
+            info.dead,
+            info.missing
         ))
 
-        for i = 1, N do
-            self:Echo(string.format(
-                "sector %d rowSegs: total=%d, alive=%d",
-                i,
-                sectorTotal[i] or 0,
-                sectorAlive[i] or 0
-            ))
+        if info.reason and info.reason ~= "" then
+            self:Echo("  причина: " .. info.reason)
         end
-    else
-        self:Echo("crossRowsList: нет")
     end
 
-    if type(inst.crossSegs) == "table" then
-        local total = #inst.crossSegs
-        local alive = 0
-        local inter = 0
+    -----------------------------------------------------------------------
+    -- Общий итог
+    -----------------------------------------------------------------------
+    local stats = self:NP_GetWebCompletionStats(inst)
+    self:Echo(string.format(
+        "Итог: основные %d/%d, перемычки план=%d, нарисовано=%d, ожидает=%d, мертво=%d, пропущено=%d, crossSegs alive=%d/%d",
+        stats.mainDrawn,
+        stats.mainTotal,
+        stats.crossPlanned,
+        stats.crossDrawn,
+        stats.crossPending,
+        stats.crossDead,
+        stats.crossMissing,
+        stats.crossSegDrawn,
+        stats.crossSegAlive
+    ))
 
-        for _, seg in ipairs(inst.crossSegs) do
-            if seg.alive then
-                alive = alive + 1
-            end
-            if seg.isInterCross then
-                inter = inter + 1
-            end
-        end
-
-        self:Echo(string.format(
-            "crossSegs: total=%d, alive=%d, interCross=%d",
-            total,
-            alive,
-            inter
-        ))
-    else
-        self:Echo("crossSegs: нет")
+    local scheduled = self:NP_CollectScheduledOwners(inst)
+    local schedCount = 0
+    for _ in pairs(scheduled) do
+        schedCount = schedCount + 1
     end
+
+    self:Echo("Запланировано владельцев в очереди: " .. tostring(schedCount))
 end
 
 function NSPauk:Echo(message)
@@ -19134,6 +19121,861 @@ function NSPauk:OnUpdateGuarded(dt)
     self:OnUpdate(dt)
     self:UpdateSpiderAnimation(dt)
     self:NP_PostUpdate()
+end
+
+---------------------------------------------------------------------------
+-- Web plan audit helpers
+---------------------------------------------------------------------------
+function NSPauk:NP_CopyPoint(p)
+    if not p then
+        return { x = 0, y = 0 }
+    end
+    return { x = p.x or 0, y = p.y or 0 }
+end
+
+function NSPauk:NP_IsWebOwnerDrawn(owner)
+    if not owner or not owner.alive then
+        return false
+    end
+    return owner.textures ~= nil and #owner.textures > 0
+end
+
+function NSPauk:NP_GetSectorIndices(inst)
+    local N = inst and inst.conns and #inst.conns or 0
+    local out = {}
+
+    if N == 2 then
+        out[1] = 1
+    elseif N >= 3 then
+        for i = 1, N do
+            out[#out + 1] = i
+        end
+    end
+
+    return out
+end
+
+function NSPauk:NP_GetRowArcLen(inst, rowIdx, row)
+    if type(row) == "table"
+        and type(row.arcLen) == "number"
+        and row.arcLen == row.arcLen
+        and row.arcLen > 0 then
+        return row.arcLen
+    end
+
+    local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
+    if spacing < 0.5 then
+        spacing = 0.5
+    end
+
+    return rowIdx * spacing
+end
+
+function NSPauk:NP_CollectScheduledOwners(inst)
+    local scheduled = {}
+    local S = self.S
+
+    local function mark(task)
+        if not task then
+            return
+        end
+        if task.owner then
+            scheduled[task.owner] = true
+        end
+    end
+
+    mark(S.currentTask)
+
+    if type(S.tasks) == "table" then
+        local start = math.max(1, tonumber(S.taskIdx) or 1)
+        for i = start, #S.tasks do
+            mark(S.tasks[i])
+        end
+    end
+
+    return scheduled
+end
+
+function NSPauk:NP_OnOwnerFirstDrawn(inst, owner)
+    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
+        return
+    end
+
+    local S = self.S
+    if S.phase ~= "task" and S.phase ~= "instanceComplete" then
+        return
+    end
+
+    inst._nspAuditComplete = nil
+    inst._nspAuditFailCount = 0
+
+    -- Основные нити важны сразу: после первой нарисованной нити
+    -- надо проверить, можно ли уже строить перемычки.
+    if owner and owner.target then
+        S.nspAuditPending = true
+        S.nspAuditPendingInst = inst
+        return
+    end
+
+    -- Перемычки считаем по 10 штук.
+    if owner
+        and (owner.connA or owner.connB or owner.isHeal or owner.isInterCross) then
+        inst._nspCrossDrawn = (inst._nspCrossDrawn or 0) + 1
+        if (inst._nspCrossDrawn % 10) == 0 then
+            S.nspAuditPending = true
+            S.nspAuditPendingInst = inst
+        end
+    end
+end
+
+function NSPauk:NP_InstanceIncomplete(inst)
+    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
+        return false
+    end
+
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.alive and not self:NP_IsWebOwnerDrawn(conn) then
+            return true
+        end
+    end
+
+    local N = inst.conns and #inst.conns or 0
+    if N >= 2 and inst.crossRowsList then
+        local indices = self:NP_GetSectorIndices(inst)
+        local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
+        if spacing < 0.5 then
+            spacing = 0.5
+        end
+        local eps = math.max(0.5, spacing * 0.5)
+
+        for rowIdx, row in ipairs(inst.crossRowsList) do
+            if type(row) == "table" then
+                local arcLen = self:NP_GetRowArcLen(inst, rowIdx, row)
+
+                for _, idx in ipairs(indices) do
+                    local seg = row[idx]
+
+                    if seg and seg.alive and not self:NP_IsWebOwnerDrawn(seg) then
+                        return true
+                    end
+
+                    if not seg or not seg.alive then
+                        local connA = inst.conns[idx]
+                        local connB = inst.conns[(idx % N) + 1]
+
+                        if connA
+                            and connB
+                            and connA.alive
+                            and connB.alive
+                            and self:NP_IsWebOwnerDrawn(connA)
+                            and self:NP_IsWebOwnerDrawn(connB) then
+                            local allowed = true
+                            if inst.sectorAllowed and inst.sectorAllowed[idx] == false then
+                                allowed = false
+                            end
+
+                            if allowed then
+                                local pairMin = math.min(
+                                    connA.arcLength or 0,
+                                    connB.arcLength or 0
+                                )
+                                if arcLen <= pairMin + eps then
+                                    return true
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    for _, seg in ipairs(inst.crossSegs or {}) do
+        if seg.alive and not self:NP_IsWebOwnerDrawn(seg) then
+            return true
+        end
+    end
+
+    return false
+end
+
+function NSPauk:NP_CanBuildCrossAtArc(inst, idx, arcLen)
+    local C = self.C
+
+    if not inst or inst.torn then
+        return false, "паутина мертва"
+    end
+
+    local N = inst.conns and #inst.conns or 0
+    if N < 2 then
+        return false, "мало нитей"
+    end
+
+    if N == 2 and idx ~= 1 then
+        return false, "для двух нитей используется только сектор 1"
+    end
+
+    local connA = inst.conns[idx]
+    local connB = inst.conns[(idx % N) + 1]
+
+    if not connA or not connB then
+        return false, "нет нитей сектора"
+    end
+
+    if not connA.alive then
+        return false, "нить A мертва"
+    end
+
+    if not connB.alive then
+        return false, "нить B мертва"
+    end
+
+    if not self:NP_IsWebOwnerDrawn(connA) then
+        return false, "нить A не нарисована"
+    end
+
+    if not self:NP_IsWebOwnerDrawn(connB) then
+        return false, "нить B не нарисована"
+    end
+
+    if connA.target and not self:ValidateAnchorRect(connA.target.rect) then
+        return false, "якорь нити A исчез/сдвинулся"
+    end
+
+    if connB.target and not self:ValidateAnchorRect(connB.target.rect) then
+        return false, "якорь нити B исчез/сдвинулся"
+    end
+
+    if inst.sectorAllowed and inst.sectorAllowed[idx] == false then
+        return false, "угол сектора запрещён"
+    end
+
+    local function ensureLen(conn)
+        if conn
+            and conn.thread
+            and (not conn.arcLength or conn.arcLength <= 0) then
+            local samples, total = self:BuildArcSamples(conn.thread)
+            conn.arcSamples = samples
+            conn.arcLength = total
+        end
+    end
+
+    ensureLen(connA)
+    ensureLen(connB)
+
+    local lenA = connA.arcLength or 0
+    local lenB = connB.arcLength or 0
+    if lenA <= 0 or lenB <= 0 then
+        return false, "нет длины дуги"
+    end
+
+    local pairMin = math.min(lenA, lenB)
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+    if spacing < 0.5 then
+        spacing = 0.5
+    end
+    local eps = math.max(0.5, spacing * 0.5)
+
+    if type(arcLen) ~= "number" or arcLen ~= arcLen or arcLen <= 0 then
+        return false, "нет длины ряда"
+    end
+
+    if arcLen > pairMin + eps then
+        return false, "ряд дальше конца короткой нити"
+    end
+
+    local tA = self:ThreadTAtLength(connA, arcLen)
+    local tB = self:ThreadTAtLength(connB, arcLen)
+    if not tA or not tB then
+        return false, "нет точки на дуге"
+    end
+
+    local ax, ay = self:BzThread(connA.thread, tA)
+    local bx, by = self:BzThread(connB.thread, tB)
+
+    local minLen = tonumber(C.MIN_CROSS_LEN) or 4
+    local dx = bx - ax
+    local dy = by - ay
+
+    if (dx * dx + dy * dy) < (minLen * minLen) then
+        return false, "перемычка короче MIN_CROSS_LEN"
+    end
+
+    return true, "ok", tA, tB
+end
+
+function NSPauk:NP_CreateCrossSegForRow(inst, row, rowIdx, idx, arcLen, tA, tB)
+    if not inst or not row or not tA or not tB then
+        return nil
+    end
+
+    local N = inst.conns and #inst.conns or 0
+    if N < 2 then
+        return nil
+    end
+
+    local connA = inst.conns[idx]
+    local connB = inst.conns[(idx % N) + 1]
+    if not connA or not connB then
+        return nil
+    end
+
+    local minLen = tonumber(self.C.MIN_CROSS_LEN) or 4
+    local seg = self:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
+    if seg then
+        seg.planArcLen = arcLen
+        seg.planSector = idx
+        seg.planRow = rowIdx
+        seg.isAuditRebuild = true
+        row[idx] = seg
+    end
+
+    return seg
+end
+
+function NSPauk:NP_OrientThreadForCursor(thread, cursor)
+    if not thread or not thread.p0 or not thread.p2 then
+        return nil
+    end
+
+    local p0 = thread.p0
+    local p2 = thread.p2
+    local p1 = thread.p1 or {
+        x = (p0.x + p2.x) / 2,
+        y = (p0.y + p2.y) / 2,
+    }
+
+    local normal = {
+        p0 = self:NP_CopyPoint(p0),
+        p1 = self:NP_CopyPoint(p1),
+        p2 = self:NP_CopyPoint(p2),
+        ownerRef = thread.ownerRef,
+        angle = thread.angle,
+    }
+
+    if not cursor then
+        return normal
+    end
+
+    local d0x = (cursor.x or 0) - p0.x
+    local d0y = (cursor.y or 0) - p0.y
+    local d0 = d0x * d0x + d0y * d0y
+
+    local d2x = (cursor.x or 0) - p2.x
+    local d2y = (cursor.y or 0) - p2.y
+    local d2 = d2x * d2x + d2y * d2y
+
+    if d2 < d0 then
+        return {
+            p0 = self:NP_CopyPoint(p2),
+            p1 = self:NP_CopyPoint(p1),
+            p2 = self:NP_CopyPoint(p0),
+            ownerRef = thread.ownerRef,
+            angle = thread.angle,
+        }
+    end
+
+    return normal
+end
+
+function NSPauk:NP_AuditWebPlan(inst)
+    local S = self.S
+    local C = self.C
+
+    if not inst or inst.torn then
+        return 0
+    end
+
+    if inst.isCocoon or inst.isMoth then
+        return 0
+    end
+
+    if S.phase ~= "task" and S.phase ~= "instanceComplete" then
+        return 0
+    end
+
+    if S.nspAuditRunning then
+        return 0
+    end
+
+    if S.limitReturnPending or S.phase == "limitWait" then
+        return 0
+    end
+
+    S.nspAuditRunning = true
+
+    -- Перед аудитам полезно реально проверить, не уехали ли якоря.
+    self:CheckInstancesMovement()
+
+    if not inst
+        or inst.torn
+        or S.phase == "limitWait"
+        or S.limitReturnPending then
+        S.nspAuditRunning = false
+        return 0
+    end
+
+    local added = 0
+    local tasks = {}
+    local scheduled = self:NP_CollectScheduledOwners(inst)
+    local cursor = self:NP_GetSpiderPointIfShown()
+        or { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+    local N = inst.conns and #inst.conns or 0
+
+    local function addThreadWithTravel(owner, drawThread, isMain)
+        if not owner
+            or not owner.alive
+            or scheduled[owner]
+            or self:NP_IsWebOwnerDrawn(owner) then
+            return nil
+        end
+
+        if not drawThread or not drawThread.p0 or not drawThread.p2 then
+            return nil
+        end
+
+        owner._nspAuditAttempts = (owner._nspAuditAttempts or 0) + 1
+        local force = owner._nspAuditAttempts >= 5
+
+        local travelConn = nil
+        if owner.connA then
+            travelConn = owner.connA
+        elseif owner.target then
+            travelConn = owner
+        end
+
+        local before = #tasks
+
+        local travel = self:AddTravelPointTask(
+            tasks,
+            cursor,
+            drawThread.p0,
+            travelConn,
+            owner
+        )
+
+        if travel and force then
+            travel.nspAllowNoSupport = true
+            travel.nspAllowTeleport = true
+        end
+
+        local task = self:AddThreadTask(tasks, owner, drawThread)
+        if task then
+            if isMain then
+                task.isMain = true
+            end
+            if force then
+                task.nspAllowNoSupport = true
+                task.nspAllowTeleport = true
+            end
+            scheduled[owner] = true
+        end
+
+        added = added + (#tasks - before)
+
+        if task then
+            return {
+                x = drawThread.p2.x,
+                y = drawThread.p2.y,
+            }
+        end
+
+        return nil
+    end
+
+    if not self:ValidateAnchorRect(inst.hub and inst.hub.rect) then
+        S.nspAuditRunning = false
+        return 0
+    end
+
+    -----------------------------------------------------------------------
+    -- 1. Дорисовка основных нитей.
+    -----------------------------------------------------------------------
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.alive
+            and not self:NP_IsWebOwnerDrawn(conn)
+            and not scheduled[conn] then
+            if conn.target and self:ValidateAnchorRect(conn.target.rect) then
+                if conn.thread and (not conn.arcLength or conn.arcLength <= 0) then
+                    local samples, total = self:BuildArcSamples(conn.thread)
+                    conn.arcSamples = samples
+                    conn.arcLength = total
+                end
+
+                local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
+                if drawThread then
+                    local newCursor = addThreadWithTravel(conn, drawThread, true)
+                    if newCursor then
+                        cursor = newCursor
+                    end
+                end
+            end
+        end
+    end
+
+    -----------------------------------------------------------------------
+    -- 2. Дорисовка перемычек по сохранённым рядам.
+    -----------------------------------------------------------------------
+    if N >= 2 and inst.crossRowsList then
+        local indices = self:NP_GetSectorIndices(inst)
+
+        for rowIdx, row in ipairs(inst.crossRowsList) do
+            if type(row) == "table" then
+                local arcLen = self:NP_GetRowArcLen(inst, rowIdx, row)
+
+                for _, idx in ipairs(indices) do
+                    local seg = row[idx]
+                    local ok, reason, tA, tB = self:NP_CanBuildCrossAtArc(
+                        inst,
+                        idx,
+                        arcLen
+                    )
+
+                    if ok then
+                        if not seg or not seg.alive then
+                            seg = self:NP_CreateCrossSegForRow(
+                                inst,
+                                row,
+                                rowIdx,
+                                idx,
+                                arcLen,
+                                tA,
+                                tB
+                            )
+                        end
+
+                        if seg
+                            and seg.alive
+                            and not self:NP_IsWebOwnerDrawn(seg)
+                            and not scheduled[seg] then
+                            local drawThread = self:NP_OrientThreadForCursor(
+                                seg.thread,
+                                cursor
+                            )
+                            local newCursor = addThreadWithTravel(
+                                seg,
+                                drawThread,
+                                false
+                            )
+                            if newCursor then
+                                cursor = newCursor
+                            end
+                        end
+                    else
+                        -- Если сегмент ещё жив, но его родители уже мертвы,
+                        -- убираем его, чтобы он не висел в плане.
+                        if seg and seg.alive then
+                            local connA = inst.conns[idx]
+                            local connB = inst.conns[(idx % N) + 1]
+                            if connA
+                                and connB
+                                and ((not connA.alive) or (not connB.alive)) then
+                                self:KillSeg(seg)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -----------------------------------------------------------------------
+    -- 3. Дорисовка живых crossSegs, которые не входят в crossRowsList
+    --    (например, heal-перемычки или inter-cross).
+    -----------------------------------------------------------------------
+    for _, seg in ipairs(inst.crossSegs or {}) do
+        if seg.alive
+            and not self:NP_IsWebOwnerDrawn(seg)
+            and not scheduled[seg] then
+            local okParents = true
+
+            if seg.connA then
+                if not seg.connA.alive or not self:NP_IsWebOwnerDrawn(seg.connA) then
+                    okParents = false
+                end
+            else
+                okParents = false
+            end
+
+            if seg.connB then
+                if not seg.connB.alive or not self:NP_IsWebOwnerDrawn(seg.connB) then
+                    okParents = false
+                end
+            else
+                okParents = false
+            end
+
+            if okParents and seg.thread then
+                local drawThread = self:NP_OrientThreadForCursor(seg.thread, cursor)
+                local newCursor = addThreadWithTravel(seg, drawThread, false)
+                if newCursor then
+                    cursor = newCursor
+                end
+            end
+        end
+    end
+
+    -----------------------------------------------------------------------
+    -- Применяем найденные дорисовки.
+    -----------------------------------------------------------------------
+    if added > 0 then
+        for _, task in ipairs(tasks) do
+            S.tasks[#S.tasks + 1] = task
+        end
+
+        inst._nspAuditComplete = nil
+        inst._nspAuditFailCount = 0
+
+        if S.phase == "instanceComplete" then
+            S.phase = "task"
+            S.completeTimer = 0
+            self:AdvanceTask()
+        elseif not S.currentTask then
+            self:AdvanceTask()
+        end
+    else
+        if not self:NP_InstanceIncomplete(inst) then
+            inst._nspAuditComplete = true
+            inst._nspAuditFailCount = 0
+        else
+            inst._nspAuditFailCount = (inst._nspAuditFailCount or 0) + 1
+        end
+    end
+
+    S.nspAuditRunning = false
+    return added
+end
+
+function NSPauk:NP_GetWebCompletionStats(inst)
+    local stats = {
+        mainTotal = 0,
+        mainDrawn = 0,
+        crossPlanned = 0,
+        crossDrawn = 0,
+        crossPending = 0,
+        crossDead = 0,
+        crossMissing = 0,
+        crossSegAlive = 0,
+        crossSegDrawn = 0,
+    }
+
+    if not inst then
+        return stats
+    end
+
+    for _, conn in ipairs(inst.conns or {}) do
+        stats.mainTotal = stats.mainTotal + 1
+        if self:NP_IsWebOwnerDrawn(conn) then
+            stats.mainDrawn = stats.mainDrawn + 1
+        end
+    end
+
+    local N = inst.conns and #inst.conns or 0
+    if N >= 2 and inst.crossRowsList then
+        local indices = self:NP_GetSectorIndices(inst)
+        local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
+        if spacing < 0.5 then
+            spacing = 0.5
+        end
+        local eps = math.max(0.5, spacing * 0.5)
+
+        for rowIdx, row in ipairs(inst.crossRowsList) do
+            if type(row) == "table" then
+                local arcLen = self:NP_GetRowArcLen(inst, rowIdx, row)
+
+                for _, idx in ipairs(indices) do
+                    local connA = inst.conns[idx]
+                    local connB = inst.conns[(idx % N) + 1]
+                    if connA and connB then
+                        local pairMin = math.min(
+                            connA.arcLength or 0,
+                            connB.arcLength or 0
+                        )
+
+                        if arcLen <= pairMin + eps then
+                            local seg = row[idx]
+                            if seg then
+                                stats.crossPlanned = stats.crossPlanned + 1
+                                if seg.alive then
+                                    if self:NP_IsWebOwnerDrawn(seg) then
+                                        stats.crossDrawn = stats.crossDrawn + 1
+                                    else
+                                        stats.crossPending = stats.crossPending + 1
+                                    end
+                                else
+                                    stats.crossDead = stats.crossDead + 1
+                                end
+                            else
+                                stats.crossMissing = stats.crossMissing + 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    for _, seg in ipairs(inst.crossSegs or {}) do
+        if seg.alive then
+            stats.crossSegAlive = stats.crossSegAlive + 1
+            if self:NP_IsWebOwnerDrawn(seg) then
+                stats.crossSegDrawn = stats.crossSegDrawn + 1
+            end
+        end
+    end
+
+    return stats
+end
+
+function NSPauk:NP_GetSectorDebugInfo(inst, idx, sectorAllowed, sectorAngleDeg, connLocalDeg)
+    local C = self.C
+    local N = inst.conns and #inst.conns or 0
+
+    local info = {
+        idx = idx,
+        angle = 0,
+        allowed = false,
+        pairMin = 0,
+        expectedRows = 0,
+        planned = 0,
+        drawn = 0,
+        pending = 0,
+        dead = 0,
+        missing = 0,
+        reasons = {},
+        reason = "",
+    }
+
+    if N < 2 then
+        info.reason = "мало нитей"
+        return info
+    end
+
+    local connA = inst.conns[idx]
+    local connB = inst.conns[(idx % N) + 1]
+
+    if not connA or not connB then
+        info.reason = "нет нитей сектора"
+        return info
+    end
+
+    local angle = sectorAngleDeg and sectorAngleDeg[idx] or 0
+    local allowed = sectorAllowed and sectorAllowed[idx] or false
+
+    info.angle = angle
+    info.allowed = allowed
+
+    local lenA = connA.arcLength or 0
+    local lenB = connB.arcLength or 0
+    local pairMin = math.min(lenA, lenB)
+    info.pairMin = pairMin
+
+    local maxDeg = tonumber(C.CROSS_MAX_SECTOR_ANGLE) or 160
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+    if spacing < 0.5 then
+        spacing = 0.5
+    end
+    local eps = math.max(0.5, spacing * 0.5)
+
+    if not connA.alive then
+        table.insert(info.reasons, "нить A мертва")
+    end
+
+    if not connB.alive then
+        table.insert(info.reasons, "нить B мертва")
+    end
+
+    if connA.alive and not self:NP_IsWebOwnerDrawn(connA) then
+        table.insert(info.reasons, "нить A не нарисована")
+    end
+
+    if connB.alive and not self:NP_IsWebOwnerDrawn(connB) then
+        table.insert(info.reasons, "нить B не нарисована")
+    end
+
+    if connA.target and not self:ValidateAnchorRect(connA.target.rect) then
+        table.insert(info.reasons, "якорь A исчез/сдвинулся")
+    end
+
+    if connB.target and not self:ValidateAnchorRect(connB.target.rect) then
+        table.insert(info.reasons, "якорь B исчез/сдвинулся")
+    end
+
+    if not allowed then
+        if angle > maxDeg then
+            table.insert(info.reasons, string.format(
+                "угол %.1f больше максимума %.1f",
+                angle,
+                maxDeg
+            ))
+        else
+            table.insert(info.reasons, "сектор запрещён флагом")
+        end
+    else
+        if angle > maxDeg then
+            table.insert(info.reasons, string.format(
+                "угол %.1f больше максимума %.1f, но сектор принудительно разрешён планом",
+                angle,
+                maxDeg
+            ))
+        end
+    end
+
+    if pairMin < spacing then
+        table.insert(info.reasons, "пара нитей слишком короткая")
+    end
+
+    if inst.crossRowsList then
+        for rowIdx, row in ipairs(inst.crossRowsList) do
+            if type(row) == "table" then
+                local arcLen = self:NP_GetRowArcLen(inst, rowIdx, row)
+
+                if arcLen <= pairMin + eps then
+                    info.expectedRows = info.expectedRows + 1
+                    local seg = row[idx]
+
+                    if seg then
+                        info.planned = info.planned + 1
+                        if seg.alive then
+                            if self:NP_IsWebOwnerDrawn(seg) then
+                                info.drawn = info.drawn + 1
+                            else
+                                info.pending = info.pending + 1
+                            end
+                        else
+                            info.dead = info.dead + 1
+                        end
+                    else
+                        info.missing = info.missing + 1
+                    end
+                end
+            end
+        end
+    else
+        table.insert(info.reasons, "нет плана рядов")
+    end
+
+    if info.expectedRows == 0 and pairMin >= spacing then
+        table.insert(info.reasons, "нет подходящих рядов")
+    end
+
+    if info.expectedRows > 0 and info.planned == 0 then
+        table.insert(info.reasons, "нет запланированных сегментов")
+    end
+
+    if info.planned > 0 and info.drawn == 0 and info.pending == 0 then
+        table.insert(info.reasons, "все запланированные сегменты мертвы")
+    end
+
+    if info.missing > 0 then
+        table.insert(info.reasons, string.format(
+            "пропущено %d сегментов",
+            info.missing
+        ))
+    end
+
+    info.reason = table.concat(info.reasons, "; ")
+    return info
 end
 
 function NSPauk:RuntimeShutdown()
