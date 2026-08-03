@@ -5768,51 +5768,53 @@ NSPauk.ConstantDescriptions = {
     SPIDER_SIZE = "Размер паука",
     WEB_SIZE = "Размер точек паутины",
     WEB_ALPHA = "Прозрачность паутины",
-
-    -----------------------------------------------------------------------
-    -- Поведение
-    -----------------------------------------------------------------------
-    STILL_WAIT = "Сколько секунд ждать в покое перед новой паутиной",
-    COMPLETE_PAUSE = "Пауза после завершения паутины (сек)",
-    DISABLE_TIME = "На сколько секунд паук отключается после убийства",
-    MOUSE_HOVER_LIMIT = "Сколько наведений мыши нужно, чтобы порвать нить",
-
-    -----------------------------------------------------------------------
-    -- Скорость
-    -----------------------------------------------------------------------
-    FAST_MODE = "Общий множитель скорости паука",
-    SPIDER_SPEED_MIN = "Минимальная скорость паука",
-    SPIDER_SPEED_MAX = "Максимальная скорость паука",
-    TRAVEL_SPEED_MULT = "Ускорение переходов без плетения",
-    CROSS_SPEED_MULT = "Скорость на перемычках",
-    MAIN_SPEED_MULT = "Скорость на основных нитях",
-    EMPTY_SPEED_MULT = "Скорость пустых переходов",
+    WEB_POINT_SPACING_MAX = "Шаг точек паутины",
+    MAIN_SAG_MIN = "Мин. провис основных нитей",
+    MAIN_SAG_MAX = "Макс. провис основных нитей",
+    CROSS_SAG_MIN = "Мин. провис перемычек",
+    CROSS_SAG_MAX = "Макс. провис перемычек",
 
     -----------------------------------------------------------------------
     -- Паутина
     -----------------------------------------------------------------------
-    TARGET_COUNT_MIN = "Минимум основных нитей паутины",
-    TARGET_COUNT_MAX = "Максимум основных нитей паутины",
-    MAX_INSTANCES = "Сколько паутин может висеть одновременно",
+    TARGET_COUNT_MIN = "Мин. нитей в паутине",
+    TARGET_COUNT_MAX = "Макс. нитей в паутине",
+    MAX_INSTANCES = "Макс. одновременных паутин",
+    CROSS_ROW_SPACING = "Шаг рядов перемычек",
+    WEB_THREAD_MIN_SEPARATION = "Мин. расстояние между нитями",
+    MIN_WEB_GAP = "Мин. длина нити",
+    MIN_CROSS_LEN = "Мин. длина перемычки",
+    MAX_CROSS_ROWS = "Макс. рядов перемычек",
+
+    -----------------------------------------------------------------------
+    -- Скорость
+    -----------------------------------------------------------------------
+    SPIDER_SPEED_MIN = "Мин. скорость паука",
+    SPIDER_SPEED_MAX = "Макс. скорость паука",
+    FAST_MODE = "Общий множитель скорости",
+    TRAVEL_SPEED_MULT = "Множитель скорости переходов",
+    CROSS_SPEED_MULT = "Множитель скорости на перемычках",
+    MAIN_SPEED_MULT = "Множитель скорости на основных нитях",
+    EMPTY_SPEED_MULT = "Множитель скорости пустых переходов",
 
     -----------------------------------------------------------------------
     -- Кокон
     -----------------------------------------------------------------------
-    COCOON_CHANCE = "Шанс сделать кокон вместо обычной паутины",
-    COCOON_WRAPS_MIN = "Минимум витков кокона",
-    COCOON_WRAPS_MAX = "Максимум витков кокона",
-    COCOON_DIAG_MIN = "Минимум диагональных нитей кокона",
-    COCOON_DIAG_MAX = "Максимум диагональных нитей кокона",
-    DISSOLVE_DURATION_MIN = "Минимальное время поедания кокона (сек)",
-    DISSOLVE_DURATION_MAX = "Максимальное время поедания кокона (сек)",
-    MIN_COCOON_ALPHA = "Насколько прозрачной становится жертва кокона",
+    COCOON_CHANCE = "Шанс кокона вместо обычной паутины",
+    DISSOLVE_DURATION_MIN = "Мин. время поедания кокона (сек)",
+    DISSOLVE_DURATION_MAX = "Макс. время поедания кокона (сек)",
+    COCOON_MIN_WIDTH = "Мин. ширина жертвы кокона",
+    COCOON_MIN_AREA = "Мин. площадь жертвы кокона",
+    COCOON_MAX_AREA = "Макс. площадь жертвы кокона",
 
     -----------------------------------------------------------------------
     -- Прогресс и выживаемость
     -----------------------------------------------------------------------
-    POINTS_PER_LEVEL = "Сколько точек паутины нужно для одного уровня",
+    POINTS_PER_LEVEL = "Точек паутины на уровень",
     COCOON_EXP_PERCENT = "Доля уровня за кокон",
-    SURVIVAL_CHANCE = "Шанс паука выжить после клика тапком",
+    SESSION_FULL_POINTS = "Точек для полного опыта сессии",
+    SESSION_EXP_PERCENT_MAX = "Макс. доля опыта сессии",
+    SURVIVAL_CHANCE = "Шанс выжить после тапка",
 }
 
 NSPauk.S = {
@@ -6491,8 +6493,8 @@ function NSPauk:ShowProgress()
     local C = self.C
     local db = self:EnsureDB()
     local progress = db.progress
-
     local perLevel = C.POINTS_PER_LEVEL or 60000
+
     if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
     end
@@ -6500,6 +6502,7 @@ function NSPauk:ShowProgress()
     local total = progress.totalPoints or 0
     local level = math.floor(total / perLevel)
     local left = perLevel - (total % perLevel)
+
     if left == perLevel then
         left = 0
     end
@@ -6530,8 +6533,13 @@ function NSPauk:ShowProgress()
         currentThreads
     ))
 
-    -- 3. Только те параметры, которые пользователь менял при лвлапе.
-    -- Считаем изменёнными те, что отличаются от DefaultConstants.
+    -----------------------------------------------------------------------
+    -- 3. Изменённые параметры.
+    --
+    -- Сюда попадают только те константы, которые присутствуют
+    -- в окне повышения уровня (имеют описание в ConstantDescriptions).
+    -- Служебные параметры в офицерский чат не выводятся.
+    -----------------------------------------------------------------------
     local descriptions = self.ConstantDescriptions
     local changed = {}
 
@@ -6539,31 +6547,37 @@ function NSPauk:ShowProgress()
         -- Выживаемость выводим отдельной строкой ниже,
         -- чтобы не дублировать её в общем списке изменений.
         if key ~= "SURVIVAL_CHANCE" then
-            local curValue = C[key]
-            if type(curValue) == "number"
-                and curValue == curValue
-                and type(defValue) == "number"
-                and defValue == defValue then
-                local diff = curValue - defValue
-                if math.abs(diff) > 1e-9 then
-                    local label = key
-                    if type(descriptions) == "table"
-                        and type(descriptions[key]) == "string"
-                        and descriptions[key] ~= "" then
-                        label = descriptions[key]
-                    end
+            local label = nil
 
-                    local valueText
-                    if type(self.FormatConstantValue) == "function" then
-                        valueText = self:FormatConstantValue(key, curValue)
-                    else
-                        valueText = tostring(curValue)
-                    end
+            if type(descriptions) == "table"
+                and type(descriptions[key]) == "string"
+                and descriptions[key] ~= "" then
+                label = descriptions[key]
+            end
 
-                    changed[#changed + 1] = {
-                        key = key,
-                        text = label .. ": " .. valueText,
-                    }
+            if label then
+                local curValue = C[key]
+
+                if type(curValue) == "number"
+                    and curValue == curValue
+                    and type(defValue) == "number"
+                    and defValue == defValue then
+                    local diff = curValue - defValue
+
+                    if math.abs(diff) > 1e-9 then
+                        local valueText
+
+                        if type(self.FormatConstantValue) == "function" then
+                            valueText = self:FormatConstantValue(key, curValue)
+                        else
+                            valueText = tostring(curValue)
+                        end
+
+                        changed[#changed + 1] = {
+                            key = key,
+                            text = label .. ": " .. valueText,
+                        }
+                    end
                 end
             end
         end
@@ -6580,6 +6594,7 @@ function NSPauk:ShowProgress()
 
         for _, item in ipairs(changed) do
             local addition = item.text
+
             if line == prefix then
                 line = prefix .. addition
             else
@@ -6599,9 +6614,11 @@ function NSPauk:ShowProgress()
 
     -- 4. Выживаемость паучка
     local survival = tonumber(C.SURVIVAL_CHANCE) or 0
+
     if type(survival) ~= "number" or survival ~= survival then
         survival = 0
     end
+
     if survival < 0 then
         survival = 0
     elseif survival > 1 then
@@ -18219,51 +18236,54 @@ function NSPauk:CreateLevelUpFrame()
     self.levelUpRows = {}
 
     -----------------------------------------------------------------------
-    -- Порядок строк в окне лвлапа.
+    -- Финальный список параметров окна повышения.
     --
-    -- Важно:
-    -- обычный pairs() по ConstantDescriptions не гарантирует порядок,
-    -- поэтому список ключей задаём явно.
+    -- Порядок здесь — это порядок строк в окне.
+    -- Служебные константы сюда не попадают.
     -----------------------------------------------------------------------
     local orderedKeys = {
         -- Внешний вид
         "SPIDER_SIZE",
         "WEB_SIZE",
         "WEB_ALPHA",
-
-        -- Поведение
-        "STILL_WAIT",
-        "COMPLETE_PAUSE",
-        "DISABLE_TIME",
-        "MOUSE_HOVER_LIMIT",
-
-        -- Скорость
-        "FAST_MODE",
-        "SPIDER_SPEED_MIN",
-        "SPIDER_SPEED_MAX",
-        "TRAVEL_SPEED_MULT",
-        "CROSS_SPEED_MULT",
-        "MAIN_SPEED_MULT",
-        "EMPTY_SPEED_MULT",
+        "WEB_POINT_SPACING_MAX",
+        "MAIN_SAG_MIN",
+        "MAIN_SAG_MAX",
+        "CROSS_SAG_MIN",
+        "CROSS_SAG_MAX",
 
         -- Паутина
         "TARGET_COUNT_MIN",
         "TARGET_COUNT_MAX",
         "MAX_INSTANCES",
+        "CROSS_ROW_SPACING",
+        "WEB_THREAD_MIN_SEPARATION",
+        "MIN_WEB_GAP",
+        "MIN_CROSS_LEN",
+        "MAX_CROSS_ROWS",
+
+        -- Скорость
+        "SPIDER_SPEED_MIN",
+        "SPIDER_SPEED_MAX",
+        "FAST_MODE",
+        "TRAVEL_SPEED_MULT",
+        "CROSS_SPEED_MULT",
+        "MAIN_SPEED_MULT",
+        "EMPTY_SPEED_MULT",
 
         -- Кокон
         "COCOON_CHANCE",
-        "COCOON_WRAPS_MIN",
-        "COCOON_WRAPS_MAX",
-        "COCOON_DIAG_MIN",
-        "COCOON_DIAG_MAX",
         "DISSOLVE_DURATION_MIN",
         "DISSOLVE_DURATION_MAX",
-        "MIN_COCOON_ALPHA",
+        "COCOON_MIN_WIDTH",
+        "COCOON_MIN_AREA",
+        "COCOON_MAX_AREA",
 
         -- Прогресс и выживаемость
         "POINTS_PER_LEVEL",
         "COCOON_EXP_PERCENT",
+        "SESSION_FULL_POINTS",
+        "SESSION_EXP_PERCENT_MAX",
         "SURVIVAL_CHANCE",
     }
 
