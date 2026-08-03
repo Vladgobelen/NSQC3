@@ -13267,6 +13267,295 @@ function NSPauk:KillSeg(seg)
     end
 end
 
+function NSPauk:NP_HealHoleAroundConn(inst, deadConn)
+    local S = self.S
+    local C = self.C
+
+    if not inst or inst.torn then
+        return 0
+    end
+
+    -- Заживляем только ту паутину, которую паук сейчас строит.
+    if inst ~= S.currentInstance then
+        return 0
+    end
+
+    if inst.isCocoon or inst.isMoth then
+        return 0
+    end
+
+    if S.phase ~= "task" and S.phase ~= "instanceComplete" then
+        return 0
+    end
+
+    local conns = inst.conns
+    local N = conns and #conns or 0
+    if N < 3 then
+        return 0
+    end
+
+    local livingCount = 0
+    for _, conn in ipairs(conns) do
+        if conn.alive then
+            livingCount = livingCount + 1
+        end
+    end
+
+    if livingCount < 2 then
+        return 0
+    end
+
+    local k = nil
+    for i, conn in ipairs(conns) do
+        if conn == deadConn then
+            k = i
+            break
+        end
+    end
+
+    if not k then
+        return 0
+    end
+
+    -- Ближайший живой сосед "против часовой" и "по часовой".
+    local prevIdx = nil
+    local nextIdx = nil
+
+    for step = 1, N do
+        local i = ((k - 1 - step) % N) + 1
+        if conns[i].alive then
+            prevIdx = i
+            break
+        end
+    end
+
+    for step = 1, N do
+        local i = ((k - 1 + step) % N) + 1
+        if conns[i].alive then
+            nextIdx = i
+            break
+        end
+    end
+
+    if not prevIdx or not nextIdx or prevIdx == nextIdx then
+        return 0
+    end
+
+    local connA = conns[prevIdx]
+    local connB = conns[nextIdx]
+
+    -- Обе соседние нити должны быть уже нарисованы,
+    -- иначе новым перемычкам не на чем висеть.
+    if not connA.textures or #connA.textures == 0 then
+        return 0
+    end
+
+    if not connB.textures or #connB.textures == 0 then
+        return 0
+    end
+
+    local twoPi = math.pi * 2
+
+    local function localAngle(conn)
+        local thread = conn.thread
+        if not thread then
+            return 0
+        end
+
+        local total = conn.arcLength or 0
+        if total <= 0 then
+            local samples, len = self:BuildArcSamples(thread)
+            conn.arcSamples = samples
+            conn.arcLength = len
+            total = len
+        end
+
+        local angle = nil
+
+        if total > 1 then
+            local dist = math.min(100, total * 0.5)
+            local t = self:ThreadTAtLength(conn, dist)
+
+            if t then
+                local x, y = self:BzThread(thread, t)
+                local hubX = (inst.hub.rect and inst.hub.rect.cx) or 0
+                local hubY = (inst.hub.rect and inst.hub.rect.cy) or 0
+                local ax = x - hubX
+                local ay = y - hubY
+
+                if ax * ax + ay * ay > 0.01 then
+                    angle = math.atan2(ay, ax)
+                end
+            end
+        end
+
+        if not angle then
+            angle = thread.angle or 0
+        end
+
+        while angle < 0 do
+            angle = angle + twoPi
+        end
+
+        while angle >= twoPi do
+            angle = angle - twoPi
+        end
+
+        return angle
+    end
+
+    local a = localAngle(connA)
+    local b = localAngle(connB)
+
+    local delta = b - a
+
+    while delta < 0 do
+        delta = delta + twoPi
+    end
+
+    while delta >= twoPi do
+        delta = delta - twoPi
+    end
+
+    local maxDeg = tonumber(C.CROSS_MAX_SECTOR_ANGLE) or 160
+    if type(maxDeg) ~= "number" or maxDeg ~= maxDeg or maxDeg <= 0 then
+        maxDeg = 160
+    end
+
+    -- Угол не подходит — дырку не заживляем.
+    if delta > maxDeg * math.pi / 180 then
+        return 0
+    end
+
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+    if not spacing or spacing < 0.5 then
+        spacing = 0.5
+    end
+
+    local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
+    if pairMin < spacing then
+        return 0
+    end
+
+    -- Одну и ту же дырку заживляем только один раз.
+    local pairKey = prevIdx .. "-" .. nextIdx
+    if type(inst.healedPairs) ~= "table" then
+        inst.healedPairs = {}
+    end
+    if inst.healedPairs[pairKey] then
+        return 0
+    end
+    inst.healedPairs[pairKey] = true
+
+    -----------------------------------------------------------------------
+    -- Строим ряды перемычек между connA и connB, зигзагом от текущей
+    -- позиции паука.
+    -----------------------------------------------------------------------
+    local minLen = tonumber(C.MIN_CROSS_LEN) or 4
+    local minD2 = minLen * minLen
+
+    local tasks = {}
+    local cursor = self:NP_GetSpiderPointIfShown()
+    local added = 0
+
+    local arcLen = spacing
+    while arcLen <= pairMin + 0.001 do
+        local tA = self:ThreadTAtLength(connA, arcLen)
+        local tB = self:ThreadTAtLength(connB, arcLen)
+
+        if tA and tB then
+            local ax, ay = self:BzThread(connA.thread, tA)
+            local bx, by = self:BzThread(connB.thread, tB)
+            local dx = bx - ax
+            local dy = by - ay
+
+            if (dx * dx + dy * dy) >= minD2 then
+                local seg = self:CreateCrossSegArc(
+                    inst,
+                    connA,
+                    connB,
+                    tA,
+                    tB,
+                    minLen
+                )
+
+                if seg then
+                    seg.isHeal = true
+
+                    local reverse = false
+                    if cursor then
+                        local dA = (ax - cursor.x) * (ax - cursor.x)
+                            + (ay - cursor.y) * (ay - cursor.y)
+                        local dB = (bx - cursor.x) * (bx - cursor.x)
+                            + (by - cursor.y) * (by - cursor.y)
+                        reverse = dB < dA
+                    end
+
+                    local startP, endP, drawThread
+
+                    if reverse then
+                        startP = { x = bx, y = by }
+                        endP = { x = ax, y = ay }
+                        drawThread = {
+                            p0 = { x = seg.thread.p2.x, y = seg.thread.p2.y },
+                            p1 = { x = seg.thread.p1.x, y = seg.thread.p1.y },
+                            p2 = { x = seg.thread.p0.x, y = seg.thread.p0.y },
+                        }
+                    else
+                        startP = { x = ax, y = ay }
+                        endP = { x = bx, y = by }
+                        drawThread = {
+                            p0 = { x = seg.thread.p0.x, y = seg.thread.p0.y },
+                            p1 = { x = seg.thread.p1.x, y = seg.thread.p1.y },
+                            p2 = { x = seg.thread.p2.x, y = seg.thread.p2.y },
+                        }
+                    end
+
+                    drawThread.ownerRef = seg.thread.ownerRef
+
+                    if cursor then
+                        self:AddTravelPointTask(
+                            tasks,
+                            cursor,
+                            startP,
+                            connA,
+                            seg
+                        )
+                    end
+
+                    self:AddThreadTask(tasks, seg, drawThread)
+
+                    cursor = endP
+                    added = added + 1
+                end
+            end
+        end
+
+        arcLen = arcLen + spacing
+    end
+
+    if added <= 0 then
+        return 0
+    end
+
+    -----------------------------------------------------------------------
+    -- Дописываем задачи в конец текущей очереди паука.
+    -----------------------------------------------------------------------
+    for _, task in ipairs(tasks) do
+        S.tasks[#S.tasks + 1] = task
+    end
+
+    if S.phase == "instanceComplete" then
+        S.phase = "task"
+        S.completeTimer = 0
+        self:AdvanceTask()
+    elseif not S.currentTask then
+        self:AdvanceTask()
+    end
+
+    return added
+end
+
 function NSPauk:KillConnection(inst, conn)
     if not conn or not conn.alive then
         return
@@ -13287,6 +13576,14 @@ function NSPauk:KillConnection(inst, conn)
         end
 
         self:CheckInstanceDead(inst)
+
+        -------------------------------------------------------------------
+        -- Заживление дырки: если паутина ещё жива, пробуем построить
+        -- перемычки между живыми соседями умершей нити.
+        -------------------------------------------------------------------
+        if not inst.torn then
+            self:NP_HealHoleAroundConn(inst, conn)
+        end
     end
 end
 
