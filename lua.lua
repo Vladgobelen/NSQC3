@@ -1206,6 +1206,70 @@ ns_llua['lua'][16] = {
     },
 }
 
+ns_llua['lua'][16.1] = {
+    type = "commenttest",
+    title = "Практика: предскажи результат сравнений",
+    helpModules = {15, 4},
+    preloadVars = {
+        {var = "answer1", desc = "answer1 очищается перед проверкой"},
+        {var = "answer2", desc = "answer2 очищается перед проверкой"},
+        {var = "answer3", desc = "answer3 очищается перед проверкой"},
+        {var = "answer4", desc = "answer4 очищается перед проверкой"},
+        {var = "answer5", desc = "answer5 очищается перед проверкой"},
+        {var = "answer6", desc = "answer6 очищается перед проверкой"},
+    },
+    reportVars = {
+        "answer1",
+        "answer2",
+        "answer3",
+        "answer4",
+        "answer5",
+        "answer6",
+    },
+    instruction = [=[
+<h>Практика: предскажи результат</h>
+<t>Ниже даны сравнения. Не нужно использовать print или сами операторы сравнения.</t>
+<t>Твоя задача — заменить <k>nil</k> на <k>true</k> или <k>false</k> в каждой строке.</t>
+<code>
+5 == 5
+7 ~= 7
+10 > 3
+10 < 3
+8 >= 8
+8 <= 7
+</code>
+<w>Пиши только answer1-answer6, знак =, true и false. Без точек с запятой и без операторов сравнения.</w>
+]=],
+    initialCode = [=[
+answer1 = nil -- 5 == 5
+answer2 = nil -- 7 ~= 7
+answer3 = nil -- 10 > 3
+answer4 = nil -- 10 < 3
+answer5 = nil -- 8 >= 8
+answer6 = nil -- 8 <= 7
+]=],
+    requireKeywords = {
+        "answer1",
+        "answer2",
+        "answer3",
+        "answer4",
+        "answer5",
+        "answer6",
+        "=",
+        "true",
+        "false",
+    },
+    onlyCodePatterns = true,
+    checkCode = function()
+        return _G.answer1 == true
+            and _G.answer2 == false
+            and _G.answer3 == true
+            and _G.answer4 == false
+            and _G.answer5 == true
+            and _G.answer6 == false
+    end,
+}
+
 ns_llua['lua'][17] = {
     type = "info",
     title = "Простые условия if",
@@ -21576,7 +21640,11 @@ function UI:SetTitle(text)
 end
 
 function UI:SetModuleInfo(index, total)
-    self.moduleText:SetText(string.format("Модуль %d из %d", index or 0, total or 0))
+    self.moduleText:SetText(string.format(
+        "Модуль %s из %s",
+        tostring(index or "?"),
+        tostring(total or "?")
+    ))
 end
 
 function UI:SetPrevEnabled(enabled)
@@ -22050,8 +22118,89 @@ local function NormalizeLines(s)
     return table.concat(lines, "\n")
 end
 
+local function CompareModuleIds(a, b)
+    local sa = tostring(a)
+    local sb = tostring(b)
+
+    local pa = {}
+    for part in sa:gmatch("[^.]+") do
+        table.insert(pa, part)
+    end
+
+    local pb = {}
+    for part in sb:gmatch("[^.]+") do
+        table.insert(pb, part)
+    end
+
+    local maxLen = math.max(#pa, #pb)
+
+    for i = 1, maxLen do
+        local va = pa[i]
+        local vb = pb[i]
+
+        -- Более короткий номер считается раньше:
+        -- 3 раньше, чем 3.1
+        if va == nil then
+            return true
+        end
+
+        if vb == nil then
+            return false
+        end
+
+        local na = tonumber(va)
+        local nb = tonumber(vb)
+
+        if na and nb then
+            if na ~= nb then
+                return na < nb
+            end
+        else
+            if va ~= vb then
+                return va < vb
+            end
+        end
+    end
+
+    return sa < sb
+end
+
 local Logic = {}
 Logic.__index = Logic
+
+function Logic:BuildOrder()
+    local order = {}
+
+    for id, module in pairs(self.db or {}) do
+        if type(id) == "number" and type(module) == "table" then
+            table.insert(order, id)
+        end
+    end
+
+    table.sort(order, CompareModuleIds)
+
+    self.order = order
+    self.total = #order
+    self.orderIndex = {}
+
+    for i, id in ipairs(order) do
+        self.orderIndex[id] = i
+    end
+end
+
+function Logic:FindModuleIndex(moduleId)
+    local id = tonumber(moduleId)
+
+    if id == nil then
+        return nil
+    end
+
+    if self.orderIndex and self.orderIndex[id] then
+        return self.orderIndex[id]
+    end
+
+    return nil
+end
 
 function Logic:EnsureSaved()
     nsDbc = nsDbc or {}
@@ -22316,8 +22465,16 @@ function Logic:new(ui, modules)
 
     self.ui = ui
     self.db = modules or {}
-    self.current = 1
-    self.total = #self.db
+
+    self.order = {}
+    self.orderIndex = {}
+
+    self:BuildOrder()
+
+    self.current = self.order[1] or 1
+    self.currentIndex = self.orderIndex[self.current] or 1
+    self.total = self.total or 0
+
     self.done = {}
     self.formatDone = false
     self.timer = nil
@@ -22335,15 +22492,12 @@ function Logic:new(ui, modules)
         onNext = function()
             self:ManageCourse("next")
         end,
-
         onPrev = function()
             self:ManageCourse("prev")
         end,
-
         onHelp = function(helpModules)
             self.ui:ShowHelp(helpModules)
         end,
-
         onExecute = function(editorName, code)
             self:CheckCode(editorName, code)
         end,
@@ -22355,7 +22509,7 @@ function Logic:new(ui, modules)
 end
 
 function Logic:ManageCourse(signal)
-    self.total = #self.db
+    self:BuildOrder()
 
     if self.total == 0 then
         return
@@ -22363,28 +22517,46 @@ function Logic:ManageCourse(signal)
 
     self:EnsureSaved()
 
-    if signal == "next" then
-        if self.current < self.total then
-            self.current = self.current + 1
+    if signal == "next" or signal == "prev" then
+        local idx = self:FindModuleIndex(nsDbc.luaTest.currentModule)
+            or self:FindModuleIndex(self.current)
+
+        if idx then
+            if signal == "next" then
+                idx = idx + 1
+
+                if idx > self.total then
+                    idx = self.total
+                end
+            else
+                idx = idx - 1
+
+                if idx < 1 then
+                    idx = 1
+                end
+            end
+        else
+            idx = 1
         end
-    elseif signal == "prev" then
-        if self.current > 1 then
-            self.current = self.current - 1
-        end
+
+        self.current = self.order[idx]
     else
-        self.current = tonumber(signal)
-            or tonumber(nsDbc.luaTest.currentModule)
-            or 1
+        local desired = tonumber(signal)
 
-        if self.current < 1 then
-            self.current = 1
+        if desired == nil then
+            desired = tonumber(nsDbc.luaTest.currentModule)
         end
 
-        if self.current > self.total then
-            self.current = self.total
+        local idx = self:FindModuleIndex(desired)
+
+        if not idx then
+            idx = 1
         end
+
+        self.current = self.order[idx]
     end
 
+    self.currentIndex = self:FindModuleIndex(self.current) or 1
     nsDbc.luaTest.currentModule = self.current
 
     self.runtimeModule = self.current
@@ -22431,6 +22603,7 @@ function Logic:ManageCourse(signal)
     if m and m.preloadVars then
         for _, v in ipairs(m.preloadVars) do
             local var = TrimString(v.var)
+
             if var ~= "" then
                 _G[var] = v.value
             end
@@ -22446,7 +22619,7 @@ function Logic:ManageCourse(signal)
                 and var ~= ""
                 and not self.done[i]
                 and _G[var] == nil then
-                    _G[var] = true
+                _G[var] = true
             end
         end
     end
@@ -22477,7 +22650,7 @@ end
 
 function Logic:SendModuleToUI()
     local n = self.current or 1
-    local m = self.db[n]
+    local m = self.db and self.db[n]
 
     if not m then
         return
@@ -22563,11 +22736,17 @@ function Logic:SendModuleToUI()
         nextEnabled = self.commentTestPassed == true
     end
 
+    local currentIndex = self.currentIndex or 1
+
+    if self.FindModuleIndex then
+        currentIndex = self:FindModuleIndex(n) or currentIndex
+    end
+
     local data = {
         title = m.title or "",
         index = n,
-        total = self.total or #self.db,
-        prevEnabled = n > 1,
+        total = self.total or 0,
+        prevEnabled = currentIndex > 1,
         nextEnabled = nextEnabled,
         helpModules = m.helpModules,
     }
@@ -22584,9 +22763,6 @@ function Logic:SendModuleToUI()
 
         local blocks = {}
 
-        -- Теперь instruction парсится как обычный контент курса.
-        -- То есть внутри можно использовать <code>...</code>,
-        -- и такие места будут отрисованы как блоки кода с подсветкой.
         for _, block in ipairs(parseContent(m.instruction or "")) do
             table.insert(blocks, block)
         end
