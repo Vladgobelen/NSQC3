@@ -1848,7 +1848,7 @@ ns_llua['lua'][34] = {
 ns_llua['lua'][35] = {
     type = "commenttest",
     title = "Практика: for, условие и сумма",
-    helpModules = {31, 10, 17, 19},
+    helpModules = {31, 10, 17},
     preloadVars = {
         {var = "totalSum", desc = "totalSum очищается перед проверкой"},
     },
@@ -2099,7 +2099,7 @@ ns_llua['lua'][39] = {
 ns_llua['lua'][40] = {
     type = "commenttest",
     title = "Практика: поиск в таблице и break",
-    helpModules = {31, 4, 17, 19},
+    helpModules = {31, 4, 17},
     preloadVars = {
         {var = "pouch", desc = "pouch очищается перед проверкой"},
         {var = "elixirIndex", desc = "elixirIndex очищается перед проверкой"},
@@ -2259,7 +2259,7 @@ ns_llua['lua'][42] = {
 ns_llua['lua'][43] = {
     type = "commenttest",
     title = "Итоговый комбо-тест: циклы, tonumber, if и string.format",
-    helpModules = {31, 32, 33, 4, 7, 10, 17, 19},
+    helpModules = {31, 4, 7, 10, 17},
     preloadVars = {
         {var = "goldStrings", desc = "goldStrings очищается перед проверкой"},
         {var = "bigGoldCount", desc = "bigGoldCount очищается перед проверкой"},
@@ -2738,7 +2738,7 @@ ns_llua['lua'][48] = {
 ns_llua['lua'][49] = {
     type = "commenttest",
     title = "Практика: чтение и запись двумя способами",
-    helpModules = {44, 47, 48},
+    helpModules = {44},
     preloadVars = {
         {var = "source", value = {name = "Клинок", price = 100}, desc = "source = {name = \"Клинок\", price = 100}"},
         {var = "copy", desc = "copy очищается перед проверкой"},
@@ -3142,7 +3142,7 @@ ns_llua['lua'][51] = {
 ns_llua['lua'][52] = {
     type = "commenttest",
     title = "Итоговый комбо-тест: функция calculateTotalPrice",
-    helpModules = {44, 45, 31, 33, 10},
+    helpModules = {44, 45, 31, 10},
     preloadVars = {
         {var = "calculateTotalPrice", desc = "calculateTotalPrice очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
@@ -3391,57 +3391,304 @@ ns_llua['lua'][52] = {
 
 
 
--- ============================================================
--- COURSE DATA: PART 2, MODULES 53-64
--- ============================================================
 
-ns_llua = ns_llua or {}
-ns_llua['lua'] = ns_llua['lua'] or {}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ns_llua['lua'][53] = {
 type = "info",
 title = "Мост Lua и WoW API",
 content = [=[
 <h>Мост Lua и WoW API</h>
-<t>Первая часть курса дала базу: переменные, типы, условия, циклы, таблицы и функции. Теперь мы будем применять эту базу к WoW API.</t>
-<t>WoW API — это набор готовых игровых функций. Они возвращают данные об игроке, цели, группе, сумках, заклинаниях, координатах и интерфейсе.</t>
-<h>Простой вызов API</h>
+<t>Первая часть курса дала базу: переменные, типы, условия, циклы, таблицы и функции. Теперь применяем её к WoW API.</t>
+<t>WoW API — это готовые игровые функции. Они возвращают данные об игроке, цели, группе, сумках, заклинаниях и мире.</t>
+<h>Простые запросы</h>
 <code>
 /run print(UnitName("player"))
-/run print(UnitHealth("player"))
 /run print(UnitLevel("player"))
+/run print(UnitHealth("player"))
 </code>
 <h>Несколько возвращаемых значений</h>
-<t>Некоторые API-функции возвращают сразу несколько значений. Для них используется множественное присваивание.</t>
+<t>Некоторые API-функции возвращают сразу несколько значений. Для них используем множественное присваивание.</t>
 <code>
 /run local className, classToken = UnitClass("player"); print(className, classToken)
 </code>
-<t>Например, функция может вернуть локализованное название класса и технический токен:</t>
+<t>Например, функция может вернуть название класса и технический токен:</t>
 <code>
 Воин   WARRIOR
 </code>
-<h>Сохраняем данные в таблицу</h>
+<h>Таблица с данными API</h>
 <code>
 /run playerInfo = { name = UnitName("player"), level = UnitLevel("player") }; print(playerInfo.name, playerInfo.level)
 </code>
-<w>Важно:</w> если задание курса будет проверять переменную, делай её глобальной, то есть без <k>local</k>.
+<w>Важно:</w> если практический модуль проверяет переменную, создавай её глобальной, то есть без <k>local</k>.
 <h>Зачем это нужно</h>
-<t>Дальше мы будем:</t>
-<t>- получать данные о юнитах;</t>
-<t>- считать проценты здоровья и маны;</t>
-<t>- перебирать группу, рейд, сумки и баффы;</t>
-<t>- создавать простые элементы интерфейса.</t>
+<t>Дальше мы будем получать данные о юнитах, считать проценты здоровья, перебирать группы и сумки, а затем создавать простые элементы интерфейса.</t>
 ]=],
 }
 
 ns_llua['lua'][54] = {
+type = "vartest",
+title = "Тест 53-1: имя и уровень игрока",
+helpModules = {53},
+tasks = {
+{
+var = "apiPlayerName",
+desc = 'Создай глобальную переменную apiPlayerName = UnitName("player")',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "apiPlayerLevel",
+desc = 'Создай глобальную переменную apiPlayerLevel = UnitLevel("player")',
+check = function(value)
+return type(value) == "number" and value > 0
+end,
+},
+},
+}
+
+ns_llua['lua'][55] = {
+type = "vartest",
+title = "Тест 53-2: таблица результатов UnitClass",
+helpModules = {53, 45},
+tasks = {
+{
+var = "apiClassTable",
+desc = 'Создай глобальную таблицу apiClassTable = { UnitClass("player") }',
+check = function(value)
+return type(value) == "table"
+and type(value[1]) == "string"
+and value[1] ~= ""
+and type(value[2]) == "string"
+and value[2] ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][56] = {
+type = "commenttest",
+title = "Тест 53-3: функция GetPlayerNameAndLevel",
+helpModules = {53, 45},
+preloadVars = {
+{var = "GetPlayerNameAndLevel", desc = "GetPlayerNameAndLevel очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 53-3: функция GetPlayerNameAndLevel</h>
+<t>Создай глобальную функцию <k>GetPlayerNameAndLevel()</k>.</t>
+<t>Функция должна вернуть два значения:</t>
+<c>1</c> — имя игрока через <k>UnitName("player")</k>.
+<c>2</c> — уровень игрока через <k>UnitLevel("player")</k>.
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPlayerNameAndLevel()
+]=],
+requireKeywords = {
+"GetPlayerNameAndLevel",
+"function",
+"UnitName",
+"UnitLevel",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPlayerNameAndLevel) ~= "function" then
+_G.checkError = "GetPlayerNameAndLevel не является глобальной функцией"
+return false
+end
+local ok, name, level = pcall(_G.GetPlayerNameAndLevel)
+if not ok then
+_G.checkError = "Ошибка вызова GetPlayerNameAndLevel: " .. tostring(name)
+return false
+end
+if type(name) ~= "string" or name == "" then
+_G.checkError = "Первым значением функция должна вернуть имя игрока"
+return false
+end
+if type(level) ~= "number" or level <= 0 then
+_G.checkError = "Вторым значением функция должна вернуть уровень игрока"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][57] = {
+type = "commenttest",
+title = "Тест 53-4: строка playerSummary",
+helpModules = {53, 7, 14},
+preloadVars = {
+{var = "playerSummary", desc = "playerSummary очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"playerSummary",
+},
+instruction = [=[
+<h>Тест 53-4: строка playerSummary</h>
+<t>Создай глобальную переменную <k>playerSummary</k>.</t>
+<t>Используй <k>string.format</k> и шаблон:</t>
+<c>"%s|%d"</c>
+<t>Первым аргументом подставь имя игрока через <k>UnitName("player")</k>.</t>
+<t>Вторым аргументом подставь уровень игрока через <k>UnitLevel("player")</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную переменную playerSummary
+]=],
+requireKeywords = {
+"playerSummary",
+"string.format",
+"UnitName",
+"UnitLevel",
+},
+checkCode = function()
+_G.checkError = nil
+local name = UnitName("player") or ""
+local levelText = tostring(UnitLevel("player") or 0)
+if type(_G.playerSummary) ~= "string" or _G.playerSummary == "" then
+_G.checkError = "playerSummary должна быть непустой строкой"
+return false
+end
+if name ~= "" and not _G.playerSummary:find(name, 1, true) then
+_G.checkError = "playerSummary не содержит имя игрока"
+return false
+end
+if not _G.playerSummary:find(levelText, 1, true) then
+_G.checkError = "playerSummary не содержит уровень игрока"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][58] = {
+type = "commenttest",
+title = "Тест 53-5: таблица playerInfo",
+helpModules = {53, 44, 45},
+preloadVars = {
+{var = "playerInfo", desc = "playerInfo очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+"playerInfo",
+},
+instruction = [=[
+<h>Тест 53-5: таблица playerInfo</h>
+<t>Создай глобальную таблицу <k>playerInfo</k> с полями:</t>
+<c>name</c> — имя игрока через <k>UnitName("player")</k>.
+<c>level</c> — уровень игрока через <k>UnitLevel("player")</k>.
+<c>class</c> — название класса через первый результат <k>UnitClass("player")</k>.
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную таблицу playerInfo
+]=],
+requireKeywords = {
+"playerInfo",
+"UnitName",
+"UnitLevel",
+"UnitClass",
+},
+checkCode = function()
+_G.checkError = nil
+local info = _G.playerInfo
+if type(info) ~= "table" then
+_G.checkError = "playerInfo должна быть таблицей"
+return false
+end
+if type(info.name) ~= "string" or info.name == "" then
+_G.checkError = "Поле name должно быть строкой с именем игрока"
+return false
+end
+if type(info.level) ~= "number" or info.level <= 0 then
+_G.checkError = "Поле level должно быть числом больше нуля"
+return false
+end
+if type(info.class) ~= "string" or info.class == "" then
+_G.checkError = "Поле class должно быть строкой с названием класса"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][59] = {
 type = "info",
 title = "Особенности WoW API 3.3.5",
 content = [=[
 <h>Особенности WoW API 3.3.5</h>
 <t>У WoW API есть несколько важных особенностей, которые нужно понимать с самого начала.</t>
 <h>1. Многие функции возвращают 1 или nil</h>
-<t>В старых версиях WoW многие проверки возвращают не <k>true</k> и <k>false</k>, а <k>1</k> или <k>nil</k>.</t>
+<t>В старых версиях WoW многие проверки возвращают не классический <k>true</k> или <k>false</k>, а <k>1</k> или <k>nil</k>.</t>
 <code>
 /run print(UnitExists("player"), type(UnitExists("player")))
 </code>
@@ -3482,9 +3729,196 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][55] = {
+ns_llua['lua'][60] = {
+type = "vartest",
+title = "Тест 54-1: UnitExists и nil",
+helpModules = {59},
+tasks = {
+{
+var = "existsPlayer",
+desc = 'Создай глобальную переменную existsPlayer = UnitExists("player")',
+check = function(value)
+return value ~= nil and value ~= false
+end,
+},
+{
+var = "existsInvalid",
+desc = 'Создай глобальную переменную existsInvalid = UnitExists("ns_invalid_unit")',
+check = function(value)
+return value == nil or value == false
+end,
+},
+},
+}
+
+ns_llua['lua'][61] = {
+type = "vartest",
+title = "Тест 54-2: технический токен класса",
+helpModules = {59, 45},
+tasks = {
+{
+var = "classTokenUpper",
+desc = 'Создай глобальную переменную classTokenUpper = select(2, UnitClass("player"))',
+check = function(value)
+return type(value) == "string"
+and value ~= ""
+and value == value:upper()
+end,
+},
+},
+}
+
+ns_llua['lua'][62] = {
+type = "commenttest",
+title = "Тест 54-3: преобразование в boolean",
+helpModules = {59, 15},
+preloadVars = {
+{var = "truthyPlayer", desc = "truthyPlayer очищается перед проверкой"},
+{var = "truthyInvalid", desc = "truthyInvalid очищается перед проверкой"},
+},
+reportVars = {
+"truthyPlayer",
+"truthyInvalid",
+},
+instruction = [=[
+<h>Тест 54-3: преобразование в boolean</h>
+<t>Создай глобальную переменную <k>truthyPlayer</k>.</t>
+<t>Она должна быть <k>true</k>, если <k>UnitExists("player")</k> возвращает истинное значение.</t>
+<t>Используй двойное отрицание:</t>
+<code>
+not not значение
+</code>
+<t>Создай глобальную переменную <k>truthyInvalid</k>.</t>
+<t>Она должна быть <k>false</k>, если <k>UnitExists("ns_invalid_unit")</k> возвращает ложное значение.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальные переменные truthyPlayer и truthyInvalid
+]=],
+requireKeywords = {
+"truthyPlayer",
+"truthyInvalid",
+"not",
+"UnitExists",
+},
+checkCode = function()
+return _G.truthyPlayer == true and _G.truthyInvalid == false
+end,
+}
+
+ns_llua['lua'][63] = {
+type = "commenttest",
+title = "Тест 54-4: функция GetPlayerClassToken",
+helpModules = {59, 45},
+preloadVars = {
+{var = "GetPlayerClassToken", desc = "GetPlayerClassToken очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 54-4: функция GetPlayerClassToken</h>
+<t>Создай глобальную функцию <k>GetPlayerClassToken()</k>.</t>
+<t>Функция должна вернуть только токен класса игрока.</t>
+<t>Используй <k>select(2, UnitClass("player"))</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPlayerClassToken()
+]=],
+requireKeywords = {
+"GetPlayerClassToken",
+"function",
+"select",
+"UnitClass",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPlayerClassToken) ~= "function" then
+_G.checkError = "GetPlayerClassToken не является глобальной функцией"
+return false
+end
+local ok, token = pcall(_G.GetPlayerClassToken)
+if not ok then
+_G.checkError = "Ошибка вызова GetPlayerClassToken: " .. tostring(token)
+return false
+end
+if type(token) ~= "string" or token == "" then
+_G.checkError = "Функция должна вернуть строку с токеном класса"
+return false
+end
+if token ~= token:upper() then
+_G.checkError = "Токен класса должен быть в верхнем регистре"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][64] = {
+type = "commenttest",
+title = "Тест 54-5: функция SafeUnitName",
+helpModules = {59},
+preloadVars = {
+{var = "SafeUnitName", desc = "SafeUnitName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 54-5: функция SafeUnitName</h>
+<t>Создай глобальную функцию <k>SafeUnitName(unit)</k>.</t>
+<t>Функция должна вернуть имя юнита через <k>UnitName(unit)</k>.</t>
+<t>Если имени нет, функция должна вернуть строку:</t>
+<s>"Нет юнита"</s>
+<t>Используй <k>or</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SafeUnitName(unit)
+]=],
+requireKeywords = {
+"SafeUnitName",
+"function",
+"UnitName",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SafeUnitName) ~= "function" then
+_G.checkError = "SafeUnitName не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.SafeUnitName, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова SafeUnitName('player'): " .. tostring(result1)
+return false
+end
+if result1 ~= UnitName("player") then
+_G.checkError = "Для player функция должна вернуть имя игрока"
+return false
+end
+local ok2, result2 = pcall(_G.SafeUnitName, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова SafeUnitName('ns_invalid_unit'): " .. tostring(result2)
+return false
+end
+if result2 ~= "Нет юнита" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 'Нет юнита'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][65] = {
 type = "info",
 title = "Безопасные шаблоны API",
+helpModules = {53, 59},
 content = [=[
 <h>Безопасные шаблоны API</h>
 <t>API часто может вернуть <k>nil</k>. Поэтому сразу учимся писать безопасный код.</t>
@@ -3526,9 +3960,222 @@ end
 ]=],
 }
 
-ns_llua['lua'][56] = {
+ns_llua['lua'][66] = {
+type = "vartest",
+title = "Тест 65-1: безопасное имя цели",
+helpModules = {65, 53, 59},
+tasks = {
+{
+var = "safeTargetName",
+desc = 'Создай глобальную переменную safeTargetName = UnitName("target") or "нет цели"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][67] = {
+type = "vartest",
+title = "Тест 65-2: безопасное здоровье игрока",
+helpModules = {65, 53, 59},
+tasks = {
+{
+var = "safeHealth",
+desc = 'Создай глобальную переменную safeHealth = UnitHealth("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "safeHealthMax",
+desc = 'Создай глобальную переменную safeHealthMax = UnitHealthMax("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][68] = {
+type = "commenttest",
+title = "Тест 65-3: функция SafePercent",
+helpModules = {65, 10, 17},
+preloadVars = {
+{var = "SafePercent", desc = "SafePercent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 65-3: функция SafePercent</h>
+<t>Создай глобальную функцию <k>SafePercent(hp, hpMax)</k>.</t>
+<t>Функция должна вернуть процент здоровья.</t>
+<t>Если <k>hpMax</k> меньше или равно нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть:</t>
+<code>
+math.floor(hp / hpMax * 100)
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SafePercent(hp, hpMax)
+]=],
+requireKeywords = {
+"SafePercent",
+"function",
+"if",
+"then",
+"return",
+"math.floor",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SafePercent) ~= "function" then
+_G.checkError = "SafePercent не является глобальной функцией"
+return false
+end
+local tests = {
+{50, 100, 50},
+{10, 0, 0},
+{0, 100, 0},
+{100, 100, 100},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.SafePercent, test[1], test[2])
+if not ok or result ~= test[3] then
+_G.checkError = "Тест " .. i .. " функции SafePercent не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][69] = {
+type = "commenttest",
+title = "Тест 65-4: функция SafeNumber",
+helpModules = {65, 10},
+preloadVars = {
+{var = "SafeNumber", desc = "SafeNumber очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 65-4: функция SafeNumber</h>
+<t>Создай глобальную функцию <k>SafeNumber(value)</k>.</t>
+<t>Функция должна превратить значение в число через <k>tonumber(value)</k>.</t>
+<t>Если <k>tonumber</k> вернул <k>nil</k>, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть само число.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SafeNumber(value)
+]=],
+requireKeywords = {
+"SafeNumber",
+"function",
+"tonumber",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SafeNumber) ~= "function" then
+_G.checkError = "SafeNumber не является глобальной функцией"
+return false
+end
+local tests = {
+{"5", 5},
+{"bad", 0},
+{7, 7},
+{"3.5", 3.5},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.SafeNumber, test[1])
+if not ok or result ~= test[2] then
+_G.checkError = "Тест " .. i .. " функции SafeNumber не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][70] = {
+type = "commenttest",
+title = "Тест 65-5: функция GetSafePlayerHealthPercent",
+helpModules = {65, 53, 59},
+preloadVars = {
+{var = "GetSafePlayerHealthPercent", desc = "GetSafePlayerHealthPercent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 65-5: функция GetSafePlayerHealthPercent</h>
+<t>Создай глобальную функцию <k>GetSafePlayerHealthPercent()</k>.</t>
+<t>Функция должна вернуть процент здоровья игрока от 0 до 100.</t>
+<t>Используй:</t>
+<c>UnitHealth("player")</c>
+<c>UnitHealthMax("player")</c>
+<c>or 0</c>
+<c>math.floor</c>
+<t>Если максимальное здоровье меньше или равно нулю, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSafePlayerHealthPercent()
+]=],
+requireKeywords = {
+"GetSafePlayerHealthPercent",
+"function",
+"UnitHealth",
+"UnitHealthMax",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSafePlayerHealthPercent) ~= "function" then
+_G.checkError = "GetSafePlayerHealthPercent не является глобальной функцией"
+return false
+end
+local ok, percent = pcall(_G.GetSafePlayerHealthPercent)
+if not ok then
+_G.checkError = "Ошибка вызова GetSafePlayerHealthPercent: " .. tostring(percent)
+return false
+end
+if type(percent) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if percent < 0 or percent > 100 then
+_G.checkError = "Процент здоровья должен быть от 0 до 100"
+return false
+end
+local hp = UnitHealth("player") or 0
+local hpMax = UnitHealthMax("player") or 0
+local expected = 0
+if hpMax > 0 then
+expected = math.floor(hp / hpMax * 100)
+end
+if math.abs(percent - expected) > 5 then
+_G.checkError = "Процент здоровья не совпадает с текущим здоровьем игрока"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][71] = {
 type = "info",
 title = "UnitID: player, target, party, raid",
+helpModules = {53, 59, 65},
 content = [=[
 <h>UnitID: player, target, party, raid</h>
 <t>Большинство функций WoW API принимают аргумент <k>unit</k>. Это строка-идентификатор юнита.</t>
@@ -3570,9 +4217,225 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][57] = {
+ns_llua['lua'][72] = {
+type = "vartest",
+title = "Тест 71-1: базовые UnitID",
+helpModules = {71},
+tasks = {
+{
+var = "unitPlayer",
+desc = 'Создай глобальную переменную unitPlayer = "player"',
+check = function(value)
+return value == "player"
+end,
+},
+{
+var = "unitTarget",
+desc = 'Создай глобальную переменную unitTarget = "target"',
+check = function(value)
+return value == "target"
+end,
+},
+},
+}
+
+ns_llua['lua'][73] = {
+type = "vartest",
+title = "Тест 71-2: таблица UnitID",
+helpModules = {71, 44},
+tasks = {
+{
+var = "unitList",
+desc = 'Создай глобальную таблицу unitList = {"player", "target", "mouseover"}',
+check = function(value)
+return type(value) == "table"
+and #value == 3
+and value[1] == "player"
+and value[2] == "target"
+and value[3] == "mouseover"
+end,
+},
+},
+}
+
+ns_llua['lua'][74] = {
+type = "commenttest",
+title = "Тест 71-3: функция GetUnitList",
+helpModules = {71, 45},
+preloadVars = {
+{var = "GetUnitList", desc = "GetUnitList очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 71-3: функция GetUnitList</h>
+<t>Создай глобальную функцию <k>GetUnitList()</k>.</t>
+<t>Функция должна вернуть таблицу из трёх строк:</t>
+<c>"player"</c>
+<c>"target"</c>
+<c>"mouseover"</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetUnitList()
+]=],
+requireKeywords = {
+"GetUnitList",
+"function",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetUnitList) ~= "function" then
+_G.checkError = "GetUnitList не является глобальной функцией"
+return false
+end
+local ok, list = pcall(_G.GetUnitList)
+if not ok then
+_G.checkError = "Ошибка вызова GetUnitList: " .. tostring(list)
+return false
+end
+if type(list) ~= "table" then
+_G.checkError = "GetUnitList должна вернуть таблицу"
+return false
+end
+if #list ~= 3 then
+_G.checkError = "В таблице должно быть 3 элемента"
+return false
+end
+if list[1] ~= "player" or list[2] ~= "target" or list[3] ~= "mouseover" then
+_G.checkError = "Таблица должна содержать player, target, mouseover"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][75] = {
+type = "commenttest",
+title = "Тест 71-4: функция CountExistingUnits",
+helpModules = {71, 45, 31},
+preloadVars = {
+{var = "CountExistingUnits", desc = "CountExistingUnits очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 71-4: функция CountExistingUnits</h>
+<t>Создай глобальную функцию <k>CountExistingUnits(units)</k>.</t>
+<t>Аргумент <k>units</k> — это таблица со строками UnitID.</t>
+<t>Функция должна вернуть количество существующих юнитов.</t>
+<t>Для проверки существования используй <k>UnitExists</k>.</t>
+<t>Если в функцию передали не таблицу, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountExistingUnits(units)
+]=],
+requireKeywords = {
+"CountExistingUnits",
+"function",
+"UnitExists",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountExistingUnits) ~= "function" then
+_G.checkError = "CountExistingUnits не является глобальной функцией"
+return false
+end
+local tests = {
+{
+input = {"player"},
+expected = 1,
+},
+{
+input = {"player", "player"},
+expected = 2,
+},
+{
+input = {},
+expected = 0,
+},
+{
+input = {"ns_invalid_unit"},
+expected = 0,
+},
+{
+input = "bad",
+expected = 0,
+},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.CountExistingUnits, test.input)
+if not ok or result ~= test.expected then
+_G.checkError = "Тест " .. i .. " функции CountExistingUnits не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][76] = {
+type = "commenttest",
+title = "Тест 71-5: функция BuildUnitString",
+helpModules = {71, 44, 45},
+preloadVars = {
+{var = "BuildUnitString", desc = "BuildUnitString очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 71-5: функция BuildUnitString</h>
+<t>Создай глобальную функцию <k>BuildUnitString()</k>.</t>
+<t>Внутри функции создай таблицу из трёх строк:</t>
+<c>"player"</c>
+<c>"target"</c>
+<c>"mouseover"</c>
+<t>Функция должна вернуть строку:</t>
+<s>"player,target,mouseover"</s>
+<t>Используй <k>table.concat</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию BuildUnitString()
+]=],
+requireKeywords = {
+"BuildUnitString",
+"function",
+"table.concat",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.BuildUnitString) ~= "function" then
+_G.checkError = "BuildUnitString не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.BuildUnitString)
+if not ok then
+_G.checkError = "Ошибка вызова BuildUnitString: " .. tostring(result)
+return false
+end
+if result ~= "player,target,mouseover" then
+_G.checkError = "Функция должна вернуть строку player,target,mouseover"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][77] = {
 type = "info",
 title = "Существование и идентификация юнита",
+helpModules = {71, 65},
 content = [=[
 <h>Существование и идентификация юнита</h>
 <t>Перед тем как использовать данные юнита, полезно проверить, существует ли он.</t>
@@ -3616,9 +4479,269 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][58] = {
+ns_llua['lua'][78] = {
+type = "vartest",
+title = "Тест 77-1: существование и имя игрока",
+helpModules = {77},
+tasks = {
+{
+var = "playerExists",
+desc = 'Создай глобальную переменную playerExists = UnitExists("player")',
+check = function(value)
+return value ~= nil and value ~= false
+end,
+},
+{
+var = "playerName",
+desc = 'Создай глобальную переменную playerName = UnitName("player")',
+check = function(value)
+return type(value) == "string" and value == UnitName("player")
+end,
+},
+},
+}
+
+ns_llua['lua'][79] = {
+type = "vartest",
+title = "Тест 77-2: игрок и GUID",
+helpModules = {77, 15},
+tasks = {
+{
+var = "playerIsPlayer",
+desc = 'Создай глобальную переменную playerIsPlayer = not not UnitIsPlayer("player")',
+check = function(value)
+return value == true
+end,
+},
+{
+var = "playerGUID",
+desc = 'Создай глобальную переменную playerGUID = UnitGUID("player")',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][80] = {
+type = "commenttest",
+title = "Тест 77-3: функция GetSafeUnitName",
+helpModules = {77, 65},
+preloadVars = {
+{var = "GetSafeUnitName", desc = "GetSafeUnitName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 77-3: функция GetSafeUnitName</h>
+<t>Создай глобальную функцию <k>GetSafeUnitName(unit)</k>.</t>
+<t>Функция должна вернуть имя юнита через <k>UnitName(unit)</k>.</t>
+<t>Если имени нет, функция должна вернуть строку:</t>
+<s>"Нет юнита"</s>
+<t>Используй <k>or</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSafeUnitName(unit)
+]=],
+requireKeywords = {
+"GetSafeUnitName",
+"function",
+"UnitName",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSafeUnitName) ~= "function" then
+_G.checkError = "GetSafeUnitName не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSafeUnitName, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSafeUnitName('player'): " .. tostring(result1)
+return false
+end
+if result1 ~= UnitName("player") then
+_G.checkError = "Для player функция должна вернуть имя игрока"
+return false
+end
+local ok2, result2 = pcall(_G.GetSafeUnitName, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetSafeUnitName('ns_invalid_unit'): " .. tostring(result2)
+return false
+end
+if result2 ~= "Нет юнита" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 'Нет юнита'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][81] = {
+type = "commenttest",
+title = "Тест: функция IsSameUnit",
+helpModules = {77, 45, 21},
+preloadVars = {
+{var = "IsSameUnit", desc = "IsSameUnit очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 77-4: функция IsSameUnit</h>
+<t>Создай глобальную функцию <k>IsSameUnit(unitA, unitB)</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если два UnitID указывают на одного и того же юнита.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй <k>UnitIsUnit</k>.</t>
+<t>Чтобы результат был именно boolean, используй конструкцию:</t>
+<code>
+return UnitIsUnit(unitA, unitB) and true or false
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsSameUnit(unitA, unitB)
+]=],
+requireKeywords = {
+"IsSameUnit",
+"function",
+"UnitIsUnit",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsSameUnit) ~= "function" then
+_G.checkError = "IsSameUnit не является глобальной функцией"
+return false
+end
+local tests = {
+{
+args = {"player", "player"},
+expected = true,
+},
+{
+args = {"player", "ns_invalid_unit"},
+expected = false,
+},
+{
+args = {"ns_invalid_unit", "player"},
+expected = false,
+},
+{
+args = {"ns_invalid_unit", "ns_invalid_unit"},
+expected = false,
+},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.IsSameUnit, test.args[1], test.args[2])
+if not ok or result ~= test.expected then
+_G.checkError = "Тест " .. i .. " функции IsSameUnit не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][82] = {
+type = "commenttest",
+title = "Тест 77-5: функция GetIdentityReport",
+helpModules = {77, 45, 44},
+preloadVars = {
+{var = "GetIdentityReport", desc = "GetIdentityReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 77-5: функция GetIdentityReport</h>
+<t>Создай глобальную функцию <k>GetIdentityReport(unit)</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>exists</c> — <k>true</k>, если юнит существует, иначе <k>false</k>.
+<c>name</c> — имя юнита или <s>"Нет юнита"</s>, если юнита нет.
+<c>isPlayer</c> — <k>true</k>, если юнит является игроком, иначе <k>false</k>.
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitName</c>
+<c>UnitIsPlayer</c>
+<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetIdentityReport(unit)
+]=],
+requireKeywords = {
+"GetIdentityReport",
+"function",
+"UnitExists",
+"UnitName",
+"UnitIsPlayer",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetIdentityReport) ~= "function" then
+_G.checkError = "GetIdentityReport не является глобальной функцией"
+return false
+end
+local ok1, playerReport = pcall(_G.GetIdentityReport, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetIdentityReport('player'): " .. tostring(playerReport)
+return false
+end
+if type(playerReport) ~= "table" then
+_G.checkError = "GetIdentityReport('player') должна вернуть таблицу"
+return false
+end
+if playerReport.exists ~= true then
+_G.checkError = "Для player поле exists должно быть true"
+return false
+end
+if playerReport.name ~= UnitName("player") then
+_G.checkError = "Для player поле name должно быть именем игрока"
+return false
+end
+if playerReport.isPlayer ~= true then
+_G.checkError = "Для player поле isPlayer должно быть true"
+return false
+end
+local ok2, invalidReport = pcall(_G.GetIdentityReport, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetIdentityReport('ns_invalid_unit'): " .. tostring(invalidReport)
+return false
+end
+if type(invalidReport) ~= "table" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
+return false
+end
+if invalidReport.exists ~= false then
+_G.checkError = "Для несуществующего юнита поле exists должно быть false"
+return false
+end
+if invalidReport.name ~= "Нет юнита" then
+_G.checkError = "Для несуществующего юнита поле name должно быть 'Нет юнита'"
+return false
+end
+if invalidReport.isPlayer ~= false then
+_G.checkError = "Для несуществующего юнита поле isPlayer должно быть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][83] = {
 type = "info",
 title = "Здоровье и ресурсы юнита",
+helpModules = {65, 71, 77},
 content = [=[
 <h>Здоровье и ресурсы юнита</h>
 <t>Основные функции для здоровья:</t>
@@ -3632,6 +4755,11 @@ content = [=[
 /run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(math.floor(hp / hpMax * 100)) else print(0) end
 </code>
 <w>Важно:</w> всегда проверяй <k>hpMax > 0</k>, иначе можно получить деление на ноль.
+<h>Красивый вывод через string.format</h>
+<code>
+/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(string.format("HP: %d/%d (%d%%)", hp, hpMax, math.floor(hp / hpMax * 100))) end
+</code>
+<t>Здесь <k>%%</k> внутри <k>string.format</k> выводит обычный знак процента.</t>
 <h>Ресурсы: мана, ярость, энергия</h>
 <t>В WoW 3.3.5 часто используются функции:</t>
 <c>UnitMana(unit)</c> — текущий ресурс.
@@ -3639,33 +4767,300 @@ content = [=[
 <code>
 /run print(UnitMana("player"), UnitManaMax("player"))
 </code>
-<t>В более новых версиях есть универсальные <k>UnitPower</k> и <k>UnitPowerMax</k>. В 3.3.5 можно встретить оба варианта, поэтому для маны часто надёжнее использовать <k>UnitMana</k>.</t>
+<t>Для разных классов ресурс может быть разным: мана, ярость, энергия, руническая сила. Функция <k>UnitMana</k> обычно возвращает текущее значение основного ресурса.</t>
 <h>Тип ресурса</h>
 <code>
 /run print(UnitPowerType("player"))
 </code>
 <t>Функция может вернуть числовой код и строковый токен типа ресурса.</t>
-<h>Пример отчёта</h>
+<h>Безопасный шаблон</h>
 <code>
-/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; local percent = 0; if hpMax > 0 then percent = math.floor(hp / hpMax * 100) end; print(string.format("HP: %d/%d (%d%%)", hp, hpMax, percent))
+function GetSafeUnitHealthPercent(unit)
+    if not UnitExists(unit) then
+        return 0
+    end
+    local hp = UnitHealth(unit) or 0
+    local hpMax = UnitHealthMax(unit) or 0
+    if hpMax <= 0 then
+        return 0
+    end
+    return math.floor(hp / hpMax * 100)
+end
 </code>
-<t>Здесь <k>%%</k> внутри <k>string.format</k> выводит обычный знак процента.</t>
 ]=],
 }
 
-ns_llua['lua'][59] = {
+ns_llua['lua'][84] = {
+type = "vartest",
+title = "Тест 83-1: здоровье игрока",
+helpModules = {83, 65},
+tasks = {
+{
+var = "myHealth",
+desc = 'Создай глобальную переменную myHealth = UnitHealth("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "myHealthMax",
+desc = 'Создай глобальную переменную myHealthMax = UnitHealthMax("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "healthIsSane",
+desc = 'Создай глобальную переменную healthIsSane = (UnitHealth("player") or 0) <= (UnitHealthMax("player") or 0)',
+check = function(value)
+return value == true
+end,
+},
+},
+}
+
+ns_llua['lua'][85] = {
+type = "vartest",
+title = "Тест 83-2: процент здоровья игрока",
+helpModules = {83, 65, 10},
+tasks = {
+{
+var = "myHealthPercent",
+desc = 'Создай глобальную переменную myHealthPercent с процентом здоровья игрока от 0 до 100',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 100
+end,
+},
+},
+}
+
+ns_llua['lua'][86] = {
+type = "commenttest",
+title = "Тест 83-3: функция GetHealthPercent",
+helpModules = {83, 65, 45},
+preloadVars = {
+{var = "GetHealthPercent", desc = "GetHealthPercent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 83-3: функция GetHealthPercent</h>
+<t>Создай глобальную функцию <k>GetHealthPercent(unit)</k>.</t>
+<t>Функция должна вернуть процент здоровья юнита от 0 до 100.</t>
+<t>Если юнита нет, функция должна вернуть <n>0</n>.</t>
+<t>Если максимальное здоровье меньше или равно нуля, функция должна вернуть <n>0</n>.</t>
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitHealth</c>
+<c>UnitHealthMax</c>
+<c>math.floor</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetHealthPercent(unit)
+]=],
+requireKeywords = {
+"GetHealthPercent",
+"function",
+"UnitExists",
+"UnitHealth",
+"UnitHealthMax",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetHealthPercent) ~= "function" then
+_G.checkError = "GetHealthPercent не является глобальной функцией"
+return false
+end
+local ok, percent = pcall(_G.GetHealthPercent, "player")
+if not ok then
+_G.checkError = "Ошибка вызова GetHealthPercent('player'): " .. tostring(percent)
+return false
+end
+if type(percent) ~= "number" then
+_G.checkError = "GetHealthPercent должна вернуть число"
+return false
+end
+if percent < 0 or percent > 100 then
+_G.checkError = "Процент здоровья должен быть от 0 до 100"
+return false
+end
+local hp = UnitHealth("player") or 0
+local hpMax = UnitHealthMax("player") or 0
+local expected = 0
+if hpMax > 0 then
+expected = math.floor(hp / hpMax * 100)
+end
+if math.abs(percent - expected) > 5 then
+_G.checkError = "Процент здоровья не совпадает с текущим здоровьем игрока"
+return false
+end
+local ok2, invalidPercent = pcall(_G.GetHealthPercent, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetHealthPercent('ns_invalid_unit'): " .. tostring(invalidPercent)
+return false
+end
+if invalidPercent ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][87] = {
+type = "commenttest",
+title = "Тест 83-4: функция GetHealthText",
+helpModules = {83, 65, 7},
+preloadVars = {
+{var = "GetHealthText", desc = "GetHealthText очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 83-4: функция GetHealthText</h>
+<t>Создай глобальную функцию <k>GetHealthText(unit)</k>.</t>
+<t>Если юнита нет, функция должна вернуть строку:</t>
+<s>"0/0"</s>
+<t>Если юнит существует, функция должна вернуть строку вида:</t>
+<s>"текущее/максимальное"</s>
+<t>Например:</t>
+<s>"8500/10000"</s>
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitHealth</c>
+<c>UnitHealthMax</c>
+<c>or 0</c>
+<c>конкатенацию</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetHealthText(unit)
+]=],
+requireKeywords = {
+"GetHealthText",
+"function",
+"UnitExists",
+"UnitHealth",
+"UnitHealthMax",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetHealthText) ~= "function" then
+_G.checkError = "GetHealthText не является глобальной функцией"
+return false
+end
+local ok1, playerText = pcall(_G.GetHealthText, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetHealthText('player'): " .. tostring(playerText)
+return false
+end
+if type(playerText) ~= "string" or playerText == "" then
+_G.checkError = "GetHealthText('player') должна вернуть строку"
+return false
+end
+local hpText, maxText = playerText:match("^(%d+)/(%d+)$")
+if not hpText or not maxText then
+_G.checkError = "Строка для player должна иметь формат число/число"
+return false
+end
+local hp = tonumber(hpText)
+local hpMax = tonumber(maxText)
+if not hp or not hpMax or hp < 0 or hpMax < 0 then
+_G.checkError = "Значения здоровья должны быть числами больше или равными нулю"
+return false
+end
+local ok2, invalidText = pcall(_G.GetHealthText, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetHealthText('ns_invalid_unit'): " .. tostring(invalidText)
+return false
+end
+if invalidText ~= "0/0" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть '0/0'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][88] = {
+type = "commenttest",
+title = "Тест 83-5: функция GetPlayerResource",
+helpModules = {83, 45},
+preloadVars = {
+{var = "GetPlayerResource", desc = "GetPlayerResource очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 83-5: функция GetPlayerResource</h>
+<t>Создай глобальную функцию <k>GetPlayerResource()</k>.</t>
+<t>Функция должна вернуть два значения:</t>
+<c>1</c> — текущий ресурс игрока.
+<c>2</c> — максимальный ресурс игрока.
+<t>Используй:</t>
+<c>UnitMana("player")</c>
+<c>UnitManaMax("player")</c>
+<c>or 0</c>
+<t>Если ресурс недоступен, оба значения должны быть числами больше или равными нулю.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPlayerResource()
+]=],
+requireKeywords = {
+"GetPlayerResource",
+"function",
+"UnitMana",
+"UnitManaMax",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPlayerResource) ~= "function" then
+_G.checkError = "GetPlayerResource не является глобальной функцией"
+return false
+end
+local ok, current, max = pcall(_G.GetPlayerResource)
+if not ok then
+_G.checkError = "Ошибка вызова GetPlayerResource: " .. tostring(current)
+return false
+end
+if type(current) ~= "number" or type(max) ~= "number" then
+_G.checkError = "Функция должна вернуть два числа"
+return false
+end
+if current < 0 or max < 0 then
+_G.checkError = "Значения ресурса не должны быть отрицательными"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][89] = {
 type = "info",
 title = "Состояние юнита",
+helpModules = {77, 83},
 content = [=[
 <h>Состояние юнита</h>
-<t>WoW API позволяет проверять базовое состояние юнита: жив, мёртв, в бою, онлайн, AFK и так далее.</t>
+<t>Эти функции помогают проверить базовое состояние юнита: жив, мёртв, в бою, онлайн, AFK и так далее.</t>
 <h>Жив или мёртв</h>
 <code>
 /run print(UnitIsDead("player"))
 /run print(UnitIsGhost("player"))
 /run print(UnitIsDeadOrGhost("player"))
 </code>
-<t>Если функция возвращает <k>1</k> или <k>true</k>, условие сработает. Если <k>nil</k> или <k>false</k> — не сработает.</t>
+<t>Если функция возвращает истинное значение, условие сработает. Если <k>nil</k> или <k>false</k> — не сработает.</t>
 <h>Пример</h>
 <code>
 /run if UnitIsDeadOrGhost("player") then print("Мёртв или призрак") else print("Жив") end
@@ -3692,12 +5087,293 @@ content = [=[
 /run local status = { dead = UnitIsDead("player"), ghost = UnitIsGhost("player"), combat = UnitAffectingCombat("player") }; print(status.dead, status.ghost, status.combat)
 </code>
 <t>Такие таблицы удобно использовать для панелей и отчётов.</t>
+<h>Приведение к boolean</h>
+<t>Так как WoW API может возвращать <k>1</k> или <k>nil</k>, удобно превращать результат в чистый <k>true</k> / <k>false</k>:</t>
+<code>
+/run local isDead = not not UnitIsDead("player"); print(isDead, type(isDead))
+</code>
 ]=],
 }
 
-ns_llua['lua'][60] = {
+ns_llua['lua'][90] = {
+type = "vartest",
+title = "Тест 89-1: жизнь и подключение",
+helpModules = {89, 15},
+tasks = {
+{
+var = "playerDead",
+desc = 'Создай глобальную переменную playerDead = not not UnitIsDead("player")',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "playerConnected",
+desc = 'Создай глобальную переменную playerConnected = not not UnitIsConnected("player")',
+check = function(value)
+return type(value) == "boolean" and value == true
+end,
+},
+},
+}
+
+ns_llua['lua'][91] = {
+type = "vartest",
+title = "Тест 89-2: бой и статус жизни",
+helpModules = {89, 17},
+tasks = {
+{
+var = "playerCombat",
+desc = 'Создай глобальную переменную playerCombat = not not UnitAffectingCombat("player")',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "playerStatusString",
+desc = 'Создай глобальную переменную playerStatusString: если UnitIsDeadOrGhost("player") истинно, то "dead", иначе "alive"',
+check = function(value)
+return value == "dead" or value == "alive"
+end,
+},
+},
+}
+
+ns_llua['lua'][92] = {
+type = "commenttest",
+title = "Тест 89-3: функция GetLifeState",
+helpModules = {89, 45, 19},
+preloadVars = {
+{var = "GetLifeState", desc = "GetLifeState очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 89-3: функция GetLifeState</h>
+<t>Создай глобальную функцию <k>GetLifeState(unit)</k>.</t>
+<t>Функция должна вернуть строку:</t>
+<c>"unknown"</c> — если юнита не существует.
+<c>"dead"</c> — если юнит мёртв.
+<c>"ghost"</c> — если юнит призрак.
+<c>"alive"</c> — в остальных случаях.
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitIsDead</c>
+<c>UnitIsGhost</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetLifeState(unit)
+]=],
+requireKeywords = {
+"GetLifeState",
+"function",
+"UnitExists",
+"UnitIsDead",
+"UnitIsGhost",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetLifeState) ~= "function" then
+_G.checkError = "GetLifeState не является глобальной функцией"
+return false
+end
+local validStates = {
+dead = true,
+ghost = true,
+alive = true,
+}
+local ok1, playerState = pcall(_G.GetLifeState, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetLifeState('player'): " .. tostring(playerState)
+return false
+end
+if type(playerState) ~= "string" or not validStates[playerState] then
+_G.checkError = "Для player функция должна вернуть dead, ghost или alive"
+return false
+end
+local ok2, invalidState = pcall(_G.GetLifeState, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetLifeState('ns_invalid_unit'): " .. tostring(invalidState)
+return false
+end
+if invalidState ~= "unknown" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть unknown"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][93] = {
+type = "commenttest",
+title = "Тест 89-4: функция IsInCombat",
+helpModules = {89, 45, 21},
+preloadVars = {
+{var = "IsInCombat", desc = "IsInCombat очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 89-4: функция IsInCombat</h>
+<t>Создай глобальную функцию <k>IsInCombat(unit)</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если юнит находится в бою.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>UnitAffectingCombat</c>
+<t>Чтобы результат был именно boolean, используй конструкцию:</t>
+<code>
+return UnitAffectingCombat(unit) and true or false
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsInCombat(unit)
+]=],
+requireKeywords = {
+"IsInCombat",
+"function",
+"UnitAffectingCombat",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsInCombat) ~= "function" then
+_G.checkError = "IsInCombat не является глобальной функцией"
+return false
+end
+local ok1, playerCombat = pcall(_G.IsInCombat, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова IsInCombat('player'): " .. tostring(playerCombat)
+return false
+end
+if type(playerCombat) ~= "boolean" then
+_G.checkError = "Для player функция должна вернуть boolean"
+return false
+end
+local ok2, invalidCombat = pcall(_G.IsInCombat, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова IsInCombat('ns_invalid_unit'): " .. tostring(invalidCombat)
+return false
+end
+if invalidCombat ~= false then
+_G.checkError = "Для несуществующего юнита функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][94] = {
+type = "commenttest",
+title = "Тест 89-5: функция GetStatusTable",
+helpModules = {89, 45, 44},
+preloadVars = {
+{var = "GetStatusTable", desc = "GetStatusTable очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 89-5: функция GetStatusTable</h>
+<t>Создай глобальную функцию <k>GetStatusTable(unit)</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>exists</c> — <k>true</k>, если юнит существует, иначе <k>false</k>.
+<c>dead</c> — <k>true</k>, если юнит мёртв, иначе <k>false</k>.
+<c>combat</c> — <k>true</k>, если юнит в бою, иначе <k>false</k>.
+<c>connected</c> — <k>true</k>, если юнит онлайн, иначе <k>false</k>.
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitIsDead</c>
+<c>UnitAffectingCombat</c>
+<c>UnitIsConnected</c>
+<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetStatusTable(unit)
+]=],
+requireKeywords = {
+"GetStatusTable",
+"function",
+"UnitExists",
+"UnitIsDead",
+"UnitAffectingCombat",
+"UnitIsConnected",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetStatusTable) ~= "function" then
+_G.checkError = "GetStatusTable не является глобальной функцией"
+return false
+end
+local ok1, playerReport = pcall(_G.GetStatusTable, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetStatusTable('player'): " .. tostring(playerReport)
+return false
+end
+if type(playerReport) ~= "table" then
+_G.checkError = "GetStatusTable('player') должна вернуть таблицу"
+return false
+end
+if playerReport.exists ~= true then
+_G.checkError = "Для player поле exists должно быть true"
+return false
+end
+if type(playerReport.dead) ~= "boolean" then
+_G.checkError = "Поле dead должно быть boolean"
+return false
+end
+if type(playerReport.combat) ~= "boolean" then
+_G.checkError = "Поле combat должно быть boolean"
+return false
+end
+if type(playerReport.connected) ~= "boolean" then
+_G.checkError = "Поле connected должно быть boolean"
+return false
+end
+local ok2, invalidReport = pcall(_G.GetStatusTable, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetStatusTable('ns_invalid_unit'): " .. tostring(invalidReport)
+return false
+end
+if type(invalidReport) ~= "table" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
+return false
+end
+if invalidReport.exists ~= false then
+_G.checkError = "Для несуществующего юнита поле exists должно быть false"
+return false
+end
+if invalidReport.dead ~= false then
+_G.checkError = "Для несуществующего юнита поле dead должно быть false"
+return false
+end
+if invalidReport.combat ~= false then
+_G.checkError = "Для несуществующего юнита поле combat должно быть false"
+return false
+end
+if invalidReport.connected ~= false then
+_G.checkError = "Для несуществующего юнита поле connected должно быть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][95] = {
 type = "info",
 title = "Отношения к юниту",
+helpModules = {77, 89},
 content = [=[
 <h>Отношения к юниту</h>
 <t>Эти функции помогают понять, можно ли атаковать юнита, дружелюбен ли он, игрок ли это, PvP ли он.</t>
@@ -3733,12 +5409,259 @@ content = [=[
 <code>
 /run if UnitExists("target") and UnitIsFriend("player", "target") then print("Дружественная цель") end
 </code>
+<h>Приведение к boolean</h>
+<code>
+/run local canAttack = not not UnitCanAttack("player", "target"); print(canAttack, type(canAttack))
+</code>
 ]=],
 }
 
-ns_llua['lua'][61] = {
+ns_llua['lua'][96] = {
+type = "vartest",
+title = "Тест 95-1: фракция игрока",
+helpModules = {95},
+tasks = {
+{
+var = "playerFaction",
+desc = 'Создай глобальную переменную playerFaction = UnitFactionGroup("player")',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][97] = {
+type = "vartest",
+title = "Тест 95-2: проверка цели",
+helpModules = {95, 15},
+tasks = {
+{
+var = "canAttackTarget",
+desc = 'Создай глобальную переменную canAttackTarget = not not UnitCanAttack("player", "target")',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "isTargetFriend",
+desc = 'Создай глобальную переменную isTargetFriend = not not UnitIsFriend("player", "target")',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+},
+}
+
+ns_llua['lua'][98] = {
+type = "commenttest",
+title = "Тест 95-3: функция CanAttackTarget",
+helpModules = {95, 45, 21},
+preloadVars = {
+{var = "CanAttackTarget", desc = "CanAttackTarget очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 95-3: функция CanAttackTarget</h>
+<t>Создай глобальную функцию <k>CanAttackTarget()</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если игрок может атаковать текущую цель.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>UnitCanAttack("player", "target")</c>
+<t>Чтобы результат был именно boolean, используй конструкцию:</t>
+<code>
+return UnitCanAttack("player", "target") and true or false
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CanAttackTarget()
+]=],
+requireKeywords = {
+"CanAttackTarget",
+"function",
+"UnitCanAttack",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CanAttackTarget) ~= "function" then
+_G.checkError = "CanAttackTarget не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.CanAttackTarget)
+if not ok then
+_G.checkError = "Ошибка вызова CanAttackTarget: " .. tostring(result)
+return false
+end
+if type(result) ~= "boolean" then
+_G.checkError = "Функция должна вернуть boolean"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][99] = {
+type = "commenttest",
+title = "Тест 95-4: функция GetRelationReport",
+helpModules = {95, 45, 44},
+preloadVars = {
+{var = "GetRelationReport", desc = "GetRelationReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 95-4: функция GetRelationReport</h>
+<t>Создай глобальную функцию <k>GetRelationReport(unit)</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>canAttack</c> — <k>true</k>, если игрок может атаковать юнита, иначе <k>false</k>.
+<c>isEnemy</c> — <k>true</k>, если юнит враждебен, иначе <k>false</k>.
+<c>isFriend</c> — <k>true</k>, если юнит дружественен, иначе <k>false</k>.
+<t>Используй:</t>
+<c>UnitCanAttack("player", unit)</c>
+<c>UnitIsEnemy("player", unit)</c>
+<c>UnitIsFriend("player", unit)</c>
+<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetRelationReport(unit)
+]=],
+requireKeywords = {
+"GetRelationReport",
+"function",
+"UnitCanAttack",
+"UnitIsEnemy",
+"UnitIsFriend",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetRelationReport) ~= "function" then
+_G.checkError = "GetRelationReport не является глобальной функцией"
+return false
+end
+local ok1, playerReport = pcall(_G.GetRelationReport, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetRelationReport('player'): " .. tostring(playerReport)
+return false
+end
+if type(playerReport) ~= "table" then
+_G.checkError = "GetRelationReport('player') должна вернуть таблицу"
+return false
+end
+if type(playerReport.canAttack) ~= "boolean" then
+_G.checkError = "Поле canAttack должно быть boolean"
+return false
+end
+if type(playerReport.isEnemy) ~= "boolean" then
+_G.checkError = "Поле isEnemy должно быть boolean"
+return false
+end
+if type(playerReport.isFriend) ~= "boolean" then
+_G.checkError = "Поле isFriend должно быть boolean"
+return false
+end
+local ok2, invalidReport = pcall(_G.GetRelationReport, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetRelationReport('ns_invalid_unit'): " .. tostring(invalidReport)
+return false
+end
+if type(invalidReport) ~= "table" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
+return false
+end
+if invalidReport.canAttack ~= false then
+_G.checkError = "Для несуществующего юнита поле canAttack должно быть false"
+return false
+end
+if invalidReport.isEnemy ~= false then
+_G.checkError = "Для несуществующего юнита поле isEnemy должно быть false"
+return false
+end
+if invalidReport.isFriend ~= false then
+_G.checkError = "Для несуществующего юнита поле isFriend должно быть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][100] = {
+type = "commenttest",
+title = "Тест 95-5: функция IsPvpActive",
+helpModules = {95, 45, 21},
+preloadVars = {
+{var = "IsPvpActive", desc = "IsPvpActive очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 95-5: функция IsPvpActive</h>
+<t>Создай глобальную функцию <k>IsPvpActive(unit)</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если у юнита включён PvP-флаг.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>UnitIsPVP</c>
+<t>Чтобы результат был именно boolean, используй конструкцию:</t>
+<code>
+return UnitIsPVP(unit) and true or false
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsPvpActive(unit)
+]=],
+requireKeywords = {
+"IsPvpActive",
+"function",
+"UnitIsPVP",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsPvpActive) ~= "function" then
+_G.checkError = "IsPvpActive не является глобальной функцией"
+return false
+end
+local ok1, playerPvp = pcall(_G.IsPvpActive, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова IsPvpActive('player'): " .. tostring(playerPvp)
+return false
+end
+if type(playerPvp) ~= "boolean" then
+_G.checkError = "Для player функция должна вернуть boolean"
+return false
+end
+local ok2, invalidPvp = pcall(_G.IsPvpActive, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова IsPvpActive('ns_invalid_unit'): " .. tostring(invalidPvp)
+return false
+end
+if invalidPvp ~= false then
+_G.checkError = "Для несуществующего юнита функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][101] = {
 type = "info",
 title = "Описание юнита",
+helpModules = {77, 83, 95},
 content = [=[
 <h>Описание юнита</h>
 <t>Эти функции возвращают базовое описание юнита: уровень, расу, класс, пол, тип существа.</t>
@@ -3752,6 +5675,8 @@ content = [=[
 <code>
 /run local race, raceToken = UnitRace("player"); print(race, raceToken)
 </code>
+<t>Первое значение — локализованное название расы.</t>
+<t>Второе значение — технический токен, например <s>HUMAN</s> или <s>ORC</s>.</t>
 <h>UnitClass</h>
 <code>
 /run local className, classToken = UnitClass("player"); print(className, classToken)
@@ -3787,9 +5712,264 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][62] = {
+ns_llua['lua'][102] = {
+type = "vartest",
+title = "Тест 101-1: уровень и токен класса",
+helpModules = {101},
+tasks = {
+{
+var = "myLevel",
+desc = 'Создай глобальную переменную myLevel = UnitLevel("player")',
+check = function(value)
+return type(value) == "number" and value > 0
+end,
+},
+{
+var = "myClassToken",
+desc = 'Создай глобальную переменную myClassToken = select(2, UnitClass("player"))',
+check = function(value)
+return type(value) == "string"
+and value ~= ""
+and value == value:upper()
+end,
+},
+},
+}
+
+ns_llua['lua'][103] = {
+type = "vartest",
+title = "Тест 101-2: раса и классификация",
+helpModules = {101},
+tasks = {
+{
+var = "myRaceToken",
+desc = 'Создай глобальную переменную myRaceToken = select(2, UnitRace("player"))',
+check = function(value)
+return type(value) == "string"
+and value ~= ""
+and value == value:upper()
+end,
+},
+{
+var = "playerClassification",
+desc = 'Создай глобальную переменную playerClassification = UnitClassification("player") or "unknown"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][104] = {
+type = "commenttest",
+title = "Тест 101-3: функция GetClassToken",
+helpModules = {101, 45},
+preloadVars = {
+{var = "GetClassToken", desc = "GetClassToken очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 101-3: функция GetClassToken</h>
+<t>Создай глобальную функцию <k>GetClassToken(unit)</k>.</t>
+<t>Функция должна вернуть токен класса юнита.</t>
+<t>Используй:</t>
+<c>UnitClass(unit)</c>
+<c>select(2, ...)</c>
+<t>Если токен получить нельзя, функция может вернуть <k>nil</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetClassToken(unit)
+]=],
+requireKeywords = {
+"GetClassToken",
+"function",
+"UnitClass",
+"select",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetClassToken) ~= "function" then
+_G.checkError = "GetClassToken не является глобальной функцией"
+return false
+end
+local ok1, playerToken = pcall(_G.GetClassToken, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetClassToken('player'): " .. tostring(playerToken)
+return false
+end
+if type(playerToken) ~= "string" or playerToken == "" then
+_G.checkError = "Для player функция должна вернуть строку с токеном класса"
+return false
+end
+local ok2, invalidToken = pcall(_G.GetClassToken, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetClassToken('ns_invalid_unit'): " .. tostring(invalidToken)
+return false
+end
+if invalidToken ~= nil then
+_G.checkError = "Для несуществующего юнита функция должна вернуть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][105] = {
+type = "commenttest",
+title = "Тест 101-4: функция GetLevelSafe",
+helpModules = {101, 65, 45},
+preloadVars = {
+{var = "GetLevelSafe", desc = "GetLevelSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 101-4: функция GetLevelSafe</h>
+<t>Создай глобальную функцию <k>GetLevelSafe(unit)</k>.</t>
+<t>Если юнита не существует, функция должна вернуть <n>0</n>.</t>
+<t>Если юнит существует, функция должна вернуть его уровень через <k>UnitLevel(unit)</k>.</t>
+<t>Если <k>UnitLevel</k> вернул <k>nil</k>, используй <k>or 0</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetLevelSafe(unit)
+]=],
+requireKeywords = {
+"GetLevelSafe",
+"function",
+"UnitExists",
+"UnitLevel",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetLevelSafe) ~= "function" then
+_G.checkError = "GetLevelSafe не является глобальной функцией"
+return false
+end
+local ok1, playerLevel = pcall(_G.GetLevelSafe, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetLevelSafe('player'): " .. tostring(playerLevel)
+return false
+end
+if type(playerLevel) ~= "number" or playerLevel <= 0 then
+_G.checkError = "Для player функция должна вернуть число больше нуля"
+return false
+end
+local ok2, invalidLevel = pcall(_G.GetLevelSafe, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetLevelSafe('ns_invalid_unit'): " .. tostring(invalidLevel)
+return false
+end
+if invalidLevel ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][106] = {
+type = "commenttest",
+title = "Тест 101-5: функция GetDescription",
+helpModules = {101, 45, 44},
+preloadVars = {
+{var = "GetDescription", desc = "GetDescription очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 101-5: функция GetDescription</h>
+<t>Создай глобальную функцию <k>GetDescription(unit)</k>.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>level</c> — уровень юнита или <n>0</n>, если юнита нет.
+<c>classToken</c> — токен класса или <k>nil</k>, если получить нельзя.
+<c>raceToken</c> — токен расы или <k>nil</k>, если получить нельзя.
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitLevel</c>
+<c>UnitClass</c>
+<c>UnitRace</c>
+<c>select(2, ...)</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetDescription(unit)
+]=],
+requireKeywords = {
+"GetDescription",
+"function",
+"UnitExists",
+"UnitLevel",
+"UnitClass",
+"UnitRace",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetDescription) ~= "function" then
+_G.checkError = "GetDescription не является глобальной функцией"
+return false
+end
+local ok1, playerReport = pcall(_G.GetDescription, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetDescription('player'): " .. tostring(playerReport)
+return false
+end
+if type(playerReport) ~= "table" then
+_G.checkError = "GetDescription('player') должна вернуть таблицу"
+return false
+end
+if type(playerReport.level) ~= "number" or playerReport.level <= 0 then
+_G.checkError = "Для player поле level должно быть числом больше нуля"
+return false
+end
+if type(playerReport.classToken) ~= "string" or playerReport.classToken == "" then
+_G.checkError = "Для player поле classToken должно быть строкой"
+return false
+end
+if type(playerReport.raceToken) ~= "string" or playerReport.raceToken == "" then
+_G.checkError = "Для player поле raceToken должно быть строкой"
+return false
+end
+local ok2, invalidReport = pcall(_G.GetDescription, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetDescription('ns_invalid_unit'): " .. tostring(invalidReport)
+return false
+end
+if type(invalidReport) ~= "table" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
+return false
+end
+if invalidReport.level ~= 0 then
+_G.checkError = "Для несуществующего юнита поле level должно быть 0"
+return false
+end
+if invalidReport.classToken ~= nil then
+_G.checkError = "Для несуществующего юнита поле classToken должно быть nil"
+return false
+end
+if invalidReport.raceToken ~= nil then
+_G.checkError = "Для несуществующего юнита поле raceToken должно быть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][107] = {
 type = "info",
 title = "Баффы и дебаффы как данные",
+helpModules = {101, 31, 33},
 content = [=[
 <h>Баффы и дебаффы как данные</h>
 <t>Баффы и дебаффы в WoW API обычно перебираются по индексу: 1, 2, 3 и так далее.</t>
@@ -3818,6 +5998,11 @@ content = [=[
 <code>
 /run local count = 0; local i = 1; while UnitBuff("player", i) do count = count + 1; i = i + 1 end; print("Баффов:", count)
 </code>
+<h>Остаток времени</h>
+<code>
+/run local name, _, _, _, _, duration, expiration = UnitBuff("player", 1); if name and expiration and expiration > 0 then print(name, math.floor(expiration - GetTime())) end
+</code>
+<t>Если <k>duration</k> и <k>expirationTime</k> равны нулю, таймер у ауры может отсутствовать.</t>
 <h>Поиск баффа по имени</h>
 <code>
 /run local found = false; for i = 1, 40 do local name = UnitBuff("player", i); if not name then break end; if string.find(name, "Бафф") then found = true end end; print(found)
@@ -3826,151 +6011,331 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][63] = {
+ns_llua['lua'][108] = {
 type = "commenttest",
-title = "Практика: функция-досье на юнита",
-helpModules = {53, 54, 55, 56, 57, 58, 59, 60, 61, 62},
+title = "Тест 107-1: функция CountUnitBuffs",
+helpModules = {107, 45, 32},
 preloadVars = {
-{var = "GetUnitReport", desc = "GetUnitReport очищается перед проверкой"},
+{var = "CountUnitBuffs", desc = "CountUnitBuffs очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "reportPlayer", desc = "reportPlayer очищается перед проверкой"},
-{var = "reportInvalid", desc = "reportInvalid очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"reportPlayer",
-"reportInvalid",
 },
 instruction = [=[
-<h>Практика: функция-досье на юнита</h>
-<t>Создай глобальную функцию <k>GetUnitReport(unit)</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>name</c> — имя юнита или <s>"Нет юнита"</s>, если юнита нет.
-<c>level</c> — уровень юнита или <n>0</n>, если юнита нет.
-<c>hp</c> — текущее здоровье или <n>0</n>.
-<c>hpMax</c> — максимальное здоровье или <n>0</n>.
-<c>hpPercent</c> — процент здоровья от <n>0</n> до <n>100</n>.
-<c>classToken</c> — токен класса или <k>nil</k>, если получить нельзя.
-<c>status</c> — строка состояния. Для живого юнита можно вернуть <s>"жив"</s>, для мёртвого <s>"мёртв"</s>, для несуществующего <s>"нет"</s>.
-<h>Требования</h>
-<t>- Используй <k>UnitExists</k>, <k>UnitName</k>, <k>UnitHealth</k>, <k>UnitHealthMax</k>, <k>UnitLevel</k>, <k>UnitClass</k>.</t>
-<t>- Для процента здоровья используй деление и <k>math.floor</k>.</t>
-<t>- Если <k>hpMax <= 0</k>, процент должен быть <n>0</n>.</t>
-<t>- Для несуществующего юнита функция не должна падать.</t>
-<t>- Для несуществующего юнита верни таблицу с <k>name = "Нет юнита"</k>, <k>level = 0</k>, <k>hp = 0</k>, <k>hpMax = 0</k>, <k>hpPercent = 0</k>, <k>status = "нет"</k>.</t>
-<h>Пример использования</h>
-<code>
-/run local report = GetUnitReport("player"); print(report.name, report.level, report.hpPercent)
-</code>
+<h>Тест 107-1: функция CountUnitBuffs</h>
+<t>Создай глобальную функцию <k>CountUnitBuffs(unit)</k>.</t>
+<t>Функция должна вернуть количество баффов на юните.</t>
+<t>Используй <k>UnitBuff(unit, index)</k>.</t>
+<t>Перебирай индексы, пока функция не вернёт <k>nil</k>.</t>
+<t>Для несуществующего юнита функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальную функцию GetUnitReport(unit)
-function GetUnitReport(unit)
-    local name = UnitName(unit) or "Нет юнита"
-    -- заполни таблицу и верни её через return
-end
+-- Создай глобальную функцию CountUnitBuffs(unit)
 ]=],
 requireKeywords = {
-"GetUnitReport",
+"CountUnitBuffs",
 "function",
-"UnitName",
-"UnitHealth",
-"UnitHealthMax",
-"UnitLevel",
-"UnitClass",
+"UnitBuff",
 "return",
 },
 checkCode = function()
 _G.checkError = nil
-_G.reportPlayer = nil
-_G.reportInvalid = nil
-if type(_G.GetUnitReport) ~= "function" then
-    _G.checkError = "GetUnitReport не является глобальной функцией"
-    return false
+if type(_G.CountUnitBuffs) ~= "function" then
+_G.checkError = "CountUnitBuffs не является глобальной функцией"
+return false
 end
-local ok, playerReport = pcall(_G.GetUnitReport, "player")
-if not ok then
-    _G.checkError = "Ошибка вызова GetUnitReport('player'): " .. tostring(playerReport)
-    return false
+local ok1, playerCount = pcall(_G.CountUnitBuffs, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова CountUnitBuffs('player'): " .. tostring(playerCount)
+return false
 end
-_G.reportPlayer = playerReport
-if type(playerReport) ~= "table" then
-    _G.checkError = "GetUnitReport('player') должна вернуть таблицу"
-    return false
+if type(playerCount) ~= "number" or playerCount < 0 then
+_G.checkError = "Для player функция должна вернуть число больше или равное нулю"
+return false
 end
-if type(playerReport.name) ~= "string" or playerReport.name == "" then
-    _G.checkError = "Поле name должно быть непустой строкой"
-    return false
-end
-local level = tonumber(playerReport.level)
-local hp = tonumber(playerReport.hp)
-local hpMax = tonumber(playerReport.hpMax)
-local hpPercent = tonumber(playerReport.hpPercent)
-if not level or not hp or not hpMax or not hpPercent then
-    _G.checkError = "Поля level, hp, hpMax и hpPercent должны быть числами"
-    return false
-end
-if level < 0 or hp < 0 or hpMax < 0 then
-    _G.checkError = "Поля hp и hpMax не должны быть отрицательными"
-    return false
-end
-if hpPercent < 0 or hpPercent > 100 then
-    _G.checkError = "Поле hpPercent должно быть от 0 до 100"
-    return false
-end
-if hpMax == 0 then
-    if hpPercent ~= 0 then
-        _G.checkError = "Если hpMax равно 0, то hpPercent тоже должен быть 0"
-        return false
-    end
-else
-    local expected = hp / hpMax * 100
-    if math.abs(hpPercent - expected) > 1.5 then
-        _G.checkError = "hpPercent не совпадает с hp / hpMax * 100"
-        return false
-    end
-end
-if playerReport.classToken ~= nil and type(playerReport.classToken) ~= "string" then
-    _G.checkError = "Поле classToken должно быть строкой или nil"
-    return false
-end
-if type(playerReport.status) ~= "string" or playerReport.status == "" then
-    _G.checkError = "Поле status должно быть непустой строкой"
-    return false
-end
-local ok2, invalidReport = pcall(_G.GetUnitReport, "ns_invalid_unit")
+local ok2, invalidCount = pcall(_G.CountUnitBuffs, "ns_invalid_unit")
 if not ok2 then
-    _G.checkError = "GetUnitReport('ns_invalid_unit') не должна падать: " .. tostring(invalidReport)
-    return false
+_G.checkError = "Ошибка вызова CountUnitBuffs('ns_invalid_unit'): " .. tostring(invalidCount)
+return false
 end
-_G.reportInvalid = invalidReport
-if type(invalidReport) ~= "table" then
-    _G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
-    return false
-end
-if invalidReport.name ~= "Нет юнита" then
-    _G.checkError = "Для несуществующего юнита поле name должно быть 'Нет юнита'"
-    return false
-end
-if tonumber(invalidReport.level) ~= 0 then
-    _G.checkError = "Для несуществующего юнита поле level должно быть 0"
-    return false
-end
-if tonumber(invalidReport.hp) ~= 0 or tonumber(invalidReport.hpMax) ~= 0 or tonumber(invalidReport.hpPercent) ~= 0 then
-    _G.checkError = "Для несуществующего юнита hp, hpMax и hpPercent должны быть 0"
-    return false
-end
-if invalidReport.status ~= "нет" then
-    _G.checkError = "Для несуществующего юнита поле status должно быть 'нет'"
-    return false
+if invalidCount ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][64] = {
+ns_llua['lua'][109] = {
+type = "commenttest",
+title = "Тест 107-2: функция CountUnitDebuffs",
+helpModules = {107, 45, 32},
+preloadVars = {
+{var = "CountUnitDebuffs", desc = "CountUnitDebuffs очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 107-2: функция CountUnitDebuffs</h>
+<t>Создай глобальную функцию <k>CountUnitDebuffs(unit)</k>.</t>
+<t>Функция должна вернуть количество дебаффов на юните.</t>
+<t>Используй <k>UnitDebuff(unit, index)</k>.</t>
+<t>Перебирай индексы, пока функция не вернёт <k>nil</k>.</t>
+<t>Для несуществующего юнита функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountUnitDebuffs(unit)
+]=],
+requireKeywords = {
+"CountUnitDebuffs",
+"function",
+"UnitDebuff",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountUnitDebuffs) ~= "function" then
+_G.checkError = "CountUnitDebuffs не является глобальной функцией"
+return false
+end
+local ok1, playerCount = pcall(_G.CountUnitDebuffs, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова CountUnitDebuffs('player'): " .. tostring(playerCount)
+return false
+end
+if type(playerCount) ~= "number" or playerCount < 0 then
+_G.checkError = "Для player функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, invalidCount = pcall(_G.CountUnitDebuffs, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова CountUnitDebuffs('ns_invalid_unit'): " .. tostring(invalidCount)
+return false
+end
+if invalidCount ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][110] = {
+type = "commenttest",
+title = "Тест 107-3: функция GetAuraName",
+helpModules = {107, 65, 45},
+preloadVars = {
+{var = "GetAuraName", desc = "GetAuraName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 107-3: функция GetAuraName</h>
+<t>Создай глобальную функцию <k>GetAuraName(unit, index)</k>.</t>
+<t>Функция должна вернуть имя баффа через <k>UnitBuff(unit, index)</k>.</t>
+<t>Если баффа нет, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetAuraName(unit, index)
+]=],
+requireKeywords = {
+"GetAuraName",
+"function",
+"UnitBuff",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetAuraName) ~= "function" then
+_G.checkError = "GetAuraName не является глобальной функцией"
+return false
+end
+local ok1, playerName = pcall(_G.GetAuraName, "player", 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetAuraName('player', 1): " .. tostring(playerName)
+return false
+end
+if type(playerName) ~= "string" or playerName == "" then
+_G.checkError = "Функция должна вернуть строку"
+return false
+end
+local ok2, invalidName = pcall(_G.GetAuraName, "ns_invalid_unit", 1)
+if not ok2 then
+_G.checkError = "Ошибка вызова GetAuraName('ns_invalid_unit', 1): " .. tostring(invalidName)
+return false
+end
+if invalidName ~= "нет" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][111] = {
+type = "commenttest",
+title = "Тест 107-4: функция HasAuraWithName",
+helpModules = {107, 33, 45, 31},
+preloadVars = {
+{var = "HasAuraWithName", desc = "HasAuraWithName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 107-4: функция HasAuraWithName</h>
+<t>Создай глобальную функцию <k>HasAuraWithName(unit, text)</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если среди баффов юнита есть бафф, в названии которого есть подстрока <k>text</k>.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>UnitBuff</c>
+<c>string.find</c>
+<t>Если <k>text</k> не строка или пустая строка, верни <k>false</k>.</t>
+<t>Проверяй баффы с индексами от 1 до 40.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию HasAuraWithName(unit, text)
+]=],
+requireKeywords = {
+"HasAuraWithName",
+"function",
+"UnitBuff",
+"string.find",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.HasAuraWithName) ~= "function" then
+_G.checkError = "HasAuraWithName не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.HasAuraWithName, "player", "zzz_no_such_aura_zzz")
+if not ok1 then
+_G.checkError = "Ошибка вызова HasAuraWithName('player', ...): " .. tostring(result1)
+return false
+end
+if result1 ~= false then
+_G.checkError = "Для несуществующей подстроки функция должна вернуть false"
+return false
+end
+local ok2, result2 = pcall(_G.HasAuraWithName, "ns_invalid_unit", "zzz_no_such_aura_zzz")
+if not ok2 then
+_G.checkError = "Ошибка вызова HasAuraWithName('ns_invalid_unit', ...): " .. tostring(result2)
+return false
+end
+if result2 ~= false then
+_G.checkError = "Для несуществующего юнита функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.HasAuraWithName, "player", "")
+if not ok3 then
+_G.checkError = "Ошибка вызова HasAuraWithName('player', ''): " .. tostring(result3)
+return false
+end
+if result3 ~= false then
+_G.checkError = "Для пустой строки функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][112] = {
+type = "commenttest",
+title = "Тест 107-5: функция GetBuffList",
+helpModules = {107, 44, 45, 31},
+preloadVars = {
+{var = "GetBuffList", desc = "GetBuffList очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 107-5: функция GetBuffList</h>
+<t>Создай глобальную функцию <k>GetBuffList(unit, max)</k>.</t>
+<t>Функция должна вернуть таблицу с именами баффов юнита.</t>
+<t>Собери не больше <k>max</k> баффов.</t>
+<t>Если бафф не найден, прекрати перебор.</t>
+<t>Если <k>max</k> не число или меньше либо равно нулю, верни пустую таблицу.</t>
+<t>Используй:</t>
+<c>UnitBuff</c>
+<c>table.insert</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetBuffList(unit, max)
+]=],
+requireKeywords = {
+"GetBuffList",
+"function",
+"UnitBuff",
+"table.insert",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetBuffList) ~= "function" then
+_G.checkError = "GetBuffList не является глобальной функцией"
+return false
+end
+local ok1, playerList = pcall(_G.GetBuffList, "player", 5)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetBuffList('player', 5): " .. tostring(playerList)
+return false
+end
+if type(playerList) ~= "table" then
+_G.checkError = "GetBuffList('player', 5) должна вернуть таблицу"
+return false
+end
+if #playerList > 5 then
+_G.checkError = "Функция не должна возвращать больше баффов, чем max"
+return false
+end
+for i, name in ipairs(playerList) do
+if type(name) ~= "string" or name == "" then
+_G.checkError = "Каждый элемент списка баффов должен быть строкой"
+return false
+end
+end
+local ok2, invalidList = pcall(_G.GetBuffList, "ns_invalid_unit", 5)
+if not ok2 then
+_G.checkError = "Ошибка вызова GetBuffList('ns_invalid_unit', 5): " .. tostring(invalidList)
+return false
+end
+if type(invalidList) ~= "table" or #invalidList ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть пустую таблицу"
+return false
+end
+local ok3, badMaxList = pcall(_G.GetBuffList, "player", 0)
+if not ok3 then
+_G.checkError = "Ошибка вызова GetBuffList('player', 0): " .. tostring(badMaxList)
+return false
+end
+if type(badMaxList) ~= "table" or #badMaxList ~= 0 then
+_G.checkError = "Для max = 0 функция должна вернуть пустую таблицу"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][113] = {
 type = "info",
 title = "Группа: party1-party4",
+helpModules = {71, 101},
 content = [=[
 <h>Группа: party1-party4</h>
 <t>В группе может быть до четырёх других игроков. Их UnitID:</t>
@@ -3993,6 +6358,7 @@ content = [=[
 /run print(GetPartyLeaderIndex())
 </code>
 <t>Если лидер — первый участник группы, функция может вернуть <n>1</n>.</t>
+<t>Если ты один или лидером являешься ты, функция может вернуть <n>0</n> или <k>nil</k>.</t>
 <h>Проверка лидера</h>
 <code>
 /run local leader = GetPartyLeaderIndex(); if leader and leader > 0 then print("Лидер группы: party" .. leader) else print("Лидер не найден или ты один") end
@@ -4009,16 +6375,220 @@ content = [=[
 ]=],
 }
 
--- ============================================================
--- COURSE DATA: PART 2, MODULES 65-76
--- ============================================================
+ns_llua['lua'][114] = {
+type = "vartest",
+title = "Тест 113-1: количество участников группы",
+helpModules = {113},
+tasks = {
+{
+var = "partyCount",
+desc = 'Создай глобальную переменную partyCount = GetNumPartyMembers() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 4
+end,
+},
+},
+}
 
-ns_llua = ns_llua or {}
-ns_llua['lua'] = ns_llua['lua'] or {}
+ns_llua['lua'][115] = {
+type = "vartest",
+title = "Тест 113-2: таблица party-юнитов",
+helpModules = {113, 44},
+tasks = {
+{
+var = "partyUnits",
+desc = 'Создай глобальную таблицу partyUnits = {"party1", "party2", "party3", "party4"}',
+check = function(value)
+return type(value) == "table"
+and #value == 4
+and value[1] == "party1"
+and value[2] == "party2"
+and value[3] == "party3"
+and value[4] == "party4"
+end,
+},
+},
+}
 
-ns_llua['lua'][65] = {
+ns_llua['lua'][116] = {
+type = "commenttest",
+title = "Тест 113-3: функция GetPartyUnitList",
+helpModules = {113, 45},
+preloadVars = {
+{var = "GetPartyUnitList", desc = "GetPartyUnitList очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 113-3: функция GetPartyUnitList</h>
+<t>Создай глобальную функцию <k>GetPartyUnitList()</k>.</t>
+<t>Функция должна вернуть таблицу из четырёх строк:</t>
+<c>"party1"</c>
+<c>"party2"</c>
+<c>"party3"</c>
+<c>"party4"</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPartyUnitList()
+]=],
+requireKeywords = {
+"GetPartyUnitList",
+"function",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPartyUnitList) ~= "function" then
+_G.checkError = "GetPartyUnitList не является глобальной функцией"
+return false
+end
+local ok, list = pcall(_G.GetPartyUnitList)
+if not ok then
+_G.checkError = "Ошибка вызова GetPartyUnitList: " .. tostring(list)
+return false
+end
+if type(list) ~= "table" then
+_G.checkError = "GetPartyUnitList должна вернуть таблицу"
+return false
+end
+if #list ~= 4 then
+_G.checkError = "В таблице должно быть 4 элемента"
+return false
+end
+if list[1] ~= "party1" or list[2] ~= "party2" or list[3] ~= "party3" or list[4] ~= "party4" then
+_G.checkError = "Таблица должна содержать party1, party2, party3, party4"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][117] = {
+type = "commenttest",
+title = "Тест 113-4: функция CountExistingPartyMembers",
+helpModules = {113, 45, 31},
+preloadVars = {
+{var = "CountExistingPartyMembers", desc = "CountExistingPartyMembers очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 113-4: функция CountExistingPartyMembers</h>
+<t>Создай глобальную функцию <k>CountExistingPartyMembers()</k>.</t>
+<t>Функция должна вернуть количество существующих участников группы.</t>
+<t>Проверь юниты:</t>
+<c>"party1"</c>
+<c>"party2"</c>
+<c>"party3"</c>
+<c>"party4"</c>
+<t>Используй цикл и <k>UnitExists</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountExistingPartyMembers()
+]=],
+requireKeywords = {
+"CountExistingPartyMembers",
+"function",
+"UnitExists",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountExistingPartyMembers) ~= "function" then
+_G.checkError = "CountExistingPartyMembers не является глобальной функцией"
+return false
+end
+local ok, count = pcall(_G.CountExistingPartyMembers)
+if not ok then
+_G.checkError = "Ошибка вызова CountExistingPartyMembers: " .. tostring(count)
+return false
+end
+if type(count) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if count < 0 or count > 4 then
+_G.checkError = "Количество участников группы должно быть от 0 до 4"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][118] = {
+type = "commenttest",
+title = "Тест 113-5: функция GetPartyLeaderUnit",
+helpModules = {113, 45, 17},
+preloadVars = {
+{var = "GetPartyLeaderUnit", desc = "GetPartyLeaderUnit очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 113-5: функция GetPartyLeaderUnit</h>
+<t>Создай глобальную функцию <k>GetPartyLeaderUnit()</k>.</t>
+<t>Функция должна вернуть строку с UnitID лидера группы.</t>
+<t>Используй <k>GetPartyLeaderIndex()</k>.</t>
+<t>Если индекс лидера больше нуля, верни строку вида:</t>
+<s>"party1"</s>
+<s>"party2"</s>
+<s>"party3"</s>
+<s>"party4"</s>
+<t>Если лидера нет или индекс меньше либо равен нулю, верни строку:</t>
+<s>"none"</s>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPartyLeaderUnit()
+]=],
+requireKeywords = {
+"GetPartyLeaderUnit",
+"function",
+"GetPartyLeaderIndex",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPartyLeaderUnit) ~= "function" then
+_G.checkError = "GetPartyLeaderUnit не является глобальной функцией"
+return false
+end
+local ok, leaderUnit = pcall(_G.GetPartyLeaderUnit)
+if not ok then
+_G.checkError = "Ошибка вызова GetPartyLeaderUnit: " .. tostring(leaderUnit)
+return false
+end
+if type(leaderUnit) ~= "string" then
+_G.checkError = "Функция должна вернуть строку"
+return false
+end
+local valid = {
+none = true,
+party1 = true,
+party2 = true,
+party3 = true,
+party4 = true,
+}
+if not valid[leaderUnit] then
+_G.checkError = "Функция должна вернуть none или party1-party4"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][119] = {
 type = "info",
 title = "Рейд: raid1-raid40",
+helpModules = {113, 71},
 content = [=[
 <h>Рейд: raid1-raid40</h>
 <t>Если игрок находится в рейде, участники доступны через UnitID:</t>
@@ -4034,7 +6604,7 @@ content = [=[
 <t>Если ты не в рейде, функция обычно возвращает <n>0</n>.</t>
 <h>Перебор рейда</h>
 <code>
-/run local count = GetNumRaidMembers(); for i = 1, count do local unit = "raid" .. i; if UnitExists(unit) then print(UnitName(unit)) end end
+/run local count = GetNumRaidMembers() or 0; for i = 1, count do local unit = "raid" .. i; if UnitExists(unit) then print(UnitName(unit)) end end
 </code>
 <t>Здесь строка <s>"raid"</s> склеивается с числом <k>i</k>, получаются <s>"raid1"</s>, <s>"raid2"</s> и так далее.</t>
 <h>GetRaidRosterInfo</h>
@@ -4045,15 +6615,246 @@ content = [=[
 <t>Если игрок не в рейде или индекс неверный, значения могут быть <k>nil</k>.</t>
 <h>Таблица имён рейда</h>
 <code>
-/run raidNames = {}; for i = 1, GetNumRaidMembers() do local name = GetRaidRosterInfo(i); if name then table.insert(raidNames, name) end end; print("В рейде:", #raidNames)
+/run raidNames = {}; local count = GetNumRaidMembers() or 0; for i = 1, count do local name = GetRaidRosterInfo(i); if name then table.insert(raidNames, name) end end; print("В рейде:", #raidNames)
 </code>
 <w>Важно:</w> в рейде не нужно использовать <c>"party1"</c> — <c>"party4"</c>. Для рейда используются <c>"raid1"</c> — <c>"raid40"</c>.
+<h>Безопасный шаблон</h>
+<code>
+/run local count = GetNumRaidMembers() or 0; if count > 0 then print("Рейд найден") else print("Рейда нет") end
+</code>
 ]=],
 }
 
-ns_llua['lua'][66] = {
+ns_llua['lua'][120] = {
+type = "vartest",
+title = "Тест 119-1: количество участников рейда",
+helpModules = {119, 65},
+tasks = {
+{
+var = "raidCount",
+desc = 'Создай глобальную переменную raidCount = GetNumRaidMembers() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 40
+end,
+},
+},
+}
+
+ns_llua['lua'][121] = {
+type = "vartest",
+title = "Тест 119-2: строки raid-юнитов",
+helpModules = {119, 71},
+tasks = {
+{
+var = "raidUnitPrefix",
+desc = 'Создай глобальную переменную raidUnitPrefix = "raid"',
+check = function(value)
+return value == "raid"
+end,
+},
+{
+var = "raidUnit1",
+desc = 'Создай глобальную переменную raidUnit1 = "raid1"',
+check = function(value)
+return value == "raid1"
+end,
+},
+{
+var = "raidUnit40",
+desc = 'Создай глобальную переменную raidUnit40 = "raid40"',
+check = function(value)
+return value == "raid40"
+end,
+},
+},
+}
+
+ns_llua['lua'][122] = {
+type = "commenttest",
+title = "Тест 119-3: функция GetRaidUnit",
+helpModules = {119, 45, 17},
+preloadVars = {
+{var = "GetRaidUnit", desc = "GetRaidUnit очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 119-3: функция GetRaidUnit</h>
+<t>Создай глобальную функцию <k>GetRaidUnit(index)</k>.</t>
+<t>Если <k>index</k> — целое число от 1 до 40, функция должна вернуть строку вида:</t>
+<s>"raid1"</s>
+<s>"raid2"</s>
+<s>"raid40"</s>
+<t>Во всех остальных случаях функция должна вернуть строку:</t>
+<s>"invalid"</s>
+<t>Используй:</t>
+<c>type</c>
+<c>math.floor</c>
+<c>конкатенацию</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetRaidUnit(index)
+]=],
+requireKeywords = {
+"GetRaidUnit",
+"function",
+"type",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetRaidUnit) ~= "function" then
+_G.checkError = "GetRaidUnit не является глобальной функцией"
+return false
+end
+local tests = {
+{input = 1, expected = "raid1"},
+{input = 40, expected = "raid40"},
+{input = 0, expected = "invalid"},
+{input = 41, expected = "invalid"},
+{input = "bad", expected = "invalid"},
+{input = 1.5, expected = "invalid"},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.GetRaidUnit, test.input)
+if not ok or result ~= test.expected then
+_G.checkError = "Тест " .. i .. " функции GetRaidUnit не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][123] = {
+type = "commenttest",
+title = "Тест 119-4: функция CountExistingRaidMembers",
+helpModules = {119, 45, 31},
+preloadVars = {
+{var = "CountExistingRaidMembers", desc = "CountExistingRaidMembers очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 119-4: функция CountExistingRaidMembers</h>
+<t>Создай глобальную функцию <k>CountExistingRaidMembers()</k>.</t>
+<t>Функция должна вернуть количество существующих участников рейда.</t>
+<t>Проверь юниты от <c>"raid1"</c> до <c>"raid40"</c>.</t>
+<t>Используй цикл и <k>UnitExists</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountExistingRaidMembers()
+]=],
+requireKeywords = {
+"CountExistingRaidMembers",
+"function",
+"UnitExists",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountExistingRaidMembers) ~= "function" then
+_G.checkError = "CountExistingRaidMembers не является глобальной функцией"
+return false
+end
+local ok, count = pcall(_G.CountExistingRaidMembers)
+if not ok then
+_G.checkError = "Ошибка вызова CountExistingRaidMembers: " .. tostring(count)
+return false
+end
+if type(count) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if count < 0 or count > 40 then
+_G.checkError = "Количество участников рейда должно быть от 0 до 40"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][124] = {
+type = "commenttest",
+title = "Тест 119-5: функция GetRaidMemberName",
+helpModules = {119, 65, 77},
+preloadVars = {
+{var = "GetRaidMemberName", desc = "GetRaidMemberName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 119-5: функция GetRaidMemberName</h>
+<t>Создай глобальную функцию <k>GetRaidMemberName(index)</k>.</t>
+<t>Если <k>index</k> не является целым числом от 1 до 40, функция должна вернуть строку:</t>
+<s>"Нет участника"</s>
+<t>Иначе функция должна вернуть имя участника рейда через:</t>
+<code>
+UnitName("raid" .. index)
+</code>
+<t>Если имени нет, функция должна вернуть строку:</t>
+<s>"Нет участника"</s>
+<t>Используй:</t>
+<c>type</c>
+<c>math.floor</c>
+<c>UnitName</c>
+<c>or</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetRaidMemberName(index)
+]=],
+requireKeywords = {
+"GetRaidMemberName",
+"function",
+"type",
+"math.floor",
+"UnitName",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetRaidMemberName) ~= "function" then
+_G.checkError = "GetRaidMemberName не является глобальной функцией"
+return false
+end
+local ok1, invalid1 = pcall(_G.GetRaidMemberName, 0)
+if not ok1 or invalid1 ~= "Нет участника" then
+_G.checkError = "Для index = 0 функция должна вернуть 'Нет участника'"
+return false
+end
+local ok2, invalid2 = pcall(_G.GetRaidMemberName, 41)
+if not ok2 or invalid2 ~= "Нет участника" then
+_G.checkError = "Для index = 41 функция должна вернуть 'Нет участника'"
+return false
+end
+local ok3, first = pcall(_G.GetRaidMemberName, 1)
+if not ok3 then
+_G.checkError = "Ошибка вызова GetRaidMemberName(1): " .. tostring(first)
+return false
+end
+if type(first) ~= "string" or first == "" then
+_G.checkError = "Для index = 1 функция должна вернуть строку"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][125] = {
 type = "info",
 title = "Лидерство, роли и лут",
+helpModules = {113, 119},
 content = [=[
 <h>Лидерство, роли и лут</h>
 <t>Эти функции помогают понять, кто главный в группе или рейде, а также как распределяется добыча.</t>
@@ -4061,12 +6862,13 @@ content = [=[
 <code>
 /run print(GetPartyLeaderIndex())
 </code>
-<t>Если лидер группы — первый участник, функция может вернуть <n>1</n>. Если ты один, результат может быть <n>0</n> или <k>nil</k>.</t>
+<t>Если лидер группы — первый участник, функция может вернуть <n>1</n>.</t>
+<t>Если ты один или лидером являешься ты, функция может вернуть <n>0</n> или <k>nil</k>.</t>
 <h>Лидер рейда</h>
 <code>
 /run print(GetRaidLeaderIndex())
 </code>
-<h>Проверка лидера</h>
+<h>Проверка лидера группы</h>
 <code>
 /run local leader = GetPartyLeaderIndex(); if leader and leader > 0 then print("Лидер группы: party" .. leader) else print("Лидер не найден") end
 </code>
@@ -4094,12 +6896,213 @@ content = [=[
 /run local method, master, threshold = GetLootMethod(); print("Порог:", threshold)
 </code>
 <w>Примечание:</w> числовое значение порога связано с качеством предмета. Чем выше число, тем выше минимальное качество для розыгрыша.
+<h>Безопасный шаблон</h>
+<code>
+/run local method = GetLootMethod() or "unknown"; print("Метод лута:", method)
+</code>
 ]=],
 }
 
-ns_llua['lua'][67] = {
+ns_llua['lua'][126] = {
+type = "vartest",
+title = "Тест 125-1: индексы лидеров",
+helpModules = {125, 65},
+tasks = {
+{
+var = "partyLeaderIndex",
+desc = 'Создай глобальную переменную partyLeaderIndex = GetPartyLeaderIndex() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 4
+end,
+},
+{
+var = "raidLeaderIndex",
+desc = 'Создай глобальную переменную raidLeaderIndex = GetRaidLeaderIndex() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 40
+end,
+},
+},
+}
+
+ns_llua['lua'][127] = {
+type = "vartest",
+title = "Тест 125-2: метод лута",
+helpModules = {125, 65},
+tasks = {
+{
+var = "lootMethod",
+desc = 'Создай глобальную переменную lootMethod = GetLootMethod() or "unknown"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "lootThreshold",
+desc = 'Создай глобальную переменную lootThreshold = select(3, GetLootMethod()) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][128] = {
+type = "commenttest",
+title = "Тест 125-3: функция GetPartyLeaderIndexSafe",
+helpModules = {125, 45, 65},
+preloadVars = {
+{var = "GetPartyLeaderIndexSafe", desc = "GetPartyLeaderIndexSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 125-3: функция GetPartyLeaderIndexSafe</h>
+<t>Создай глобальную функцию <k>GetPartyLeaderIndexSafe()</k>.</t>
+<t>Функция должна вернуть индекс лидера группы через <k>GetPartyLeaderIndex()</k>.</t>
+<t>Если индекс не существует или меньше либо равен нулю, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPartyLeaderIndexSafe()
+]=],
+requireKeywords = {
+"GetPartyLeaderIndexSafe",
+"function",
+"GetPartyLeaderIndex",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPartyLeaderIndexSafe) ~= "function" then
+_G.checkError = "GetPartyLeaderIndexSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetPartyLeaderIndexSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetPartyLeaderIndexSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 or result > 4 then
+_G.checkError = "Индекс лидера группы должен быть от 0 до 4"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][129] = {
+type = "commenttest",
+title = "Тест 125-4: функция GetRaidLeaderIndexSafe",
+helpModules = {125, 45, 65},
+preloadVars = {
+{var = "GetRaidLeaderIndexSafe", desc = "GetRaidLeaderIndexSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 125-4: функция GetRaidLeaderIndexSafe</h>
+<t>Создай глобальную функцию <k>GetRaidLeaderIndexSafe()</k>.</t>
+<t>Функция должна вернуть индекс лидера рейда через <k>GetRaidLeaderIndex()</k>.</t>
+<t>Если индекс не существует или меньше либо равен нулю, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetRaidLeaderIndexSafe()
+]=],
+requireKeywords = {
+"GetRaidLeaderIndexSafe",
+"function",
+"GetRaidLeaderIndex",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetRaidLeaderIndexSafe) ~= "function" then
+_G.checkError = "GetRaidLeaderIndexSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetRaidLeaderIndexSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetRaidLeaderIndexSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 or result > 40 then
+_G.checkError = "Индекс лидера рейда должен быть от 0 до 40"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][130] = {
+type = "commenttest",
+title = "Тест 125-5: функция GetLootMethodSafe",
+helpModules = {125, 45, 65},
+preloadVars = {
+{var = "GetLootMethodSafe", desc = "GetLootMethodSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 125-5: функция GetLootMethodSafe</h>
+<t>Создай глобальную функцию <k>GetLootMethodSafe()</k>.</t>
+<t>Функция должна вернуть метод распределения лута через <k>GetLootMethod()</k>.</t>
+<t>Если метод не является непустой строкой, функция должна вернуть строку:</t>
+<s>"unknown"</s>
+<t>Используй:</t>
+<c>GetLootMethod</c>
+<c>type</c>
+<c>return</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetLootMethodSafe()
+]=],
+requireKeywords = {
+"GetLootMethodSafe",
+"function",
+"GetLootMethod",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetLootMethodSafe) ~= "function" then
+_G.checkError = "GetLootMethodSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetLootMethodSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetLootMethodSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "string" or result == "" then
+_G.checkError = "Функция должна вернуть непустую строку"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][131] = {
 type = "info",
 title = "Гильдия",
+helpModules = {113, 65},
 content = [=[
 <h>Гильдия</h>
 <t>WoW API позволяет получать информацию о гильдии игрока.</t>
@@ -4125,124 +7128,219 @@ content = [=[
 </code>
 <h>Таблица участников</h>
 <code>
-/run guildOnline = {}; local total, online = GetNumGuildMembers(); for i = 1, online do local name = GetGuildRosterInfo(i); if name then table.insert(guildOnline, name) end end; print("Онлайн:", #guildOnline)
+/run guildOnline = {}; local total, online = GetNumGuildMembers(); if online then for i = 1, online do local name = GetGuildRosterInfo(i); if name then table.insert(guildOnline, name) end end end; print("Онлайн:", #guildOnline)
 </code>
 <w>Примечание:</w> если ростер гильдии ещё не загружен, значения могут быть <k>nil</k>. Позже, в модуле событий, мы научимся обновлять такие данные по событию.
+<h>Безопасные значения по умолчанию</h>
+<code>
+/run local total = GetNumGuildMembers() or 0; local online = select(2, GetNumGuildMembers()) or 0; print("Всего:", total, "Онлайн:", online)
+</code>
 ]=],
 }
 
-ns_llua['lua'][68] = {
+ns_llua['lua'][132] = {
+type = "vartest",
+title = "Тест 131-1: имя гильдии",
+helpModules = {131, 65},
+tasks = {
+{
+var = "guildName",
+desc = 'Создай глобальную переменную guildName = GetGuildInfo("player") or "Без гильдии"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][133] = {
+type = "vartest",
+title = "Тест 131-2: количество участников гильдии",
+helpModules = {131, 65},
+tasks = {
+{
+var = "guildTotal",
+desc = 'Создай глобальную переменную guildTotal = GetNumGuildMembers() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "guildOnline",
+desc = 'Создай глобальную переменную guildOnline = select(2, GetNumGuildMembers()) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][134] = {
 type = "commenttest",
-title = "Практика: отчёт по группе и рейду",
-helpModules = {64, 65, 66, 67},
+title = "Тест 131-3: функция GetGuildNameSafe",
+helpModules = {131, 45, 65},
 preloadVars = {
-{var = "GetGroupReport", desc = "GetGroupReport очищается перед проверкой"},
+{var = "GetGuildNameSafe", desc = "GetGuildNameSafe очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "reportGroup", desc = "reportGroup очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"reportGroup",
 },
 instruction = [=[
-<h>Практика: отчёт по группе и рейду</h>
-<t>Создай глобальную функцию <k>GetGroupReport()</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>inParty</c> — <k>true</k>, если игрок в группе, иначе <k>false</k>.
-<c>inRaid</c> — <k>true</k>, если игрок в рейде, иначе <k>false</k>.
-<c>partyCount</c> — количество участников группы через <k>GetNumPartyMembers</k>.
-<c>raidCount</c> — количество участников рейда через <k>GetNumRaidMembers</k>.
-<c>memberCount</c> — итоговое количество участников.
-<h>Логика memberCount</h>
-<t>Если <k>raidCount</k> больше нуля, то <k>memberCount</k> должен быть равен <k>raidCount</k>.</t>
-<t>Иначе <k>memberCount</k> должен быть равен <k>partyCount</k>.</t>
-<h>Требования</h>
-<t>- Используй <k>GetNumPartyMembers</k> и <k>GetNumRaidMembers</k>.</t>
-<t>- Если API вернул <k>nil</k>, используй <k>or 0</k>.</t>
-<t>- Логические поля должны быть именно <k>true</k> или <k>false</k>.</t>
-<t>- Функция должна работать, даже если игрок один.</t>
-<h>Пример использования</h>
+<h>Тест 131-3: функция GetGuildNameSafe</h>
+<t>Создай глобальную функцию <k>GetGuildNameSafe()</k>.</t>
+<t>Функция должна вернуть имя гильдии игрока через:</t>
 <code>
-/run local report = GetGroupReport(); print(report.inParty, report.inRaid, report.memberCount)
+GetGuildInfo("player")
 </code>
+<t>Если имя не является непустой строкой, функция должна вернуть строку:</t>
+<s>"Без гильдии"</s>
+<t>Используй:</t>
+<c>GetGuildInfo</c>
+<c>type</c>
+<c>return</c>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальную функцию GetGroupReport()
-function GetGroupReport()
-    local partyCount = GetNumPartyMembers() or 0
-    local raidCount = GetNumRaidMembers() or 0
-    -- заполни таблицу и верни её через return
-end
+-- Создай глобальную функцию GetGuildNameSafe()
 ]=],
 requireKeywords = {
-"GetGroupReport",
+"GetGuildNameSafe",
 "function",
-"GetNumPartyMembers",
-"GetNumRaidMembers",
+"GetGuildInfo",
+"type",
 "return",
 },
 checkCode = function()
 _G.checkError = nil
-_G.reportGroup = nil
-if type(_G.GetGroupReport) ~= "function" then
-    _G.checkError = "GetGroupReport не является глобальной функцией"
-    return false
+if type(_G.GetGuildNameSafe) ~= "function" then
+_G.checkError = "GetGuildNameSafe не является глобальной функцией"
+return false
 end
-local ok, report = pcall(_G.GetGroupReport)
+local ok, result = pcall(_G.GetGuildNameSafe)
 if not ok then
-    _G.checkError = "Ошибка вызова GetGroupReport(): " .. tostring(report)
-    return false
+_G.checkError = "Ошибка вызова GetGuildNameSafe: " .. tostring(result)
+return false
 end
-_G.reportGroup = report
-if type(report) ~= "table" then
-    _G.checkError = "GetGroupReport должна вернуть таблицу"
-    return false
-end
-if type(report.inParty) ~= "boolean" then
-    _G.checkError = "Поле inParty должно быть true или false"
-    return false
-end
-if type(report.inRaid) ~= "boolean" then
-    _G.checkError = "Поле inRaid должно быть true или false"
-    return false
-end
-local partyCount = tonumber(report.partyCount)
-local raidCount = tonumber(report.raidCount)
-local memberCount = tonumber(report.memberCount)
-if not partyCount or not raidCount or not memberCount then
-    _G.checkError = "Поля partyCount, raidCount и memberCount должны быть числами"
-    return false
-end
-if partyCount < 0 or raidCount < 0 or memberCount < 0 then
-    _G.checkError = "Количество участников не может быть отрицательным"
-    return false
-end
-if (partyCount > 0) ~= report.inParty then
-    _G.checkError = "Поле inParty должно соответствовать partyCount > 0"
-    return false
-end
-if (raidCount > 0) ~= report.inRaid then
-    _G.checkError = "Поле inRaid должно соответствовать raidCount > 0"
-    return false
-end
-if raidCount > 0 then
-    if memberCount ~= raidCount then
-        _G.checkError = "Если игрок в рейде, memberCount должен быть равен raidCount"
-        return false
-    end
-else
-    if memberCount ~= partyCount then
-        _G.checkError = "Если игрок не в рейде, memberCount должен быть равен partyCount"
-        return false
-    end
+if type(result) ~= "string" or result == "" then
+_G.checkError = "Функция должна вернуть непустую строку"
+return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][69] = {
+ns_llua['lua'][135] = {
+type = "commenttest",
+title = "Тест 131-4: функция GetGuildMemberCountSafe",
+helpModules = {131, 45, 65},
+preloadVars = {
+{var = "GetGuildMemberCountSafe", desc = "GetGuildMemberCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 131-4: функция GetGuildMemberCountSafe</h>
+<t>Создай глобальную функцию <k>GetGuildMemberCountSafe()</k>.</t>
+<t>Функция должна вернуть общее количество участников гильдии через:</t>
+<code>
+GetNumGuildMembers()
+</code>
+<t>Если значение не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetGuildMemberCountSafe()
+]=],
+requireKeywords = {
+"GetGuildMemberCountSafe",
+"function",
+"GetNumGuildMembers",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetGuildMemberCountSafe) ~= "function" then
+_G.checkError = "GetGuildMemberCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetGuildMemberCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetGuildMemberCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество участников гильдии не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][136] = {
+type = "commenttest",
+title = "Тест 131-5: функция GetGuildOnlineCountSafe",
+helpModules = {131, 45, 65},
+preloadVars = {
+{var = "GetGuildOnlineCountSafe", desc = "GetGuildOnlineCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 131-5: функция GetGuildOnlineCountSafe</h>
+<t>Создай глобальную функцию <k>GetGuildOnlineCountSafe()</k>.</t>
+<t>Функция должна вернуть количество участников гильдии онлайн.</t>
+<t>Используй:</t>
+<code>
+local total, online = GetNumGuildMembers()
+</code>
+<t>Если <k>online</k> не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetGuildOnlineCountSafe()
+]=],
+requireKeywords = {
+"GetGuildOnlineCountSafe",
+"function",
+"GetNumGuildMembers",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetGuildOnlineCountSafe) ~= "function" then
+_G.checkError = "GetGuildOnlineCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetGuildOnlineCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetGuildOnlineCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество участников онлайн не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][137] = {
 type = "info",
 title = "Координаты игрока",
+helpModules = {65, 71, 14},
 content = [=[
 <h>Координаты игрока</h>
 <t>Функция <k>GetPlayerMapPosition</k> возвращает координаты юнита на текущей карте.</t>
@@ -4273,9 +7371,231 @@ print(string.format("%.2f", 12.345)) -- 12.35
 ]=],
 }
 
-ns_llua['lua'][70] = {
+ns_llua['lua'][138] = {
+type = "vartest",
+title = "Тест 137-1: сырые координаты игрока",
+helpModules = {137, 65},
+tasks = {
+{
+var = "mapX",
+desc = 'Создай глобальную переменную mapX = (GetPlayerMapPosition("player")) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 1
+end,
+},
+{
+var = "mapY",
+desc = 'Создай глобальную переменную mapY = select(2, GetPlayerMapPosition("player")) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 1
+end,
+},
+},
+}
+
+ns_llua['lua'][139] = {
+type = "vartest",
+title = "Тест 137-2: координаты в процентах",
+helpModules = {137, 10, 14},
+tasks = {
+{
+var = "mapXPercent",
+desc = 'Создай глобальную переменную mapXPercent = math.floor(((GetPlayerMapPosition("player")) or 0) * 100)',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 100
+end,
+},
+{
+var = "mapYPercent",
+desc = 'Создай глобальную переменную mapYPercent = math.floor((select(2, GetPlayerMapPosition("player")) or 0) * 100)',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 100
+end,
+},
+},
+}
+
+ns_llua['lua'][140] = {
+type = "commenttest",
+title = "Тест 137-3: функция GetPlayerCoordinatesRaw",
+helpModules = {137, 45, 65},
+preloadVars = {
+{var = "GetPlayerCoordinatesRaw", desc = "GetPlayerCoordinatesRaw очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 137-3: функция GetPlayerCoordinatesRaw</h>
+<t>Создай глобальную функцию <k>GetPlayerCoordinatesRaw()</k>.</t>
+<t>Функция должна вернуть два значения:</t>
+<c>1</c> — координату X игрока через <k>GetPlayerMapPosition("player")</k>.
+<c>2</c> — координату Y игрока через <k>GetPlayerMapPosition("player")</k>.
+<t>Если значение равно <k>nil</k>, используй <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPlayerCoordinatesRaw()
+]=],
+requireKeywords = {
+"GetPlayerCoordinatesRaw",
+"function",
+"GetPlayerMapPosition",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPlayerCoordinatesRaw) ~= "function" then
+_G.checkError = "GetPlayerCoordinatesRaw не является глобальной функцией"
+return false
+end
+local ok, x, y = pcall(_G.GetPlayerCoordinatesRaw)
+if not ok then
+_G.checkError = "Ошибка вызова GetPlayerCoordinatesRaw: " .. tostring(x)
+return false
+end
+if type(x) ~= "number" or type(y) ~= "number" then
+_G.checkError = "Функция должна вернуть два числа"
+return false
+end
+if x < 0 or x > 1 then
+_G.checkError = "Координата X должна быть от 0 до 1"
+return false
+end
+if y < 0 or y > 1 then
+_G.checkError = "Координата Y должна быть от 0 до 1"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][141] = {
+type = "commenttest",
+title = "Тест 137-4: функция GetPlayerCoordinatesPercent",
+helpModules = {137, 45, 10, 14},
+preloadVars = {
+{var = "GetPlayerCoordinatesPercent", desc = "GetPlayerCoordinatesPercent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 137-4: функция GetPlayerCoordinatesPercent</h>
+<t>Создай глобальную функцию <k>GetPlayerCoordinatesPercent()</k>.</t>
+<t>Функция должна вернуть два значения:</t>
+<c>1</c> — координату X игрока в процентах от 0 до 100.
+<c>2</c> — координату Y игрока в процентах от 0 до 100.
+<t>Используй:</t>
+<c>GetPlayerMapPosition("player")</c>
+<c>or 0</c>
+<c>math.floor</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPlayerCoordinatesPercent()
+]=],
+requireKeywords = {
+"GetPlayerCoordinatesPercent",
+"function",
+"GetPlayerMapPosition",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPlayerCoordinatesPercent) ~= "function" then
+_G.checkError = "GetPlayerCoordinatesPercent не является глобальной функцией"
+return false
+end
+local ok, xPercent, yPercent = pcall(_G.GetPlayerCoordinatesPercent)
+if not ok then
+_G.checkError = "Ошибка вызова GetPlayerCoordinatesPercent: " .. tostring(xPercent)
+return false
+end
+if type(xPercent) ~= "number" or type(yPercent) ~= "number" then
+_G.checkError = "Функция должна вернуть два числа"
+return false
+end
+if xPercent < 0 or xPercent > 100 then
+_G.checkError = "Координата X в процентах должна быть от 0 до 100"
+return false
+end
+if yPercent < 0 or yPercent > 100 then
+_G.checkError = "Координата Y в процентах должна быть от 0 до 100"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][142] = {
+type = "commenttest",
+title = "Тест 137-5: функция GetCoordinateText",
+helpModules = {137, 45, 14, 7},
+preloadVars = {
+{var = "GetCoordinateText", desc = "GetCoordinateText очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 137-5: функция GetCoordinateText</h>
+<t>Создай глобальную функцию <k>GetCoordinateText()</k>.</t>
+<t>Функция должна вернуть строку с координатами игрока в процентах.</t>
+<t>Формат строки:</t>
+<s>"X: 12.3, Y: 45.6"</s>
+<t>Используй:</t>
+<c>GetPlayerMapPosition("player")</c>
+<c>or 0</c>
+<c>string.format</c>
+<c>%.1f</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetCoordinateText()
+]=],
+requireKeywords = {
+"GetCoordinateText",
+"function",
+"GetPlayerMapPosition",
+"string.format",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetCoordinateText) ~= "function" then
+_G.checkError = "GetCoordinateText не является глобальной функцией"
+return false
+end
+local ok, text = pcall(_G.GetCoordinateText)
+if not ok then
+_G.checkError = "Ошибка вызова GetCoordinateText: " .. tostring(text)
+return false
+end
+if type(text) ~= "string" or text == "" then
+_G.checkError = "Функция должна вернуть строку"
+return false
+end
+if not text:find("X: ", 1, true) then
+_G.checkError = "Строка должна начинаться с 'X: '"
+return false
+end
+if not text:find(", Y: ", 1, true) then
+_G.checkError = "Строка должна содержать ', Y: '"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][143] = {
 type = "info",
 title = "Направление и зоны",
+helpModules = {137, 10, 14},
 content = [=[
 <h>Направление и зоны</h>
 <t>Кроме координат, можно получить направление взгляда игрока и название зоны.</t>
@@ -4309,12 +7629,252 @@ content = [=[
 <code>
 /run local zone = GetZoneText() or "Неизвестно"; local sub = GetSubZoneText() or ""; print(string.format("Зона: %s, подзона: %s", zone, sub))
 </code>
+<h>Безопасный шаблон</h>
+<code>
+/run local facing = GetPlayerFacing() or 0; if facing >= 0 then print("Направление доступно") else print("Направление недоступно") end
+</code>
 ]=],
 }
 
-ns_llua['lua'][71] = {
+ns_llua['lua'][144] = {
+type = "vartest",
+title = "Тест 143-1: направление игрока",
+helpModules = {143, 65, 10},
+tasks = {
+{
+var = "playerFacing",
+desc = 'Создай глобальную переменную playerFacing = GetPlayerFacing() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerFacingDegrees",
+desc = 'Создай глобальную переменную playerFacingDegrees = math.floor((GetPlayerFacing() or 0) * 180 / math.pi + 0.5)',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 360
+end,
+},
+},
+}
+
+ns_llua['lua'][145] = {
+type = "vartest",
+title = "Тест 143-2: зоны игрока",
+helpModules = {143, 65},
+tasks = {
+{
+var = "zoneText",
+desc = 'Создай глобальную переменную zoneText = GetZoneText() or "Неизвестно"',
+check = function(value)
+return type(value) == "string"
+end,
+},
+{
+var = "minimapZoneText",
+desc = 'Создай глобальную переменную minimapZoneText = GetMinimapZoneText() or ""',
+check = function(value)
+return type(value) == "string"
+end,
+},
+},
+}
+
+ns_llua['lua'][146] = {
+type = "commenttest",
+title = "Тест 143-3: функция GetFacingDegrees",
+helpModules = {143, 45, 10},
+preloadVars = {
+{var = "GetFacingDegrees", desc = "GetFacingDegrees очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 143-3: функция GetFacingDegrees</h>
+<t>Создай глобальную функцию <k>GetFacingDegrees()</k>.</t>
+<t>Функция должна вернуть направление игрока в градусах.</t>
+<t>Используй:</t>
+<c>GetPlayerFacing()</c>
+<c>or 0</c>
+<c>math.floor</c>
+<c>math.pi</c>
+<t>Если направление недоступно, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetFacingDegrees()
+]=],
+requireKeywords = {
+"GetFacingDegrees",
+"function",
+"GetPlayerFacing",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetFacingDegrees) ~= "function" then
+_G.checkError = "GetFacingDegrees не является глобальной функцией"
+return false
+end
+local ok, degrees = pcall(_G.GetFacingDegrees)
+if not ok then
+_G.checkError = "Ошибка вызова GetFacingDegrees: " .. tostring(degrees)
+return false
+end
+if type(degrees) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if degrees < 0 or degrees > 360 then
+_G.checkError = "Направление в градусах должно быть от 0 до 360"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][147] = {
+type = "commenttest",
+title = "Тест 143-4: функция GetZoneReport",
+helpModules = {143, 45, 7},
+preloadVars = {
+{var = "GetZoneReport", desc = "GetZoneReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 143-4: функция GetZoneReport</h>
+<t>Создай глобальную функцию <k>GetZoneReport()</k>.</t>
+<t>Функция должна вернуть строку:</t>
+<s>"Зона: название"</s>
+<t>Если <k>GetZoneText()</k> вернул <k>nil</k>, используй строку:</t>
+<s>"Неизвестно"</s>
+<t>Используй:</t>
+<c>GetZoneText</c>
+<c>or</c>
+<c>конкатенацию</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetZoneReport()
+]=],
+requireKeywords = {
+"GetZoneReport",
+"function",
+"GetZoneText",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetZoneReport) ~= "function" then
+_G.checkError = "GetZoneReport не является глобальной функцией"
+return false
+end
+local ok, text = pcall(_G.GetZoneReport)
+if not ok then
+_G.checkError = "Ошибка вызова GetZoneReport: " .. tostring(text)
+return false
+end
+if type(text) ~= "string" or text == "" then
+_G.checkError = "Функция должна вернуть строку"
+return false
+end
+if not text:find("Зона: ", 1, true) then
+_G.checkError = "Строка должна начинаться с 'Зона: '"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][148] = {
+type = "commenttest",
+title = "Тест 143-5: функция GetCardinalDirection",
+helpModules = {143, 45, 17, 19},
+preloadVars = {
+{var = "GetCardinalDirection", desc = "GetCardinalDirection очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 143-5: функция GetCardinalDirection</h>
+<t>Создай глобальную функцию <k>GetCardinalDirection(degrees)</k>.</t>
+<t>Функция должна вернуть сторону света по градусам.</t>
+<t>Правила:</t>
+<c>0-44</c> — <s>"Север"</s>
+<c>45-134</c> — <s>"Восток"</s>
+<c>135-224</c> — <s>"Юг"</s>
+<c>225-314</c> — <s>"Запад"</s>
+<c>315-359</c> — <s>"Север"</s>
+<t>Если <k>degrees</k> не число, меньше 0 или больше либо равно 360, функция должна вернуть:</t>
+<s>"Неизвестно"</s>
+<t>Используй:</t>
+<c>type</c>
+<c>if</c>
+<c>elseif</c>
+<c>else</c>
+<c>return</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetCardinalDirection(degrees)
+]=],
+requireKeywords = {
+"GetCardinalDirection",
+"function",
+"type",
+"if",
+"then",
+"elseif",
+"else",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetCardinalDirection) ~= "function" then
+_G.checkError = "GetCardinalDirection не является глобальной функцией"
+return false
+end
+local tests = {
+{input = 0, expected = "Север"},
+{input = 44, expected = "Север"},
+{input = 45, expected = "Восток"},
+{input = 90, expected = "Восток"},
+{input = 134, expected = "Восток"},
+{input = 135, expected = "Юг"},
+{input = 180, expected = "Юг"},
+{input = 224, expected = "Юг"},
+{input = 225, expected = "Запад"},
+{input = 270, expected = "Запад"},
+{input = 314, expected = "Запад"},
+{input = 315, expected = "Север"},
+{input = 359, expected = "Север"},
+{input = -1, expected = "Неизвестно"},
+{input = 360, expected = "Неизвестно"},
+{input = "bad", expected = "Неизвестно"},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.GetCardinalDirection, test.input)
+if not ok or result ~= test.expected then
+_G.checkError = "Тест " .. i .. " функции GetCardinalDirection не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][149] = {
 type = "info",
 title = "Скорость и перемещение",
+helpModules = {143, 65},
 content = [=[
 <h>Скорость и перемещение</h>
 <t>WoW API позволяет получить скорость игрока и проверить, находится ли он верхом, летит или плывёт.</t>
@@ -4345,16 +7905,248 @@ content = [=[
 <code>
 /run if IsMounted() then print("Верхом") else print("Пешком") end
 </code>
+<h>Приведение к boolean</h>
+<code>
+/run local mounted = not not IsMounted(); print(mounted, type(mounted))
+</code>
 <h>Мини-отчёт</h>
 <code>
 /run local state = "Пешком"; if IsFlying() then state = "Летит" elseif IsMounted() then state = "Верхом" elseif IsSwimming() then state = "Плывёт" end; print(state)
 </code>
+<h>Безопасный шаблон скорости</h>
+<code>
+/run local speed = 0; if GetPlayerSpeed then speed = GetPlayerSpeed() or 0 end; print("Скорость:", speed)
+</code>
 ]=],
 }
 
-ns_llua['lua'][72] = {
+ns_llua['lua'][150] = {
+type = "vartest",
+title = "Тест 149-1: состояния движения",
+helpModules = {149, 15},
+tasks = {
+{
+var = "isMounted",
+desc = 'Создай глобальную переменную isMounted = not not IsMounted()',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "isFlying",
+desc = 'Создай глобальную переменную isFlying = not not IsFlying()',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "isSwimming",
+desc = 'Создай глобальную переменную isSwimming = not not IsSwimming()',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+},
+}
+
+ns_llua['lua'][151] = {
+type = "vartest",
+title = "Тест 149-2: скорость игрока",
+helpModules = {149, 65},
+tasks = {
+{
+var = "runSpeed",
+desc = 'Создай глобальную переменную runSpeed: если GetPlayerSpeed существует, используй её результат, иначе 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "flightSpeed",
+desc = 'Создай глобальную переменную flightSpeed: если GetPlayerSpeed существует, используй второй результат через select(2, ...), иначе 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][152] = {
+type = "commenttest",
+title = "Тест 149-3: функция GetMovementState",
+helpModules = {149, 45, 17, 19},
+preloadVars = {
+{var = "GetMovementState", desc = "GetMovementState очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 149-3: функция GetMovementState</h>
+<t>Создай глобальную функцию <k>GetMovementState()</k>.</t>
+<t>Функция должна вернуть одно из значений:</t>
+<c>"flying"</c> — если <k>IsFlying()</k> истинно.
+<c>"mounted"</c> — если игрок не летит, но <k>IsMounted()</k> истинно.
+<c>"swimming"</c> — если игрок не летит, не верхом, но <k>IsSwimming()</k> истинно.
+<c>"normal"</c> — во всех остальных случаях.
+<t>Используй:</t>
+<c>IsFlying</c>
+<c>IsMounted</c>
+<c>IsSwimming</c>
+<c>if / elseif / else</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetMovementState()
+]=],
+requireKeywords = {
+"GetMovementState",
+"function",
+"IsFlying",
+"IsMounted",
+"IsSwimming",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetMovementState) ~= "function" then
+_G.checkError = "GetMovementState не является глобальной функцией"
+return false
+end
+local ok, state = pcall(_G.GetMovementState)
+if not ok then
+_G.checkError = "Ошибка вызова GetMovementState: " .. tostring(state)
+return false
+end
+local valid = {
+flying = true,
+mounted = true,
+swimming = true,
+normal = true,
+}
+if type(state) ~= "string" or not valid[state] then
+_G.checkError = "Функция должна вернуть flying, mounted, swimming или normal"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][153] = {
+type = "commenttest",
+title = "Тест 149-4: функция GetSpeedReport",
+helpModules = {149, 45, 7, 65},
+preloadVars = {
+{var = "GetSpeedReport", desc = "GetSpeedReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 149-4: функция GetSpeedReport</h>
+<t>Создай глобальную функцию <k>GetSpeedReport()</k>.</t>
+<t>Функция должна вернуть строку:</t>
+<s>"Скорость: значение"</s>
+<t>Если функция <k>GetPlayerSpeed</k> недоступна, используй значение <n>0</n>.</t>
+<t>Используй:</t>
+<c>GetPlayerSpeed</c>
+<c>tostring</c>
+<c>конкатенацию</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpeedReport()
+]=],
+requireKeywords = {
+"GetSpeedReport",
+"function",
+"GetPlayerSpeed",
+"tostring",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpeedReport) ~= "function" then
+_G.checkError = "GetSpeedReport не является глобальной функцией"
+return false
+end
+local ok, text = pcall(_G.GetSpeedReport)
+if not ok then
+_G.checkError = "Ошибка вызова GetSpeedReport: " .. tostring(text)
+return false
+end
+if type(text) ~= "string" or text == "" then
+_G.checkError = "Функция должна вернуть строку"
+return false
+end
+if not text:find("Скорость: ", 1, true) then
+_G.checkError = "Строка должна начинаться с 'Скорость: '"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][154] = {
+type = "commenttest",
+title = "Тест 149-5: функция IsMountedOrFlying",
+helpModules = {149, 45, 21},
+preloadVars = {
+{var = "IsMountedOrFlying", desc = "IsMountedOrFlying очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 149-5: функция IsMountedOrFlying</h>
+<t>Создай глобальную функцию <k>IsMountedOrFlying()</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если игрок верхом или летит.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>IsMounted()</c>
+<c>IsFlying()</c>
+<c>or</c>
+<c>and true or false</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsMountedOrFlying()
+]=],
+requireKeywords = {
+"IsMountedOrFlying",
+"function",
+"IsMounted",
+"IsFlying",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsMountedOrFlying) ~= "function" then
+_G.checkError = "IsMountedOrFlying не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.IsMountedOrFlying)
+if not ok then
+_G.checkError = "Ошибка вызова IsMountedOrFlying: " .. tostring(result)
+return false
+end
+if type(result) ~= "boolean" then
+_G.checkError = "Функция должна вернуть boolean"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][155] = {
 type = "info",
 title = "Время, FPS и пинг",
+helpModules = {65, 10, 14},
 content = [=[
 <h>Время, FPS и пинг</h>
 <t>Эти функции полезны для таймеров, измерений и диагностики.</t>
@@ -4375,10 +8167,12 @@ content = [=[
 <code>
 /run local hour, minute = GetGameTime(); print(hour, minute)
 </code>
+<t>Функция возвращает игровое или серверное время в формате часы и минуты.</t>
 <h>GetFramerate</h>
 <code>
 /run print(math.floor(GetFramerate()))
 </code>
+<t>Возвращает текущий FPS.</t>
 <h>GetNetStats</h>
 <t>Функция возвращает статистику сети. Удобнее всего сначала посмотреть её через <k>/dump</k>.</t>
 <code>
@@ -4386,131 +8180,234 @@ content = [=[
 </code>
 <t>Пример получения домашнего пинга:</t>
 <code>
-/run local _, _, latencyHome = GetNetStats(); print("Пинг:", latencyHome)
+/run local _, _, latencyHome = GetNetStats(); print(latencyHome or 0)
 </code>
 <w>Примечание:</w> порядок возвращаемых значений может зависеть от версии клиента, поэтому при сомнениях используй <k>/dump</k>.
+<h>Безопасный шаблон</h>
+<code>
+/run local fps = GetFramerate() or 0; print(string.format("FPS: %d", math.floor(fps)))
+</code>
 ]=],
 }
 
-ns_llua['lua'][73] = {
+ns_llua['lua'][156] = {
+type = "vartest",
+title = "Тест 155-1: время сессии",
+helpModules = {155, 65, 10},
+tasks = {
+{
+var = "gameTimeSeconds",
+desc = 'Создай глобальную переменную gameTimeSeconds = GetTime() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "gameTimeMinutes",
+desc = 'Создай глобальную переменную gameTimeMinutes = math.floor((GetTime() or 0) / 60)',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][157] = {
+type = "vartest",
+title = "Тест 155-2: игровое время",
+helpModules = {155, 65},
+tasks = {
+{
+var = "gameHour",
+desc = 'Создай глобальную переменную gameHour = GetGameTime() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 23
+end,
+},
+{
+var = "gameMinute",
+desc = 'Создай глобальную переменную gameMinute = select(2, GetGameTime()) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 59
+end,
+},
+},
+}
+
+ns_llua['lua'][158] = {
 type = "commenttest",
-title = "Практика: панель путешественника",
-helpModules = {69, 70, 71, 72},
+title = "Тест 155-3: функция GetSessionTimeText",
+helpModules = {155, 45, 14, 10},
 preloadVars = {
-{var = "GetTravelReport", desc = "GetTravelReport очищается перед проверкой"},
+{var = "GetSessionTimeText", desc = "GetSessionTimeText очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "reportTravel", desc = "reportTravel очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"reportTravel",
 },
 instruction = [=[
-<h>Практика: панель путешественника</h>
-<t>Создай глобальную функцию <k>GetTravelReport()</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>zone</c> — строка с названием зоны. Если <k>GetZoneText</k> вернул <k>nil</k>, используй <s>"Неизвестно"</s>.
-<c>x</c> — сырая координата X от 0 до 1. Если <k>nil</k>, используй <n>0</n>.
-<c>y</c> — сырая координата Y от 0 до 1. Если <k>nil</k>, используй <n>0</n>.
-<c>xPercent</c> — координата X в процентах от 0 до 100.
-<c>yPercent</c> — координата Y в процентах от 0 до 100.
-<c>facing</c> — направление игрока. Если <k>GetPlayerFacing</k> вернул <k>nil</k>, используй <n>0</n>.
-<h>Требования</h>
-<t>- Используй <k>GetZoneText</k>.</t>
-<t>- Используй <k>GetPlayerMapPosition("player")</k>.</t>
-<t>- Используй <k>GetPlayerFacing</k>.</t>
-<t>- Для отсутствующих значений используй <k>or 0</k> или <k>or "Неизвестно"</k>.</t>
-<t>- <k>xPercent</k> должен соответствовать <k>x * 100</k>. Можно округлить через <k>math.floor</k>.</t>
-<t>- <k>yPercent</k> должен соответствовать <k>y * 100</k>. Можно округлить через <k>math.floor</k>.</t>
-<h>Пример использования</h>
-<code>
-/run local report = GetTravelReport(); print(report.zone, report.xPercent, report.yPercent)
-</code>
+<h>Тест 155-3: функция GetSessionTimeText</h>
+<t>Создай глобальную функцию <k>GetSessionTimeText()</k>.</t>
+<t>Функция должна вернуть строку с временем сессии.</t>
+<t>Формат строки:</t>
+<s>"Минут: X, Секунд: Y"</s>
+<t>Используй:</t>
+<c>GetTime()</c>
+<c>math.floor</c>
+<c>остаток от деления %</c>
+<c>string.format</c>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальную функцию GetTravelReport()
-function GetTravelReport()
-    local zone = GetZoneText() or "Неизвестно"
-    local x, y = GetPlayerMapPosition("player")
-    x = x or 0
-    y = y or 0
-    local facing = GetPlayerFacing() or 0
-    -- заполни таблицу и верни её через return
-end
+-- Создай глобальную функцию GetSessionTimeText()
 ]=],
 requireKeywords = {
-"GetTravelReport",
+"GetSessionTimeText",
 "function",
-"GetZoneText",
-"GetPlayerMapPosition",
-"GetPlayerFacing",
+"GetTime",
+"math.floor",
+"string.format",
 "return",
 },
 checkCode = function()
 _G.checkError = nil
-_G.reportTravel = nil
-if type(_G.GetTravelReport) ~= "function" then
-    _G.checkError = "GetTravelReport не является глобальной функцией"
-    return false
+if type(_G.GetSessionTimeText) ~= "function" then
+_G.checkError = "GetSessionTimeText не является глобальной функцией"
+return false
 end
-local ok, report = pcall(_G.GetTravelReport)
+local ok, text = pcall(_G.GetSessionTimeText)
 if not ok then
-    _G.checkError = "Ошибка вызова GetTravelReport(): " .. tostring(report)
-    return false
+_G.checkError = "Ошибка вызова GetSessionTimeText: " .. tostring(text)
+return false
 end
-_G.reportTravel = report
-if type(report) ~= "table" then
-    _G.checkError = "GetTravelReport должна вернуть таблицу"
-    return false
+if type(text) ~= "string" or text == "" then
+_G.checkError = "Функция должна вернуть строку"
+return false
 end
-if type(report.zone) ~= "string" or report.zone == "" then
-    _G.checkError = "Поле zone должно быть непустой строкой"
-    return false
+if not text:find("Минут: ", 1, true) then
+_G.checkError = "Строка должна содержать 'Минут: '"
+return false
 end
-local x = tonumber(report.x)
-local y = tonumber(report.y)
-local xPercent = tonumber(report.xPercent)
-local yPercent = tonumber(report.yPercent)
-local facing = tonumber(report.facing)
-if not x or not y or not xPercent or not yPercent or not facing then
-    _G.checkError = "Поля x, y, xPercent, yPercent и facing должны быть числами"
-    return false
-end
-if x < 0 or x > 1 then
-    _G.checkError = "Поле x должно быть от 0 до 1"
-    return false
-end
-if y < 0 or y > 1 then
-    _G.checkError = "Поле y должно быть от 0 до 1"
-    return false
-end
-if xPercent < 0 or xPercent > 100 then
-    _G.checkError = "Поле xPercent должно быть от 0 до 100"
-    return false
-end
-if yPercent < 0 or yPercent > 100 then
-    _G.checkError = "Поле yPercent должно быть от 0 до 100"
-    return false
-end
-if facing < 0 then
-    _G.checkError = "Поле facing не должно быть отрицательным"
-    return false
-end
-if math.abs(xPercent - x * 100) > 1.5 then
-    _G.checkError = "Поле xPercent не совпадает с x * 100"
-    return false
-end
-if math.abs(yPercent - y * 100) > 1.5 then
-    _G.checkError = "Поле yPercent не совпадает с y * 100"
-    return false
+if not text:find(", Секунд: ", 1, true) then
+_G.checkError = "Строка должна содержать ', Секунд: '"
+return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][74] = {
+ns_llua['lua'][159] = {
+type = "commenttest",
+title = "Тест 155-4: функция GetFramerateSafe",
+helpModules = {155, 45, 65},
+preloadVars = {
+{var = "GetFramerateSafe", desc = "GetFramerateSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 155-4: функция GetFramerateSafe</h>
+<t>Создай глобальную функцию <k>GetFramerateSafe()</k>.</t>
+<t>Функция должна вернуть FPS как число.</t>
+<t>Используй:</t>
+<c>GetFramerate()</c>
+<c>or 0</c>
+<t>Если FPS получить нельзя, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetFramerateSafe()
+]=],
+requireKeywords = {
+"GetFramerateSafe",
+"function",
+"GetFramerate",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetFramerateSafe) ~= "function" then
+_G.checkError = "GetFramerateSafe не является глобальной функцией"
+return false
+end
+local ok, fps = pcall(_G.GetFramerateSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetFramerateSafe: " .. tostring(fps)
+return false
+end
+if type(fps) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if fps < 0 then
+_G.checkError = "FPS не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][160] = {
+type = "commenttest",
+title = "Тест 155-5: функция GetLatencySafe",
+helpModules = {155, 45, 65},
+preloadVars = {
+{var = "GetLatencySafe", desc = "GetLatencySafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 155-5: функция GetLatencySafe</h>
+<t>Создай глобальную функцию <k>GetLatencySafe()</k>.</t>
+<t>Функция должна вернуть пинг как число.</t>
+<t>Используй:</t>
+<c>GetNetStats()</c>
+<c>select(3, ...)</c>
+<c>or 0</c>
+<t>Если пинг получить нельзя, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetLatencySafe()
+]=],
+requireKeywords = {
+"GetLatencySafe",
+"function",
+"GetNetStats",
+"select",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetLatencySafe) ~= "function" then
+_G.checkError = "GetLatencySafe не является глобальной функцией"
+return false
+end
+local ok, latency = pcall(_G.GetLatencySafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetLatencySafe: " .. tostring(latency)
+return false
+end
+if type(latency) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if latency < 0 then
+_G.checkError = "Пинг не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][161] = {
 type = "info",
 title = "Деньги и опыт",
+helpModules = {65, 10, 14},
 content = [=[
 <h>Деньги и опыт</h>
 <t>Деньги в WoW хранятся в меди. 100 меди — 1 серебро. 100 серебра — 1 золото.</t>
@@ -4521,7 +8418,7 @@ content = [=[
 <t>Функция возвращает общее количество меди.</t>
 <h>Ручное форматирование</h>
 <code>
-/run local copper = GetMoney(); local gold = math.floor(copper / 10000); local silver = math.floor((copper % 10000) / 100); local cop = copper % 100; print(string.format("%dз %dс %dм", gold, silver, cop))
+/run local copper = GetMoney() or 0; local gold = math.floor(copper / 10000); local silver = math.floor((copper % 10000) / 100); local cop = copper % 100; print(string.format("%dз %dс %dм", gold, silver, cop))
 </code>
 <t>Здесь:</t>
 <c>copper / 10000</c> — золото.
@@ -4549,9 +8446,242 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][75] = {
+ns_llua['lua'][162] = {
+type = "vartest",
+title = "Тест 161-1: деньги игрока",
+helpModules = {161, 65, 10},
+tasks = {
+{
+var = "playerMoney",
+desc = 'Создай глобальную переменную playerMoney = GetMoney() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerGold",
+desc = 'Создай глобальную переменную playerGold = math.floor((GetMoney() or 0) / 10000)',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][163] = {
+type = "vartest",
+title = "Тест 161-2: опыт игрока",
+helpModules = {161, 65},
+tasks = {
+{
+var = "playerXP",
+desc = 'Создай глобальную переменную playerXP = UnitXP("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerXPMax",
+desc = 'Создай глобальную переменную playerXPMax = UnitXPMax("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][164] = {
+type = "commenttest",
+title = "Тест: функция GetMoneyParts",
+helpModules = {161, 45, 10},
+preloadVars = {
+{var = "GetMoneyParts", desc = "GetMoneyParts очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 161-3: функция GetMoneyParts</h>
+<t>Создай глобальную функцию <k>GetMoneyParts()</k>.</t>
+<t>Функция должна вернуть три значения:</t>
+<c>1</c> — золото.
+<c>2</c> — серебро.
+<c>3</c> — медь.
+<t>Используй:</t>
+<c>GetMoney()</c>
+<c>or 0</c>
+<c>math.floor</c>
+<c>остаток от деления %</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetMoneyParts()
+]=],
+requireKeywords = {
+"GetMoneyParts",
+"function",
+"GetMoney",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetMoneyParts) ~= "function" then
+_G.checkError = "GetMoneyParts не является глобальной функцией"
+return false
+end
+local money = GetMoney() or 0
+local expectedGold = math.floor(money / 10000)
+local expectedSilver = math.floor((money % 10000) / 100)
+local expectedCopper = money % 100
+local ok, gold, silver, copper = pcall(_G.GetMoneyParts)
+if not ok then
+_G.checkError = "Ошибка вызова GetMoneyParts: " .. tostring(gold)
+return false
+end
+if type(gold) ~= "number" or type(silver) ~= "number" or type(copper) ~= "number" then
+_G.checkError = "Функция должна вернуть три числа"
+return false
+end
+if gold ~= expectedGold or silver ~= expectedSilver or copper ~= expectedCopper then
+_G.checkError = "Золото, серебро или медь посчитаны неверно"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][165] = {
+type = "commenttest",
+title = "Тест 161-4: функция GetMoneyText",
+helpModules = {161, 45, 14, 10},
+preloadVars = {
+{var = "GetMoneyText", desc = "GetMoneyText очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 161-4: функция GetMoneyText</h>
+<t>Создай глобальную функцию <k>GetMoneyText()</k>.</t>
+<t>Функция должна вернуть строку с деньгами игрока.</t>
+<t>Формат строки:</t>
+<s>"12з 34с 56м"</s>
+<t>Используй:</t>
+<c>GetMoney()</c>
+<c>or 0</c>
+<c>math.floor</c>
+<c>остаток от деления %</c>
+<c>string.format</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetMoneyText()
+]=],
+requireKeywords = {
+"GetMoneyText",
+"function",
+"GetMoney",
+"math.floor",
+"string.format",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetMoneyText) ~= "function" then
+_G.checkError = "GetMoneyText не является глобальной функцией"
+return false
+end
+local ok, text = pcall(_G.GetMoneyText)
+if not ok then
+_G.checkError = "Ошибка вызова GetMoneyText: " .. tostring(text)
+return false
+end
+if type(text) ~= "string" or text == "" then
+_G.checkError = "Функция должна вернуть строку"
+return false
+end
+if not text:match("^%d+з %d+с %d+м$") then
+_G.checkError = "Строка должна иметь формат 'золото з серебро с медь м'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][166] = {
+type = "commenttest",
+title = "Тест 161-5: функция GetXPPercent",
+helpModules = {161, 45, 10, 65},
+preloadVars = {
+{var = "GetXPPercent", desc = "GetXPPercent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 161-5: функция GetXPPercent</h>
+<t>Создай глобальную функцию <k>GetXPPercent()</k>.</t>
+<t>Функция должна вернуть процент опыта игрока от 0 до 100.</t>
+<t>Используй:</t>
+<c>UnitXP("player")</c>
+<c>UnitXPMax("player")</c>
+<c>or 0</c>
+<c>math.floor</c>
+<t>Если максимальный опыт меньше или равен нулю, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetXPPercent()
+]=],
+requireKeywords = {
+"GetXPPercent",
+"function",
+"UnitXP",
+"UnitXPMax",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetXPPercent) ~= "function" then
+_G.checkError = "GetXPPercent не является глобальной функцией"
+return false
+end
+local ok, percent = pcall(_G.GetXPPercent)
+if not ok then
+_G.checkError = "Ошибка вызова GetXPPercent: " .. tostring(percent)
+return false
+end
+if type(percent) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if percent < 0 or percent > 100 then
+_G.checkError = "Процент опыта должен быть от 0 до 100"
+return false
+end
+local xp = UnitXP("player") or 0
+local xpMax = UnitXPMax("player") or 0
+local expected = 0
+if xpMax > 0 then
+expected = math.floor(xp / xpMax * 100)
+end
+if math.abs(percent - expected) > 2 then
+_G.checkError = "Процент опыта не совпадает с текущим опытом игрока"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][167] = {
 type = "info",
 title = "Сумки: ячейки и свободное место",
+helpModules = {65, 31, 45},
 content = [=[
 <h>Сумки: ячейки и свободное место</h>
 <t>В WoW 3.3.5 основные сумки имеют ID от 0 до 4.</t>
@@ -4585,9 +8715,237 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][76] = {
+ns_llua['lua'][168] = {
+type = "vartest",
+title = "Тест 167-1: рюкзак игрока",
+helpModules = {167, 65},
+tasks = {
+{
+var = "bagSlots0",
+desc = 'Создай глобальную переменную bagSlots0 = GetContainerNumSlots(0) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "bagFree0",
+desc = 'Создай глобальную переменную bagFree0 = GetContainerNumFreeSlots(0) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][169] = {
+type = "vartest",
+title = "Тест 167-2: таблица ID сумок",
+helpModules = {167, 44},
+tasks = {
+{
+var = "bagIDs",
+desc = 'Создай глобальную таблицу bagIDs = {0, 1, 2, 3, 4}',
+check = function(value)
+return type(value) == "table"
+and #value == 5
+and value[1] == 0
+and value[2] == 1
+and value[3] == 2
+and value[4] == 3
+and value[5] == 4
+end,
+},
+},
+}
+
+ns_llua['lua'][170] = {
+type = "commenttest",
+title = "Тест 167-3: функция GetBagSlotCount",
+helpModules = {167, 45, 65},
+preloadVars = {
+{var = "GetBagSlotCount", desc = "GetBagSlotCount очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 167-3: функция GetBagSlotCount</h>
+<t>Создай глобальную функцию <k>GetBagSlotCount(bag)</k>.</t>
+<t>Если <k>bag</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество ячеек в сумке через:</t>
+<code>
+GetContainerNumSlots(bag)
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetBagSlotCount(bag)
+]=],
+requireKeywords = {
+"GetBagSlotCount",
+"function",
+"GetContainerNumSlots",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetBagSlotCount) ~= "function" then
+_G.checkError = "GetBagSlotCount не является глобальной функцией"
+return false
+end
+local ok1, backpack = pcall(_G.GetBagSlotCount, 0)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetBagSlotCount(0): " .. tostring(backpack)
+return false
+end
+if type(backpack) ~= "number" or backpack < 0 then
+_G.checkError = "Для сумки 0 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, invalidBag = pcall(_G.GetBagSlotCount, -1)
+if not ok2 or invalidBag ~= 0 then
+_G.checkError = "Для сумки -1 функция должна вернуть 0"
+return false
+end
+local ok3, badBag = pcall(_G.GetBagSlotCount, "bad")
+if not ok3 or badBag ~= 0 then
+_G.checkError = "Для нечислового аргумента функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][171] = {
+type = "commenttest",
+title = "Тест 167-4: функция GetTotalBagSlots",
+helpModules = {167, 45, 31, 65},
+preloadVars = {
+{var = "GetTotalBagSlots", desc = "GetTotalBagSlots очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 167-4: функция GetTotalBagSlots</h>
+<t>Создай глобальную функцию <k>GetTotalBagSlots()</k>.</t>
+<t>Функция должна вернуть общее количество ячеек во всех сумках от 0 до 4.</t>
+<t>Используй цикл и:</t>
+<code>
+GetContainerNumSlots(bag)
+</code>
+<t>Если функция вернула <k>nil</k>, используй <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTotalBagSlots()
+]=],
+requireKeywords = {
+"GetTotalBagSlots",
+"function",
+"for",
+"GetContainerNumSlots",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetTotalBagSlots) ~= "function" then
+_G.checkError = "GetTotalBagSlots не является глобальной функцией"
+return false
+end
+local expected = 0
+for bag = 0, 4 do
+local slots = GetContainerNumSlots(bag)
+if type(slots) == "number" and slots > 0 then
+expected = expected + slots
+end
+end
+local ok, total = pcall(_G.GetTotalBagSlots)
+if not ok then
+_G.checkError = "Ошибка вызова GetTotalBagSlots: " .. tostring(total)
+return false
+end
+if type(total) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if total ~= expected then
+_G.checkError = "Общее количество ячеек не совпадает с суммой по сумкам 0-4"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][172] = {
+type = "commenttest",
+title = "Тест 167-5: функция GetTotalFreeBagSlots",
+helpModules = {167, 45, 31, 65},
+preloadVars = {
+{var = "GetTotalFreeBagSlots", desc = "GetTotalFreeBagSlots очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 167-5: функция GetTotalFreeBagSlots</h>
+<t>Создай глобальную функцию <k>GetTotalFreeBagSlots()</k>.</t>
+<t>Функция должна вернуть общее количество свободных ячеек во всех сумках от 0 до 4.</t>
+<t>Используй цикл и:</t>
+<code>
+GetContainerNumFreeSlots(bag)
+</code>
+<t>Если функция вернула <k>nil</k>, используй <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTotalFreeBagSlots()
+]=],
+requireKeywords = {
+"GetTotalFreeBagSlots",
+"function",
+"for",
+"GetContainerNumFreeSlots",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetTotalFreeBagSlots) ~= "function" then
+_G.checkError = "GetTotalFreeBagSlots не является глобальной функцией"
+return false
+end
+local expected = 0
+for bag = 0, 4 do
+local freeSlots = GetContainerNumFreeSlots(bag)
+if type(freeSlots) == "number" and freeSlots > 0 then
+expected = expected + freeSlots
+end
+end
+local ok, freeTotal = pcall(_G.GetTotalFreeBagSlots)
+if not ok then
+_G.checkError = "Ошибка вызова GetTotalFreeBagSlots: " .. tostring(freeTotal)
+return false
+end
+if type(freeTotal) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if freeTotal ~= expected then
+_G.checkError = "Количество свободных ячеек не совпадает с суммой по сумкам 0-4"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][173] = {
 type = "info",
 title = "Предметы в сумках",
+helpModules = {167, 65},
 content = [=[
 <h>Предметы в сумках</h>
 <t>Чтобы получить предмет в сумке, нужны два аргумента: ID сумки и номер ячейки.</t>
@@ -4596,11 +8954,16 @@ content = [=[
 /run local link = GetContainerItemLink(0, 1); print(link or "Пусто")
 </code>
 <t>Если ячейка пустая, функция вернёт <k>nil</k>.</t>
+<t>Если предмет есть, функция вернёт строку-ссылку предмета. Такая ссылка содержит цвет, имя и внутреннюю информацию о предмете.</t>
 <h>GetContainerItemInfo</h>
 <code>
 /run local texture, count = GetContainerItemInfo(0, 1); print(texture, count)
 </code>
-<t>Функция возвращает текстуру, количество и другие данные предмета.</t>
+<t>Функция возвращает несколько значений. Основные:</t>
+<c>texture</c> — иконка предмета.
+<c>count</c> — количество предметов в ячейке.
+<c>locked</c> — заблокирован ли предмет.
+<c>quality</c> — качество предмета.
 <h>GetContainerItemID</h>
 <code>
 /run print(GetContainerItemID(0, 1))
@@ -4618,16 +8981,266 @@ content = [=[
 ]=],
 }
 
--- ============================================================
--- COURSE DATA: PART 2, MODULES 77-88
--- ============================================================
+ns_llua['lua'][174] = {
+type = "vartest",
+title = "Тест 173-1: первый слот рюкзака",
+helpModules = {173, 167, 65},
+tasks = {
+{
+var = "backpackSlots",
+desc = 'Создай глобальную переменную backpackSlots = GetContainerNumSlots(0) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "backpackFirstLink",
+desc = 'Создай глобальную переменную backpackFirstLink = GetContainerItemLink(0, 1) or "empty"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
 
-ns_llua = ns_llua or {}
-ns_llua['lua'] = ns_llua['lua'] or {}
+ns_llua['lua'][175] = {
+type = "vartest",
+title = "Тест 173-2: ID и количество предмета",
+helpModules = {173, 167, 65},
+tasks = {
+{
+var = "backpackFirstID",
+desc = 'Создай глобальную переменную backpackFirstID = GetContainerItemID(0, 1) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "backpackFirstCount",
+desc = 'Создай глобальную переменную backpackFirstCount = select(2, GetContainerItemInfo(0, 1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
 
-ns_llua['lua'][77] = {
+ns_llua['lua'][176] = {
+type = "commenttest",
+title = "Тест 173-3: функция GetContainerItemLinkSafe",
+helpModules = {173, 45, 65},
+preloadVars = {
+{var = "GetContainerItemLinkSafe", desc = "GetContainerItemLinkSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 173-3: функция GetContainerItemLinkSafe</h>
+<t>Создай глобальную функцию <k>GetContainerItemLinkSafe(bag, slot)</k>.</t>
+<t>Если <k>bag</k> или <k>slot</k> не являются числами, функция должна вернуть строку:</t>
+<s>"empty"</s>
+<t>Иначе функция должна получить ссылку на предмет через:</t>
+<code>
+GetContainerItemLink(bag, slot)
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"empty"</s>
+<t>Иначе функция должна вернуть саму ссылку на предмет.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetContainerItemLinkSafe(bag, slot)
+]=],
+requireKeywords = {
+"GetContainerItemLinkSafe",
+"function",
+"GetContainerItemLink",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetContainerItemLinkSafe) ~= "function" then
+_G.checkError = "GetContainerItemLinkSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetContainerItemLinkSafe, 0, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetContainerItemLinkSafe(0, 1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для bag = 0 и slot = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetContainerItemLinkSafe, "bad", 1)
+if not ok2 or result2 ~= "empty" then
+_G.checkError = "Для нечислового bag функция должна вернуть 'empty'"
+return false
+end
+local ok3, result3 = pcall(_G.GetContainerItemLinkSafe, 0, "bad")
+if not ok3 or result3 ~= "empty" then
+_G.checkError = "Для нечислового slot функция должна вернуть 'empty'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][177] = {
+type = "commenttest",
+title = "Тест 173-4: функция GetContainerItemCountSafe",
+helpModules = {173, 45, 65},
+preloadVars = {
+{var = "GetContainerItemCountSafe", desc = "GetContainerItemCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 173-4: функция GetContainerItemCountSafe</h>
+<t>Создай глобальную функцию <k>GetContainerItemCountSafe(bag, slot)</k>.</t>
+<t>Если <k>bag</k> или <k>slot</k> не являются числами, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить количество предметов через:</t>
+<code>
+select(2, GetContainerItemInfo(bag, slot))
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть само количество.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetContainerItemCountSafe(bag, slot)
+]=],
+requireKeywords = {
+"GetContainerItemCountSafe",
+"function",
+"GetContainerItemInfo",
+"select",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetContainerItemCountSafe) ~= "function" then
+_G.checkError = "GetContainerItemCountSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetContainerItemCountSafe, 0, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetContainerItemCountSafe(0, 1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для bag = 0 и slot = 1 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetContainerItemCountSafe, "bad", 1)
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нечислового bag функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.GetContainerItemCountSafe, 0, "bad")
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нечислового slot функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][178] = {
+type = "commenttest",
+title = "Тест 173-5: функция CountFilledSlotsInBag",
+helpModules = {173, 45, 31, 65},
+preloadVars = {
+{var = "CountFilledSlotsInBag", desc = "CountFilledSlotsInBag очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 173-5: функция CountFilledSlotsInBag</h>
+<t>Создай глобальную функцию <k>CountFilledSlotsInBag(bag)</k>.</t>
+<t>Если <k>bag</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить количество ячеек через:</t>
+<code>
+GetContainerNumSlots(bag)
+</code>
+<t>Если количество ячеек не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна пройти циклом по всем ячейкам и посчитать, сколько из них не пустые.</t>
+<t>Ячейка считается не пустой, если:</t>
+<code>
+GetContainerItemLink(bag, slot)
+</code>
+<t>вернул значение, отличное от <k>nil</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountFilledSlotsInBag(bag)
+]=],
+requireKeywords = {
+"CountFilledSlotsInBag",
+"function",
+"GetContainerNumSlots",
+"GetContainerItemLink",
+"for",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountFilledSlotsInBag) ~= "function" then
+_G.checkError = "CountFilledSlotsInBag не является глобальной функцией"
+return false
+end
+local function countExpected(bag)
+if type(bag) ~= "number" then
+return 0
+end
+local slots = GetContainerNumSlots(bag)
+if type(slots) ~= "number" or slots < 0 then
+return 0
+end
+local expected = 0
+for slot = 1, slots do
+if GetContainerItemLink(bag, slot) then
+expected = expected + 1
+end
+end
+return expected
+end
+local ok1, result1 = pcall(_G.CountFilledSlotsInBag, 0)
+if not ok1 then
+_G.checkError = "Ошибка вызова CountFilledSlotsInBag(0): " .. tostring(result1)
+return false
+end
+local expected1 = countExpected(0)
+if result1 ~= expected1 then
+_G.checkError = "Количество занятых ячеек в сумке 0 не совпадает с ожидаемым"
+return false
+end
+local ok2, result2 = pcall(_G.CountFilledSlotsInBag, -1)
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для сумки -1 функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.CountFilledSlotsInBag, "bad")
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нечислового bag функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][179] = {
 type = "info",
 title = "Информация о предмете",
+helpModules = {173, 65},
 content = [=[
 <h>Информация о предмете</h>
 <t>Функция <k>GetItemInfo</k> возвращает много данных о предмете: название, ссылку, качество, уровень предмета и другое.</t>
@@ -4670,9 +9283,228 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][78] = {
+ns_llua['lua'][180] = {
+type = "vartest",
+title = "Тест 179-1: камень возвращения",
+helpModules = {179, 65},
+tasks = {
+{
+var = "hearthstoneName",
+desc = 'Создай глобальную переменную hearthstoneName = GetItemInfo(6948) or "Неизвестно"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "hearthstoneQuality",
+desc = 'Создай глобальную переменную hearthstoneQuality = select(3, GetItemInfo(6948)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][181] = {
+type = "vartest",
+title = "Тест 179-2: количество и уровень предмета",
+helpModules = {179, 65},
+tasks = {
+{
+var = "hearthstoneCount",
+desc = 'Создай глобальную переменную hearthstoneCount = GetItemCount(6948) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "hearthstoneItemLevel",
+desc = 'Создай глобальную переменную hearthstoneItemLevel = select(4, GetItemInfo(6948)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][182] = {
+type = "commenttest",
+title = "Тест 179-3: функция GetItemNameSafe",
+helpModules = {179, 45, 65},
+preloadVars = {
+{var = "GetItemNameSafe", desc = "GetItemNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 179-3: функция GetItemNameSafe</h>
+<t>Создай глобальную функцию <k>GetItemNameSafe(itemID)</k>.</t>
+<t>Если <k>itemID</k> не является числом, функция должна вернуть строку:</t>
+<s>"Неизвестно"</s>
+<t>Иначе функция должна получить имя предмета через:</t>
+<code>
+GetItemInfo(itemID)
+</code>
+<t>Если имя не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"Неизвестно"</s>
+<t>Иначе функция должна вернуть имя предмета.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetItemNameSafe(itemID)
+]=],
+requireKeywords = {
+"GetItemNameSafe",
+"function",
+"GetItemInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetItemNameSafe) ~= "function" then
+_G.checkError = "GetItemNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetItemNameSafe, 6948)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetItemNameSafe(6948): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для itemID = 6948 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetItemNameSafe, "bad")
+if not ok2 or result2 ~= "Неизвестно" then
+_G.checkError = "Для нечислового itemID функция должна вернуть 'Неизвестно'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][183] = {
+type = "commenttest",
+title = "Тест 179-4: функция GetItemQualitySafe",
+helpModules = {179, 45, 65},
+preloadVars = {
+{var = "GetItemQualitySafe", desc = "GetItemQualitySafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 179-4: функция GetItemQualitySafe</h>
+<t>Создай глобальную функцию <k>GetItemQualitySafe(itemID)</k>.</t>
+<t>Если <k>itemID</k> не является числом, функция должна вернуть <n>-1</n>.</t>
+<t>Иначе функция должна получить качество предмета через:</t>
+<code>
+select(3, GetItemInfo(itemID))
+</code>
+<t>Если качество не является числом или меньше нуля, функция должна вернуть <n>-1</n>.</t>
+<t>Иначе функция должна вернуть качество предмета.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetItemQualitySafe(itemID)
+]=],
+requireKeywords = {
+"GetItemQualitySafe",
+"function",
+"GetItemInfo",
+"select",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetItemQualitySafe) ~= "function" then
+_G.checkError = "GetItemQualitySafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetItemQualitySafe, 6948)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetItemQualitySafe(6948): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < -1 or result1 > 5 then
+_G.checkError = "Для itemID = 6948 функция должна вернуть число от -1 до 5"
+return false
+end
+local ok2, result2 = pcall(_G.GetItemQualitySafe, "bad")
+if not ok2 or result2 ~= -1 then
+_G.checkError = "Для нечислового itemID функция должна вернуть -1"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][184] = {
+type = "commenttest",
+title = "Тест 179-5: функция GetItemCountSafe",
+helpModules = {179, 45, 65},
+preloadVars = {
+{var = "GetItemCountSafe", desc = "GetItemCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 179-5: функция GetItemCountSafe</h>
+<t>Создай глобальную функцию <k>GetItemCountSafe(itemID)</k>.</t>
+<t>Если <k>itemID</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить количество предметов через:</t>
+<code>
+GetItemCount(itemID)
+</code>
+<t>Если количество не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество предметов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetItemCountSafe(itemID)
+]=],
+requireKeywords = {
+"GetItemCountSafe",
+"function",
+"GetItemCount",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetItemCountSafe) ~= "function" then
+_G.checkError = "GetItemCountSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetItemCountSafe, 6948)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetItemCountSafe(6948): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для itemID = 6948 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetItemCountSafe, "bad")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нечислового itemID функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][185] = {
 type = "info",
 title = "Экипировка игрока",
+helpModules = {179, 173, 65},
 content = [=[
 <h>Экипировка игрока</h>
 <t>Экипировка доступна через слоты. У каждого слота есть строковое имя.</t>
@@ -4717,107 +9549,268 @@ content = [=[
 ]=],
 }
 
-ns_llua['lua'][79] = {
+ns_llua['lua'][186] = {
+type = "vartest",
+title = "Тест 185-1: ID слотов экипировки",
+helpModules = {185, 65},
+tasks = {
+{
+var = "headSlotID",
+desc = 'Создай глобальную переменную headSlotID = GetInventorySlotInfo("HeadSlot") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "chestSlotID",
+desc = 'Создай глобальную переменную chestSlotID = GetInventorySlotInfo("ChestSlot") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][187] = {
+type = "vartest",
+title = "Тест 185-2: предметы в слотах",
+helpModules = {185, 65},
+tasks = {
+{
+var = "headItemLink",
+desc = 'Создай глобальную переменную headItemLink = GetInventoryItemLink("player", GetInventorySlotInfo("HeadSlot")) or "empty"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "mainHandItemLink",
+desc = 'Создай глобальную переменную mainHandItemLink = GetInventoryItemLink("player", GetInventorySlotInfo("MainHandSlot")) or "empty"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][188] = {
 type = "commenttest",
-title = "Практика: сводка по сумкам",
-helpModules = {75, 76, 77},
+title = "Тест 185-3: функция GetInventorySlotIDSafe",
+helpModules = {185, 45, 65},
 preloadVars = {
-{var = "GetBagSummary", desc = "GetBagSummary очищается перед проверкой"},
+{var = "GetInventorySlotIDSafe", desc = "GetInventorySlotIDSafe очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "reportBag", desc = "reportBag очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"reportBag",
 },
 instruction = [=[
-<h>Практика: сводка по сумкам</h>
-<t>Создай глобальную функцию <k>GetBagSummary()</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>totalSlots</c> — всего ячеек во всех сумках 0-4.
-<c>freeSlots</c> — свободные ячейки во всех сумках 0-4.
-<c>usedSlots</c> — занятые ячейки.
-<c>bagCount</c> — количество проверенных сумок, всегда <n>5</n>.
-<h>Требования</h>
-<t>- Используй цикл по сумкам от <n>0</n> до <n>4</n>.</t>
-<t>- Используй <k>GetContainerNumSlots</k>.</t>
-<t>- Используй <k>GetContainerNumFreeSlots</k>.</t>
-<t>- Если API вернул <k>nil</k>, используй <k>or 0</k>.</t>
-<t>- Поле <k>usedSlots</k> должно быть равно <k>totalSlots - freeSlots</k>.</t>
-<t>- Если вдруг разница отрицательная, верни <n>0</n>.</t>
-<h>Пример использования</h>
+<h>Тест 185-3: функция GetInventorySlotIDSafe</h>
+<t>Создай глобальную функцию <k>GetInventorySlotIDSafe(slotName)</k>.</t>
+<t>Если <k>slotName</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить ID слота через:</t>
 <code>
-/run local summary = GetBagSummary(); print(summary.totalSlots, summary.freeSlots, summary.usedSlots)
+GetInventorySlotInfo(slotName)
 </code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть ID слота.</t>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальную функцию GetBagSummary()
-function GetBagSummary()
-    local totalSlots = 0
-    local freeSlots = 0
-    -- пройди цикл по сумкам от 0 до 4
-    -- верни таблицу через return
-end
+-- Создай глобальную функцию GetInventorySlotIDSafe(slotName)
 ]=],
 requireKeywords = {
-"GetBagSummary",
+"GetInventorySlotIDSafe",
 "function",
-"GetContainerNumSlots",
-"GetContainerNumFreeSlots",
+"GetInventorySlotInfo",
+"type",
 "return",
 },
 checkCode = function()
 _G.checkError = nil
-_G.reportBag = nil
-if type(_G.GetBagSummary) ~= "function" then
-    _G.checkError = "GetBagSummary не является глобальной функцией"
-    return false
+if type(_G.GetInventorySlotIDSafe) ~= "function" then
+_G.checkError = "GetInventorySlotIDSafe не является глобальной функцией"
+return false
 end
-local ok, summary = pcall(_G.GetBagSummary)
-if not ok then
-    _G.checkError = "Ошибка вызова GetBagSummary(): " .. tostring(summary)
-    return false
+local ok1, result1 = pcall(_G.GetInventorySlotIDSafe, "HeadSlot")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetInventorySlotIDSafe('HeadSlot'): " .. tostring(result1)
+return false
 end
-_G.reportBag = summary
-if type(summary) ~= "table" then
-    _G.checkError = "GetBagSummary должна вернуть таблицу"
-    return false
+if type(result1) ~= "number" or result1 <= 0 then
+_G.checkError = "Для HeadSlot функция должна вернуть число больше нуля"
+return false
 end
-local totalSlots = tonumber(summary.totalSlots)
-local freeSlots = tonumber(summary.freeSlots)
-local usedSlots = tonumber(summary.usedSlots)
-local bagCount = tonumber(summary.bagCount)
-if not totalSlots or not freeSlots or not usedSlots or not bagCount then
-    _G.checkError = "Поля totalSlots, freeSlots, usedSlots и bagCount должны быть числами"
-    return false
+local ok2, result2 = pcall(_G.GetInventorySlotIDSafe, "BadSlot")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для BadSlot функция должна вернуть 0"
+return false
 end
-if totalSlots < 0 or freeSlots < 0 or usedSlots < 0 or bagCount < 0 then
-    _G.checkError = "Значения не должны быть отрицательными"
-    return false
-end
-if bagCount ~= 5 then
-    _G.checkError = "Поле bagCount должно быть равно 5"
-    return false
-end
-if totalSlots == 0 then
-    _G.checkError = "Сумка игрока должна дать хотя бы несколько ячеек"
-    return false
-end
-if freeSlots > totalSlots then
-    _G.checkError = "freeSlots не может быть больше totalSlots"
-    return false
-end
-if usedSlots ~= math.max(0, totalSlots - freeSlots) then
-    _G.checkError = "usedSlots должно быть равно totalSlots - freeSlots"
-    return false
+local ok3, result3 = pcall(_G.GetInventorySlotIDSafe, 123)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нестрокового slotName функция должна вернуть 0"
+return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][80] = {
+ns_llua['lua'][189] = {
+type = "commenttest",
+title = "Тест 185-4: функция GetInventoryItemLinkSafe",
+helpModules = {185, 45, 65},
+preloadVars = {
+{var = "GetInventoryItemLinkSafe", desc = "GetInventoryItemLinkSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 185-4: функция GetInventoryItemLinkSafe</h>
+<t>Создай глобальную функцию <k>GetInventoryItemLinkSafe(slotName)</k>.</t>
+<t>Если <k>slotName</k> не является строкой, функция должна вернуть строку:</t>
+<s>"empty"</s>
+<t>Иначе функция должна получить ID слота через:</t>
+<code>
+GetInventorySlotInfo(slotName)
+</code>
+<t>Если ID слота не является числом или меньше нуля, функция должна вернуть:</t>
+<s>"empty"</s>
+<t>Иначе функция должна получить ссылку на предмет через:</t>
+<code>
+GetInventoryItemLink("player", slotID)
+</code>
+<t>Если ссылка не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"empty"</s>
+<t>Иначе функция должна вернуть ссылку на предмет.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetInventoryItemLinkSafe(slotName)
+]=],
+requireKeywords = {
+"GetInventoryItemLinkSafe",
+"function",
+"GetInventorySlotInfo",
+"GetInventoryItemLink",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetInventoryItemLinkSafe) ~= "function" then
+_G.checkError = "GetInventoryItemLinkSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetInventoryItemLinkSafe, "HeadSlot")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetInventoryItemLinkSafe('HeadSlot'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для HeadSlot функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetInventoryItemLinkSafe, "BadSlot")
+if not ok2 or result2 ~= "empty" then
+_G.checkError = "Для BadSlot функция должна вернуть 'empty'"
+return false
+end
+local ok3, result3 = pcall(_G.GetInventoryItemLinkSafe, 123)
+if not ok3 or result3 ~= "empty" then
+_G.checkError = "Для нестрокового slotName функция должна вернуть 'empty'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][190] = {
+type = "commenttest",
+title = "Тест 185-5: функция CountEquippedSlots",
+helpModules = {185, 45, 31, 65},
+preloadVars = {
+{var = "CountEquippedSlots", desc = "CountEquippedSlots очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 185-5: функция CountEquippedSlots</h>
+<t>Создай глобальную функцию <k>CountEquippedSlots(slotNames)</k>.</t>
+<t>Аргумент <k>slotNames</k> — это таблица со строками-названиями слотов экипировки.</t>
+<t>Если <k>slotNames</k> не является таблицей, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна пройти по таблице через <k>ipairs</k> и посчитать, сколько слотов содержат предмет.</t>
+<t>Для каждого имени слота используй:</t>
+<c>GetInventorySlotInfo(slotName)</c>
+<c>GetInventoryItemLink("player", slotID)</c>
+<t>Слот считается надетым, если ссылка на предмет является непустой строкой.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountEquippedSlots(slotNames)
+]=],
+requireKeywords = {
+"CountEquippedSlots",
+"function",
+"ipairs",
+"GetInventorySlotInfo",
+"GetInventoryItemLink",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountEquippedSlots) ~= "function" then
+_G.checkError = "CountEquippedSlots не является глобальной функцией"
+return false
+end
+local function expectedCount(slotNames)
+if type(slotNames) ~= "table" then
+return 0
+end
+local expected = 0
+for _, slotName in ipairs(slotNames) do
+if type(slotName) == "string" then
+local slotID = GetInventorySlotInfo(slotName)
+if type(slotID) == "number" and slotID >= 0 then
+local link = GetInventoryItemLink("player", slotID)
+if type(link) == "string" and link ~= "" then
+expected = expected + 1
+end
+end
+end
+end
+return expected
+end
+local tests = {
+{
+input = {"HeadSlot", "ChestSlot"},
+},
+{
+input = {},
+},
+{
+input = "bad",
+},
+}
+for i, test in ipairs(tests) do
+local expected = expectedCount(test.input)
+local ok, result = pcall(_G.CountEquippedSlots, test.input)
+if not ok or result ~= expected then
+_G.checkError = "Тест " .. i .. " функции CountEquippedSlots не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][191] = {
 type = "info",
 title = "Информация о заклинаниях",
+helpModules = {65, 45, 10},
 content = [=[
 <h>Информация о заклинаниях</h>
 <t>Функция <k>GetSpellInfo</k> возвращает данные о заклинании по ID или названию.</t>
@@ -4825,12 +9818,13 @@ content = [=[
 /run local name, rank, icon, cost, isFunnel, powerType, castTime = GetSpellInfo(6603); print(name, castTime)
 </code>
 <t>Здесь <n>6603</n> — ID базовой автоматической атаки.</t>
+<w>Важно:</w> если заклинание неизвестно или данные ещё не доступны, функция может вернуть <k>nil</k>.
 <h>Что возвращает GetSpellInfo</h>
+<t>Основные значения:</t>
 <c>name</c> — название заклинания.
 <c>rank</c> — ранг.
-<c>icon</c> — путь к иконке.
+<c>icon</c> — иконка.
 <c>cost</c> — стоимость.
-<c>isFunnel</c> — является ли заклинание канальным с поддержкой.
 <c>powerType</c> — тип ресурса.
 <c>castTime</c> — время каста в миллисекундах.
 <h>SpellID лучше названия</h>
@@ -4838,22 +9832,242 @@ content = [=[
 <code>
 /run print(GetSpellInfo(6603))
 </code>
-<t>ID заклинания одинаковый для всех клиентов.</t>
+<t>ID заклинания одинаковый для всех клиентов, поэтому для логики лучше использовать ID.</t>
 <h>Иконка заклинания</h>
 <code>
 /run print(GetSpellTexture(6603))
 </code>
-<h>Поиск по названию</h>
+<h>Безопасный шаблон</h>
 <code>
-/run local name = GetSpellInfo(6603); if name and string.find(name, "Атака") then print("Найдено слово Атака") end
+/run local name = GetSpellInfo(6603) or "Неизвестно"; print(name)
 </code>
-<w>Примечание:</w> точное название зависит от локализации, поэтому для логики лучше использовать ID.
 ]=],
 }
 
-ns_llua['lua'][81] = {
+ns_llua['lua'][192] = {
+type = "vartest",
+title = "Тест 191-1: имя и иконка заклинания",
+helpModules = {191, 65},
+tasks = {
+{
+var = "spellName",
+desc = 'Создай глобальную переменную spellName = GetSpellInfo(6603) or "Неизвестно"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "spellTexture",
+desc = 'Создай глобальную переменную spellTexture = GetSpellTexture(6603) or ""',
+check = function(value)
+return type(value) == "string"
+end,
+},
+},
+}
+
+ns_llua['lua'][193] = {
+type = "vartest",
+title = "Тест 191-2: стоимость и время каста",
+helpModules = {191, 65},
+tasks = {
+{
+var = "spellCost",
+desc = 'Создай глобальную переменную spellCost = select(4, GetSpellInfo(6603)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "spellCastTime",
+desc = 'Создай глобальную переменную spellCastTime = select(7, GetSpellInfo(6603)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][194] = {
+type = "commenttest",
+title = "Тест 191-3: функция GetSpellNameSafe",
+helpModules = {191, 45, 65},
+preloadVars = {
+{var = "GetSpellNameSafe", desc = "GetSpellNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 191-3: функция GetSpellNameSafe</h>
+<t>Создай глобальную функцию <k>GetSpellNameSafe(spellID)</k>.</t>
+<t>Если <k>spellID</k> не является числом, функция должна вернуть строку:</t>
+<s>"Неизвестно"</s>
+<t>Иначе функция должна получить имя заклинания через:</t>
+<code>
+GetSpellInfo(spellID)
+</code>
+<t>Если имя не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"Неизвестно"</s>
+<t>Иначе функция должна вернуть имя заклинания.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellNameSafe(spellID)
+]=],
+requireKeywords = {
+"GetSpellNameSafe",
+"function",
+"GetSpellInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellNameSafe) ~= "function" then
+_G.checkError = "GetSpellNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSpellNameSafe, 6603)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSpellNameSafe(6603): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для spellID = 6603 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetSpellNameSafe, "bad")
+if not ok2 or result2 ~= "Неизвестно" then
+_G.checkError = "Для нечислового spellID функция должна вернуть 'Неизвестно'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][195] = {
+type = "commenttest",
+title = "Тест 191-4: функция GetSpellTextureSafe",
+helpModules = {191, 45, 65},
+preloadVars = {
+{var = "GetSpellTextureSafe", desc = "GetSpellTextureSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 191-4: функция GetSpellTextureSafe</h>
+<t>Создай глобальную функцию <k>GetSpellTextureSafe(spellID)</k>.</t>
+<t>Если <k>spellID</k> не является числом, функция должна вернуть строку:</t>
+<s>"empty"</s>
+<t>Иначе функция должна получить иконку заклинания через:</t>
+<code>
+GetSpellTexture(spellID)
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"empty"</s>
+<t>Иначе функция должна вернуть путь к иконке.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellTextureSafe(spellID)
+]=],
+requireKeywords = {
+"GetSpellTextureSafe",
+"function",
+"GetSpellTexture",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellTextureSafe) ~= "function" then
+_G.checkError = "GetSpellTextureSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSpellTextureSafe, 6603)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSpellTextureSafe(6603): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" then
+_G.checkError = "Для spellID = 6603 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetSpellTextureSafe, "bad")
+if not ok2 or result2 ~= "empty" then
+_G.checkError = "Для нечислового spellID функция должна вернуть 'empty'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][196] = {
+type = "commenttest",
+title = "Тест 191-5: функция GetSpellCastTimeSafe",
+helpModules = {191, 45, 65},
+preloadVars = {
+{var = "GetSpellCastTimeSafe", desc = "GetSpellCastTimeSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 191-5: функция GetSpellCastTimeSafe</h>
+<t>Создай глобальную функцию <k>GetSpellCastTimeSafe(spellID)</k>.</t>
+<t>Если <k>spellID</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить время каста через:</t>
+<code>
+select(7, GetSpellInfo(spellID))
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть время каста.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellCastTimeSafe(spellID)
+]=],
+requireKeywords = {
+"GetSpellCastTimeSafe",
+"function",
+"GetSpellInfo",
+"select",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellCastTimeSafe) ~= "function" then
+_G.checkError = "GetSpellCastTimeSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSpellCastTimeSafe, 6603)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSpellCastTimeSafe(6603): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для spellID = 6603 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetSpellCastTimeSafe, "bad")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нечислового spellID функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][197] = {
 type = "info",
 title = "Кулдауны заклинаний",
+helpModules = {191, 65, 10},
 content = [=[
 <h>Кулдауны заклинаний</h>
 <t>Функция <k>GetSpellCooldown</k> возвращает информацию о восстановлении заклинания.</t>
@@ -4865,7 +10079,7 @@ content = [=[
 <c>duration</c> — длительность кулдауна в секундах.
 <c>enabled</c> — доступно ли заклинание.
 <h>Если заклинание готово</h>
-<t>Обычно если <k>start</k> равно <n>0</k>, кулдауна нет.</t>
+<t>Обычно если <k>start</k> равно <n>0</n>, кулдауна нет.</t>
 <code>
 /run local start, duration = GetSpellCooldown(6603); if start == 0 then print("Готово") else print("Кулдаун") end
 </code>
@@ -4873,137 +10087,206 @@ content = [=[
 <code>
 /run local start, duration = GetSpellCooldown(6603); local remaining = 0; if start and duration and start > 0 then remaining = start + duration - GetTime(); if remaining < 0 then remaining = 0 end end; print(string.format("Осталось: %.1f", remaining))
 </code>
-<h>Функция-обёртка</h>
+<h>Безопасный шаблон</h>
 <code>
-function GetCooldownRemaining(spellID)
-    local start, duration = GetSpellCooldown(spellID)
-    if not start or start == 0 then
-        return 0
-    end
-    local remaining = start + duration - GetTime()
-    if remaining < 0 then
-        return 0
-    end
-    return remaining
-end
+/run local start = GetSpellCooldown(6603) or 0; if start == 0 then print("Кулдауна нет") end
 </code>
-<t>Такую функцию можно использовать для панелей и трекеров.</t>
 ]=],
 }
 
-ns_llua['lua'][82] = {
-type = "info",
-title = "Баффы и дебаффы глубже",
-content = [=[
-<h>Баффы и дебаффы глубже</h>
-<t>Раньше мы использовали <k>UnitBuff</k> и <k>UnitDebuff</k> для простого получения названия. Теперь добавим длительность и стаки.</t>
-<h>UnitAura</h>
-<code>
-/run local name, _, _, count, _, duration, expiration = UnitAura("player", 1, "HELPFUL"); print(name, count, duration, expiration)
-</code>
-<h>Основные возвращаемые значения</h>
-<c>name</c> — название ауры.
-<c>icon</c> — иконка.
-<c>count</c> — количество стаков.
-<c>debuffType</c> — тип дебаффа.
-<c>duration</c> — длительность в секундах.
-<c>expirationTime</c> — время окончания по <k>GetTime</k>.
-<h>Остаток времени баффа</h>
-<code>
-/run local name, _, _, _, _, duration, expiration = UnitBuff("player", 1); if name and expiration and expiration > 0 then print(name, math.floor(expiration - GetTime())) else print(name or "Нет баффа") end
-</code>
-<h>Если таймера нет</h>
-<t>У некоторых аур <k>duration</k> может быть <n>0</n>, а <k>expirationTime</k> — <n>0</n>. Это значит, что аура постоянная или таймер недоступен.</t>
-<h>Перебор дебаффов цели</h>
-<code>
-/run for i = 1, 40 do local name, _, _, count, _, duration, expiration = UnitDebuff("target", i); if not name then break end; print(i, name, count) end
-</code>
-<h>Фильтр</h>
-<c>"HELPFUL"</c> — баффы.
-<c>"HARMFUL"</c> — дебаффы.
-<c>"PLAYER"</c> — только свои ауры, если используется дополнительным фильтром.
-]=],
+ns_llua['lua'][198] = {
+type = "vartest",
+title = "Тест 197-1: старт и длительность кулдауна",
+helpModules = {197, 65},
+tasks = {
+{
+var = "spellCooldownStart",
+desc = 'Создай глобальную переменную spellCooldownStart = GetSpellCooldown(6603) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "spellCooldownDuration",
+desc = 'Создай глобальную переменную spellCooldownDuration = select(2, GetSpellCooldown(6603)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
 }
 
-ns_llua['lua'][83] = {
-type = "info",
-title = "Каст, каналы и угроза",
-content = [=[
-<h>Каст, каналы и угроза</h>
-<t>WoW API позволяет проверить, кастует ли юнит заклинание или поддерживает канальное заклинание.</t>
-<h>UnitCastingInfo</h>
-<code>
-/run local name, _, _, startTime, endTime = UnitCastingInfo("player"); print(name, startTime, endTime)
-</code>
-<t>Если игрок ничего не кастует, функция вернёт <k>nil</k>.</t>
-<h>Время каста</h>
-<t>Значения <k>startTime</k> и <k>endTime</k> обычно возвращаются в миллисекундах.</t>
-<code>
-/run local name, _, _, startTime, endTime = UnitCastingInfo("player"); if name then local remaining = (endTime / 1000) - GetTime(); print(string.format("Осталось: %.1f", remaining)) end
-</code>
-<h>UnitChannelInfo</h>
-<t>Для канальных заклинаний используется <k>UnitChannelInfo</k>.</t>
-<code>
-/run local name, _, _, startTime, endTime = UnitChannelInfo("player"); print(name, startTime, endTime)
-</code>
-<h>UnitThreatSituation</h>
-<t>Возвращает примерный статус угрозы.</t>
-<code>
-/run print(UnitThreatSituation("player"))
-</code>
-<h>InCombatLockdown</h>
-<t>Показывает, находится ли игрок в состоянии боя с ограничениями интерфейса.</t>
-<code>
-/run if InCombatLockdown() then print("Блокировка боя") else print("Вне блокировки") end
-</code>
-<w>Важно:</w> в бою многие действия интерфейса защищены. Позже мы отдельно разберём защищённые кнопки.
-]=],
+ns_llua['lua'][199] = {
+type = "vartest",
+title = "Тест 197-2: готовность заклинания",
+helpModules = {197, 15, 65},
+tasks = {
+{
+var = "spellIsReady",
+desc = 'Создай глобальную переменную spellIsReady = ((GetSpellCooldown(6603) or 0) == 0)',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "spellCooldownEnabled",
+desc = 'Создай глобальную переменную spellCooldownEnabled = select(3, GetSpellCooldown(6603)) or 1',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
 }
 
-ns_llua['lua'][84] = {
+ns_llua['lua'][200] = {
 type = "commenttest",
-title = "Практика: остаток кулдауна",
-helpModules = {80, 81},
+title = "Тест 197-3: функция GetSpellCooldownStartSafe",
+helpModules = {197, 45, 65},
 preloadVars = {
-{var = "GetCooldownRemaining", desc = "GetCooldownRemaining очищается перед проверкой"},
+{var = "GetSpellCooldownStartSafe", desc = "GetSpellCooldownStartSafe очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "cooldownTest1", desc = "cooldownTest1 очищается перед проверкой"},
-{var = "cooldownTest2", desc = "cooldownTest2 очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"cooldownTest1",
-"cooldownTest2",
 },
 instruction = [=[
-<h>Практика: остаток кулдауна</h>
-<t>Создай глобальную функцию <k>GetCooldownRemaining(spellID)</k>.</t>
-<t>Функция должна вернуть остаток кулдауна в секундах.</t>
-<h>Логика</h>
-<t>1. Получи <k>start</k> и <k>duration</k> через <k>GetSpellCooldown(spellID)</k>.</t>
-<t>2. Если <k>start</k> отсутствует или равно <n>0</n>, верни <n>0</n>.</t>
-<t>3. Иначе посчитай: <k>start + duration - GetTime()</k>.</t>
-<t>4. Если результат отрицательный, верни <n>0</n>.</t>
-<t>5. Иначе верни результат.</t>
-<h>Требования</h>
-<t>- Используй <k>GetSpellCooldown</k>.</t>
-<t>- Используй <k>GetTime</k>.</t>
-<t>- Функция должна возвращать число.</t>
-<t>- Функция не должна падать на неизвестном spellID.</t>
-<h>Пример использования</h>
+<h>Тест 197-3: функция GetSpellCooldownStartSafe</h>
+<t>Создай глобальную функцию <k>GetSpellCooldownStartSafe(spellID)</k>.</t>
+<t>Если <k>spellID</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить старт кулдауна через:</t>
 <code>
-/run print(GetCooldownRemaining(6603))
+GetSpellCooldown(spellID)
 </code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть старт кулдауна.</t>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальную функцию GetCooldownRemaining(spellID)
-function GetCooldownRemaining(spellID)
-    local start, duration = GetSpellCooldown(spellID)
-    -- закончи функцию и верни число
-end
+-- Создай глобальную функцию GetSpellCooldownStartSafe(spellID)
 ]=],
 requireKeywords = {
-"GetCooldownRemaining",
+"GetSpellCooldownStartSafe",
+"function",
+"GetSpellCooldown",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellCooldownStartSafe) ~= "function" then
+_G.checkError = "GetSpellCooldownStartSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSpellCooldownStartSafe, 6603)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSpellCooldownStartSafe(6603): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для spellID = 6603 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetSpellCooldownStartSafe, "bad")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нечислового spellID функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][201] = {
+type = "commenttest",
+title = "Тест 197-4: функция GetSpellCooldownDurationSafe",
+helpModules = {197, 45, 65},
+preloadVars = {
+{var = "GetSpellCooldownDurationSafe", desc = "GetSpellCooldownDurationSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 197-4: функция GetSpellCooldownDurationSafe</h>
+<t>Создай глобальную функцию <k>GetSpellCooldownDurationSafe(spellID)</k>.</t>
+<t>Если <k>spellID</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить длительность кулдауна через:</t>
+<code>
+select(2, GetSpellCooldown(spellID))
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть длительность кулдауна.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellCooldownDurationSafe(spellID)
+]=],
+requireKeywords = {
+"GetSpellCooldownDurationSafe",
+"function",
+"GetSpellCooldown",
+"select",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellCooldownDurationSafe) ~= "function" then
+_G.checkError = "GetSpellCooldownDurationSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSpellCooldownDurationSafe, 6603)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSpellCooldownDurationSafe(6603): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для spellID = 6603 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetSpellCooldownDurationSafe, "bad")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нечислового spellID функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][202] = {
+type = "commenttest",
+title = "Тест 197-5: функция GetSpellCooldownRemaining",
+helpModules = {197, 45, 10, 65},
+preloadVars = {
+{var = "GetSpellCooldownRemaining", desc = "GetSpellCooldownRemaining очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 197-5: функция GetSpellCooldownRemaining</h>
+<t>Создай глобальную функцию <k>GetSpellCooldownRemaining(spellID)</k>.</t>
+<t>Если <k>spellID</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить <k>start</k> и <k>duration</k> через:</t>
+<code>
+GetSpellCooldown(spellID)
+</code>
+<t>Если <k>start</k> не является числом или равен нулю, функция должна вернуть <n>0</n>.</t>
+<t>Если <k>duration</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна посчитать остаток:</t>
+<code>
+start + duration - GetTime()
+</code>
+<t>Если остаток меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть остаток.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellCooldownRemaining(spellID)
+]=],
+requireKeywords = {
+"GetSpellCooldownRemaining",
 "function",
 "GetSpellCooldown",
 "GetTime",
@@ -5011,47 +10294,593 @@ requireKeywords = {
 },
 checkCode = function()
 _G.checkError = nil
-_G.cooldownTest1 = nil
-_G.cooldownTest2 = nil
-if type(_G.GetCooldownRemaining) ~= "function" then
-    _G.checkError = "GetCooldownRemaining не является глобальной функцией"
-    return false
+if type(_G.GetSpellCooldownRemaining) ~= "function" then
+_G.checkError = "GetSpellCooldownRemaining не является глобальной функцией"
+return false
 end
-local ok1, result1 = pcall(_G.GetCooldownRemaining, 6603)
+local ok1, result1 = pcall(_G.GetSpellCooldownRemaining, 6603)
 if not ok1 then
-    _G.checkError = "Ошибка вызова GetCooldownRemaining(6603): " .. tostring(result1)
-    return false
+_G.checkError = "Ошибка вызова GetSpellCooldownRemaining(6603): " .. tostring(result1)
+return false
 end
-_G.cooldownTest1 = result1
-if type(result1) ~= "number" then
-    _G.checkError = "GetCooldownRemaining(6603) должна вернуть число"
-    return false
+if type(result1) ~= "number" or result1 < 0 or result1 > 1000000 then
+_G.checkError = "Для spellID = 6603 функция должна вернуть число от 0 до 1000000"
+return false
 end
-if result1 < 0 or result1 > 1000000 then
-    _G.checkError = "GetCooldownRemaining(6603) вернула некорректное значение"
-    return false
-end
-local ok2, result2 = pcall(_G.GetCooldownRemaining, 999999)
-if not ok2 then
-    _G.checkError = "Функция не должна падать на неизвестном spellID: " .. tostring(result2)
-    return false
-end
-_G.cooldownTest2 = result2
-if type(result2) ~= "number" then
-    _G.checkError = "Для неизвестного spellID функция должна вернуть число"
-    return false
-end
-if result2 < 0 or result2 > 1000000 then
-    _G.checkError = "Для неизвестного spellID функция вернула некорректное значение"
-    return false
+local ok2, result2 = pcall(_G.GetSpellCooldownRemaining, "bad")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нечислового spellID функция должна вернуть 0"
+return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][85] = {
+ns_llua['lua'][203] = {
+type = "info",
+title = "Баффы и дебаффы глубже",
+helpModules = {107, 65, 45},
+content = [=[
+<h>Баффы и дебаффы глубже</h>
+<t>Раньше мы получали только имя баффа или дебаффа. Теперь разберём дополнительные данные: стаки, длительность и время окончания.</t>
+<h>UnitAura</h>
+<code>
+/run local name, rank, icon, count, debuffType, duration, expiration = UnitAura("player", 1, "HELPFUL"); print(name, count, duration, expiration)
+</code>
+<h>Основные возвращаемые значения</h>
+<c>name</c> — название ауры.
+<c>rank</c> — ранг.
+<c>icon</c> — иконка.
+<c>count</c> — количество стаков.
+<c>debuffType</c> — тип дебаффа.
+<c>duration</c> — длительность в секундах.
+<c>expirationTime</c> — время окончания по <k>GetTime</k>.
+<h>Баффы и дебаффы</h>
+<code>
+/run local name = UnitBuff("player", 1); print(name or "нет")
+</code>
+<code>
+/run local name = UnitDebuff("player", 1); print(name or "нет")
+</code>
+<h>Остаток времени</h>
+<code>
+/run local name, _, _, _, _, duration, expiration = UnitBuff("player", 1); if name and expiration and expiration > 0 then print(name, math.floor(expiration - GetTime())) else print("Таймера нет") end
+</code>
+<t>Если <k>duration</k> и <k>expirationTime</k> равны нулю, таймер у ауры может отсутствовать.</t>
+<h>Фильтры</h>
+<c>"HELPFUL"</c> — баффы.
+<c>"HARMFUL"</c> — дебаффы.
+<t>Фильтры можно комбинировать, например искать только свои ауры, но в простых случаях достаточно <c>"HELPFUL"</c> и <c>"HARMFUL"</c>.</t>
+]=],
+}
+
+ns_llua['lua'][204] = {
+type = "vartest",
+title = "Тест 203-1: первый бафф игрока",
+helpModules = {203, 65},
+tasks = {
+{
+var = "firstBuffName",
+desc = 'Создай глобальную переменную firstBuffName = UnitBuff("player", 1) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "firstBuffCount",
+desc = 'Создай глобальную переменную firstBuffCount = select(4, UnitBuff("player", 1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][205] = {
+type = "vartest",
+title = "Тест 203-2: первый дебафф игрока",
+helpModules = {203, 65},
+tasks = {
+{
+var = "firstDebuffName",
+desc = 'Создай глобальную переменную firstDebuffName = UnitDebuff("player", 1) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "firstDebuffType",
+desc = 'Создай глобальную переменную firstDebuffType = select(5, UnitDebuff("player", 1)) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][206] = {
+type = "commenttest",
+title = "Тест 203-3: функция GetAuraNameSafe",
+helpModules = {203, 45, 65},
+preloadVars = {
+{var = "GetAuraNameSafe", desc = "GetAuraNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 203-3: функция GetAuraNameSafe</h>
+<t>Создай глобальную функцию <k>GetAuraNameSafe(unit, index)</k>.</t>
+<t>Если <k>unit</k> не является строкой или <k>index</k> не является числом, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна получить имя баффа через:</t>
+<code>
+UnitBuff(unit, index)
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть имя баффа.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetAuraNameSafe(unit, index)
+]=],
+requireKeywords = {
+"GetAuraNameSafe",
+"function",
+"UnitBuff",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetAuraNameSafe) ~= "function" then
+_G.checkError = "GetAuraNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetAuraNameSafe, "player", 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetAuraNameSafe('player', 1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для player и index = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetAuraNameSafe, "ns_invalid_unit", 1)
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 'нет'"
+return false
+end
+local ok3, result3 = pcall(_G.GetAuraNameSafe, "player", "bad")
+if not ok3 or result3 ~= "нет" then
+_G.checkError = "Для нечислового index функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][207] = {
+type = "commenttest",
+title = "Тест 203-4: функция GetAuraRemainingSafe",
+helpModules = {203, 45, 10, 65},
+preloadVars = {
+{var = "GetAuraRemainingSafe", desc = "GetAuraRemainingSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 203-4: функция GetAuraRemainingSafe</h>
+<t>Создай глобальную функцию <k>GetAuraRemainingSafe(unit, index)</k>.</t>
+<t>Если <k>unit</k> не является строкой или <k>index</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить данные баффа через:</t>
+<code>
+UnitBuff(unit, index)
+</code>
+<t>Из полученных данных используй имя, длительность и время окончания.</t>
+<t>Если имени нет, функция должна вернуть <n>0</n>.</t>
+<t>Если время окончания не является числом или меньше либо равно нулю, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть остаток времени:</t>
+<code>
+expirationTime - GetTime()
+</code>
+<t>Если остаток меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetAuraRemainingSafe(unit, index)
+]=],
+requireKeywords = {
+"GetAuraRemainingSafe",
+"function",
+"UnitBuff",
+"GetTime",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetAuraRemainingSafe) ~= "function" then
+_G.checkError = "GetAuraRemainingSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetAuraRemainingSafe, "player", 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetAuraRemainingSafe('player', 1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для player и index = 1 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetAuraRemainingSafe, "ns_invalid_unit", 1)
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.GetAuraRemainingSafe, "player", "bad")
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нечислового index функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][208] = {
+type = "commenttest",
+title = "Тест 203-5: функция CountAurasWithFilter",
+helpModules = {203, 45, 31, 65},
+preloadVars = {
+{var = "CountAurasWithFilter", desc = "CountAurasWithFilter очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 203-5: функция CountAurasWithFilter</h>
+<t>Создай глобальную функцию <k>CountAurasWithFilter(unit, filter)</k>.</t>
+<t>Если <k>unit</k> не является строкой или <k>filter</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна посчитать количество аур юнита с указанным фильтром.</t>
+<t>Используй:</t>
+<code>
+UnitAura(unit, index, filter)
+</code>
+<t>Проверяй индексы от 1 до 40.</t>
+<t>Если <k>UnitAura</k> вернул <k>nil</k>, прекрати подсчёт.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountAurasWithFilter(unit, filter)
+]=],
+requireKeywords = {
+"CountAurasWithFilter",
+"function",
+"UnitAura",
+"for",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountAurasWithFilter) ~= "function" then
+_G.checkError = "CountAurasWithFilter не является глобальной функцией"
+return false
+end
+local function countExpected(unit, filter)
+if type(unit) ~= "string" or type(filter) ~= "string" then
+return 0
+end
+local count = 0
+for i = 1, 40 do
+if not UnitAura(unit, i, filter) then
+break
+end
+count = count + 1
+end
+return count
+end
+local expected1 = countExpected("player", "HELPFUL")
+local ok1, result1 = pcall(_G.CountAurasWithFilter, "player", "HELPFUL")
+if not ok1 or result1 ~= expected1 then
+_G.checkError = "Для player и фильтра HELPFUL функция вернула неверное количество"
+return false
+end
+local ok2, result2 = pcall(_G.CountAurasWithFilter, "ns_invalid_unit", "HELPFUL")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.CountAurasWithFilter, "player", 123)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нестрокового фильтра функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][209] = {
+type = "info",
+title = "Каст, каналы и угроза",
+helpModules = {197, 203},
+content = [=[
+<h>Каст, каналы и угроза</h>
+<t>WoW API позволяет проверить, кастует ли юнит заклинание или поддерживает канальное заклинание.</t>
+<h>UnitCastingInfo</h>
+<code>
+/run local name, rank, text, startTime, endTime = UnitCastingInfo("player"); print(name or "нет")
+</code>
+<t>Если игрок ничего не кастует, функция вернёт <k>nil</k>.</t>
+<h>UnitChannelInfo</h>
+<t>Для канальных заклинаний используется <k>UnitChannelInfo</k>.</t>
+<code>
+/run local name, rank, text, startTime, endTime = UnitChannelInfo("player"); print(name or "нет")
+</code>
+<h>Время каста</h>
+<t>Значения <k>startTime</k> и <k>endTime</k> обычно возвращаются в миллисекундах.</t>
+<t><k>GetTime()</k> возвращает время в секундах, поэтому для сравнения секунды нужно умножить на 1000.</t>
+<code>
+/run local name, _, _, startTime, endTime = UnitCastingInfo("player"); if name then local remaining = (endTime / 1000) - GetTime(); print(string.format("Осталось: %.1f", remaining)) end
+</code>
+<h>UnitThreatSituation</h>
+<t>Возвращает примерный статус угрозы.</t>
+<code>
+/run print(UnitThreatSituation("player"))
+</code>
+<h>InCombatLockdown</h>
+<t>Показывает, находится ли интерфейс в состоянии боя с ограничениями.</t>
+<code>
+/run if InCombatLockdown() then print("Блокировка боя") else print("Вне блокировки") end
+</code>
+<w>Важно:</w> в бою многие действия интерфейса защищены. Позже мы отдельно разберём защищённые кнопки.
+]=],
+}
+
+ns_llua['lua'][210] = {
+type = "vartest",
+title = "Тест 209-1: каст и канал игрока",
+helpModules = {209, 65},
+tasks = {
+{
+var = "playerCastName",
+desc = 'Создай глобальную переменную playerCastName = UnitCastingInfo("player") or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "playerChannelName",
+desc = 'Создай глобальную переменную playerChannelName = UnitChannelInfo("player") or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][211] = {
+type = "vartest",
+title = "Тест 209-2: время каста",
+helpModules = {209, 65},
+tasks = {
+{
+var = "playerCastStart",
+desc = 'Создай глобальную переменную playerCastStart = select(4, UnitCastingInfo("player")) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerCastEnd",
+desc = 'Создай глобальную переменную playerCastEnd = select(5, UnitCastingInfo("player")) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][212] = {
+type = "commenttest",
+title = "Тест 209-3: функция GetCastNameSafe",
+helpModules = {209, 45, 65},
+preloadVars = {
+{var = "GetCastNameSafe", desc = "GetCastNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 209-3: функция GetCastNameSafe</h>
+<t>Создай глобальную функцию <k>GetCastNameSafe(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна сначала попробовать получить имя обычного каста через:</t>
+<code>
+UnitCastingInfo(unit)
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна попробовать получить имя канального заклинания через:</t>
+<code>
+UnitChannelInfo(unit)
+</code>
+<t>Если и этот результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть имя заклинания.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetCastNameSafe(unit)
+]=],
+requireKeywords = {
+"GetCastNameSafe",
+"function",
+"UnitCastingInfo",
+"UnitChannelInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetCastNameSafe) ~= "function" then
+_G.checkError = "GetCastNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetCastNameSafe, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetCastNameSafe('player'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для player функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetCastNameSafe, "ns_invalid_unit")
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][213] = {
+type = "commenttest",
+title = "Тест 209-4: функция GetCastProgressSafe",
+helpModules = {209, 45, 10, 65},
+preloadVars = {
+{var = "GetCastProgressSafe", desc = "GetCastProgressSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 209-4: функция GetCastProgressSafe</h>
+<t>Создай глобальную функцию <k>GetCastProgressSafe(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить данные каста через:</t>
+<code>
+UnitCastingInfo(unit)
+</code>
+<t>Если обычного каста нет, функция должна попробовать:</t>
+<code>
+UnitChannelInfo(unit)
+</code>
+<t>Если имя каста не получено, функция должна вернуть <n>0</n>.</t>
+<t>Если <k>startTime</k> или <k>endTime</k> не являются числами, функция должна вернуть <n>0</n>.</t>
+<t>Если <k>endTime</k> меньше или равен <k>startTime</k>, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть процент прогресса от 0 до 100.</t>
+<t>Формула:</t>
+<code>
+(GetTime() * 1000 - startTime) / (endTime - startTime) * 100
+</code>
+<t>Если результат меньше нуля, верни <n>0</n>.</t>
+<t>Если результат больше 100, верни <n>100</n>.</t>
+<t>Используй <k>math.floor</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetCastProgressSafe(unit)
+]=],
+requireKeywords = {
+"GetCastProgressSafe",
+"function",
+"UnitCastingInfo",
+"UnitChannelInfo",
+"GetTime",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetCastProgressSafe) ~= "function" then
+_G.checkError = "GetCastProgressSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetCastProgressSafe, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetCastProgressSafe('player'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 or result1 > 100 then
+_G.checkError = "Для player функция должна вернуть число от 0 до 100"
+return false
+end
+local ok2, result2 = pcall(_G.GetCastProgressSafe, "ns_invalid_unit")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][214] = {
+type = "commenttest",
+title = "Тест 209-5: функция GetThreatStatusSafe",
+helpModules = {209, 45, 65},
+preloadVars = {
+{var = "GetThreatStatusSafe", desc = "GetThreatStatusSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 209-5: функция GetThreatStatusSafe</h>
+<t>Создай глобальную функцию <k>GetThreatStatusSafe(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>-1</n>.</t>
+<t>Иначе функция должна получить статус угрозы через:</t>
+<code>
+UnitThreatSituation(unit)
+</code>
+<t>Если результат не является числом или меньше нуля или больше 3, функция должна вернуть <n>-1</n>.</t>
+<t>Иначе функция должна вернуть статус угрозы.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetThreatStatusSafe(unit)
+]=],
+requireKeywords = {
+"GetThreatStatusSafe",
+"function",
+"UnitThreatSituation",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetThreatStatusSafe) ~= "function" then
+_G.checkError = "GetThreatStatusSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetThreatStatusSafe, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetThreatStatusSafe('player'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < -1 or result1 > 3 then
+_G.checkError = "Для player функция должна вернуть число от -1 до 3"
+return false
+end
+local ok2, result2 = pcall(_G.GetThreatStatusSafe, "ns_invalid_unit")
+if not ok2 or result2 ~= -1 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть -1"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][215] = {
 type = "info",
 title = "Фреймы как объекты",
+helpModules = {45, 44},
 content = [=[
 <h>Фреймы как объекты</h>
 <t>С этого момента мы начинаем работать с интерфейсом. Основной строительный блок интерфейса WoW — фрейм.</t>
@@ -5095,9 +10924,291 @@ print(MyFirstFrame:IsShown())
 ]=],
 }
 
-ns_llua['lua'][86] = {
+ns_llua['lua'][216] = {
+type = "commenttest",
+title = "Тест 215-1: первый фрейм",
+helpModules = {215},
+preloadVars = {
+{var = "CourseTestFrame", desc = "CourseTestFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 215-1: первый фрейм</h>
+<t>Создай глобальный фрейм <k>CourseTestFrame</k>.</t>
+<t>Используй:</t>
+<code>
+CourseTestFrame = CreateFrame("Frame", "CourseTestFrame", UIParent)
+</code>
+<t>Размер и позиция не нужны.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseTestFrame
+]=],
+requireKeywords = {
+"CourseTestFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseTestFrame
+if not f then
+_G.checkError = "CourseTestFrame не был создан"
+return false
+end
+if type(f.Show) ~= "function" or type(f.Hide) ~= "function" or type(f.IsShown) ~= "function" then
+_G.checkError = "CourseTestFrame не похож на фрейм"
+return false
+end
+if f.GetName and f:GetName() ~= "CourseTestFrame" then
+_G.checkError = "Фрейм должен иметь глобальное имя CourseTestFrame"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][217] = {
+type = "commenttest",
+title = "Тест 215-2: видимый фрейм",
+helpModules = {215},
+preloadVars = {
+{var = "CourseFrameShown", desc = "CourseFrameShown очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 215-2: видимый фрейм</h>
+<t>Создай глобальный фрейм <k>CourseFrameShown</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"CourseFrameShown"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 180 на 120;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- фрейм должен быть показан через <k>Show()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseFrameShown
+]=],
+requireKeywords = {
+"CourseFrameShown",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"Show",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseFrameShown
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "CourseFrameShown не является фреймом"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "Фрейм должен быть показан"
+return false
+end
+if f:GetWidth() ~= 180 then
+_G.checkError = "Ширина фрейма должна быть 180"
+return false
+end
+if f:GetHeight() ~= 120 then
+_G.checkError = "Высота фрейма должна быть 120"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][218] = {
+type = "commenttest",
+title = "Тест 215-3: скрытый фрейм",
+helpModules = {215},
+preloadVars = {
+{var = "CourseFrameHidden", desc = "CourseFrameHidden очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 215-3: скрытый фрейм</h>
+<t>Создай глобальный фрейм <k>CourseFrameHidden</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"CourseFrameHidden"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 100 на 100;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- фрейм должен быть скрыт через <k>Hide()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseFrameHidden
+]=],
+requireKeywords = {
+"CourseFrameHidden",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"Hide",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseFrameHidden
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "CourseFrameHidden не является фреймом"
+return false
+end
+if f:IsShown() then
+_G.checkError = "Фрейм должен быть скрыт"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][219] = {
+type = "commenttest",
+title = "Тест 215-4: функция IsFrameShownSafe",
+helpModules = {215, 45, 65},
+preloadVars = {
+{var = "IsFrameShownSafe", desc = "IsFrameShownSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 215-4: функция IsFrameShownSafe</h>
+<t>Создай глобальную функцию <k>IsFrameShownSafe(frame)</k>.</t>
+<t>Если <k>frame</k> не существует или у него нет метода <k>IsShown</k>, функция должна вернуть <k>false</k>.</t>
+<t>Иначе функция должна вернуть результат:</t>
+<code>
+frame:IsShown()
+</code>
+<t>Результат должен быть именно boolean: <k>true</k> или <k>false</k>.</t>
+<t>Используй приведение через <k>and true or false</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsFrameShownSafe(frame)
+]=],
+requireKeywords = {
+"IsFrameShownSafe",
+"function",
+"IsShown",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsFrameShownSafe) ~= "function" then
+_G.checkError = "IsFrameShownSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.IsFrameShownSafe, UIParent)
+if not ok1 or result1 ~= true then
+_G.checkError = "Для UIParent функция должна вернуть true"
+return false
+end
+local ok2, result2 = pcall(_G.IsFrameShownSafe, nil)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.IsFrameShownSafe, {})
+if not ok3 or result3 ~= false then
+_G.checkError = "Для пустой таблицы функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][220] = {
+type = "commenttest",
+title = "Тест 215-5: функция GetFrameNameSafe",
+helpModules = {215, 45, 65},
+preloadVars = {
+{var = "GetFrameNameSafe", desc = "GetFrameNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 215-5: функция GetFrameNameSafe</h>
+<t>Создай глобальную функцию <k>GetFrameNameSafe(frame)</k>.</t>
+<t>Если <k>frame</k> не существует или у него нет метода <k>GetName</k>, функция должна вернуть строку:</t>
+<s>"anonymous"</s>
+<t>Иначе функция должна получить имя через:</t>
+<code>
+frame:GetName()
+</code>
+<t>Если имя не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"anonymous"</s>
+<t>Иначе функция должна вернуть имя фрейма.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetFrameNameSafe(frame)
+]=],
+requireKeywords = {
+"GetFrameNameSafe",
+"function",
+"GetName",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetFrameNameSafe) ~= "function" then
+_G.checkError = "GetFrameNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetFrameNameSafe, UIParent)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetFrameNameSafe(UIParent): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для UIParent функция должна вернуть строку"
+return false
+end
+local anon = CreateFrame("Frame", nil, UIParent)
+local ok2, result2 = pcall(_G.GetFrameNameSafe, anon)
+if not ok2 or result2 ~= "anonymous" then
+_G.checkError = "Для анонимного фрейма функция должна вернуть 'anonymous'"
+return false
+end
+local ok3, result3 = pcall(_G.GetFrameNameSafe, nil)
+if not ok3 or result3 ~= "anonymous" then
+_G.checkError = "Для nil функция должна вернуть 'anonymous'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][221] = {
 type = "info",
 title = "Позиция, размер и перетаскивание",
+helpModules = {215},
 content = [=[
 <h>Позиция, размер и перетаскивание</h>
 <t>Чтобы фрейм было видно, ему нужны размер и точка крепления.</t>
@@ -5148,841 +11259,9371 @@ MyDragFrame:Show()
 ]=],
 }
 
-ns_llua['lua'][87] = {
-type = "info",
-title = "Текстуры и текст",
-content = [=[
-<h>Текстуры и текст</h>
-<t>Сам по себе фрейм обычно невидим. Чтобы его увидеть, добавляют текстуры и текстовые слои.</t>
-<h>Фон</h>
-<code>
-MyCard = CreateFrame("Frame", "MyCard", UIParent)
-MyCard:SetSize(220, 120)
-MyCard:SetPoint("CENTER")
-local bg = MyCard:CreateTexture(nil, "BACKGROUND")
-bg:SetAllPoints(MyCard)
-bg:SetTexture(0.1, 0.1, 0.2, 0.9)
-MyCard:Show()
-</code>
-<t>Здесь цвет задаётся четырьмя числами:</t>
-<c>красный</c>
-<c>зелёный</c>
-<c>синий</c>
-<c>прозрачность</c>
-<h>Текст</h>
-<code>
-local title = MyCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-title:SetPoint("TOP", MyCard, "TOP", 0, -10)
-title:SetText("Моя карточка")
-</code>
-<h>Полезные шрифтовые объекты</h>
-<c>GameFontNormal</c>
-<c>GameFontNormalLarge</c>
-<c>GameFontHighlight</c>
-<c>GameFontDisable</c>
-<h>Цвет текста</h>
-<code>
-title:SetTextColor(1, 0.84, 0, 1)
-</code>
-<h>Полный пример</h>
-<code>
-MyCard = CreateFrame("Frame", "MyCard", UIParent)
-MyCard:SetSize(240, 140)
-MyCard:SetPoint("CENTER")
-local bg = MyCard:CreateTexture(nil, "BACKGROUND")
-bg:SetAllPoints(MyCard)
-bg:SetTexture(0.08, 0.08, 0.12, 0.95)
-local title = MyCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-title:SetPoint("TOP", MyCard, "TOP", 0, -10)
-title:SetText("Панель")
-title:SetTextColor(1, 0.84, 0, 1)
-local info = MyCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-info:SetPoint("CENTER", MyCard, "CENTER", 0, 0)
-info:SetText("Текст внутри фрейма")
-MyCard:Show()
-</code>
-]=],
-}
-
-ns_llua['lua'][88] = {
-type = "info",
-title = "Кнопки",
-content = [=[
-<h>Кнопки</h>
-<t>Кнопка создаётся так же через <k>CreateFrame</k>, но тип будет <c>"Button"</c>.</t>
-<h>Простая кнопка</h>
-<code>
-MyButton = CreateFrame("Button", "MyButton", UIParent, "UIPanelButtonTemplate")
-MyButton:SetSize(140, 24)
-MyButton:SetPoint("CENTER")
-MyButton:SetText("Нажми меня")
-MyButton:Show()
-</code>
-<t>Шаблон <c>"UIPanelButtonTemplate"</c> даёт стандартный внешний вид кнопки.</t>
-<h>Обработчик клика</h>
-<code>
-MyButton:SetScript("OnClick", function(self, button)
-    print("Кнопка нажата:", button)
-end)
-</code>
-<t>Внутри обработчика:</t>
-<c>self</c> — сама кнопка.
-<c>button</c> — кнопка мыши, например <s>"LeftButton"</s> или <s>"RightButton"</s>.
-<h>Кнопка показывает и скрывает фрейм</h>
-<code>
-MyToggleButton = CreateFrame("Button", "MyToggleButton", UIParent, "UIPanelButtonTemplate")
-MyToggleButton:SetSize(140, 24)
-MyToggleButton:SetPoint("CENTER", UIParent, "CENTER", 0, -40)
-MyToggleButton:SetText("Показать/скрыть")
-MyToggleButton:SetScript("OnClick", function()
-    if MyCard and MyCard:IsShown() then
-        MyCard:Hide()
-    elseif MyCard then
-        MyCard:Show()
-    end
-end)
-MyToggleButton:Show()
-</code>
-<h>Включение и отключение</h>
-<code>
-MyButton:Disable()
-MyButton:Enable()
-</code>
-<w>Важно:</w> отключённая кнопка не реагирует на клики.
-]=],
-}
-
--- ============================================================
--- COURSE DATA: PART 2, MODULES 89-102
--- ============================================================
-
-ns_llua = ns_llua or {}
-ns_llua['lua'] = ns_llua['lua'] or {}
-
-ns_llua['lua'][89] = {
-type = "info",
-title = "StatusBar и Slider",
-content = [=[
-<h>StatusBar</h>
-<t>StatusBar — это полоса состояния. Её удобно использовать для здоровья, маны, опыта и прогресса.</t>
-<code>
-MyBar = CreateFrame("StatusBar", "MyBar", UIParent)
-MyBar:SetSize(200, 20)
-MyBar:SetPoint("CENTER")
-MyBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-MyBar:SetStatusBarColor(0.2, 0.8, 0.2, 1)
-MyBar:SetMinMaxValues(0, 100)
-MyBar:SetValue(65)
-MyBar:Show()
-</code>
-<h>Основные методы StatusBar</h>
-<c>SetStatusBarTexture</c> — текстура полосы.
-<c>SetStatusBarColor</c> — цвет.
-<c>SetMinMaxValues</c> — минимальное и максимальное значение.
-<c>SetValue</c> — текущее значение.
-<c>GetValue</c> — получить текущее значение.
-<h>Пример со здоровьем</h>
-<code>
-/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; MyBar:SetMinMaxValues(0, hpMax); MyBar:SetValue(hp)
-</code>
-<h>Slider</h>
-<t>Slider — это ползунок. Его используют для настроек громкости, прозрачности, масштаба.</t>
-<code>
-MySlider = CreateFrame("Slider", "MySlider", UIParent)
-MySlider:SetSize(180, 16)
-MySlider:SetPoint("CENTER", UIParent, "CENTER", 0, -60)
-MySlider:SetOrientation("HORIZONTAL")
-MySlider:SetMinMaxValues(0, 100)
-MySlider:SetValueStep(1)
-MySlider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
-MySlider:SetValue(50)
-MySlider:Show()
-</code>
-<h>OnValueChanged</h>
-<code>
-MySlider:SetScript("OnValueChanged", function(self, value)
-    print("Значение:", value)
-end)
-</code>
-<w>Примечание:</w> если нужно реагировать только при отпускании ползунка, можно использовать <c>OnMouseUp</c> или сохранять значение в таблицу настроек.
-]=],
-}
-
-ns_llua['lua'][90] = {
-type = "info",
-title = "EditBox и CheckButton",
-content = [=[
-<h>EditBox</h>
-<t>EditBox — это поле ввода текста.</t>
-<code>
-MyEdit = CreateFrame("EditBox", "MyEdit", UIParent, "InputBoxTemplate")
-MyEdit:SetSize(180, 20)
-MyEdit:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-MyEdit:SetAutoFocus(false)
-MyEdit:SetText("Привет")
-MyEdit:Show()
-</code>
-<h>Получить текст</h>
-<code>
-/run print(MyEdit:GetText())
-</code>
-<h>Полезные скрипты</h>
-<code>
-MyEdit:SetScript("OnEnterPressed", function(self)
-    print("Ввод:", self:GetText())
-    self:ClearFocus()
-end)
-MyEdit:SetScript("OnEscapePressed", function(self)
-    self:ClearFocus()
-end)
-MyEdit:SetScript("OnTextChanged", function(self)
-    print("Текст меняется:", self:GetText())
-end)
-</code>
-<h>CheckButton</h>
-<t>CheckButton — это галочка.</t>
-<code>
-MyCheck = CreateFrame("CheckButton", "MyCheck", UIParent, "UICheckButtonTemplate")
-MyCheck:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-MyCheck:SetChecked(false)
-MyCheck:Show()
-</code>
-<h>Проверить состояние</h>
-<code>
-/run print(MyCheck:GetChecked())
-</code>
-<h>Обработчик клика</h>
-<code>
-MyCheck:SetScript("OnClick", function(self)
-    if self:GetChecked() then
-        print("Включено")
-    else
-        print("Выключено")
-    end
-end)
-</code>
-<w>Примечание:</w> шаблон <c>UICheckButtonTemplate</c> даёт стандартный внешний вид галочки.
-]=],
-}
-
-ns_llua['lua'][91] = {
+ns_llua['lua'][222] = {
 type = "commenttest",
-title = "Практика: простая панель",
-helpModules = {85, 86, 87, 88, 89, 90},
+title = "Тест 221-1: позиция CENTER",
+helpModules = {221},
 preloadVars = {
-{var = "CoursePanel", desc = "CoursePanel очищается перед проверкой"},
+{var = "CoursePositionFrame", desc = "CoursePositionFrame очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "reportPanel", desc = "reportPanel очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"reportPanel",
 },
 instruction = [=[
-<h>Практика: простая панель</h>
-<t>Создай глобальный фрейм <k>CoursePanel</k>.</t>
+<h>Тест 221-1: позиция CENTER</h>
+<t>Создай глобальный фрейм <k>CoursePositionFrame</k>.</t>
 <t>Требования:</t>
 <t>- тип фрейма: <s>"Frame"</s>;</t>
-<t>- глобальное имя: <s>"CoursePanel"</s>;</t>
+<t>- глобальное имя: <s>"CoursePositionFrame"</s>;</t>
 <t>- родитель: <k>UIParent</k>;</t>
-<t>- размер не меньше 200 на 120;</t>
-<t>- позиция через <k>SetPoint("CENTER")</k>;</t>
-<t>- добавь фон через <k>CreateTexture</k>;</t>
-<t>- добавь текст через <k>CreateFontString</k>;</t>
-<t>- текст должен быть <s>"Моя панель"</s>;</t>
-<t>- покажи фрейм через <k>Show</k>.</t>
-<h>Пример использования</h>
-<code>
-/run print(CoursePanel:IsShown())
-</code>
+<t>- размер: 160 на 120;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>.</t>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальный фрейм CoursePanel
-CoursePanel = CreateFrame("Frame", "CoursePanel", UIParent)
--- Задай размер, позицию, фон, текст и покажи фрейм
+-- Создай глобальный фрейм CoursePositionFrame
 ]=],
 requireKeywords = {
-"CoursePanel",
+"CoursePositionFrame",
 "CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"CENTER",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CoursePositionFrame
+if not f or type(f.GetPoint) ~= "function" then
+_G.checkError = "CoursePositionFrame не является фреймом"
+return false
+end
+if f:GetWidth() ~= 160 then
+_G.checkError = "Ширина фрейма должна быть 160"
+return false
+end
+if f:GetHeight() ~= 120 then
+_G.checkError = "Высота фрейма должна быть 120"
+return false
+end
+local point = f:GetPoint(1)
+if point ~= "CENTER" then
+_G.checkError = "Фрейм должен быть прикреплён через CENTER"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][223] = {
+type = "commenttest",
+title = "Тест 221-2: прозрачность и масштаб",
+helpModules = {221},
+preloadVars = {
+{var = "CourseAlphaFrame", desc = "CourseAlphaFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 221-2: прозрачность и масштаб</h>
+<t>Создай глобальный фрейм <k>CourseAlphaFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"CourseAlphaFrame"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 100 на 100;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- прозрачность: <k>SetAlpha(0.5)</k>;</t>
+<t>- масштаб: <k>SetScale(1)</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseAlphaFrame
+]=],
+requireKeywords = {
+"CourseAlphaFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"SetAlpha",
+"SetScale",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseAlphaFrame
+if not f or type(f.GetAlpha) ~= "function" or type(f.GetScale) ~= "function" then
+_G.checkError = "CourseAlphaFrame не является фреймом"
+return false
+end
+local alpha = f:GetAlpha()
+if type(alpha) ~= "number" or math.abs(alpha - 0.5) > 0.01 then
+_G.checkError = "Alpha фрейма должен быть примерно 0.5"
+return false
+end
+local scale = f:GetScale()
+if type(scale) ~= "number" or math.abs(scale - 1) > 0.01 then
+_G.checkError = "Scale фрейма должен быть примерно 1"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][224] = {
+type = "commenttest",
+title = "Тест 221-3: слой HIGH",
+helpModules = {221},
+preloadVars = {
+{var = "CourseStrataFrame", desc = "CourseStrataFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 221-3: слой HIGH</h>
+<t>Создай глобальный фрейм <k>CourseStrataFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"CourseStrataFrame"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 80 на 80;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- слой: <k>SetFrameStrata("HIGH")</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseStrataFrame
+]=],
+requireKeywords = {
+"CourseStrataFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"SetFrameStrata",
+"HIGH",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseStrataFrame
+if not f or type(f.GetFrameStrata) ~= "function" then
+_G.checkError = "CourseStrataFrame не является фреймом"
+return false
+end
+if f:GetFrameStrata() ~= "HIGH" then
+_G.checkError = "Фрейм должен иметь слой HIGH"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][225] = {
+type = "commenttest",
+title = "Тест 221-4: перетаскиваемый фрейм",
+helpModules = {221},
+preloadVars = {
+{var = "CourseDragFrame", desc = "CourseDragFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 221-4: перетаскиваемый фрейм</h>
+<t>Создай глобальный фрейм <k>CourseDragFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"CourseDragFrame"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 140 на 100;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- включи мышку через <k>EnableMouse(true)</k>;</t>
+<t>- сделай фрейм перемещаемым через <k>SetMovable(true)</k>;</t>
+<t>- зарегистрируй перетаскивание через <k>RegisterForDrag("LeftButton")</k>;</t>
+<t>- назначь скрипт <k>OnDragStart</k>, чтобы он вызывал <k>self:StartMoving()</k>;</t>
+<t>- назначь скрипт <k>OnDragStop</k>, чтобы он вызывал <k>self:StopMovingOrSizing()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseDragFrame
+]=],
+requireKeywords = {
+"CourseDragFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"EnableMouse",
+"SetMovable",
+"RegisterForDrag",
+"SetScript",
+"OnDragStart",
+"OnDragStop",
+"StartMoving",
+"StopMovingOrSizing",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseDragFrame
+if not f or type(f.GetScript) ~= "function" then
+_G.checkError = "CourseDragFrame не является фреймом"
+return false
+end
+if type(f:GetScript("OnDragStart")) ~= "function" then
+_G.checkError = "Фрейм должен иметь обработчик OnDragStart"
+return false
+end
+if type(f:GetScript("OnDragStop")) ~= "function" then
+_G.checkError = "Фрейм должен иметь обработчик OnDragStop"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][226] = {
+type = "commenttest",
+title = "Тест 221-5: функция SetFrameSizeSafe",
+helpModules = {221, 45, 65},
+preloadVars = {
+{var = "SetFrameSizeSafe", desc = "SetFrameSizeSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 221-5: функция SetFrameSizeSafe</h>
+<t>Создай глобальную функцию <k>SetFrameSizeSafe(frame, width, height)</k>.</t>
+<t>Если <k>frame</k> не существует или у него нет метода <k>SetSize</k>, функция ничего не должна делать.</t>
+<t>Если <k>width</k> или <k>height</k> не являются числами, функция ничего не должна делать.</t>
+<t>Если <k>width</k> или <k>height</k> меньше либо равны нулю, функция ничего не должна делать.</t>
+<t>Иначе функция должна вызвать:</t>
+<code>
+frame:SetSize(width, height)
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SetFrameSizeSafe(frame, width, height)
+]=],
+requireKeywords = {
+"SetFrameSizeSafe",
+"function",
+"SetSize",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SetFrameSizeSafe) ~= "function" then
+_G.checkError = "SetFrameSizeSafe не является глобальной функцией"
+return false
+end
+local f = CreateFrame("Frame", nil, UIParent)
+local ok1 = pcall(_G.SetFrameSizeSafe, f, 123, 45)
+if not ok1 then
+_G.checkError = "Ошибка вызова SetFrameSizeSafe с корректными данными"
+return false
+end
+if f:GetWidth() ~= 123 or f:GetHeight() ~= 45 then
+_G.checkError = "SetFrameSizeSafe должна изменить размер фрейма"
+return false
+end
+local ok2 = pcall(_G.SetFrameSizeSafe, f, -5, 10)
+if not ok2 then
+_G.checkError = "Ошибка вызова SetFrameSizeSafe с отрицательной шириной"
+return false
+end
+if f:GetWidth() ~= 123 or f:GetHeight() ~= 45 then
+_G.checkError = "Некорректные данные не должны менять размер фрейма"
+return false
+end
+local ok3 = pcall(_G.SetFrameSizeSafe, nil, 10, 10)
+if not ok3 then
+_G.checkError = "SetFrameSizeSafe не должна падать на nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][227] = {
+type = "info",
+title = "Текстуры и текст на фреймах",
+helpModules = {215, 221},
+content = [=[
+<h>Текстуры и текст на фреймах</h>
+<t>Сам по себе фрейм невидим. Чтобы что-то показать на нём, нужны текстуры и текстовые объекты.</t>
+<h>CreateTexture</h>
+<t>Метод <k>CreateTexture</k> создаёт текстуру внутри фрейма.</t>
+<code>
+MyIconFrame = CreateFrame("Frame", "MyIconFrame", UIParent)
+MyIconFrame:SetSize(64, 64)
+MyIconFrame:SetPoint("CENTER")
+local tex = MyIconFrame:CreateTexture(nil, "ARTWORK")
+tex:SetAllPoints(MyIconFrame)
+tex:SetTexture("Interface\\Icons\\Spell_Frost_IceStorm")
+</code>
+<t>Аргументы <k>CreateTexture</k>:</t>
+<c>1</c> — имя текстуры. Обычно <k>nil</k>.
+<c>2</c> — слой: <s>BACKGROUND</s>, <s>BORDER</s>, <s>ARTWORK</s>, <s>OVERLAY</s>.
+<h>SetAllPoints</h>
+<t>Метод <k>SetAllPoints(parent)</k> растягивает текстуру на весь родительский фрейм.</t>
+<code>
+tex:SetAllPoints(MyIconFrame)
+</code>
+<t>Это то же самое, что прикрепить текстуру всеми четырьмя углами к фрейму.</t>
+<h>CreateFontString</h>
+<t>Текст создаётся методом <k>CreateFontString</k>.</t>
+<code>
+local text = MyIconFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+text:SetPoint("CENTER")
+text:SetText("Привет!")
+</code>
+<t>Третий аргумент — шаблон шрифта:</t>
+<c>GameFontNormal</c> — обычный текст.
+<c>GameFontNormalLarge</c> — крупный текст.
+<c>GameFontHighlight</c> — белый текст.
+<c>GameFontRed</c> — красный текст.
+<h>Цвет текста</h>
+<code>
+text:SetTextColor(1, 1, 0, 1)
+</code>
+<t>Четыре числа: красный, зелёный, синий, прозрачность. Каждое от 0 до 1.</t>
+<h>Выравнивание</h>
+<code>
+text:SetJustifyH("LEFT")
+text:SetJustifyH("CENTER")
+text:SetJustifyH("RIGHT")
+</code>
+<h>Размер шрифта</h>
+<code>
+text:SetFont("Fonts\\FRIZQT__.TTF", 16)
+</code>
+<t>Первый аргумент — файл шрифта, второй — размер.</t>
+<w>Важно:</w> если шрифт не найден, текст может не отобразиться. Поэтому лучше использовать готовые шаблоны вроде <k>GameFontNormal</k>.
+<h>Иконки из игры</h>
+<t>Пути к иконкам начинаются с <s>Interface\Icons\</s>.</t>
+<code>
+tex:SetTexture("Interface\\Icons\\Spell_Frost_IceStorm")
+tex:SetTexture("Interface\\Icons\\Inv_Sword_04")
+</code>
+<w>Обрати внимание:</w> в Lua-строке обратный слеш пишется как <k>\\</k>, потому что одинарный слеш имеет специальное значение.
+<h>Полный пример</h>
+<code>
+CourseInfoFrame = CreateFrame("Frame", "CourseInfoFrame", UIParent)
+CourseInfoFrame:SetSize(200, 200)
+CourseInfoFrame:SetPoint("CENTER")
+CourseInfoFrame:SetFrameStrata("HIGH")
+local bg = CourseInfoFrame:CreateTexture(nil, "BACKGROUND")
+bg:SetAllPoints(CourseInfoFrame)
+bg:SetTexture(0.1, 0.1, 0.1, 0.8)
+local icon = CourseInfoFrame:CreateTexture(nil, "ARTWORK")
+icon:SetSize(64, 64)
+icon:SetPoint("TOP", 0, -10)
+icon:SetTexture("Interface\\Icons\\Spell_Frost_IceStorm")
+local title = CourseInfoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+title:SetPoint("TOP", icon, "BOTTOM", 0, -10)
+title:SetText("Курс Lua")
+title:SetTextColor(1, 0.84, 0, 1)
+CourseInfoFrame:Show()
+</code>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> забыть <k>Show()</k> у фрейма.
+<w>Ошибка 2:</w> перепутать слой. Текстура на слое <s>BACKGROUND</s> будет под текстом на слое <s>OVERLAY</s>.
+<w>Ошибка 3:</w> написать путь к иконке с одинарными слешами.
+<code>
+tex:SetTexture("Interface\Icons\Icon")   -- ошибка
+tex:SetTexture("Interface\\Icons\\Icon") -- правильно
+</code>
+]=],
+}
+
+ns_llua['lua'][228] = {
+type = "commenttest",
+title = "Тест 227-1: фрейм с иконкой",
+helpModules = {227, 221, 215},
+preloadVars = {
+{var = "CourseIconFrame", desc = "CourseIconFrame очищается перед проверкой"},
+},
+reportVars = {"CourseIconFrame"},
+instruction = [=[
+<h>Тест 227-1: фрейм с иконкой</h>
+<t>Создай глобальный фрейм <k>CourseIconFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>Frame</s>;</t>
+<t>- глобальное имя: <s>CourseIconFrame</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 64 на 64;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- внутри создай текстуру слоем <s>ARTWORK</s>;</t>
+<t>- текстура должна быть растянута через <k>SetAllPoints</k>;</t>
+<t>- установи текстуре путь: <s>Interface\Icons\Spell_Frost_IceStorm</s>;</t>
+<t>- покажи фрейм через <k>Show()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseIconFrame
+]=],
+requireKeywords = {
+"CourseIconFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
 "SetSize",
 "SetPoint",
 "CreateTexture",
+"ARTWORK",
+"SetAllPoints",
+"SetTexture",
+"Show",
+},
+checkCode = function()
+local f = _G.CourseIconFrame
+if not f then
+    return false
+end
+if type(f.IsShown) ~= "function" then
+    return false
+end
+if not f:IsShown() then
+    return false
+end
+if f:GetWidth() ~= 64 or f:GetHeight() ~= 64 then
+    return false
+end
+if not f.CreateTexture or type(f.CreateTexture) ~= "function" then
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][229] = {
+type = "commenttest",
+title = "Тест 227-2: фрейм с текстом",
+helpModules = {227, 215, 7},
+preloadVars = {
+{var = "CourseTextFrame", desc = "CourseTextFrame очищается перед проверкой"},
+},
+reportVars = {"CourseTextFrame"},
+instruction = [=[
+<h>Тест 227-2: фрейм с текстом</h>
+<t>Создай глобальный фрейм <k>CourseTextFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>Frame</s>;</t>
+<t>- глобальное имя: <s>CourseTextFrame</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 200 на 60;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- внутри создай FontString слоем <s>OVERLAY</s> с шаблоном <s>GameFontNormal</s>;</t>
+<t>- установи текст: <s>Привет, Азерот!</s>;</t>
+<t>- прикрепи текст через <k>SetPoint("CENTER")</k>;</t>
+<t>- покажи фрейм через <k>Show()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseTextFrame
+]=],
+requireKeywords = {
+"CourseTextFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
 "CreateFontString",
+"OVERLAY",
+"GameFontNormal",
 "SetText",
 "Show",
 },
 checkCode = function()
-_G.checkError = nil
-_G.reportPanel = nil
-local f = _G.CoursePanel
-if not f or type(f.IsShown) ~= "function" then
-    _G.checkError = "CoursePanel не является фреймом"
+local f = _G.CourseTextFrame
+if not f then
     return false
 end
-_G.reportPanel = tostring(f:GetName()) .. " shown=" .. tostring(f:IsShown())
-if f:GetName() ~= "CoursePanel" then
-    _G.checkError = "Фрейм должен иметь глобальное имя CoursePanel"
+if type(f.IsShown) ~= "function" then
     return false
 end
 if not f:IsShown() then
-    _G.checkError = "Фрейм должен быть показан через Show"
     return false
 end
-local width = f:GetWidth() or 0
-local height = f:GetHeight() or 0
-if width < 100 or height < 80 then
-    _G.checkError = "Размер фрейма слишком маленький"
+if f:GetWidth() ~= 200 or f:GetHeight() ~= 60 then
+    return false
+end
+if type(f.CreateFontString) ~= "function" then
     return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][92] = {
-type = "info",
-title = "Введение в события",
-content = [=[
-<h>Введение в события</h>
-<t>События позволяют интерфейсу реагировать на игровые действия: вход в игру, смену цели, изменение здоровья, получение денег и так далее.</t>
-<h>Как подписаться на событие</h>
-<code>
-MyEventFrame = CreateFrame("Frame", "MyEventFrame", UIParent)
-MyEventFrame:RegisterEvent("PLAYER_LOGIN")
-MyEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-MyEventFrame:SetScript("OnEvent", function(self, event, ...)
-    print("Событие:", event)
-end)
-</code>
-<h>Что здесь важно</h>
-<c>CreateFrame</c> — создаёт фрейм-слушатель.
-<c>RegisterEvent</c> — подписывает фрейм на событие.
-<c>SetScript("OnEvent", ...)</c> — назначает обработчик.
-<c>event</c> — имя события, которое пришло.
-<h>PLAYER_LOGIN и PLAYER_ENTERING_WORLD</h>
-<c>PLAYER_LOGIN</c> — срабатывает при входе персонажа в игру.
-<c>PLAYER_ENTERING_WORLD</c> — срабатывает при входе в мир, а также после загрузок.
-<w>Важно:</w> если создать фрейм после того, как <c>PLAYER_LOGIN</c> уже произошёл, это событие может не прийти. Поэтому для поздних тестов часто используют <c>PLAYER_ENTERING_WORLD</c>.
-<h>Пример ручного теста</h>
-<code>
-/run MyEventFrame:RegisterEvent("PLAYER_MONEY"); print("Подписка на PLAYER_MONEY выполнена")
-</code>
-]=],
-}
-
-ns_llua['lua'][93] = {
-type = "info",
-title = "События цели и юнитов",
-content = [=[
-<h>События цели и юнитов</h>
-<t>Эти события нужны для панелей цели, здоровья, маны и статуса юнитов.</t>
-<h>PLAYER_TARGET_CHANGED</h>
-<t>Срабатывает, когда игрок меняет цель.</t>
-<code>
-TargetFrame = CreateFrame("Frame", "TargetFrame", UIParent)
-TargetFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-TargetFrame:SetScript("OnEvent", function(self, event)
-    if event == "PLAYER_TARGET_CHANGED" then
-        print("Цель изменена:", UnitName("target") or "нет цели")
-    end
-end)
-</code>
-<h>UNIT_HEALTH</h>
-<t>Срабатывает, когда меняется здоровье юнита.</t>
-<code>
-HealthFrame = CreateFrame("Frame", "HealthFrame", UIParent)
-HealthFrame:RegisterEvent("UNIT_HEALTH")
-HealthFrame:SetScript("OnEvent", function(self, event, unit)
-    if unit == "player" then
-        print("HP:", UnitHealth("player"))
-    end
-end)
-</code>
-<h>UNIT_MAXHEALTH</h>
-<t>Срабатывает, когда меняется максимальное здоровье.</t>
-<code>
-HealthFrame:RegisterEvent("UNIT_MAXHEALTH")
-</code>
-<h>Общий обработчик</h>
-<code>
-HealthFrame:SetScript("OnEvent", function(self, event, unit)
-    if event == "UNIT_HEALTH" and unit == "player" then
-        print("HP changed")
-    elseif event == "UNIT_MAXHEALTH" and unit == "player" then
-        print("Max HP changed")
-    end
-end)
-</code>
-<w>Примечание:</w> в 3.3.5 ресурсные события могут быть отдельными: <c>UNIT_MANA</c>, <c>UNIT_RAGE</c>, <c>UNIT_ENERGY</c>, <c>UNIT_RUNIC_POWER</c>.
-]=],
-}
-
-ns_llua['lua'][94] = {
-type = "info",
-title = "События игрока: бой, деньги, опыт",
-content = [=[
-<h>События игрока: бой, деньги, опыт</h>
-<t>Эти события полезны для трекеров боя, денег, опыта и уровня.</t>
-<h>Бой</h>
-<c>PLAYER_REGEN_DISABLED</c> — игрок вошёл в бой.
-<c>PLAYER_REGEN_ENABLED</c> — игрок вышел из боя.
-<code>
-CombatFrame = CreateFrame("Frame", "CombatFrame", UIParent)
-CombatFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-CombatFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-CombatFrame:SetScript("OnEvent", function(self, event)
-    if event == "PLAYER_REGEN_DISABLED" then
-        print("Начался бой")
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        print("Бой закончился")
-    end
-end)
-</code>
-<h>Деньги</h>
-<code>
-MoneyFrame = CreateFrame("Frame", "MoneyFrame", UIParent)
-MoneyFrame:RegisterEvent("PLAYER_MONEY")
-MoneyFrame:SetScript("OnEvent", function()
-    print("Деньги:", GetMoney())
-end)
-</code>
-<h>Опыт и уровень</h>
-<c>PLAYER_XP_UPDATE</c> — изменился опыт.
-<c>PLAYER_LEVEL_UP</c> — игрок получил уровень.
-<code>
-XpFrame = CreateFrame("Frame", "XpFrame", UIParent)
-XpFrame:RegisterEvent("PLAYER_XP_UPDATE")
-XpFrame:RegisterEvent("PLAYER_LEVEL_UP")
-XpFrame:SetScript("OnEvent", function(self, event)
-    print("Событие:", event)
-end)
-</code>
-<w>Важно:</w> некоторые события передают аргументы. Например, <c>PLAYER_LEVEL_UP</c> может передать новый уровень.
-]=],
-}
-
-ns_llua['lua'][95] = {
-type = "info",
-title = "События группы, рейда, сумок и аур",
-content = [=[
-<h>События группы, рейда, сумок и аур</h>
-<t>Эти события нужны для списков группы, рейда, трекеров сумок и баффов.</t>
-<h>Группа и рейд</h>
-<c>PARTY_MEMBERS_CHANGED</c> — изменился состав группы.
-<c>RAID_ROSTER_UPDATE</c> — изменился состав рейда.
-<code>
-GroupFrame = CreateFrame("Frame", "GroupFrame", UIParent)
-GroupFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
-GroupFrame:RegisterEvent("RAID_ROSTER_UPDATE")
-GroupFrame:SetScript("OnEvent", function(self, event)
-    print("Событие группы:", event)
-end)
-</code>
-<h>Сумки</h>
-<c>BAG_UPDATE</c> — изменилась сумка.
-<code>
-BagFrame = CreateFrame("Frame", "BagFrame", UIParent)
-BagFrame:RegisterEvent("BAG_UPDATE")
-BagFrame:SetScript("OnEvent", function(self, event, bag)
-    print("Обновление сумки:", bag)
-end)
-</code>
-<h>Ауры</h>
-<c>UNIT_AURA</c> — изменились баффы или дебаффы юнита.
-<code>
-AuraFrame = CreateFrame("Frame", "AuraFrame", UIParent)
-AuraFrame:RegisterEvent("UNIT_AURA")
-AuraFrame:SetScript("OnEvent", function(self, event, unit)
-    if unit == "player" then
-        print("Ауры игрока изменились")
-    end
-end)
-</code>
-<w>Примечание:</w> данные гильдии могут обновляться через <c>GUILD_ROSTER_UPDATE</c>, но часто需要先 запросить ростер.
-]=],
-}
-
-ns_llua['lua'][96] = {
-type = "info",
-title = "OnUpdate и таймеры",
-content = [=[
-<h>OnUpdate и таймеры</h>
-<t>Скрипт <c>OnUpdate</c> выполняется каждый кадр. Он полезен для плавных обновлений, таймеров и анимаций.</t>
-<code>
-TickerFrame = CreateFrame("Frame", "TickerFrame", UIParent)
-TickerFrame:SetScript("OnUpdate", function(self, elapsed)
-    print("Кадр:", elapsed)
-end)
-</code>
-<w>Опасность:</w> если выводить что-то каждый кадр, чат и интерфейс могут сильно нагрузиться.
-<h>Throttle</h>
-<t>Обычно обновление делают не каждый кадр, а раз в 0.2-0.5 секунды.</t>
-<code>
-TickerFrame.nextUpdate = 0
-TickerFrame:SetScript("OnUpdate", function(self, elapsed)
-    self.nextUpdate = self.nextUpdate - elapsed
-    if self.nextUpdate <= 0 then
-        self.nextUpdate = 0.5
-        print("Тик:", GetTime())
-    end
-end)
-</code>
-<h>Пример с координатами</h>
-<code>
-CoordTicker = CreateFrame("Frame", "CoordTicker", UIParent)
-CoordTicker.nextUpdate = 0
-CoordTicker:SetScript("OnUpdate", function(self, elapsed)
-    self.nextUpdate = self.nextUpdate - elapsed
-    if self.nextUpdate <= 0 then
-        self.nextUpdate = 0.5
-        local x, y = GetPlayerMapPosition("player")
-        x = x or 0
-        y = y or 0
-        print(string.format("X: %.1f, Y: %.1f", x * 100, y * 100))
-    end
-end)
-</code>
-<h>Остановка</h>
-<code>
-/run CoordTicker:SetScript("OnUpdate", nil)
-</code>
-<t>Если задать скрипт как <k>nil</k>, он перестанет выполняться.</t>
-]=],
-}
-
-ns_llua['lua'][97] = {
+ns_llua['lua'][230] = {
 type = "commenttest",
-title = "Практика: фрейм событий",
-helpModules = {92, 93, 94, 95},
+title = "Тест 227-3: функция CreateLabeledFrame",
+helpModules = {227, 215, 45, 65},
 preloadVars = {
-{var = "CourseEventFrame", desc = "CourseEventFrame очищается перед проверкой"},
-{var = "lastCourseEvent", desc = "lastCourseEvent очищается перед проверкой"},
+{var = "CreateLabeledFrame", desc = "CreateLabeledFrame очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "reportEvent", desc = "reportEvent очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 227-3: функция CreateLabeledFrame</h>
+<t>Создай глобальную функцию <k>CreateLabeledFrame(name, text)</k>.</t>
+<t>Функция должна создать фрейм и вернуть его.</t>
+<t>Требования:</t>
+<t>- если <k>name</k> не строка или пустая строка, функция должна вернуть <k>nil</k>;</t>
+<t>- если <k>text</k> не строка, используй пустую строку <s>""</s>;</t>
+<t>- создай фрейм типа <s>Frame</s> с именем <k>name</k> и родителем <k>UIParent</k>;</t>
+<t>- размер фрейма: 220 на 80;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- создай внутри FontString слоем <s>OVERLAY</s> с шаблоном <s>GameFontNormal</s>;</t>
+<t>- установи тексту текст из аргумента;</t>
+<t>- прикрепи текст через <k>SetPoint("CENTER")</k>;</t>
+<t>- покажи фрейм;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateLabeledFrame(name, text)
+]=],
+requireKeywords = {
+"CreateLabeledFrame",
+"function",
+"CreateFrame",
+"CreateFontString",
+"SetText",
+"SetPoint",
+"Show",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateLabeledFrame) ~= "function" then
+    _G.checkError = "CreateLabeledFrame не является глобальной функцией"
+    return false
+end
+local ok1, f1 = pcall(_G.CreateLabeledFrame, "NS_Test_Labeled_1", "Текст")
+if not ok1 then
+    _G.checkError = "Ошибка вызова CreateLabeledFrame: " .. tostring(f1)
+    return false
+end
+if not f1 or type(f1.IsShown) ~= "function" then
+    _G.checkError = "Функция должна вернуть фрейм"
+    return false
+end
+if not f1:IsShown() then
+    _G.checkError = "Фрейм должен быть показан"
+    return false
+end
+if f1:GetWidth() ~= 220 or f1:GetHeight() ~= 80 then
+    _G.checkError = "Размер фрейма должен быть 220 на 80"
+    return false
+end
+local ok2, f2 = pcall(_G.CreateLabeledFrame, "", "Текст")
+if not ok2 or f2 ~= nil then
+    _G.checkError = "Для пустого имени функция должна вернуть nil"
+    return false
+end
+local ok3, f3 = pcall(_G.CreateLabeledFrame, 123, "Текст")
+if not ok3 or f3 ~= nil then
+    _G.checkError = "Для нестрокового имени функция должна вернуть nil"
+    return false
+end
+local ok4, f4 = pcall(_G.CreateLabeledFrame, "NS_Test_Labeled_2", nil)
+if not ok4 then
+    _G.checkError = "Ошибка вызова CreateLabeledFrame с nil-текстом: " .. tostring(f4)
+    return false
+end
+if not f4 or type(f4.IsShown) ~= "function" then
+    _G.checkError = "Для nil-текста функция всё равно должна вернуть фрейм"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][231] = {
+type = "commenttest",
+title = "Тест 227-4: функция SetFrameTextSafe",
+helpModules = {227, 215, 45, 65, 21},
+preloadVars = {
+{var = "SetFrameTextSafe", desc = "SetFrameTextSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 227-4: функция SetFrameTextSafe</h>
+<t>Создай глобальную функцию <k>SetFrameTextSafe(frame, text)</k>.</t>
+<t>Функция должна безопасно установить текст на фрейм.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>CreateFontString</k>, функция должна вернуть <k>false</k>;</t>
+<t>- если <k>text</k> не строка, функция должна вернуть <k>false</k>;</t>
+<t>- иначе создай FontString слоем <s>OVERLAY</s> с шаблоном <s>GameFontNormal</s>;</t>
+<t>- прикрепи текст через <k>SetPoint("CENTER")</k>;</t>
+<t>- установи текст через <k>SetText(text)</k>;</t>
+<t>- верни <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SetFrameTextSafe(frame, text)
+]=],
+requireKeywords = {
+"SetFrameTextSafe",
+"function",
+"CreateFontString",
+"OVERLAY",
+"GameFontNormal",
+"SetText",
+"SetPoint",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SetFrameTextSafe) ~= "function" then
+    _G.checkError = "SetFrameTextSafe не является глобальной функцией"
+    return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(150, 50)
+local ok1, result1 = pcall(_G.SetFrameTextSafe, testFrame, "Проверка")
+if not ok1 then
+    _G.checkError = "Ошибка вызова SetFrameTextSafe: " .. tostring(result1)
+    return false
+end
+if result1 ~= true then
+    _G.checkError = "Для корректного фрейма функция должна вернуть true"
+    return false
+end
+local ok2, result2 = pcall(_G.SetFrameTextSafe, nil, "Проверка")
+if not ok2 or result2 ~= false then
+    _G.checkError = "Для nil-фрейма функция должна вернуть false"
+    return false
+end
+local ok3, result3 = pcall(_G.SetFrameTextSafe, testFrame, 123)
+if not ok3 or result3 ~= false then
+    _G.checkError = "Для нестрокового текста функция должна вернуть false"
+    return false
+end
+local ok4, result4 = pcall(_G.SetFrameTextSafe, {}, "Проверка")
+if not ok4 or result4 ~= false then
+    _G.checkError = "Для пустой таблицы функция должна вернуть false"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][232] = {
+type = "commenttest",
+title = "Тест 227-5: функция CreateIconFrameSafe",
+helpModules = {227, 221, 215, 45, 65, 10, 17, 19},
+preloadVars = {
+{var = "CreateIconFrameSafe", desc = "CreateIconFrameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 227-5: функция CreateIconFrameSafe</h>
+<t>Создай глобальную функцию <k>CreateIconFrameSafe(parent, texturePath, size)</k>.</t>
+<t>Функция должна безопасно создать фрейм с иконкой.</t>
+<t>Требования:</t>
+<t>- если <k>parent</k> не существует или у него нет метода <k>CreateFrame</k> как у фрейма, верни <k>nil</k>;</t>
+<t>- если <k>texturePath</k> не строка или пустая строка, верни <k>nil</k>;</t>
+<t>- если <k>size</k> не число, меньше 8 или больше 512, верни <k>nil</k>;</t>
+<t>- иначе создай анонимный фрейм типа <s>Frame</s> с родителем <k>parent</k>;</t>
+<t>- размер фрейма: <k>size</k> на <k>size</k>;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- создай текстуру слоем <s>ARTWORK</s>;</t>
+<t>- растяни текстуру через <k>SetAllPoints</k>;</t>
+<t>- установи текстуру через <k>SetTexture(texturePath)</k>;</t>
+<t>- покажи фрейм;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateIconFrameSafe(parent, texturePath, size)
+]=],
+requireKeywords = {
+"CreateIconFrameSafe",
+"function",
+"CreateFrame",
+"CreateTexture",
+"SetAllPoints",
+"SetTexture",
+"SetSize",
+"SetPoint",
+"Show",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateIconFrameSafe) ~= "function" then
+    _G.checkError = "CreateIconFrameSafe не является глобальной функцией"
+    return false
+end
+local ok1, f1 = pcall(_G.CreateIconFrameSafe, UIParent, "Interface\\Icons\\Spell_Frost_IceStorm", 48)
+if not ok1 then
+    _G.checkError = "Ошибка вызова CreateIconFrameSafe: " .. tostring(f1)
+    return false
+end
+if not f1 or type(f1.IsShown) ~= "function" then
+    _G.checkError = "Для корректных данных функция должна вернуть фрейм"
+    return false
+end
+if not f1:IsShown() then
+    _G.checkError = "Созданный фрейм должен быть показан"
+    return false
+end
+if f1:GetWidth() ~= 48 or f1:GetHeight() ~= 48 then
+    _G.checkError = "Размер фрейма должен совпадать с аргументом size"
+    return false
+end
+local ok2, f2 = pcall(_G.CreateIconFrameSafe, nil, "Interface\\Icons\\Spell_Frost_IceStorm", 48)
+if not ok2 or f2 ~= nil then
+    _G.checkError = "Для nil-родителя функция должна вернуть nil"
+    return false
+end
+local ok3, f3 = pcall(_G.CreateIconFrameSafe, UIParent, "", 48)
+if not ok3 or f3 ~= nil then
+    _G.checkError = "Для пустой строки текстуры функция должна вернуть nil"
+    return false
+end
+local ok4, f4 = pcall(_G.CreateIconFrameSafe, UIParent, "Interface\\Icons\\Spell_Frost_IceStorm", 4)
+if not ok4 or f4 ~= nil then
+    _G.checkError = "Для размера меньше 8 функция должна вернуть nil"
+    return false
+end
+local ok5, f5 = pcall(_G.CreateIconFrameSafe, UIParent, "Interface\\Icons\\Spell_Frost_IceStorm", 1000)
+if not ok5 or f5 ~= nil then
+    _G.checkError = "Для размера больше 512 функция должна вернуть nil"
+    return false
+end
+local ok6, f6 = pcall(_G.CreateIconFrameSafe, UIParent, "Interface\\Icons\\Spell_Frost_IceStorm", "big")
+if not ok6 or f6 ~= nil then
+    _G.checkError = "Для нечислового размера функция должна вернуть nil"
+    return false
+end
+return true
+end,
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ns_llua['lua'][233] = {
+type = "info",
+title = "Кнопки и обработчики кликов",
+helpModules = {215, 221, 227},
+content = [=[
+<h>Кнопки и обработчики кликов</h>
+<t>Кнопка — это специальный тип фрейма, который реагирует на клики мыши.</t>
+<h>Создание кнопки</h>
+<code>
+CourseButton = CreateFrame("Button", "CourseButton", UIParent)
+CourseButton:SetSize(120, 40)
+CourseButton:SetPoint("CENTER")
+</code>
+<t>Обрати внимание: тип фрейма — <s>"Button"</s>, а не <s>"Frame"</s>.</t>
+<h>Текст кнопки через FontString</h>
+<t>У кнопки без шаблона нет встроенного текста. Его нужно создавать вручную:</t>
+<code>
+local fs = CourseButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+fs:SetAllPoints(CourseButton)
+fs:SetText("Нажми меня")
+</code>
+<h>Шаблон UIPanelButtonTemplate</h>
+<t>WoW предоставляет готовые шаблоны. С шаблоном <s>"UIPanelButtonTemplate"</s> кнопка получает стандартный внешний вид и метод <k>SetText</k>:</t>
+<code>
+CourseStyledButton = CreateFrame("Button", "CourseStyledButton", UIParent, "UIPanelButtonTemplate")
+CourseStyledButton:SetSize(120, 40)
+CourseStyledButton:SetPoint("CENTER")
+CourseStyledButton:SetText("Готово")
+</code>
+<w>Примечание:</w> в WoW 3.3.5 <k>SetText</k> работает для кнопок, созданных с шаблоном <s>"UIPanelButtonTemplate"</s>. Для кнопок без шаблона нужно создавать FontString вручную.
+<h>Обработчик клика</h>
+<code>
+CourseButton:SetScript("OnClick", function(self, button)
+    print("Клик! Кнопка мыши: " .. tostring(button))
+end)
+</code>
+<t>Аргументы обработчика:</t>
+<c>self</c> — сама кнопка.
+<c>button</c> — какая кнопка мыши нажата: <s>"LeftButton"</s>, <s>"RightButton"</s> и т.д.
+<h>Enable и Disable</h>
+<code>
+CourseButton:Enable()
+CourseButton:Disable()
+</code>
+<t>Отключённая кнопка не реагирует на клики.</t>
+<h>Проверка состояния</h>
+<code>
+if CourseButton:IsEnabled() then
+    print("Кнопка включена")
+else
+    print("Кнопка отключена")
+end
+</code>
+<w>Важно:</w> в WoW 3.3.5 <k>IsEnabled()</k> возвращает <k>1</k> или <k>nil</k>, а не <k>true</k>/<k>false</k>. Но в условии <k>if</k> это работает одинаково, потому что <k>1</k> — истина, а <k>nil</k> — ложь.
+<h>Безопасный обработчик</h>
+<code>
+CourseSafeButton:SetScript("OnClick", function(self)
+    if not self:IsEnabled() then return end
+    print("Действие выполнено")
+end)
+</code>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> забыть <k>Show()</k> у кнопки.
+<w>Ошибка 2:</w> использовать <k>SetText</k> на кнопке без шаблона.
+<w>Ошибка 3:</w> сравнивать <k>IsEnabled()</k> с <k>true</k> через <k>==</k>.
+<code>
+-- неправильно
+if CourseButton:IsEnabled() == true then
+-- правильно
+if CourseButton:IsEnabled() then
+</code>
+]=],
+}
+
+ns_llua['lua'][234] = {
+type = "commenttest",
+title = "Тест 233-1: кнопка с обработчиком",
+helpModules = {233, 215, 221},
+preloadVars = {
+{var = "CourseClickButton", desc = "CourseClickButton очищается перед проверкой"},
+{var = "courseClickCount", desc = "courseClickCount очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
 },
 reportVars = {
 "checkError",
-"reportEvent",
+"courseClickCount",
 },
 instruction = [=[
-<h>Практика: фрейм событий</h>
-<t>Создай глобальный фрейм <k>CourseEventFrame</k>.</t>
+<h>Тест 233-1: кнопка с обработчиком</h>
+<t>Создай глобальную кнопку <k>CourseClickButton</k>.</t>
 <t>Требования:</t>
-<t>- зарегистрируй событие <c>PLAYER_TARGET_CHANGED</c>;</t>
-<t>- зарегистрируй событие <c>PLAYER_MONEY</c>;</t>
-<t>- назначь обработчик <c>OnEvent</c>;</t>
-<t>- внутри обработчика создай глобальную переменную <k>lastCourseEvent</k> и запиши в неё <k>event</k>.</t>
-<h>Шаблон обработчика</h>
+<t>- тип фрейма: <s>"Button"</s>;</t>
+<t>- глобальное имя: <s>"CourseClickButton"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 120 на 40;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- создай глобальную переменную <k>courseClickCount</k> со значением <n>0</n>;</t>
+<t>- назначь обработчик <k>OnClick</k>, который увеличивает <k>courseClickCount</k> на 1.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную кнопку CourseClickButton
+]=],
+requireKeywords = {
+"CourseClickButton",
+"CreateFrame",
+"Button",
+"UIParent",
+"SetSize",
+"SetPoint",
+"SetScript",
+"OnClick",
+"courseClickCount",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseClickButton
+if not f then
+    _G.checkError = "CourseClickButton не был создан"
+    return false
+end
+if type(f.GetScript) ~= "function" then
+    _G.checkError = "CourseClickButton не похож на кнопку"
+    return false
+end
+if f:GetWidth() ~= 120 or f:GetHeight() ~= 40 then
+    _G.checkError = "Размер кнопки должен быть 120 на 40"
+    return false
+end
+local script = f:GetScript("OnClick")
+if type(script) ~= "function" then
+    _G.checkError = "У кнопки должен быть обработчик OnClick"
+    return false
+end
+if _G.courseClickCount ~= 0 then
+    _G.checkError = "courseClickCount должен быть 0 до клика"
+    return false
+end
+-- Вызываем обработчик вручную, чтобы проверить логику
+local ok, err = pcall(script, f, "LeftButton")
+if not ok then
+    _G.checkError = "Ошибка при вызове OnClick: " .. tostring(err)
+    return false
+end
+if _G.courseClickCount ~= 1 then
+    _G.checkError = "После одного клика courseClickCount должен быть 1"
+    return false
+end
+-- Второй клик
+local ok2, err2 = pcall(script, f, "LeftButton")
+if not ok2 then
+    _G.checkError = "Ошибка при втором вызове OnClick: " .. tostring(err2)
+    return false
+end
+if _G.courseClickCount ~= 2 then
+    _G.checkError = "После двух кликов courseClickCount должен быть 2"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][235] = {
+type = "commenttest",
+title = "Тест 233-2: кнопка-переключатель",
+helpModules = {233, 215, 221, 17},
+preloadVars = {
+{var = "CourseToggleTarget", desc = "CourseToggleTarget очищается перед проверкой"},
+{var = "CourseToggleButton", desc = "CourseToggleButton очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 233-2: кнопка-переключатель</h>
+<t>Создай два глобальных объекта:</t>
+<t>1. Фрейм <k>CourseToggleTarget</k>:</t>
+<t>- тип: <s>"Frame"</s>, родитель: <k>UIParent</k>;</t>
+<t>- размер: 100 на 100;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- фрейм должен быть показан через <k>Show()</k>.</t>
+<t>2. Кнопку <k>CourseToggleButton</k>:</t>
+<t>- тип: <s>"Button"</s>, родитель: <k>UIParent</k>;</t>
+<t>- размер: 100 на 30;</t>
+<t>- позиция: <k>SetPoint("CENTER", UIParent, "CENTER", 0, -100)</k>;</t>
+<t>- обработчик <k>OnClick</k>, который переключает видимость <k>CourseToggleTarget</k>:</t>
+<t>если фрейм показан — скрыть через <k>Hide()</k>, иначе — показать через <k>Show()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай CourseToggleTarget и CourseToggleButton
+]=],
+requireKeywords = {
+"CourseToggleTarget",
+"CourseToggleButton",
+"CreateFrame",
+"Frame",
+"Button",
+"UIParent",
+"SetSize",
+"SetPoint",
+"Show",
+"SetScript",
+"OnClick",
+"IsShown",
+"Hide",
+},
+checkCode = function()
+_G.checkError = nil
+local target = _G.CourseToggleTarget
+local button = _G.CourseToggleButton
+if not target then
+    _G.checkError = "CourseToggleTarget не был создан"
+    return false
+end
+if not button then
+    _G.checkError = "CourseToggleButton не был создан"
+    return false
+end
+if type(target.IsShown) ~= "function" then
+    _G.checkError = "CourseToggleTarget не похож на фрейм"
+    return false
+end
+if type(button.GetScript) ~= "function" then
+    _G.checkError = "CourseToggleButton не похож на кнопку"
+    return false
+end
+if not target:IsShown() then
+    _G.checkError = "CourseToggleTarget должен быть показан изначально"
+    return false
+end
+local script = button:GetScript("OnClick")
+if type(script) ~= "function" then
+    _G.checkError = "У кнопки должен быть обработчик OnClick"
+    return false
+end
+-- Первый клик: фрейм должен скрыться
+local ok1, err1 = pcall(script, button, "LeftButton")
+if not ok1 then
+    _G.checkError = "Ошибка при первом вызове OnClick: " .. tostring(err1)
+    return false
+end
+if target:IsShown() then
+    _G.checkError = "После первого клика фрейм должен быть скрыт"
+    return false
+end
+-- Второй клик: фрейм должен показаться
+local ok2, err2 = pcall(script, button, "LeftButton")
+if not ok2 then
+    _G.checkError = "Ошибка при втором вызове OnClick: " .. tostring(err2)
+    return false
+end
+if not target:IsShown() then
+    _G.checkError = "После второго клика фрейм должен быть показан"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][236] = {
+type = "commenttest",
+title = "Тест 233-3: функция CreateClickCounter",
+helpModules = {233, 215, 45, 44},
+preloadVars = {
+{var = "CreateClickCounter", desc = "CreateClickCounter очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 233-3: функция CreateClickCounter</h>
+<t>Создай глобальную функцию <k>CreateClickCounter(name)</k>.</t>
+<t>Аргумент:</t>
+<c>name</c> — строка с глобальным именем кнопки.
+<t>Функция должна:</t>
+<t>- если <k>name</k> не является строкой или является пустой строкой, вернуть <k>nil</k>;</t>
+<t>- создать кнопку типа <s>"Button"</s> с глобальным именем <k>name</k> и родителем <k>UIParent</k>;</t>
+<t>- задать размер 100 на 30;</t>
+<t>- задать позицию <k>SetPoint("CENTER")</k>;</t>
+<t>- создать таблицу-счётчик с полем <k>count</k> равным <n>0</n>;</t>
+<t>- назначить обработчик <k>OnClick</k>, который увеличивает <k>count</k> на 1;</t>
+<t>- вернуть таблицу с полями:</t>
+<c>frame</c> — созданная кнопка.
+<c>count</c> — текущее количество кликов.
+<c>GetCount</c> — функция, которая возвращает текущее количество кликов.
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateClickCounter(name)
+]=],
+requireKeywords = {
+"CreateClickCounter",
+"function",
+"CreateFrame",
+"Button",
+"SetScript",
+"OnClick",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateClickCounter) ~= "function" then
+    _G.checkError = "CreateClickCounter не является глобальной функцией"
+    return false
+end
+local ok1, result1 = pcall(_G.CreateClickCounter, "NS_Test_Counter_1")
+if not ok1 then
+    _G.checkError = "Ошибка вызова CreateClickCounter: " .. tostring(result1)
+    return false
+end
+if type(result1) ~= "table" then
+    _G.checkError = "Функция должна вернуть таблицу"
+    return false
+end
+if result1.count ~= 0 then
+    _G.checkError = "Начальное значение count должно быть 0"
+    return false
+end
+if not result1.frame then
+    _G.checkError = "В таблице должно быть поле frame"
+    return false
+end
+if type(result1.GetCount) ~= "function" then
+    _G.checkError = "В таблице должна быть функция GetCount"
+    return false
+end
+if result1.GetCount() ~= 0 then
+    _G.checkError = "GetCount должна вернуть 0 до кликов"
+    return false
+end
+-- Вызываем OnClick вручную
+local script = result1.frame:GetScript("OnClick")
+if type(script) ~= "function" then
+    _G.checkError = "У кнопки должен быть обработчик OnClick"
+    return false
+end
+local ok2, err2 = pcall(script, result1.frame, "LeftButton")
+if not ok2 then
+    _G.checkError = "Ошибка при вызове OnClick: " .. tostring(err2)
+    return false
+end
+if result1.count ~= 1 then
+    _G.checkError = "После одного клика count должен быть 1"
+    return false
+end
+if result1.GetCount() ~= 1 then
+    _G.checkError = "GetCount должна вернуть 1 после одного клика"
+    return false
+end
+-- Проверяем пустое имя
+local ok3, result3 = pcall(_G.CreateClickCounter, "")
+if not ok3 or result3 ~= nil then
+    _G.checkError = "Для пустого имени функция должна вернуть nil"
+    return false
+end
+-- Проверяем нестроковое имя
+local ok4, result4 = pcall(_G.CreateClickCounter, 123)
+if not ok4 or result4 ~= nil then
+    _G.checkError = "Для нестрокового имени функция должна вернуть nil"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][237] = {
+type = "commenttest",
+title = "Тест 233-4: функция SetButtonEnabledSafe",
+helpModules = {233, 45, 65, 21},
+preloadVars = {
+{var = "SetButtonEnabledSafe", desc = "SetButtonEnabledSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 233-4: функция SetButtonEnabledSafe</h>
+<t>Создай глобальную функцию <k>SetButtonEnabledSafe(button, enabled)</k>.</t>
+<t>Функция должна безопасно включить или выключить кнопку.</t>
+<t>Требования:</t>
+<t>- если <k>button</k> не существует или у него нет метода <k>Enable</k> или <k>Disable</k>, функция должна вернуть <k>false</k>;</t>
+<t>- если <k>enabled</k> является истинным значением, вызови <k>button:Enable()</k> и верни <k>true</k>;</t>
+<t>- если <k>enabled</k> является ложным значением, вызови <k>button:Disable()</k> и верни <k>true</k>;</t>
+<t>- используй <k>type</k> для проверки наличия методов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SetButtonEnabledSafe(button, enabled)
+]=],
+requireKeywords = {
+"SetButtonEnabledSafe",
+"function",
+"Enable",
+"Disable",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SetButtonEnabledSafe) ~= "function" then
+    _G.checkError = "SetButtonEnabledSafe не является глобальной функцией"
+    return false
+end
+-- Создаём тестовую кнопку
+local testButton = CreateFrame("Button", nil, UIParent)
+testButton:SetSize(80, 30)
+-- Тест 1: выключить кнопку
+local ok1, result1 = pcall(_G.SetButtonEnabledSafe, testButton, false)
+if not ok1 then
+    _G.checkError = "Ошибка вызова SetButtonEnabledSafe(button, false): " .. tostring(result1)
+    return false
+end
+if result1 ~= true then
+    _G.checkError = "Для корректной кнопки и false функция должна вернуть true"
+    return false
+end
+if testButton:IsEnabled() then
+    _G.checkError = "После Disable кнопка должна быть отключена"
+    return false
+end
+-- Тест 2: включить кнопку
+local ok2, result2 = pcall(_G.SetButtonEnabledSafe, testButton, true)
+if not ok2 then
+    _G.checkError = "Ошибка вызова SetButtonEnabledSafe(button, true): " .. tostring(result2)
+    return false
+end
+if result2 ~= true then
+    _G.checkError = "Для корректной кнопки и true функция должна вернуть true"
+    return false
+end
+if not testButton:IsEnabled() then
+    _G.checkError = "После Enable кнопка должна быть включена"
+    return false
+end
+-- Тест 3: nil вместо кнопки
+local ok3, result3 = pcall(_G.SetButtonEnabledSafe, nil, true)
+if not ok3 or result3 ~= false then
+    _G.checkError = "Для nil-кнопки функция должна вернуть false"
+    return false
+end
+-- Тест 4: пустая таблица вместо кнопки
+local ok4, result4 = pcall(_G.SetButtonEnabledSafe, {}, true)
+if not ok4 or result4 ~= false then
+    _G.checkError = "Для пустой таблицы функция должна вернуть false"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][238] = {
+type = "commenttest",
+title = "Тест 233-5: функция ToggleFrameVisibility",
+helpModules = {233, 215, 45, 65, 17},
+preloadVars = {
+{var = "ToggleFrameVisibility", desc = "ToggleFrameVisibility очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 233-5: функция ToggleFrameVisibility</h>
+<t>Создай глобальную функцию <k>ToggleFrameVisibility(frame)</k>.</t>
+<t>Функция должна переключить видимость фрейма.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>IsShown</k>, функция должна вернуть <k>nil</k>;</t>
+<t>- если фрейм показан, вызови <k>frame:Hide()</k> и верни <k>false</k>;</t>
+<t>- если фрейм скрыт, вызови <k>frame:Show()</k> и верни <k>true</k>;</t>
+<t>- используй <k>IsShown()</k> для проверки видимости.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ToggleFrameVisibility(frame)
+]=],
+requireKeywords = {
+"ToggleFrameVisibility",
+"function",
+"IsShown",
+"Show",
+"Hide",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ToggleFrameVisibility) ~= "function" then
+    _G.checkError = "ToggleFrameVisibility не является глобальной функцией"
+    return false
+end
+-- Создаём тестовый фрейм
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(100, 100)
+testFrame:SetPoint("CENTER")
+testFrame:Show()
+-- Тест 1: фрейм показан -> должен скрыться
+local ok1, result1 = pcall(_G.ToggleFrameVisibility, testFrame)
+if not ok1 then
+    _G.checkError = "Ошибка вызова ToggleFrameVisibility: " .. tostring(result1)
+    return false
+end
+if result1 ~= false then
+    _G.checkError = "Для показанного фрейма функция должна вернуть false"
+    return false
+end
+if testFrame:IsShown() then
+    _G.checkError = "После ToggleFrameVisibility показанный фрейм должен быть скрыт"
+    return false
+end
+-- Тест 2: фрейм скрыт -> должен показаться
+local ok2, result2 = pcall(_G.ToggleFrameVisibility, testFrame)
+if not ok2 then
+    _G.checkError = "Ошибка второго вызова ToggleFrameVisibility: " .. tostring(result2)
+    return false
+end
+if result2 ~= true then
+    _G.checkError = "Для скрытого фрейма функция должна вернуть true"
+    return false
+end
+if not testFrame:IsShown() then
+    _G.checkError = "После ToggleFrameVisibility скрытый фрейм должен быть показан"
+    return false
+end
+-- Тест 3: nil вместо фрейма
+local ok3, result3 = pcall(_G.ToggleFrameVisibility, nil)
+if not ok3 or result3 ~= nil then
+    _G.checkError = "Для nil-фрейма функция должна вернуть nil"
+    return false
+end
+-- Тест 4: пустая таблица вместо фрейма
+local ok4, result4 = pcall(_G.ToggleFrameVisibility, {})
+if not ok4 or result4 ~= nil then
+    _G.checkError = "Для пустой таблицы функция должна вернуть nil"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][239] = {
+type = "info",
+title = "События: RegisterEvent и OnEvent",
+helpModules = {215, 227, 233},
+content = [=[
+<h>События: RegisterEvent и OnEvent</h>
+<t>До сих пор наш код выполнялся один раз. Чтобы аддон реагировал на действия игрока — смену цели, получение урона, вход в игру — нужны события.</t>
+<h>Как работают события</h>
+<t>WoW генерирует события автоматически. Например:</t>
+<c>PLAYER_LOGIN</c> — игрок вошёл в мир.
+<c>PLAYER_TARGET_CHANGED</c> — сменилась цель.
+<c>UNIT_HEALTH</c> — изменилось здоровье юнита.
+<c>PLAYER_REGEN_ENABLED</c> — игрок вышел из боя.
+<c>PLAYER_REGEN_DISABLED</c> — игрок вошёл в бой.
+<c>BAG_UPDATE</c> — содержимое сумок изменилось.
+<h>Регистрация события</h>
+<t>Чтобы фрейм получал события, нужно зарегистрировать их методом <k>RegisterEvent</k>:</t>
 <code>
-CourseEventFrame:SetScript("OnEvent", function(self, event)
-    lastCourseEvent = event
+MyEventFrame = CreateFrame("Frame", nil, UIParent)
+MyEventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+</code>
+<h>Обработчик OnEvent</h>
+<t>Когда событие происходит, WoW вызывает скрипт <k>OnEvent</k>:</t>
+<code>
+MyEventFrame:SetScript("OnEvent", function(self, event)
+    print("Событие: " .. event)
 end)
 </code>
-<t>События специально вызывать не нужно. Проверка посмотрит, что фрейм создан и подписан на нужные события.</t>
+<t>Аргументы обработчика:</t>
+<c>self</c> — фрейм, на который пришло событие.
+<c>event</c> — строка с именем события.
+<c>...</c> — дополнительные аргументы события (зависят от события).
+<h>Несколько событий на одном фрейме</h>
+<code>
+MyMultiFrame = CreateFrame("Frame", nil, UIParent)
+MyMultiFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+MyMultiFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+MyMultiFrame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_TARGET_CHANGED" then
+        print("Цель изменилась")
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        print("Вошёл в бой")
+    end
+end)
+</code>
+<h>Событие UNIT_HEALTH</h>
+<t>Некоторые события требуют указания юнита через <k>RegisterUnitEvent</k>:</t>
+<code>
+MyHealthFrame = CreateFrame("Frame", nil, UIParent)
+MyHealthFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+MyHealthFrame:SetScript("OnEvent", function(self, event, unit)
+    if unit == "player" then
+        print("HP: " .. (UnitHealth("player") or 0))
+    end
+end)
+</code>
+<w>Важно:</w> в WoW 3.3.5 вместо RegisterUnitEvent можно использовать RegisterEvent, но тогда придётся вручную проверять аргумент unit.
+<h>PLAYER_LOGIN — точка входа</h>
+<t>Событие <c>PLAYER_LOGIN</c> срабатывает, когда игрок полностью вошёл в мир. Это лучшее место для инициализации аддона:</t>
+<code>
+MyInitFrame = CreateFrame("Frame", nil, UIParent)
+MyInitFrame:RegisterEvent("PLAYER_LOGIN")
+MyInitFrame:SetScript("OnEvent", function(self, event)
+    print("Добро пожаловать, " .. (UnitName("player") or "Неизвестный"))
+end)
+</code>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> забыть зарегистрировать событие перед назначением OnEvent.
+<code>
+-- неправильно: событие не зарегистрировано
+MyFrame:SetScript("OnEvent", function(self, event) end)
+-- правильно: сначала регистрируем
+MyFrame:RegisterEvent("PLAYER_LOGIN")
+MyFrame:SetScript("OnEvent", function(self, event) end)
+</code>
+<w>Ошибка 2:</w> сравнивать event с числом вместо строки.
+<code>
+-- неправильно
+if event == 1 then
+-- правильно
+if event == "PLAYER_TARGET_CHANGED" then
+</code>
+<w>Ошибка 3:</w> ожидать, что OnEvent вызовется без RegisterEvent. Событие придёт только на зарегистрированные события.
+]=],
+}
+
+ns_llua['lua'][240] = {
+type = "vartest",
+title = "Тест 239-1: строки событий",
+helpModules = {239},
+tasks = {
+{
+var = "eventLogin",
+desc = 'Создай глобальную переменную eventLogin = "PLAYER_LOGIN"',
+check = function(value)
+return value == "PLAYER_LOGIN"
+end,
+},
+{
+var = "eventTarget",
+desc = 'Создай глобальную переменную eventTarget = "PLAYER_TARGET_CHANGED"',
+check = function(value)
+return value == "PLAYER_TARGET_CHANGED"
+end,
+},
+{
+var = "eventCombatStart",
+desc = 'Создай глобальную переменную eventCombatStart = "PLAYER_REGEN_DISABLED"',
+check = function(value)
+return value == "PLAYER_REGEN_DISABLED"
+end,
+},
+},
+}
+
+ns_llua['lua'][241] = {
+type = "commenttest",
+title = "Тест 239-2: фрейм с зарегистрированным событием",
+helpModules = {239, 215},
+preloadVars = {
+{var = "CourseEventFrame", desc = "CourseEventFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 239-2: фрейм с зарегистрированным событием</h>
+<t>Создай глобальный фрейм <k>CourseEventFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>"Frame"</s>, родитель: <k>UIParent</k>;</t>
+<t>- зарегистрируй событие <s>"PLAYER_TARGET_CHANGED"</s> через <k>RegisterEvent</k>;</t>
+<t>- назначь скрипт <k>OnEvent</k>, который ничего не делает (пустая функция).</t>
+<t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
 -- Создай глобальный фрейм CourseEventFrame
-CourseEventFrame = CreateFrame("Frame", "CourseEventFrame", UIParent)
--- Зарегистрируй события и назначь OnEvent
 ]=],
 requireKeywords = {
 "CourseEventFrame",
 "CreateFrame",
+"Frame",
+"UIParent",
 "RegisterEvent",
+"PLAYER_TARGET_CHANGED",
 "SetScript",
 "OnEvent",
-"lastCourseEvent",
 },
 checkCode = function()
 _G.checkError = nil
-_G.reportEvent = nil
 local f = _G.CourseEventFrame
-if not f or type(f.RegisterEvent) ~= "function" then
-    _G.checkError = "CourseEventFrame не является фреймом"
+if not f then
+    _G.checkError = "CourseEventFrame не был создан"
     return false
 end
-_G.reportEvent = tostring(f:GetName()) .. " event frame"
-if type(f.IsEventRegistered) ~= "function" then
-    _G.checkError = "Фрейм не поддерживает проверку событий"
+if type(f.GetScript) ~= "function" then
+    _G.checkError = "CourseEventFrame не похож на фрейм"
     return false
 end
-if not f:IsEventRegistered("PLAYER_TARGET_CHANGED") then
-    _G.checkError = "Фрейм не зарегистрирован на PLAYER_TARGET_CHANGED"
+local script = f:GetScript("OnEvent")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnEvent"
     return false
 end
-if not f:IsEventRegistered("PLAYER_MONEY") then
-    _G.checkError = "Фрейм не зарегистрирован на PLAYER_MONEY"
-    return false
-end
-if f.GetScript and type(f:GetScript("OnEvent")) ~= "function" then
-    _G.checkError = "Фрейм должен иметь обработчик OnEvent"
-    return false
-end
-if _G.lastCourseEvent ~= nil and type(_G.lastCourseEvent) ~= "string" then
-    _G.checkError = "lastCourseEvent должна быть строкой или nil до события"
+if type(f.RegisterEvent) ~= "function" then
+    _G.checkError = "У фрейма должен быть метод RegisterEvent"
     return false
 end
 return true
 end,
 }
 
-ns_llua['lua'][98] = {
+ns_llua['lua'][242] = {
+type = "commenttest",
+title = "Тест 239-3: обработчик с двумя событиями",
+helpModules = {239, 215, 19},
+preloadVars = {
+{var = "CourseMultiEventFrame", desc = "CourseMultiEventFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 239-3: обработчик с двумя событиями</h>
+<t>Создай глобальный фрейм <k>CourseMultiEventFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>"Frame"</s>, родитель: <k>UIParent</k>;</t>
+<t>- зарегистрируй два события:</t>
+<c>"PLAYER_REGEN_DISABLED"</c>
+<c>"PLAYER_REGEN_ENABLED"</c>
+<t>- назначь скрипт <k>OnEvent</k>, который:</t>
+<t>если event равен <s>"PLAYER_REGEN_DISABLED"</s>, записывает в глобальную переменную <k>combatStateLog</k> строку <s>"in"</s>;</t>
+<t>если event равен <s>"PLAYER_REGEN_ENABLED"</s>, записывает в глобальную переменную <k>combatStateLog</k> строку <s>"out"</s>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseMultiEventFrame
+]=],
+requireKeywords = {
+"CourseMultiEventFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+"RegisterEvent",
+"PLAYER_REGEN_DISABLED",
+"PLAYER_REGEN_ENABLED",
+"SetScript",
+"OnEvent",
+"combatStateLog",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseMultiEventFrame
+if not f then
+    _G.checkError = "CourseMultiEventFrame не был создан"
+    return false
+end
+local script = f:GetScript("OnEvent")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnEvent"
+    return false
+end
+-- Вызываем обработчик вручную, чтобы проверить логику
+_G.combatStateLog = nil
+local ok1, err1 = pcall(script, f, "PLAYER_REGEN_DISABLED")
+if not ok1 then
+    _G.checkError = "Ошибка при вызове OnEvent с PLAYER_REGEN_DISABLED: " .. tostring(err1)
+    return false
+end
+if _G.combatStateLog ~= "in" then
+    _G.checkError = "После PLAYER_REGEN_DISABLED combatStateLog должен быть 'in'"
+    return false
+end
+_G.combatStateLog = nil
+local ok2, err2 = pcall(script, f, "PLAYER_REGEN_ENABLED")
+if not ok2 then
+    _G.checkError = "Ошибка при вызове OnEvent с PLAYER_REGEN_ENABLED: " .. tostring(err2)
+    return false
+end
+if _G.combatStateLog ~= "out" then
+    _G.checkError = "После PLAYER_REGEN_ENABLED combatStateLog должен быть 'out'"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][243] = {
+type = "commenttest",
+title = "Тест 239-4: функция CreateEventLogger",
+helpModules = {239, 215, 45, 65},
+preloadVars = {
+{var = "CreateEventLogger", desc = "CreateEventLogger очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 239-4: функция CreateEventLogger</h>
+<t>Создай глобальную функцию <k>CreateEventLogger(eventName)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>eventName</k> не является строкой или является пустой строкой, верни <k>nil</k>;</t>
+<t>- иначе создай анонимный фрейм типа <s>"Frame"</s> с родителем <k>UIParent</k>;</t>
+<t>- зарегистрируй событие через <k>RegisterEvent(eventName)</k>;</t>
+<t>- создай таблицу с полями:</t>
+<c>frame</c> — созданный фрейм.
+<c>count</c> — число, изначально 0.
+<c>lastEvent</c> — строка, изначально пустая строка.
+<t>- назначь обработчик OnEvent, который увеличивает <k>count</k> на 1 и записывает <k>event</k> в <k>lastEvent</k>;</t>
+<t>- верни таблицу.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateEventLogger(eventName)
+]=],
+requireKeywords = {
+"CreateEventLogger",
+"function",
+"CreateFrame",
+"Frame",
+"UIParent",
+"RegisterEvent",
+"SetScript",
+"OnEvent",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateEventLogger) ~= "function" then
+    _G.checkError = "CreateEventLogger не является глобальной функцией"
+    return false
+end
+-- Тест 1: корректное событие
+local ok1, logger1 = pcall(_G.CreateEventLogger, "PLAYER_TARGET_CHANGED")
+if not ok1 then
+    _G.checkError = "Ошибка вызова CreateEventLogger: " .. tostring(logger1)
+    return false
+end
+if type(logger1) ~= "table" then
+    _G.checkError = "Функция должна вернуть таблицу"
+    return false
+end
+if not logger1.frame then
+    _G.checkError = "В таблице должно быть поле frame"
+    return false
+end
+if logger1.count ~= 0 then
+    _G.checkError = "Начальное значение count должно быть 0"
+    return false
+end
+if logger1.lastEvent ~= "" then
+    _G.checkError = "Начальное значение lastEvent должно быть пустой строкой"
+    return false
+end
+-- Вызываем OnEvent вручную
+local script = logger1.frame:GetScript("OnEvent")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnEvent"
+    return false
+end
+local ok2, err2 = pcall(script, logger1.frame, "PLAYER_TARGET_CHANGED")
+if not ok2 then
+    _G.checkError = "Ошибка при вызове OnEvent: " .. tostring(err2)
+    return false
+end
+if logger1.count ~= 1 then
+    _G.checkError = "После одного события count должен быть 1"
+    return false
+end
+if logger1.lastEvent ~= "PLAYER_TARGET_CHANGED" then
+    _G.checkError = "lastEvent должен содержать имя события"
+    return false
+end
+-- Тест 2: пустая строка
+local ok3, logger2 = pcall(_G.CreateEventLogger, "")
+if not ok3 or logger2 ~= nil then
+    _G.checkError = "Для пустой строки функция должна вернуть nil"
+    return false
+end
+-- Тест 3: не строка
+local ok4, logger3 = pcall(_G.CreateEventLogger, 123)
+if not ok4 or logger3 ~= nil then
+    _G.checkError = "Для нестрокового аргумента функция должна вернуть nil"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][244] = {
+type = "commenttest",
+title = "Тест 239-5: функция CreateHealthWatcher",
+helpModules = {239, 215, 83, 65, 45},
+preloadVars = {
+{var = "CreateHealthWatcher", desc = "CreateHealthWatcher очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 239-5: функция CreateHealthWatcher</h>
+<t>Создай глобальную функцию <k>CreateHealthWatcher(unit)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>unit</k> не является строкой или является пустой строкой, верни <k>nil</k>;</t>
+<t>- иначе создай анонимный фрейм типа <s>"Frame"</s> с родителем <k>UIParent</k>;</t>
+<t>- зарегистрируй событие <s>"UNIT_HEALTH"</s> через <k>RegisterEvent</k>;</t>
+<t>- создай таблицу с полями:</t>
+<c>frame</c> — созданный фрейм.
+<c>unit</c> — строка unit.
+<c>lastHP</c> — число, изначально 0.
+<c>updateCount</c> — число, изначально 0.
+<t>- назначь обработчик OnEvent, который:</t>
+<t>если аргумент unit события совпадает с сохранённым unit, увеличивает <k>updateCount</k> на 1 и записывает текущее здоровье через <k>UnitHealth(unit) or 0</k> в <k>lastHP</k>;</t>
+<t>- верни таблицу.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateHealthWatcher(unit)
+]=],
+requireKeywords = {
+"CreateHealthWatcher",
+"function",
+"CreateFrame",
+"Frame",
+"UIParent",
+"RegisterEvent",
+"UNIT_HEALTH",
+"SetScript",
+"OnEvent",
+"UnitHealth",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateHealthWatcher) ~= "function" then
+    _G.checkError = "CreateHealthWatcher не является глобальной функцией"
+    return false
+end
+-- Тест 1: корректный unit
+local ok1, watcher = pcall(_G.CreateHealthWatcher, "player")
+if not ok1 then
+    _G.checkError = "Ошибка вызова CreateHealthWatcher: " .. tostring(watcher)
+    return false
+end
+if type(watcher) ~= "table" then
+    _G.checkError = "Функция должна вернуть таблицу"
+    return false
+end
+if not watcher.frame then
+    _G.checkError = "В таблице должно быть поле frame"
+    return false
+end
+if watcher.unit ~= "player" then
+    _G.checkError = "Поле unit должно быть 'player'"
+    return false
+end
+if watcher.lastHP ~= 0 then
+    _G.checkError = "Начальное значение lastHP должно быть 0"
+    return false
+end
+if watcher.updateCount ~= 0 then
+    _G.checkError = "Начальное значение updateCount должно быть 0"
+    return false
+end
+-- Вызываем OnEvent вручную с правильным unit
+local script = watcher.frame:GetScript("OnEvent")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnEvent"
+    return false
+end
+local ok2, err2 = pcall(script, watcher.frame, "UNIT_HEALTH", "player")
+if not ok2 then
+    _G.checkError = "Ошибка при вызове OnEvent: " .. tostring(err2)
+    return false
+end
+if watcher.updateCount ~= 1 then
+    _G.checkError = "После одного события updateCount должен быть 1"
+    return false
+end
+-- Вызываем с другим unit — не должно меняться
+local ok3, err3 = pcall(script, watcher.frame, "UNIT_HEALTH", "target")
+if not ok3 then
+    _G.checkError = "Ошибка при вызове OnEvent с target: " .. tostring(err3)
+    return false
+end
+if watcher.updateCount ~= 1 then
+    _G.checkError = "Для другого unit updateCount не должен меняться"
+    return false
+end
+-- Тест 2: пустая строка
+local ok4, watcher2 = pcall(_G.CreateHealthWatcher, "")
+if not ok4 or watcher2 ~= nil then
+    _G.checkError = "Для пустой строки функция должна вернуть nil"
+    return false
+end
+-- Тест 3: не строка
+local ok5, watcher3 = pcall(_G.CreateHealthWatcher, 123)
+if not ok5 or watcher3 ~= nil then
+    _G.checkError = "Для нестрокового аргумента функция должна вернуть nil"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][245] = {
 type = "info",
-title = "Мышь, наведение и тултипы",
+title = "OnUpdate: таймеры и ручная имитация анимаций",
+helpModules = {215, 221, 227},
 content = [=[
-<h>Мышь, наведение и тултипы</h>
-<t>Интерфейс можно делать интерактивным: реагировать на наведение, клики и показывать подсказки.</t>
+<h>OnUpdate: таймеры и ручная имитация анимаций</h>
+<w>Важно:</w> в WoW 3.3.5 нет готовых анимаций и системы AnimationGroup. Всё, что связано с движением, мерцанием, плавным появлением и исчезновением, делается вручную через <k>OnUpdate</k>.
+<h>Что такое OnUpdate</h>
+<t>Скрипт <k>OnUpdate</k> вызывается каждый кадр для фрейма. Это примерно 30-60 раз в секунду, в зависимости от FPS.</t>
+<code>
+MyTimerFrame = CreateFrame("Frame", nil, UIParent)
+MyTimerFrame:SetScript("OnUpdate", function(self, elapsed)
+    -- этот код выполняется каждый кадр
+end)
+</code>
+<t>Аргументы обработчика:</t>
+<c>self</c> — сам фрейм.
+<c>elapsed</c> — время в секундах, прошедшее с последнего кадра. Обычно очень маленькое число, например 0.016.
+<h>Накопление времени</h>
+<t>Чтобы отсчитать нужное количество секунд, накапливают <k>elapsed</k> в переменной.</t>
+<code>
+MyTimerFrame.elapsed = 0
+MyTimerFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.elapsed = self.elapsed + elapsed
+    if self.elapsed >= 5 then
+        print("Прошло 5 секунд")
+        self:SetScript("OnUpdate", nil)
+    end
+end)
+</code>
+<t>Когда время вышло, скрипт снимают через <k>SetScript("OnUpdate", nil)</k>, чтобы он больше не выполнялся.</t>
+<h>Почему elapsed, а не GetTime</h>
+<t><k>elapsed</k> даёт точное время между кадрами. Это удобно для плавных анимаций, потому что скорость анимации не зависит от FPS.</t>
+<code>
+-- неправильно: привязка к FPS
+self.alpha = self.alpha + 0.01
+-- правильно: привязка ко времени
+self.alpha = self.alpha + elapsed * speed
+</code>
+<h>Одноразовый таймер</h>
+<code>
+function CreateOneShotTimer(seconds, callback)
+    local f = CreateFrame("Frame", nil, UIParent)
+    f.elapsed = 0
+    f:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= seconds then
+            self:SetScript("OnUpdate", nil)
+            if type(callback) == "function" then
+                callback()
+            end
+        end
+    end)
+    return f
+end
+</code>
+<h>Повторяющийся таймер</h>
+<code>
+function CreateRepeatingTimer(seconds, callback)
+    local f = CreateFrame("Frame", nil, UIParent)
+    f.elapsed = 0
+    f:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= seconds then
+            self.elapsed = self.elapsed - seconds
+            if type(callback) == "function" then
+                callback()
+            end
+        end
+    end)
+    return f
+end
+</code>
+<t>Здесь вместо снятия скрипта мы вычитаем прошедшее время, чтобы следующий интервал начался с остатка.</t>
+<h>Ручная имитация анимации: плавное появление</h>
+<code>
+function CreateFadeIn(frame, duration)
+    frame:SetAlpha(0)
+    frame.elapsed = 0
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        local progress = self.elapsed / duration
+        if progress >= 1 then
+            progress = 1
+            self:SetScript("OnUpdate", nil)
+        end
+        self:SetAlpha(progress)
+    end)
+end
+</code>
+<h>Ручная имитация анимации: плавное исчезновение</h>
+<code>
+function CreateFadeOut(frame, duration)
+    frame:SetAlpha(1)
+    frame.elapsed = 0
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        local progress = self.elapsed / duration
+        if progress >= 1 then
+            progress = 1
+            self:SetScript("OnUpdate", nil)
+        end
+        self:SetAlpha(1 - progress)
+    end)
+end
+</code>
+<h>Ручная имитация анимации: мерцание</h>
+<code>
+function CreateBlink(frame, interval)
+    frame.elapsed = 0
+    frame.visible = true
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= interval then
+            self.elapsed = self.elapsed - interval
+            self.visible = not self.visible
+            if self.visible then
+                self:Show()
+            else
+                self:Hide()
+            end
+        end
+    end)
+end
+</code>
+<h>Ручная имитация анимации: пульсация масштаба</h>
+<code>
+function CreatePulse(frame, speed)
+    frame.elapsed = 0
+    frame.growing = true
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        local scale = self:GetScale()
+        if self.growing then
+            scale = scale + elapsed * speed
+            if scale >= 1.2 then
+                scale = 1.2
+                self.growing = false
+            end
+        else
+            scale = scale - elapsed * speed
+            if scale <= 1.0 then
+                scale = 1.0
+                self.growing = true
+            end
+        end
+        self:SetScale(scale)
+    end)
+end
+</code>
+<h>Ручная имитация анимации: обратный отсчёт</h>
+<code>
+function CreateCountdownDisplay(frame, seconds)
+    frame.remaining = seconds
+    frame.elapsed = 0
+    local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    fs:SetPoint("CENTER")
+    fs:SetText(tostring(seconds))
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= 1 then
+            self.elapsed = self.elapsed - 1
+            self.remaining = self.remaining - 1
+            if self.remaining <= 0 then
+                fs:SetText("Готово!")
+                self:SetScript("OnUpdate", nil)
+            else
+                fs:SetText(tostring(self.remaining))
+            end
+        end
+    end)
+end
+</code>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> забыть снять OnUpdate, когда анимация закончилась. Фрейм будет продолжать выполняться каждый кадр и тратить ресурсы.
+<code>
+-- неправильно: OnUpdate работает бесконечно
+frame:SetScript("OnUpdate", function(self, elapsed)
+    self:SetAlpha(self:GetAlpha() - 0.01)
+end)
+-- правильно: снимаем после завершения
+frame:SetScript("OnUpdate", function(self, elapsed)
+    local alpha = self:GetAlpha() - elapsed
+    if alpha <= 0 then
+        self:SetAlpha(0)
+        self:SetScript("OnUpdate", nil)
+    else
+        self:SetAlpha(alpha)
+    end
+end)
+</code>
+<w>Ошибка 2:</w> не привязывать скорость к <k>elapsed</k>. Анимация будет зависеть от FPS.
+<w>Ошибка 3:</w> использовать <k>GetTime()</k> внутри OnUpdate вместо накопления <k>elapsed</k>. Это работает, но менее точно и менее удобно для пауз.
+]=],
+}
+
+ns_llua['lua'][246] = {
+type = "vartest",
+title = "Тест 245-1: базовые понятия OnUpdate",
+helpModules = {245},
+tasks = {
+{
+var = "onUpdateArgName",
+desc = 'Создай глобальную переменную onUpdateArgName = "elapsed"',
+check = function(value)
+return value == "elapsed"
+end,
+},
+{
+var = "onUpdateStopMethod",
+desc = 'Создай глобальную переменную onUpdateStopMethod = "SetScript"',
+check = function(value)
+return value == "SetScript"
+end,
+},
+{
+var = "onUpdateStopValue",
+desc = 'Создай глобальную переменную onUpdateStopValue = nil',
+check = function(value)
+return value == nil
+end,
+},
+},
+}
+
+ns_llua['lua'][247] = {
+type = "commenttest",
+title = "Тест 245-2: функция CreateOneShotTimer",
+helpModules = {245, 215, 45},
+preloadVars = {
+{var = "CreateOneShotTimer", desc = "CreateOneShotTimer очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "testTimerFired", desc = "testTimerFired очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 245-2: функция CreateOneShotTimer</h>
+<t>Создай глобальную функцию <k>CreateOneShotTimer(seconds, callback)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>seconds</k> не является числом или меньше либо равно нуля, функция должна вернуть <k>nil</k>;</t>
+<t>- иначе создай анонимный фрейм типа <s>"Frame"</s> с родителем <k>UIParent</k>;</t>
+<t>- создай поле <k>elapsed</k> со значением <n>0</n>;</t>
+<t>- назначь скрипт <k>OnUpdate</k>, который:</t>
+<t>накапливает <k>elapsed</k>;</t>
+<t>когда накопленное время больше или равно <k>seconds</k>, снимает скрипт через <k>SetScript("OnUpdate", nil)</k> и вызывает <k>callback</k>, если это функция;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateOneShotTimer(seconds, callback)
+]=],
+requireKeywords = {
+"CreateOneShotTimer",
+"function",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetScript",
+"OnUpdate",
+"elapsed",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateOneShotTimer) ~= "function" then
+    _G.checkError = "CreateOneShotTimer не является глобальной функцией"
+    return false
+end
+-- Тест 1: некорректные секунды
+local ok1, result1 = pcall(_G.CreateOneShotTimer, -1, nil)
+if not ok1 or result1 ~= nil then
+    _G.checkError = "Для отрицательных секунд функция должна вернуть nil"
+    return false
+end
+local ok2, result2 = pcall(_G.CreateOneShotTimer, "bad", nil)
+if not ok2 or result2 ~= nil then
+    _G.checkError = "Для нечисловых секунд функция должна вернуть nil"
+    return false
+end
+-- Тест 2: корректный вызов
+_G.testTimerFired = false
+local ok3, timerFrame = pcall(_G.CreateOneShotTimer, 0.01, function()
+    _G.testTimerFired = true
+end)
+if not ok3 then
+    _G.checkError = "Ошибка вызова CreateOneShotTimer: " .. tostring(timerFrame)
+    return false
+end
+if not timerFrame or type(timerFrame.SetScript) ~= "function" then
+    _G.checkError = "Функция должна вернуть фрейм"
+    return false
+end
+if timerFrame.elapsed ~= 0 then
+    _G.checkError = "Поле elapsed должно быть 0"
+    return false
+end
+local script = timerFrame:GetScript("OnUpdate")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnUpdate"
+    return false
+end
+-- Вызываем OnUpdate вручную с большим elapsed, чтобы сработал таймер
+local ok4, err4 = pcall(script, timerFrame, 1)
+if not ok4 then
+    _G.checkError = "Ошибка при вызове OnUpdate: " .. tostring(err4)
+    return false
+end
+if _G.testTimerFired ~= true then
+    _G.checkError = "Callback должен быть вызван после истечения времени"
+    return false
+end
+-- После срабатывания OnUpdate должен быть снят
+local scriptAfter = timerFrame:GetScript("OnUpdate")
+if scriptAfter ~= nil then
+    _G.checkError = "После срабатывания таймера OnUpdate должен быть снят"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][248] = {
+type = "commenttest",
+title = "Тест 245-3: функция CreateBlinkAnimation",
+helpModules = {245, 215, 45},
+preloadVars = {
+{var = "CreateBlinkAnimation", desc = "CreateBlinkAnimation очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 245-3: функция CreateBlinkAnimation</h>
+<t>Создай глобальную функцию <k>CreateBlinkAnimation(frame, interval)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>Show</k> или <k>Hide</k>, функция должна вернуть <k>nil</k>;</t>
+<t>- если <k>interval</k> не является числом или меньше либо равно нуля, функция должна вернуть <k>nil</k>;</t>
+<t>- иначе создай поле <k>elapsed</k> со значением <n>0</n> на фрейме;</t>
+<t>- создай поле <k>visible</k> со значением <k>true</k> на фрейме;</t>
+<t>- назначь скрипт <k>OnUpdate</k>, который:</t>
+<t>накапливает <k>elapsed</k>;</t>
+<t>когда накопленное время больше или равно <k>interval</k>, вычитает <k>interval</k> из <k>elapsed</k>, переключает <k>visible</k> и вызывает <k>Show()</k> или <k>Hide()</k>;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateBlinkAnimation(frame, interval)
+]=],
+requireKeywords = {
+"CreateBlinkAnimation",
+"function",
+"Show",
+"Hide",
+"SetScript",
+"OnUpdate",
+"elapsed",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateBlinkAnimation) ~= "function" then
+    _G.checkError = "CreateBlinkAnimation не является глобальной функцией"
+    return false
+end
+-- Тест 1: некорректные аргументы
+local ok1, result1 = pcall(_G.CreateBlinkAnimation, nil, 1)
+if not ok1 or result1 ~= nil then
+    _G.checkError = "Для nil-фрейма функция должна вернуть nil"
+    return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+local ok2, result2 = pcall(_G.CreateBlinkAnimation, testFrame, -1)
+if not ok2 or result2 ~= nil then
+    _G.checkError = "Для отрицательного interval функция должна вернуть nil"
+    return false
+end
+-- Тест 2: корректный вызов
+local ok3, result3 = pcall(_G.CreateBlinkAnimation, testFrame, 0.5)
+if not ok3 then
+    _G.checkError = "Ошибка вызова CreateBlinkAnimation: " .. tostring(result3)
+    return false
+end
+if not result3 or type(result3.Show) ~= "function" then
+    _G.checkError = "Функция должна вернуть фрейм"
+    return false
+end
+if result3.elapsed ~= 0 then
+    _G.checkError = "Поле elapsed должно быть 0"
+    return false
+end
+if result3.visible ~= true then
+    _G.checkError = "Поле visible должно быть true"
+    return false
+end
+local script = result3:GetScript("OnUpdate")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnUpdate"
+    return false
+end
+-- Вызываем OnUpdate вручную, чтобы проверить переключение
+result3:Show()
+local ok4, err4 = pcall(script, result3, 1)
+if not ok4 then
+    _G.checkError = "Ошибка при вызове OnUpdate: " .. tostring(err4)
+    return false
+end
+if result3.visible ~= false then
+    _G.checkError = "После первого интервала visible должен быть false"
+    return false
+end
+if result3:IsShown() then
+    _G.checkError = "После первого интервала фрейм должен быть скрыт"
+    return false
+end
+-- Второй вызов должен вернуть видимость
+local ok5, err5 = pcall(script, result3, 1)
+if not ok5 then
+    _G.checkError = "Ошибка при втором вызове OnUpdate: " .. tostring(err5)
+    return false
+end
+if result3.visible ~= true then
+    _G.checkError = "После второго интервала visible должен быть true"
+    return false
+end
+if not result3:IsShown() then
+    _G.checkError = "После второго интервала фрейм должен быть показан"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][249] = {
+type = "commenttest",
+title = "Тест 245-4: функция CreateFadeOutAnimation",
+helpModules = {245, 215, 45, 10},
+preloadVars = {
+{var = "CreateFadeOutAnimation", desc = "CreateFadeOutAnimation очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 245-4: функция CreateFadeOutAnimation</h>
+<t>Создай глобальную функцию <k>CreateFadeOutAnimation(frame, duration)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>SetAlpha</k>, функция должна вернуть <k>nil</k>;</t>
+<t>- если <k>duration</k> не является числом или меньше либо равно нуля, функция должна вернуть <k>nil</k>;</t>
+<t>- иначе установи начальную прозрачность <k>SetAlpha(1)</k>;</t>
+<t>- создай поле <k>elapsed</k> со значением <n>0</n> на фрейме;</t>
+<t>- назначь скрипт <k>OnUpdate</k>, который:</t>
+<t>накапливает <k>elapsed</k>;</t>
+<t>вычисляет прогресс как <k>elapsed / duration</k>;</t>
+<t>если прогресс больше или равен 1, устанавливает <k>SetAlpha(0)</k> и снимает скрипт;</t>
+<t>иначе устанавливает <k>SetAlpha(1 - progress)</k>;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateFadeOutAnimation(frame, duration)
+]=],
+requireKeywords = {
+"CreateFadeOutAnimation",
+"function",
+"SetAlpha",
+"SetScript",
+"OnUpdate",
+"elapsed",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateFadeOutAnimation) ~= "function" then
+    _G.checkError = "CreateFadeOutAnimation не является глобальной функцией"
+    return false
+end
+-- Тест 1: некорректные аргументы
+local ok1, result1 = pcall(_G.CreateFadeOutAnimation, nil, 1)
+if not ok1 or result1 ~= nil then
+    _G.checkError = "Для nil-фрейма функция должна вернуть nil"
+    return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+local ok2, result2 = pcall(_G.CreateFadeOutAnimation, testFrame, -1)
+if not ok2 or result2 ~= nil then
+    _G.checkError = "Для отрицательного duration функция должна вернуть nil"
+    return false
+end
+-- Тест 2: корректный вызов
+local ok3, result3 = pcall(_G.CreateFadeOutAnimation, testFrame, 2)
+if not ok3 then
+    _G.checkError = "Ошибка вызова CreateFadeOutAnimation: " .. tostring(result3)
+    return false
+end
+if not result3 or type(result3.SetAlpha) ~= "function" then
+    _G.checkError = "Функция должна вернуть фрейм"
+    return false
+end
+if result3.elapsed ~= 0 then
+    _G.checkError = "Поле elapsed должно быть 0"
+    return false
+end
+local alpha = result3:GetAlpha()
+if type(alpha) ~= "number" or math.abs(alpha - 1) > 0.01 then
+    _G.checkError = "Начальная прозрачность должна быть 1"
+    return false
+end
+local script = result3:GetScript("OnUpdate")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnUpdate"
+    return false
+end
+-- Вызываем OnUpdate вручную с половиной duration
+local ok4, err4 = pcall(script, result3, 1)
+if not ok4 then
+    _G.checkError = "Ошибка при вызове OnUpdate: " .. tostring(err4)
+    return false
+end
+local alphaMid = result3:GetAlpha()
+if type(alphaMid) ~= "number" or alphaMid > 0.6 or alphaMid < 0.4 then
+    _G.checkError = "После половины duration прозрачность должна быть около 0.5"
+    return false
+end
+-- Вызываем OnUpdate с оставшимся временем
+local ok5, err5 = pcall(script, result3, 2)
+if not ok5 then
+    _G.checkError = "Ошибка при втором вызове OnUpdate: " .. tostring(err5)
+    return false
+end
+local alphaEnd = result3:GetAlpha()
+if type(alphaEnd) ~= "number" or alphaEnd > 0.01 then
+    _G.checkError = "После завершения прозрачность должна быть 0"
+    return false
+end
+-- После завершения OnUpdate должен быть снят
+local scriptAfter = result3:GetScript("OnUpdate")
+if scriptAfter ~= nil then
+    _G.checkError = "После завершения анимации OnUpdate должен быть снят"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][250] = {
+type = "commenttest",
+title = "Тест 245-5: функция CreateCountdownDisplay",
+helpModules = {245, 215, 227, 45, 10},
+preloadVars = {
+{var = "CreateCountdownDisplay", desc = "CreateCountdownDisplay очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 245-5: функция CreateCountdownDisplay</h>
+<t>Создай глобальную функцию <k>CreateCountdownDisplay(frame, seconds)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>CreateFontString</k>, функция должна вернуть <k>nil</k>;</t>
+<t>- если <k>seconds</k> не является целым числом или меньше либо равно нуля, функция должна вернуть <k>nil</k>;</t>
+<t>- иначе создай FontString слоем <s>"OVERLAY"</s> с шаблоном <s>"GameFontNormalLarge"</s>;</t>
+<t>- прикрепи текст через <k>SetPoint("CENTER")</k>;</t>
+<t>- установи начальный текст как строку с числом <k>seconds</k>;</t>
+<t>- создай поле <k>remaining</k> со значением <k>seconds</k> на фрейме;</t>
+<t>- создай поле <k>elapsed</k> со значением <n>0</n> на фрейме;</t>
+<t>- назначь скрипт <k>OnUpdate</k>, который:</t>
+<t>накапливает <k>elapsed</k>;</t>
+<t>когда накопленное время больше или равно 1, вычитает 1 из <k>elapsed</k> и уменьшает <k>remaining</k> на 1;</t>
+<t>если <k>remaining</k> меньше или равно нуля, устанавливает текст <s>"Готово!"</s> и снимает скрипт;</t>
+<t>иначе устанавливает текст как строку с числом <k>remaining</k>;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateCountdownDisplay(frame, seconds)
+]=],
+requireKeywords = {
+"CreateCountdownDisplay",
+"function",
+"CreateFontString",
+"OVERLAY",
+"GameFontNormalLarge",
+"SetPoint",
+"SetText",
+"SetScript",
+"OnUpdate",
+"elapsed",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateCountdownDisplay) ~= "function" then
+    _G.checkError = "CreateCountdownDisplay не является глобальной функцией"
+    return false
+end
+-- Тест 1: некорректные аргументы
+local ok1, result1 = pcall(_G.CreateCountdownDisplay, nil, 5)
+if not ok1 or result1 ~= nil then
+    _G.checkError = "Для nil-фрейма функция должна вернуть nil"
+    return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(200, 100)
+local ok2, result2 = pcall(_G.CreateCountdownDisplay, testFrame, -1)
+if not ok2 or result2 ~= nil then
+    _G.checkError = "Для отрицательного seconds функция должна вернуть nil"
+    return false
+end
+local ok3, result3 = pcall(_G.CreateCountdownDisplay, testFrame, 1.5)
+if not ok3 or result3 ~= nil then
+    _G.checkError = "Для дробного seconds функция должна вернуть nil"
+    return false
+end
+-- Тест 2: корректный вызов
+local ok4, result4 = pcall(_G.CreateCountdownDisplay, testFrame, 3)
+if not ok4 then
+    _G.checkError = "Ошибка вызова CreateCountdownDisplay: " .. tostring(result4)
+    return false
+end
+if not result4 or type(result4.CreateFontString) ~= "function" then
+    _G.checkError = "Функция должна вернуть фрейм"
+    return false
+end
+if result4.remaining ~= 3 then
+    _G.checkError = "Поле remaining должно быть 3"
+    return false
+end
+if result4.elapsed ~= 0 then
+    _G.checkError = "Поле elapsed должно быть 0"
+    return false
+end
+local script = result4:GetScript("OnUpdate")
+if type(script) ~= "function" then
+    _G.checkError = "У фрейма должен быть обработчик OnUpdate"
+    return false
+end
+-- Вызываем OnUpdate вручную, чтобы проверить отсчёт
+local ok5, err5 = pcall(script, result4, 1)
+if not ok5 then
+    _G.checkError = "Ошибка при вызове OnUpdate: " .. tostring(err5)
+    return false
+end
+if result4.remaining ~= 2 then
+    _G.checkError = "После первой секунды remaining должен быть 2"
+    return false
+end
+local ok6, err6 = pcall(script, result4, 1)
+if not ok6 then
+    _G.checkError = "Ошибка при втором вызове OnUpdate: " .. tostring(err6)
+    return false
+end
+if result4.remaining ~= 1 then
+    _G.checkError = "После второй секунды remaining должен быть 1"
+    return false
+end
+local ok7, err7 = pcall(script, result4, 1)
+if not ok7 then
+    _G.checkError = "Ошибка при третьем вызове OnUpdate: " .. tostring(err7)
+    return false
+end
+if result4.remaining ~= 0 then
+    _G.checkError = "После третьей секунды remaining должен быть 0"
+    return false
+end
+-- После завершения OnUpdate должен быть снят
+local scriptAfter = result4:GetScript("OnUpdate")
+if scriptAfter ~= nil then
+    _G.checkError = "После завершения отсчёта OnUpdate должен быть снят"
+    return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][251] = {
+type = "info",
+title = "Книга заклинаний и HasSpell",
+helpModules = {191, 65, 45},
+content = [=[
+<h>Книга заклинаний и HasSpell</h>
+<t>Книга заклинаний — это список всех заклинаний, которые персонаж выучил. Она разбита на вкладки.</t>
+<w>Важно:</w> в WoW 3.3.5 нет готовой функции <k>IsSpellKnown</k> и нет готовой функции <k>HasSpell</k>. Чтобы проверить, знает ли персонаж заклинание, нужно перебрать книгу заклинаний вручную.
+<h>Вкладки книги</h>
+<t>Книга заклинаний состоит из вкладок. Обычно это:</t>
+<c>1</c> — основные заклинания класса.
+<c>2</c> — таланты.
+<c>3</c> — общие заклинания.
+<c>4</c> — профессии и другие.
+<h>GetNumSpellTabs</h>
+<code>
+/run print(GetNumSpellTabs())
+</code>
+<t>Возвращает количество вкладок книги заклинаний.</t>
+<h>GetSpellTabInfo</h>
+<code>
+/run local name, texture, offset, numSpells = GetSpellTabInfo(1); print(name, offset, numSpells)
+</code>
+<t>Возвращает данные о вкладке:</t>
+<c>name</c> — название вкладки.
+<c>texture</c> — иконка вкладки.
+<c>offset</c> — смещение индекса. Заклинания этой вкладки начинаются с offset + 1.
+<c>numSpells</c> — количество заклинаний на вкладке.
+<h>GetSpellBookItemName</h>
+<code>
+/run print(GetSpellBookItemName(1, "SPELL"))
+</code>
+<t>Возвращает имя заклинания по глобальному индексу в книге.</t>
+<t>Второй аргумент — тип книги:</t>
+<c>"SPELL"</c> — книга заклинаний.
+<c>"PET"</c> — книга заклинаний питомца.
+<h>GetSpellBookItemTexture</h>
+<code>
+/run print(GetSpellBookItemTexture(1, "SPELL"))
+</code>
+<t>Возвращает путь к иконке заклинания.</t>
+<h>Перебор книги заклинаний</h>
+<code>
+/run local total = 0; local tabs = GetNumSpellTabs() or 0; for tab = 1, tabs do local _, _, offset, numSpells = GetSpellTabInfo(tab); if numSpells then total = total + numSpells end end; print("Всего заклинаний: " .. total)
+</code>
+<h>Поиск заклинания по имени</h>
+<t>Чтобы проверить, знает ли персонаж заклинание, нужно перебрать книгу:</t>
+<code>
+/run local found = false; local tabs = GetNumSpellTabs() or 0; for tab = 1, tabs do local _, _, offset, numSpells = GetSpellTabInfo(tab); if numSpells then for i = 1, numSpells do local name = GetSpellBookItemName(offset + i, "SPELL"); if name and string.find(name, "Огн") then found = true end end end end; print(found)
+</code>
+<w>Важно:</w> имя заклинания зависит от языка клиента. Поэтому для надёжной проверки лучше использовать spellID, если он доступен.
+<h>Поиск по spellID через GetSpellBookItemName</h>
+<t>В WoW 3.3.5 нет прямой функции поиска по spellID в книге. Однако можно использовать <k>GetSpellInfo(spellID)</k> чтобы получить имя, а затем искать это имя в книге.</t>
+<code>
+/run local spellName = GetSpellInfo(6603); if spellName then print("Имя заклинания 6603: " .. spellName) end
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local tabs = GetNumSpellTabs() or 0; print(string.format("Вкладок в книге: %d", tabs))
+</code>
+]=],
+}
+
+ns_llua['lua'][252] = {
+type = "vartest",
+title = "Тест 251-1: количество вкладок книги",
+helpModules = {251, 65},
+tasks = {
+{
+var = "spellTabCount",
+desc = 'Создай глобальную переменную spellTabCount = GetNumSpellTabs() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "firstTabName",
+desc = 'Создай глобальную переменную firstTabName = GetSpellTabInfo(1) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][253] = {
+type = "vartest",
+title = "Тест 251-2: данные первой вкладки",
+helpModules = {251, 65},
+tasks = {
+{
+var = "firstTabOffset",
+desc = 'Создай глобальную переменную firstTabOffset = select(3, GetSpellTabInfo(1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "firstTabSpellCount",
+desc = 'Создай глобальную переменную firstTabSpellCount = select(4, GetSpellTabInfo(1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "firstSpellName",
+desc = 'Создай глобальную переменную firstSpellName = GetSpellBookItemName(1, "SPELL") or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][254] = {
+type = "commenttest",
+title = "Тест 251-3: функция GetSpellTabCountSafe",
+helpModules = {251, 45, 65},
+preloadVars = {
+{var = "GetSpellTabCountSafe", desc = "GetSpellTabCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 251-3: функция GetSpellTabCountSafe</h>
+<t>Создай глобальную функцию <k>GetSpellTabCountSafe()</k>.</t>
+<t>Функция должна вернуть количество вкладок книги заклинаний через:</t>
+<code>
+GetNumSpellTabs()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество вкладок.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellTabCountSafe()
+]=],
+requireKeywords = {
+"GetSpellTabCountSafe",
+"function",
+"GetNumSpellTabs",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellTabCountSafe) ~= "function" then
+_G.checkError = "GetSpellTabCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetSpellTabCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetSpellTabCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество вкладок не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][255] = {
+type = "commenttest",
+title = "Тест 251-4: функция GetSpellBookItemNameSafe",
+helpModules = {251, 45, 65},
+preloadVars = {
+{var = "GetSpellBookItemNameSafe", desc = "GetSpellBookItemNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 251-4: функция GetSpellBookItemNameSafe</h>
+<t>Создай глобальную функцию <k>GetSpellBookItemNameSafe(index)</k>.</t>
+<t>Если <k>index</k> не является числом или меньше либо равно нуля, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна получить имя заклинания через:</t>
+<code>
+GetSpellBookItemName(index, "SPELL")
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть имя заклинания.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetSpellBookItemNameSafe(index)
+]=],
+requireKeywords = {
+"GetSpellBookItemNameSafe",
+"function",
+"GetSpellBookItemName",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetSpellBookItemNameSafe) ~= "function" then
+_G.checkError = "GetSpellBookItemNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetSpellBookItemNameSafe, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetSpellBookItemNameSafe(1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для index = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetSpellBookItemNameSafe, 0)
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для index = 0 функция должна вернуть 'нет'"
+return false
+end
+local ok3, result3 = pcall(_G.GetSpellBookItemNameSafe, "bad")
+if not ok3 or result3 ~= "нет" then
+_G.checkError = "Для нечислового index функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][256] = {
+type = "commenttest",
+title = "Тест 251-5: функция FindSpellInBook",
+helpModules = {251, 45, 31, 33, 65},
+preloadVars = {
+{var = "FindSpellInBook", desc = "FindSpellInBook очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 251-5: функция FindSpellInBook</h>
+<t>Создай глобальную функцию <k>FindSpellInBook(text)</k>.</t>
+<t>Если <k>text</k> не является строкой или является пустой строкой, функция должна вернуть <k>false</k>.</t>
+<t>Иначе функция должна перебрать все вкладки книги заклинаний и найти заклинание, в названии которого есть подстрока <k>text</k>.</t>
+<t>Алгоритм:</t>
+<t>1. Получи количество вкладок через <k>GetNumSpellTabs()</k>.</t>
+<t>2. Для каждой вкладки получи <k>offset</k> и <k>numSpells</k> через <k>GetSpellTabInfo(tab)</k>.</t>
+<t>3. Перебери заклинания от <k>offset + 1</k> до <k>offset + numSpells</k>.</t>
+<t>4. Для каждого заклинания получи имя через <k>GetSpellBookItemName(index, "SPELL")</k>.</t>
+<t>5. Если имя содержит подстроку <k>text</k>, верни <k>true</k>.</t>
+<t>6. Если ничего не найдено, верни <k>false</k>.</t>
+<t>Используй:</t>
+<c>GetNumSpellTabs</c>
+<c>GetSpellTabInfo</c>
+<c>GetSpellBookItemName</c>
+<c>string.find</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию FindSpellInBook(text)
+]=],
+requireKeywords = {
+"FindSpellInBook",
+"function",
+"GetNumSpellTabs",
+"GetSpellTabInfo",
+"GetSpellBookItemName",
+"string.find",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.FindSpellInBook) ~= "function" then
+_G.checkError = "FindSpellInBook не является глобальной функцией"
+return false
+end
+-- Тест 1: пустая строка
+local ok1, result1 = pcall(_G.FindSpellInBook, "")
+if not ok1 or result1 ~= false then
+_G.checkError = "Для пустой строки функция должна вернуть false"
+return false
+end
+-- Тест 2: не строка
+local ok2, result2 = pcall(_G.FindSpellInBook, 123)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для нестрокового аргумента функция должна вернуть false"
+return false
+end
+-- Тест 3: несуществующая подстрока
+local ok3, result3 = pcall(_G.FindSpellInBook, "zzz_no_such_spell_zzz")
+if not ok3 then
+_G.checkError = "Ошибка вызова FindSpellInBook с несуществующей строкой: " .. tostring(result3)
+return false
+end
+if result3 ~= false then
+_G.checkError = "Для несуществующей подстроки функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][257] = {
+type = "info",
+title = "Backdrop: рамки и фоны фреймов",
+helpModules = {215, 221, 227},
+content = [=[
+<h>Backdrop: рамки и фоны фреймов</h>
+<t>В WoW 3.3.5 для создания красивых панелей с рамками и фонами используется метод <k>SetBackdrop</k>. Это основной способ стилизации фреймов.</t>
+<w>Важно:</w> в современных версиях WoW этот метод убрали и заменили на NineSlice. Но в 3.3.5 именно <k>SetBackdrop</k> — единственный способ.
+<h>Структура backdropInfo</h>
+<t>Backdrop задаётся таблицей со следующими полями:</t>
+<code>
+local backdropInfo = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+}
+</code>
+<t>Поля:</t>
+<c>bgFile</c> — путь к текстуре фона.
+<c>edgeFile</c> — путь к текстуре рамки.
+<c>tile</c> — тайлить фон (повторять текстуру).
+<c>tileSize</c> — размер тайла фона.
+<c>edgeSize</c> — толщина рамки.
+<c>insets</c> — отступ фона от краёв рамки.
+<h>Применение SetBackdrop</h>
+<code>
+MyStyledFrame = CreateFrame("Frame", "MyStyledFrame", UIParent)
+MyStyledFrame:SetSize(250, 180)
+MyStyledFrame:SetPoint("CENTER")
+MyStyledFrame:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+})
+MyStyledFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+MyStyledFrame:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+MyStyledFrame:Show()
+</code>
+<h>SetBackdropColor</h>
+<t>Устанавливает цвет фона. Четыре аргумента: R, G, B, A (от 0 до 1).</t>
+<code>
+MyStyledFrame:SetBackdropColor(0, 0, 0, 0.8)   -- чёрный полупрозрачный
+MyStyledFrame:SetBackdropColor(0.2, 0.1, 0.1, 1) -- тёмно-красный
+</code>
+<h>SetBackdropBorderColor</h>
+<t>Устанавливает цвет рамки. Формат тот же: R, G, B, A.</t>
+<code>
+MyStyledFrame:SetBackdropBorderColor(1, 0.84, 0, 1) -- золотая рамка
+</code>
+<h>Популярные текстуры Blizzard</h>
+<c>"Interface\\Tooltips\\UI-Tooltip-Background"</c> — гладкий фон.
+<c>"Interface\\Tooltips\\UI-Tooltip-Border"</c> — тонкая рамка.
+<c>"Interface\\DialogFrame\\UI-DialogBox-Background"</c> — фон диалога.
+<c>"Interface\\DialogFrame\\UI-DialogBox-Border"</c> — рамка диалога.
+<c>"Interface\\ChatFrame\\ChatFrameBackground"</c> — фон чата.
+<c>"Interface\\Buttons\\WHITE8x8"</c> — белый квадрат (универсальный).
+<h>Шаблоны с backdrop</h>
+<t>Некоторые шаблоны уже содержат backdrop:</t>
+<code>
+MyDialog = CreateFrame("Frame", "MyDialog", UIParent, "UIPanelDialogTemplate")
+</code>
+<t>Но для полного контроля лучше задавать backdrop вручную.</t>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> забыть двойной обратный слеш в путях.
+<code>
+-- неправильно
+bgFile = "Interface\Tooltips\UI-Tooltip-Background"
+-- правильно
+bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"
+</code>
+<w>Ошибка 2:</w> вызвать SetBackdropColor до SetBackdrop. Сначала нужно задать backdrop, потом менять цвет.
+<w>Ошибка 3:</w> не указать insets. Без них фон может залезать под рамку.
+]=],
+}
+
+ns_llua['lua'][258] = {
+type = "vartest",
+title = "Тест 258: пути текстур backdrop",
+helpModules = {257},
+tasks = {
+{
+var = "backdropBgPath",
+desc = 'Создай глобальную переменную backdropBgPath = "Interface\\\\Tooltips\\\\UI-Tooltip-Background"',
+check = function(value)
+return type(value) == "string" and value:find("UI%-Tooltip%-Background") ~= nil
+end,
+},
+{
+var = "backdropEdgePath",
+desc = 'Создай глобальную переменную backdropEdgePath = "Interface\\\\Tooltips\\\\UI-Tooltip-Border"',
+check = function(value)
+return type(value) == "string" and value:find("UI%-Tooltip%-Border") ~= nil
+end,
+},
+{
+var = "backdropTileSize",
+desc = 'Создай глобальную переменную backdropTileSize = 16',
+check = function(value)
+return type(value) == "number" and value == 16
+end,
+},
+},
+}
+
+ns_llua['lua'][259] = {
+type = "commenttest",
+title = "Тест 259: фрейм с backdrop",
+helpModules = {257, 215, 221},
+preloadVars = {
+{var = "CourseBackdropFrame", desc = "CourseBackdropFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 233-2: фрейм с backdrop</h>
+<t>Создай глобальный фрейм <k>CourseBackdropFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>"Frame"</s>, глобальное имя: <s>"CourseBackdropFrame"</s>, родитель: <k>UIParent</k>;</t>
+<t>- размер: 260 на 160;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- примени <k>SetBackdrop</k> с таблицей:</t>
+<c>bgFile</c> = "Interface\\Tooltips\\UI-Tooltip-Background"
+<c>edgeFile</c> = "Interface\\Tooltips\\UI-Tooltip-Border"
+<c>tile</c> = true
+<c>tileSize</c> = 16
+<c>edgeSize</c> = 16
+<c>insets</c> = { left = 4, right = 4, top = 4, bottom = 4 }
+<t>- установи цвет фона: <k>SetBackdropColor(0.05, 0.05, 0.05, 0.9)</k>;</t>
+<t>- установи цвет рамки: <k>SetBackdropBorderColor(0.6, 0.6, 0.6, 1)</k>;</t>
+<t>- покажи фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseBackdropFrame с backdrop
+]=],
+requireKeywords = {
+"CourseBackdropFrame",
+"CreateFrame",
+"SetBackdrop",
+"bgFile",
+"edgeFile",
+"SetBackdropColor",
+"SetBackdropBorderColor",
+"Show",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseBackdropFrame
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "CourseBackdropFrame не является фреймом"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "Фрейм должен быть показан"
+return false
+end
+if f:GetWidth() ~= 260 or f:GetHeight() ~= 160 then
+_G.checkError = "Размер фрейма должен быть 260 на 160"
+return false
+end
+if type(f.GetBackdrop) ~= "function" then
+_G.checkError = "У фрейма должен быть метод GetBackdrop"
+return false
+end
+local bd = f:GetBackdrop()
+if type(bd) ~= "table" then
+_G.checkError = "Backdrop не был применён"
+return false
+end
+if type(bd.bgFile) ~= "string" or bd.bgFile == "" then
+_G.checkError = "bgFile должен быть непустой строкой"
+return false
+end
+if type(bd.edgeFile) ~= "string" or bd.edgeFile == "" then
+_G.checkError = "edgeFile должен быть непустой строкой"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][260] = {
+type = "commenttest",
+title = "Тест 260: функция ApplyBackdrop",
+helpModules = {257, 215, 45, 65},
+preloadVars = {
+{var = "ApplyBackdrop", desc = "ApplyBackdrop очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 233-3: функция ApplyBackdrop</h>
+<t>Создай глобальную функцию <k>ApplyBackdrop(frame, r, g, b, a)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>SetBackdrop</k>, верни <k>false</k>;</t>
+<t>- если <k>r</k>, <k>g</k>, <k>b</k> не являются числами, верни <k>false</k>;</t>
+<t>- если <k>a</k> не является числом, используй <n>1</n>;</t>
+<t>- иначе примени стандартный backdrop с bgFile <s>"Interface\\Tooltips\\UI-Tooltip-Background"</s> и edgeFile <s>"Interface\\Tooltips\\UI-Tooltip-Border"</s>;</t>
+<t>- установи цвет фона через <k>SetBackdropColor(r, g, b, a)</k>;</t>
+<t>- установи цвет рамки через <k>SetBackdropBorderColor(0.5, 0.5, 0.5, 1)</k>;</t>
+<t>- верни <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ApplyBackdrop(frame, r, g, b, a)
+]=],
+requireKeywords = {
+"ApplyBackdrop",
+"function",
+"SetBackdrop",
+"SetBackdropColor",
+"SetBackdropBorderColor",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ApplyBackdrop) ~= "function" then
+_G.checkError = "ApplyBackdrop не является глобальной функцией"
+return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(100, 100)
+local ok1, result1 = pcall(_G.ApplyBackdrop, testFrame, 0.1, 0.1, 0.1, 0.8)
+if not ok1 then
+_G.checkError = "Ошибка вызова ApplyBackdrop: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для корректного фрейма функция должна вернуть true"
+return false
+end
+local bd = testFrame:GetBackdrop()
+if type(bd) ~= "table" or type(bd.bgFile) ~= "string" then
+_G.checkError = "Backdrop не был применён"
+return false
+end
+local ok2, result2 = pcall(_G.ApplyBackdrop, nil, 0, 0, 0, 1)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil-фрейма функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.ApplyBackdrop, testFrame, "bad", 0, 0, 1)
+if not ok3 or result3 ~= false then
+_G.checkError = "Для нечислового r функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][261] = {
+type = "commenttest",
+title = "Тест 261: функция SetFrameBackdropColor",
+helpModules = {257, 45, 65, 21},
+preloadVars = {
+{var = "SetFrameBackdropColor", desc = "SetFrameBackdropColor очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 233-4: функция SetFrameBackdropColor</h>
+<t>Создай глобальную функцию <k>SetFrameBackdropColor(frame, r, g, b, a)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>SetBackdropColor</k>, верни <k>false</k>;</t>
+<t>- если любой из аргументов <k>r</k>, <k>g</k>, <k>b</k> не является числом, верни <k>false</k>;</t>
+<t>- если <k>a</k> не является числом, используй <n>1</n>;</t>
+<t>- ограничь каждое значение от 0 до 1 через <k>math.max(0, math.min(1, value))</k>;</t>
+<t>- вызови <k>frame:SetBackdropColor(r, g, b, a)</k>;</t>
+<t>- верни <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SetFrameBackdropColor(frame, r, g, b, a)
+]=],
+requireKeywords = {
+"SetFrameBackdropColor",
+"function",
+"SetBackdropColor",
+"math.max",
+"math.min",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SetFrameBackdropColor) ~= "function" then
+_G.checkError = "SetFrameBackdropColor не является глобальной функцией"
+return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(80, 80)
+testFrame:SetBackdrop({
+bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+tile = true, tileSize = 16, edgeSize = 16,
+insets = { left = 3, right = 3, top = 3, bottom = 3 },
+})
+local ok1, result1 = pcall(_G.SetFrameBackdropColor, testFrame, 0.5, 0.3, 0.1, 0.9)
+if not ok1 then
+_G.checkError = "Ошибка вызова SetFrameBackdropColor: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для корректных данных функция должна вернуть true"
+return false
+end
+local ok2, result2 = pcall(_G.SetFrameBackdropColor, nil, 0, 0, 0, 1)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil-фрейма функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.SetFrameBackdropColor, testFrame, 2, 0, 0, 1)
+if not ok3 then
+_G.checkError = "Ошибка при r > 1: " .. tostring(result3)
+return false
+end
+if result3 ~= true then
+_G.checkError = "Для r > 1 функция должна вернуть true (с клампом)"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][262] = {
+type = "commenttest",
+title = "Тест 262: функция CreateStyledPanel",
+helpModules = {257, 215, 221, 227, 45, 65},
+preloadVars = {
+{var = "CreateStyledPanel", desc = "CreateStyledPanel очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 233-5: функция CreateStyledPanel</h>
+<t>Создай глобальную функцию <k>CreateStyledPanel(name, width, height, title)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>name</k> не строка или пустая, верни <k>nil</k>;</t>
+<t>- если <k>width</k> или <k>height</k> не числа или меньше 50, верни <k>nil</k>;</t>
+<t>- если <k>title</k> не строка, используй пустую строку;</t>
+<t>- создай фрейм типа <s>"Frame"</s> с именем <k>name</k>, родитель <k>UIParent</k>;</t>
+<t>- размер: <k>width</k> на <k>height</k>;</t>
+<t>- позиция: CENTER;</t>
+<t>- примени backdrop с bgFile и edgeFile из Tooltips;</t>
+<t>- цвет фона: чёрный полупрозрачный (0, 0, 0, 0.85);</t>
+<t>- цвет рамки: серый (0.5, 0.5, 0.5, 1);</t>
+<t>- создай FontString заголовок слоем OVERLAY, шаблон GameFontNormalLarge;</t>
+<t>- позиция заголовка: TOP, смещение 0, -10;</t>
+<t>- текст заголовка: <k>title</k>;</t>
+<t>- покажи фрейм;</t>
+<t>- верни фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateStyledPanel(name, width, height, title)
+]=],
+requireKeywords = {
+"CreateStyledPanel",
+"function",
+"CreateFrame",
+"SetBackdrop",
+"SetBackdropColor",
+"CreateFontString",
+"SetText",
+"Show",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateStyledPanel) ~= "function" then
+_G.checkError = "CreateStyledPanel не является глобальной функцией"
+return false
+end
+local ok1, f1 = pcall(_G.CreateStyledPanel, "NS_Test_Panel_1", 200, 150, "Заголовок")
+if not ok1 then
+_G.checkError = "Ошибка вызова CreateStyledPanel: " .. tostring(f1)
+return false
+end
+if not f1 or type(f1.IsShown) ~= "function" then
+_G.checkError = "Функция должна вернуть фрейм"
+return false
+end
+if not f1:IsShown() then
+_G.checkError = "Фрейм должен быть показан"
+return false
+end
+if f1:GetWidth() ~= 200 or f1:GetHeight() ~= 150 then
+_G.checkError = "Размер фрейма должен быть 200 на 150"
+return false
+end
+local bd = f1:GetBackdrop()
+if type(bd) ~= "table" or type(bd.bgFile) ~= "string" then
+_G.checkError = "Backdrop должен быть применён"
+return false
+end
+local ok2, f2 = pcall(_G.CreateStyledPanel, "", 200, 150, "Тест")
+if not ok2 or f2 ~= nil then
+_G.checkError = "Для пустого имени функция должна вернуть nil"
+return false
+end
+local ok3, f3 = pcall(_G.CreateStyledPanel, "NS_Test_Panel_2", 30, 150, "Тест")
+if not ok3 or f3 ~= nil then
+_G.checkError = "Для width < 50 функция должна вернуть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][263] = {
+type = "info",
+title = "Тултипы: GameTooltip и подсказки",
+helpModules = {215, 227, 233},
+content = [=[
+<h>Тултипы: GameTooltip и подсказки</h>
+<t>Тултип — это всплывающая подсказка, которая появляется при наведении курсора на элемент интерфейса. В WoW 3.3.5 есть глобальный объект <k>GameTooltip</k>, который можно использовать для показа информации.</t>
+<h>Основные методы GameTooltip</h>
+<c>GameTooltip:SetOwner(frame, anchor)</c> — привязать тултип к фрейму.
+<c>GameTooltip:SetText(text)</c> — установить основной текст.
+<c>GameTooltip:AddLine(text, r, g, b)</c> — добавить строку.
+<c>GameTooltip:AddDoubleLine(left, right)</c> — добавить строку с двумя колонками.
+<c>GameTooltip:Show()</c> — показать тултип.
+<c>GameTooltip:Hide()</c> — скрыть тултип.
+<h>SetOwner</h>
+<t>Перед показом тултипа нужно указать, к какому фрейму он привязан:</t>
+<code>
+GameTooltip:SetOwner(MyFrame, "ANCHOR_TOPRIGHT")
+</code>
+<t>Варианты привязки:</t>
+<c>"ANCHOR_TOP"</c> — над фреймом.
+<c>"ANCHOR_BOTTOM"</c> — под фреймом.
+<c>"ANCHOR_LEFT"</c> — слева.
+<c>"ANCHOR_RIGHT"</c> — справа.
+<c>"ANCHOR_TOPRIGHT"</c> — в правом верхнем углу.
+<c>"ANCHOR_CURSOR"</c> — у курсора мыши.
 <h>OnEnter и OnLeave</h>
+<t>Тултипы показываются при наведении мыши. Для этого используются скрипты <k>OnEnter</k> и <k>OnLeave</k>:</t>
 <code>
-MyBox = CreateFrame("Frame", "MyBox", UIParent)
-MyBox:SetSize(120, 80)
-MyBox:SetPoint("CENTER")
-MyBox:EnableMouse(true)
-local bg = MyBox:CreateTexture(nil, "BACKGROUND")
-bg:SetAllPoints(MyBox)
-bg:SetTexture(0.2, 0.2, 0.3, 1)
-MyBox:SetScript("OnEnter", function()
-    print("Курсор на фрейме")
-end)
-MyBox:SetScript("OnLeave", function()
-    print("Курсор ушёл")
-end)
-MyBox:Show()
-</code>
-<h>MouseIsOver</h>
-<code>
-/run print(MouseIsOver(MyBox))
-</code>
-<h>GetMouseFocus</h>
-<code>
-/run local focus = GetMouseFocus(); print(focus and focus.GetName and focus:GetName() or "нет фокуса")
-</code>
-<h>GameTooltip</h>
-<code>
-MyBox:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Моя панель")
-    GameTooltip:AddLine("Описание панели", 1, 1, 1)
+MyFrame:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+    GameTooltip:SetText("Мой фрейм")
+    GameTooltip:AddLine("Описание фрейма", 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end)
-MyBox:SetScript("OnLeave", function()
+MyFrame:SetScript("OnLeave", function(self)
     GameTooltip:Hide()
 end)
 </code>
-<h>Тултип юнита</h>
+<h>Показ предмета через SetHyperlink</h>
+<t>Чтобы показать стандартный тултип предмета:</t>
 <code>
-/run GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR"); GameTooltip:SetUnit("target"); GameTooltip:Show()
+GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+GameTooltip:SetHyperlink("item:6948:0:0:0:0:0:0:0")
+GameTooltip:Show()
 </code>
-<w>Примечание:</w> если цели нет, тултип может быть пустым или не показаться.
-]=],
-}
-
-ns_llua['lua'][99] = {
-type = "info",
-title = "Чат, цвета и сообщения",
-content = [=[
-<h>Чат, цвета и сообщения</h>
-<t>Кроме обычного <k>print</k>, можно писать напрямую в чат через <k>ChatFrame1:AddMessage</k>.</t>
+<t>Или через ссылку:</t>
 <code>
-/run ChatFrame1:AddMessage("Обычное сообщение")
-</code>
-<h>Цветовые коды</h>
-<t>WoW использует формат:</t>
-<c>|cAARRGGBB</c> — начало цвета.
-<c>|r</c> — сброс цвета.
-<t>Пример:</t>
-<code>
-/run ChatFrame1:AddMessage("|cFF00FF00Зелёный текст|r")
-/run ChatFrame1:AddMessage("|cFFFF8080Красный текст|r")
-/run ChatFrame1:AddMessage("|cFF66CCFFГолубой текст|r")
-</code>
-<h>Расшифровка цвета</h>
-<t>Для <c>|cFF00FF00</c>:</t>
-<c>FF</c> — прозрачность.
-<c>00</c> — красный.
-<c>FF</c> — зелёный.
-<c>00</c> — синий.
-<h>DEFAULT_CHAT_FRAME</h>
-<code>
-/run DEFAULT_CHAT_FRAME:AddMessage("|cFFFFD700Золотой текст|r")
-</code>
-<h>SendChatMessage</h>
-<t>Можно отправить сообщение в чат от имени игрока.</t>
-<code>
-/run SendChatMessage("Привет из курса Lua", "SAY")
-</code>
-<w>Важно:</w> у отправки сообщений есть ограничения и задержки. Не стоит спамить ими.
-]=],
-}
-
-ns_llua['lua'][100] = {
-type = "info",
-title = "Слэш-команды",
-content = [=[
-<h>Слэш-команды</h>
-<t>Слэш-команды позволяют управлять аддоном из чата.</t>
-<h>Простая команда</h>
-<code>
-SlashCmdList["COURSEDEMO"] = function(msg)
-    print("Команда получена:", msg)
+local _, link = GetItemInfo(6948)
+if link then
+    GameTooltip:SetHyperlink(link)
 end
-SLASH_COURSEDEMO1 = "/coursedemo"
 </code>
-<t>После этого можно написать:</t>
+<h>Показ заклинания</h>
 <code>
-/coursedemo привет
+GameTooltip:SetSpellByID(6603)
 </code>
+<h>AddLine с цветом</h>
+<code>
+GameTooltip:AddLine("Красный текст", 1, 0, 0)
+GameTooltip:AddLine("Зелёный текст", 0, 1, 0)
+GameTooltip:AddLine("Белый текст", 1, 1, 1)
+</code>
+<h>AddDoubleLine</h>
+<code>
+GameTooltip:AddDoubleLine("Слева", "Справа", 1, 1, 1, 0.8, 0.8, 0.8)
+</code>
+<h>GameTooltip_SetDefaultAnchor</h>
+<t>Стандартная функция для привязки тултипа к курсору:</t>
+<code>
+GameTooltip_SetDefaultAnchor(GameTooltip, self)
+</code>
+<t>Это эквивалент <k>GameTooltip:SetOwner(self, "ANCHOR_CURSOR")</k>.</t>
+<h>Важные правила</h>
+<w>Правило 1:</w> всегда вызывай <k>GameTooltip:Hide()</k> в OnLeave. Иначе тултип останется на экране.
+<w>Правило 2:</w> перед AddLine вызови SetText или SetOwner. Иначе тултип может быть пустым.
+<w>Правило 3:</w> не показывай тултип в бою, если он может блокировать обзор.
+]=],
+}
+
+ns_llua['lua'][264] = {
+type = "vartest",
+title = "Тест 264: константы тултипов",
+helpModules = {263},
+tasks = {
+{
+var = "tooltipAnchorTop",
+desc = 'Создай глобальную переменную tooltipAnchorTop = "ANCHOR_TOP"',
+check = function(value)
+return value == "ANCHOR_TOP"
+end,
+},
+{
+var = "tooltipAnchorCursor",
+desc = 'Создай глобальную переменную tooltipAnchorCursor = "ANCHOR_CURSOR"',
+check = function(value)
+return value == "ANCHOR_CURSOR"
+end,
+},
+{
+var = "tooltipExists",
+desc = 'Создай глобальную переменную tooltipExists = (type(GameTooltip) ~= "nil")',
+check = function(value)
+return value == true
+end,
+},
+},
+}
+
+ns_llua['lua'][265] = {
+type = "commenttest",
+title = "Тест 265: фрейм с тултипом",
+helpModules = {263, 215, 221},
+preloadVars = {
+{var = "CourseTooltipFrame", desc = "CourseTooltipFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 239-2: фрейм с тултипом</h>
+<t>Создай глобальный фрейм <k>CourseTooltipFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>"Frame"</s>, глобальное имя: <s>"CourseTooltipFrame"</s>, родитель: <k>UIParent</k>;</t>
+<t>- размер: 150 на 100;</t>
+<t>- позиция: CENTER;</t>
+<t>- включи мышку через <k>EnableMouse(true)</k>;</t>
+<t>- назначь скрипт <k>OnEnter</k>, который:</t>
+<c>вызывает GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")</c>
+<c>вызывает GameTooltip:SetText("Тестовый фрейм")</c>
+<c>вызывает GameTooltip:AddLine("Наведи и прочитай", 0.8, 0.8, 0.8)</c>
+<c>вызывает GameTooltip:Show()</c>
+<t>- назначь скрипт <k>OnLeave</k>, который вызывает <k>GameTooltip:Hide()</k>;</t>
+<t>- покажи фрейм.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм CourseTooltipFrame с тултипом
+]=],
+requireKeywords = {
+"CourseTooltipFrame",
+"CreateFrame",
+"EnableMouse",
+"SetScript",
+"OnEnter",
+"OnLeave",
+"GameTooltip",
+"SetOwner",
+"SetText",
+"AddLine",
+"Show",
+"Hide",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.CourseTooltipFrame
+if not f or type(f.GetScript) ~= "function" then
+_G.checkError = "CourseTooltipFrame не является фреймом"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "Фрейм должен быть показан"
+return false
+end
+if f:GetWidth() ~= 150 or f:GetHeight() ~= 100 then
+_G.checkError = "Размер фрейма должен быть 150 на 100"
+return false
+end
+local onEnter = f:GetScript("OnEnter")
+if type(onEnter) ~= "function" then
+_G.checkError = "У фрейма должен быть обработчик OnEnter"
+return false
+end
+local onLeave = f:GetScript("OnLeave")
+if type(onLeave) ~= "function" then
+_G.checkError = "У фрейма должен быть обработчик OnLeave"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][266] = {
+type = "commenttest",
+title = "Тест 266: функция ShowItemTooltip",
+helpModules = {263, 179, 45, 65},
+preloadVars = {
+{var = "ShowItemTooltip", desc = "ShowItemTooltip очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 239-3: функция ShowItemTooltip</h>
+<t>Создай глобальную функцию <k>ShowItemTooltip(frame, itemID)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>GetScript</k>, верни <k>false</k>;</t>
+<t>- если <k>itemID</k> не является числом или меньше либо равно нуля, верни <k>false</k>;</t>
+<t>- иначе назначь скрипт <k>OnEnter</k> на фрейм, который:</t>
+<c>вызывает GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")</c>
+<c>вызывает GameTooltip:SetHyperlink("item:" .. itemID)</c>
+<c>вызывает GameTooltip:Show()</c>
+<t>- назначь скрипт <k>OnLeave</k>, который вызывает <k>GameTooltip:Hide()</k>;</t>
+<t>- верни <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ShowItemTooltip(frame, itemID)
+]=],
+requireKeywords = {
+"ShowItemTooltip",
+"function",
+"GameTooltip",
+"SetOwner",
+"SetHyperlink",
+"OnEnter",
+"OnLeave",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ShowItemTooltip) ~= "function" then
+_G.checkError = "ShowItemTooltip не является глобальной функцией"
+return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(64, 64)
+local ok1, result1 = pcall(_G.ShowItemTooltip, testFrame, 6948)
+if not ok1 then
+_G.checkError = "Ошибка вызова ShowItemTooltip: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для корректных данных функция должна вернуть true"
+return false
+end
+local onEnter = testFrame:GetScript("OnEnter")
+if type(onEnter) ~= "function" then
+_G.checkError = "OnEnter должен быть назначен"
+return false
+end
+local onLeave = testFrame:GetScript("OnLeave")
+if type(onLeave) ~= "function" then
+_G.checkError = "OnLeave должен быть назначен"
+return false
+end
+local ok2, result2 = pcall(_G.ShowItemTooltip, nil, 6948)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil-фрейма функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.ShowItemTooltip, testFrame, -1)
+if not ok3 or result3 ~= false then
+_G.checkError = "Для отрицательного itemID функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][267] = {
+type = "commenttest",
+title = "Тест 267: функция ShowCustomTooltip",
+helpModules = {263, 45, 65},
+preloadVars = {
+{var = "ShowCustomTooltip", desc = "ShowCustomTooltip очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 239-4: функция ShowCustomTooltip</h>
+<t>Создай глобальную функцию <k>ShowCustomTooltip(frame, title, lines)</k>.</t>
+<t>Аргументы:</t>
+<c>frame</c> — фрейм-владелец.
+<c>title</c> — строка-заголовок.
+<c>lines</c> — таблица-массив со строками для дополнительных линий.
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует, верни <k>false</k>;</t>
+<t>- если <k>title</k> не строка, используй пустую строку;</t>
+<t>- если <k>lines</k> не таблица, используй пустую таблицу;</t>
+<t>- назначь OnEnter на фрейм, который:</t>
+<c>GameTooltip:SetOwner(frame, "ANCHOR_TOPRIGHT")</c>
+<c>GameTooltip:SetText(title, 1, 0.84, 0)</c>
+<c>для каждой строки из lines: GameTooltip:AddLine(line, 0.8, 0.8, 0.8)</c>
+<c>GameTooltip:Show()</c>
+<t>- назначь OnLeave с GameTooltip:Hide();</t>
+<t>- верни <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ShowCustomTooltip(frame, title, lines)
+]=],
+requireKeywords = {
+"ShowCustomTooltip",
+"function",
+"GameTooltip",
+"SetOwner",
+"SetText",
+"AddLine",
+"OnEnter",
+"OnLeave",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ShowCustomTooltip) ~= "function" then
+_G.checkError = "ShowCustomTooltip не является глобальной функцией"
+return false
+end
+local testFrame = CreateFrame("Frame", nil, UIParent)
+testFrame:SetSize(100, 100)
+local ok1, result1 = pcall(_G.ShowCustomTooltip, testFrame, "Заголовок", {"Строка 1", "Строка 2"})
+if not ok1 then
+_G.checkError = "Ошибка вызова ShowCustomTooltip: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для корректных данных функция должна вернуть true"
+return false
+end
+local onEnter = testFrame:GetScript("OnEnter")
+if type(onEnter) ~= "function" then
+_G.checkError = "OnEnter должен быть назначен"
+return false
+end
+local ok2, result2 = pcall(_G.ShowCustomTooltip, nil, "Тест", {})
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil-фрейма функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.ShowCustomTooltip, testFrame, nil, nil)
+if not ok3 or result3 ~= true then
+_G.checkError = "Для nil-title и nil-lines функция должна вернуть true (с дефолтами)"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][268] = {
+type = "commenttest",
+title = "Тест 268: функция CreateTooltipButton",
+helpModules = {263, 233, 215, 45, 65},
+preloadVars = {
+{var = "CreateTooltipButton", desc = "CreateTooltipButton очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 239-5: функция CreateTooltipButton</h>
+<t>Создай глобальную функцию <k>CreateTooltipButton(name, text, tooltipText)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>name</k> не строка или пустая, верни <k>nil</k>;</t>
+<t>- если <k>text</k> не строка, используй <s>"Кнопка"</s>;</t>
+<t>- если <k>tooltipText</k> не строка, используй пустую строку;</t>
+<t>- создай кнопку типа <s>"Button"</s> с именем <k>name</k>, родитель <k>UIParent</k>;</t>
+<t>- размер: 140 на 35;</t>
+<t>- позиция: CENTER;</t>
+<t>- создай FontString для кнопки с текстом <k>text</k>;</t>
+<t>- назначь OnEnter: GameTooltip:SetOwner, SetText(tooltipText), Show;</t>
+<t>- назначь OnLeave: GameTooltip:Hide();</t>
+<t>- покажи кнопку;</t>
+<t>- верни кнопку.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateTooltipButton(name, text, tooltipText)
+]=],
+requireKeywords = {
+"CreateTooltipButton",
+"function",
+"CreateFrame",
+"Button",
+"CreateFontString",
+"SetText",
+"OnEnter",
+"OnLeave",
+"GameTooltip",
+"Show",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateTooltipButton) ~= "function" then
+_G.checkError = "CreateTooltipButton не является глобальной функцией"
+return false
+end
+local ok1, btn = pcall(_G.CreateTooltipButton, "NS_TT_Btn_1", "Нажми", "Подсказка")
+if not ok1 then
+_G.checkError = "Ошибка вызова CreateTooltipButton: " .. tostring(btn)
+return false
+end
+if not btn or type(btn.GetScript) ~= "function" then
+_G.checkError = "Функция должна вернуть кнопку"
+return false
+end
+if not btn:IsShown() then
+_G.checkError = "Кнопка должна быть показана"
+return false
+end
+local onEnter = btn:GetScript("OnEnter")
+if type(onEnter) ~= "function" then
+_G.checkError = "У кнопки должен быть OnEnter"
+return false
+end
+local onLeave = btn:GetScript("OnLeave")
+if type(onLeave) ~= "function" then
+_G.checkError = "У кнопки должен быть OnLeave"
+return false
+end
+local ok2, result2 = pcall(_G.CreateTooltipButton, "", "Текст", "Тултип")
+if not ok2 or result2 ~= nil then
+_G.checkError = "Для пустого имени функция должна вернуть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][269] = {
+type = "info",
+title = "Слэш-команды: SlashCmdList",
+helpModules = {239, 215},
+content = [=[
+<h>Слэш-команды: SlashCmdList</h>
+<t>Слэш-команды позволяют игроку управлять аддоном через чат. Например, <k>/panel show</k> или <k>/panel reset</k>.</t>
 <h>Как это работает</h>
-<c>SlashCmdList["COURSEDEMO"]</c> — функция-обработчик.
-<c>SLASH_COURSEDEMO1</c> — текстовая команда.
-<c>msg</c> — текст после команды.
+<t>WoW использует две вещи для регистрации команды:</t>
+<c>1</c> — глобальная переменная <k>SLASH_ИМЯ1</k> содержит текст команды.
+<c>2</c> — таблица <k>SlashCmdList["ИМЯ"]</k> содержит функцию-обработчик.
+<h>Простой пример</h>
+<code>
+SLASH_MYADDON1 = "/myaddon"
+SlashCmdList["MYADDON"] = function(msg)
+    print("Вы ввели: " .. msg)
+end
+</code>
+<t>После этого в чате можно написать:</t>
+<code>
+/myaddon hello
+</code>
+<t>И в чат выведется: <s>"Вы ввели: hello"</s></t>
 <h>Несколько алиасов</h>
+<t>Можно зарегистрировать несколько вариантов команды:</t>
 <code>
-SLASH_COURSEDEMO2 = "/cdemo"
+SLASH_MYADDON1 = "/myaddon"
+SLASH_MYADDON2 = "/ma"
+SlashCmdList["MYADDON"] = function(msg)
+    print("Команда вызвана с: " .. msg)
+end
 </code>
-<h>Практический шаблон</h>
+<t>Теперь работают и <k>/myaddon</k>, и <k>/ma</k>.</t>
+<h>Аргумент msg</h>
+<t>Аргумент <k>msg</k> — это всё, что игрок написал после команды. Если написать <k>/myaddon show all</k>, то <k>msg</k> будет равен <s>"show all"</s>.</t>
+<h>Разбиение аргументов</h>
 <code>
-SlashCmdList["MY_PANEL"] = function(msg)
-    msg = string.lower(msg or "")
-    if msg == "show" and MyPanel then
-        MyPanel:Show()
-    elseif msg == "hide" and MyPanel then
-        MyPanel:Hide()
+SLASH_MYADDON1 = "/myaddon"
+SlashCmdList["MYADDON"] = function(msg)
+    local args = {}
+    for word in msg:gmatch("%S+") do
+        table.insert(args, word)
+    end
+    local cmd = args[1] or ""
+    if cmd == "show" then
+        print("Показываю")
+    elseif cmd == "hide" then
+        print("Скрываю")
+    elseif cmd == "reset" then
+        print("Сбрасываю")
     else
-        print("Использование: /mypanel show или hide")
+        print("Неизвестная команда: " .. cmd)
     end
 end
-SLASH_MY_PANEL1 = "/mypanel"
 </code>
-<w>Примечание:</w> имя в <c>SlashCmdList</c> и имя переменной <c>SLASH_...</c> должны быть связаны по смыслу и уникальны.
+<h>Типичные подкоманды</h>
+<c>show</c> — показать фрейм.
+<c>hide</c> — скрыть фрейм.
+<c>toggle</c> — переключить видимость.
+<c>reset</c> — сбросить позицию или настройки.
+<c>config</c> — открыть настройки.
+<c>help</c> — показать список команд.
+<h>Безопасный шаблон</h>
+<code>
+SLASH_NSPANEL1 = "/nspanel"
+SLASH_NSPANEL2 = "/nsp"
+SlashCmdList["NSPANEL"] = function(msg)
+    msg = msg or ""
+    msg = msg:lower()
+    msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
+    if msg == "" or msg == "help" then
+        print("/nspanel show|hide|toggle|reset")
+    elseif msg == "show" then
+        -- показать
+    elseif msg == "hide" then
+        -- скрыть
+    elseif msg == "toggle" then
+        -- переключить
+    elseif msg == "reset" then
+        -- сбросить
+    else
+        print("Неизвестная подкоманда: " .. msg)
+    end
+end
+</code>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> имя в SlashCmdList должно совпадать с суффиксом SLASH_ИМЯ. Если переменная <k>SLASH_MYADDON1</k>, то ключ в SlashCmdList — <s>"MYADDON"</s>.
+<w>Ошибка 2:</w> забыть привести msg к нижнему регистру. Игрок может написать <k>/panel SHOW</k>.
+<w>Ошибка 3:</w> не обрабатывать пустой msg. Игрок может написать просто <k>/panel</k> без аргументов.
 ]=],
 }
 
-ns_llua['lua'][101] = {
+ns_llua['lua'][270] = {
+type = "vartest",
+title = "Тест 270: структура слэш-команд",
+helpModules = {269},
+tasks = {
+{
+var = "slashCmdPrefix",
+desc = 'Создай глобальную переменную slashCmdPrefix = "SLASH_"',
+check = function(value)
+return value == "SLASH_"
+end,
+},
+{
+var = "slashCmdListType",
+desc = 'Создай глобальную переменную slashCmdListType = type(SlashCmdList)',
+check = function(value)
+return value == "table"
+end,
+},
+{
+var = "slashCmdTest",
+desc = 'Создай глобальную переменную slashCmdTest = "/testcmd"',
+check = function(value)
+return value == "/testcmd"
+end,
+},
+},
+}
+
+ns_llua['lua'][271] = {
+type = "commenttest",
+title = "Тест 271: регистрация слэш-команды",
+helpModules = {269, 45},
+preloadVars = {
+{var = "nsSlashTestLog", desc = "nsSlashTestLog очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError", "nsSlashTestLog"},
+instruction = [=[
+<h>Тест 245-2: регистрация слэш-команды</h>
+<t>Зарегистрируй слэш-команду:</t>
+<t>- создай глобальную переменную <k>nsSlashTestLog</k> со значением <s>""</s>;</t>
+<t>- создай глобальную переменную <k>SLASH_NSTEST1</k> со значением <s>"/nstest"</s>;</t>
+<t>- создай обработчик в <k>SlashCmdList["NSTEST"]</k>;</t>
+<t>- обработчик должен записывать аргумент <k>msg</k> в <k>nsSlashTestLog</k>;</t>
+<t>- если <k>msg</k> равен <k>nil</k>, запиши пустую строку.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Зарегистрируй слэш-команду /nstest
+]=],
+requireKeywords = {
+"SLASH_NSTEST1",
+"SlashCmdList",
+"NSTEST",
+"function",
+"nsSlashTestLog",
+},
+checkCode = function()
+_G.checkError = nil
+if _G.SLASH_NSTEST1 ~= "/nstest" then
+_G.checkError = "SLASH_NSTEST1 должна быть '/nstest'"
+return false
+end
+local handler = SlashCmdList["NSTEST"]
+if type(handler) ~= "function" then
+_G.checkError = "SlashCmdList['NSTEST'] должна быть функцией"
+return false
+end
+_G.nsSlashTestLog = nil
+local ok, err = pcall(handler, "hello world")
+if not ok then
+_G.checkError = "Ошибка вызова обработчика: " .. tostring(err)
+return false
+end
+if _G.nsSlashTestLog ~= "hello world" then
+_G.checkError = "Обработчик должен записать msg в nsSlashTestLog"
+return false
+end
+_G.nsSlashTestLog = nil
+local ok2, err2 = pcall(handler, nil)
+if not ok2 then
+_G.checkError = "Ошибка вызова обработчика с nil: " .. tostring(err2)
+return false
+end
+if _G.nsSlashTestLog ~= "" then
+_G.checkError = "Для nil msg обработчик должен записать пустую строку"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][272] = {
+type = "commenttest",
+title = "Тест 272: функция ParseSlashArgs",
+helpModules = {269, 45, 31, 44},
+preloadVars = {
+{var = "ParseSlashArgs", desc = "ParseSlashArgs очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 245-3: функция ParseSlashArgs</h>
+<t>Создай глобальную функцию <k>ParseSlashArgs(msg)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>msg</k> не строка, верни пустую таблицу <k>{}</k>;</t>
+<t>- иначе разбей строку по пробелам и верни таблицу-массив со словами;</t>
+<t>- пустые строки и лишние пробелы должны игнорироваться;</t>
+<t>- все слова должны быть в нижнем регистре через <k>string.lower</k>;</t>
+<t>- используй <k>string.gmatch</k> с паттерном <s>"%S+"</s>;</t>
+<t>- используй <k>table.insert</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ParseSlashArgs(msg)
+]=],
+requireKeywords = {
+"ParseSlashArgs",
+"function",
+"string.gmatch",
+"string.lower",
+"table.insert",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ParseSlashArgs) ~= "function" then
+_G.checkError = "ParseSlashArgs не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.ParseSlashArgs, "show all")
+if not ok1 then
+_G.checkError = "Ошибка вызова ParseSlashArgs: " .. tostring(result1)
+return false
+end
+if type(result1) ~= "table" or #result1 ~= 2 then
+_G.checkError = "Для 'show all' функция должна вернуть таблицу из 2 элементов"
+return false
+end
+if result1[1] ~= "show" or result1[2] ~= "all" then
+_G.checkError = "Элементы таблицы неверны"
+return false
+end
+local ok2, result2 = pcall(_G.ParseSlashArgs, "  SHOW   ALL  ")
+if not ok2 or type(result2) ~= "table" or #result2 ~= 2 then
+_G.checkError = "Лишние пробелы должны игнорироваться"
+return false
+end
+if result2[1] ~= "show" or result2[2] ~= "all" then
+_G.checkError = "Слова должны быть в нижнем регистре"
+return false
+end
+local ok3, result3 = pcall(_G.ParseSlashArgs, "")
+if not ok3 or type(result3) ~= "table" or #result3 ~= 0 then
+_G.checkError = "Для пустой строки функция должна вернуть пустую таблицу"
+return false
+end
+local ok4, result4 = pcall(_G.ParseSlashArgs, 123)
+if not ok4 or type(result4) ~= "table" or #result4 ~= 0 then
+_G.checkError = "Для не-строки функция должна вернуть пустую таблицу"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][273] = {
+type = "commenttest",
+title = "Тест 273: функция HandlePanelCommand",
+helpModules = {269, 45, 17, 19},
+preloadVars = {
+{var = "HandlePanelCommand", desc = "HandlePanelCommand очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 245-4: функция HandlePanelCommand</h>
+<t>Создай глобальную функцию <k>HandlePanelCommand(msg)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>msg</k> не строка, верни строку <s>"invalid"</s>;</t>
+<t>- приведи msg к нижнему регистру и убери пробелы по краям;</t>
+<t>- если msg пустой или равен <s>"help"</s>, верни <s>"help"</s>;</t>
+<t>- если msg равен <s>"show"</s>, верни <s>"show"</s>;</t>
+<t>- если msg равен <s>"hide"</s>, верни <s>"hide"</s>;</t>
+<t>- если msg равен <s>"toggle"</s>, верни <s>"toggle"</s>;</t>
+<t>- если msg равен <s>"reset"</s>, верни <s>"reset"</s>;</t>
+<t>- во всех остальных случаях верни <s>"unknown"</s>.</t>
+<t>Используй <k>string.lower</k>, <k>string.gsub</k> для удаления пробелов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию HandlePanelCommand(msg)
+]=],
+requireKeywords = {
+"HandlePanelCommand",
+"function",
+"string.lower",
+"if",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.HandlePanelCommand) ~= "function" then
+_G.checkError = "HandlePanelCommand не является глобальной функцией"
+return false
+end
+local tests = {
+{input = "show", expected = "show"},
+{input = "SHOW", expected = "show"},
+{input = "  show  ", expected = "show"},
+{input = "hide", expected = "hide"},
+{input = "toggle", expected = "toggle"},
+{input = "reset", expected = "reset"},
+{input = "", expected = "help"},
+{input = "help", expected = "help"},
+{input = "  ", expected = "help"},
+{input = "badcmd", expected = "unknown"},
+{input = 123, expected = "invalid"},
+{input = nil, expected = "invalid"},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.HandlePanelCommand, test.input)
+if not ok or result ~= test.expected then
+_G.checkError = "Тест " .. i .. " не пройден (вход: " .. tostring(test.input) .. ")"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][274] = {
+type = "commenttest",
+title = "Тест 274: полный обработчик слэш-команды",
+helpModules = {269, 215, 45, 31},
+preloadVars = {
+{var = "nsSlashPanel", desc = "nsSlashPanel очищается перед проверкой"},
+{var = "nsSlashPanelState", desc = "nsSlashPanelState очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError", "nsSlashPanelState"},
+instruction = [=[
+<h>Тест 245-5: полный обработчик слэш-команды</h>
+<t>Создай:</t>
+<t>1. Глобальную таблицу <k>nsSlashPanelState</k> с полем <k>visible</k> равным <k>true</k>.</t>
+<t>2. Глобальный фрейм <k>nsSlashPanel</k> (Frame, 200x100, CENTER, показан).</t>
+<t>3. Глобальную переменную <k>SLASH_NSPANEL1</k> = <s>"/nspanel"</s>.</t>
+<t>4. Обработчик <k>SlashCmdList["NSPANEL"]</k>, который:</t>
+<t>- парсит msg в нижнем регистре;</t>
+<t>- если <s>"show"</s>: показывает фрейм, ставит visible = true;</t>
+<t>- если <s>"hide"</s>: скрывает фрейм, ставит visible = false;</t>
+<t>- если <s>"toggle"</s>: переключает видимость;</t>
+<t>- если <s>"reset"</s>: SetPoint("CENTER"), visible = true, Show();</t>
+<t>- иначе: ничего не делает.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай nsSlashPanelState, nsSlashPanel и обработчик /nspanel
+]=],
+requireKeywords = {
+"nsSlashPanelState",
+"nsSlashPanel",
+"SLASH_NSPANEL1",
+"SlashCmdList",
+"NSPANEL",
+"function",
+"Show",
+"Hide",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.nsSlashPanelState) ~= "table" then
+_G.checkError = "nsSlashPanelState должна быть таблицей"
+return false
+end
+if _G.nsSlashPanelState.visible ~= true then
+_G.checkError = "nsSlashPanelState.visible должна быть true изначально"
+return false
+end
+local f = _G.nsSlashPanel
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "nsSlashPanel не является фреймом"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "nsSlashPanel должен быть показан изначально"
+return false
+end
+if _G.SLASH_NSPANEL1 ~= "/nspanel" then
+_G.checkError = "SLASH_NSPANEL1 должна быть '/nspanel'"
+return false
+end
+local handler = SlashCmdList["NSPANEL"]
+if type(handler) ~= "function" then
+_G.checkError = "SlashCmdList['NSPANEL'] должна быть функцией"
+return false
+end
+-- Тест hide
+local ok1, err1 = pcall(handler, "hide")
+if not ok1 then
+_G.checkError = "Ошибка при вызове 'hide': " .. tostring(err1)
+return false
+end
+if _G.nsSlashPanelState.visible ~= false then
+_G.checkError = "После 'hide' visible должна быть false"
+return false
+end
+if f:IsShown() then
+_G.checkError = "После 'hide' фрейм должен быть скрыт"
+return false
+end
+-- Тест show
+local ok2, err2 = pcall(handler, "show")
+if not ok2 then
+_G.checkError = "Ошибка при вызове 'show': " .. tostring(err2)
+return false
+end
+if _G.nsSlashPanelState.visible ~= true then
+_G.checkError = "После 'show' visible должна быть true"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "После 'show' фрейм должен быть показан"
+return false
+end
+-- Тест toggle
+local ok3, err3 = pcall(handler, "toggle")
+if not ok3 then
+_G.checkError = "Ошибка при вызове 'toggle': " .. tostring(err3)
+return false
+end
+if _G.nsSlashPanelState.visible ~= false then
+_G.checkError = "После 'toggle' visible должна быть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][275] = {
 type = "info",
-title = "Хранение настроек и позиций",
+title = "Кнопка на миникарте",
+helpModules = {215, 221, 227, 233, 239},
 content = [=[
-<h>Хранение настроек и позиций</h>
-<t>Чтобы интерфейс помнил положение и настройки, их нужно куда-то сохранять.</t>
-<h>Глобальная таблица настроек</h>
+<h>Кнопка на миникарте</h>
+<t>Многие аддоны добавляют иконку на миникарту для быстрого доступа к настройкам или переключения видимости. В WoW 3.3.5 это делается вручную через позиционирование фрейма вокруг миникарты.</t>
+<h>Миникарта как ориентир</h>
+<t>Глобальный фрейм <k>Minimap</k> — это миникарта. Её размер обычно 140x140 пикселей.</t>
 <code>
-nsMyAddon = nsMyAddon or {}
-nsMyAddon.settings = nsMyAddon.settings or {}
+/run print(Minimap:GetWidth(), Minimap:GetHeight())
 </code>
-<h>Сохранение позиции фрейма</h>
+<h>Позиционирование по кругу</h>
+<t>Чтобы разместить кнопку вокруг миникарты, используют тригонометрию:</t>
 <code>
-function SaveMyPanelPosition()
-    if not MyPanel then
-        return
-    end
-    local point, _, relativePoint, x, y = MyPanel:GetPoint(1)
-    nsMyAddon.settings.point = point
-    nsMyAddon.settings.relativePoint = relativePoint
-    nsMyAddon.settings.x = x
-    nsMyAddon.settings.y = y
-end
+local angle = math.rad(45) -- угол в радианах
+local radius = 80          -- радиус от центра
+local x = math.cos(angle) * radius
+local y = math.sin(angle) * radius
+MyMinimapButton:SetPoint("CENTER", Minimap, "CENTER", x, y)
 </code>
-<h>Загрузка позиции</h>
+<t>Угол 0 — справа, 90 — сверху, 180 — слева, 270 — снизу.</t>
+<h>Создание кнопки миникарты</h>
 <code>
-function LoadMyPanelPosition()
-    if not MyPanel then
-        return
-    end
-    local s = nsMyAddon.settings
-    if not s or not s.point then
-        MyPanel:SetPoint("CENTER")
-        return
-    end
-    MyPanel:ClearAllPoints()
-    MyPanel:SetPoint(s.point, UIParent, s.relativePoint or s.point, s.x or 0, s.y or 0)
-end
+CourseMinimapBtn = CreateFrame("Button", "CourseMinimapBtn", Minimap)
+CourseMinimapBtn:SetSize(32, 32)
+CourseMinimapBtn:SetFrameStrata("HIGH")
+CourseMinimapBtn:SetPoint("CENTER", Minimap, "CENTER", 80, 0)
 </code>
-<h>Когда сохранять</h>
+<t>Обрати внимание: родитель — <k>Minimap</k>, а не <k>UIParent</k>. Это позволяет кнопке двигаться вместе с миникартой.</t>
+<h>Иконка кнопки</h>
 <code>
-MyPanel:RegisterForDrag("LeftButton")
-MyPanel:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    SaveMyPanelPosition()
+local icon = CourseMinimapBtn:CreateTexture(nil, "BACKGROUND")
+icon:SetAllPoints(CourseMinimapBtn)
+icon:SetTexture("Interface\\Icons\\Spell_Frost_IceStorm")
+</code>
+<h>Рамка (border)</h>
+<t>Стандартная круглая рамка миникарты:</t>
+<code>
+local border = CourseMinimapBtn:CreateTexture(nil, "OVERLAY")
+border:SetSize(54, 54)
+border:SetPoint("CENTER", CourseMinimapBtn, "CENTER")
+border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+</code>
+<h>Перетаскивание по кругу миникарты</h>
+<t>Чтобы кнопка двигалась только по окружности вокруг миникарты:</t>
+<code>
+CourseMinimapBtn:RegisterForDrag("LeftButton")
+CourseMinimapBtn:SetScript("OnDragStart", function(self)
+    self:SetScript("OnUpdate", function(self)
+        local cx, cy = Minimap:GetCenter()
+        local mx, my = GetCursorPosition()
+        local scale = Minimap:GetEffectiveScale()
+        mx = mx / scale
+        my = my / scale
+        local angle = math.atan2(my - cy, mx - cx)
+        local radius = 80
+        local x = math.cos(angle) * radius
+        local y = math.sin(angle) * radius
+        self:SetPoint("CENTER", Minimap, "CENTER", x, y)
+    end)
+end)
+CourseMinimapBtn:SetScript("OnDragStop", function(self)
+    self:SetScript("OnUpdate", nil)
 end)
 </code>
-<h>Настоящие SavedVariables</h>
-<t>Для настоящего аддона настройки обычно сохраняются через TOC-файл:</t>
+<h>math.atan2</h>
 <code>
-## SavedVariables: nsMyAddon
+/run print(math.atan2(1, 0))  -- pi/2 (90 градусов)
+/run print(math.atan2(0, 1))  -- 0 (0 градусов)
 </code>
-<t>Тогда таблица <k>nsMyAddon</k> будет автоматически сохраняться между сессиями.</t>
-<w>Важно:</w> в рамках <k>/run</k> глобальные таблицы живут только до <k>/reload</k>, если нет настоящего аддона и SavedVariables.
+<t>Функция <k>math.atan2(y, x)</k> возвращает угол в радианах от -pi до pi.</t>
+<h>GetCursorPosition</h>
+<t>Возвращает позицию курсора в пикселях экрана. Нужно делить на <k>GetEffectiveScale()</k> фрейма, чтобы получить координаты в масштабе фрейма.</t>
+<h>Сохранение позиции</h>
+<t>Угол кнопки удобно сохранять в SavedVariables:</t>
+<code>
+MyAddonDB = MyAddonDB or {}
+MyAddonDB.minimapAngle = MyAddonDB.minimapAngle or 0
+</code>
+<t>При загрузке аддона восстанавливаем позицию:</t>
+<code>
+local angle = MyAddonDB.minimapAngle
+local x = math.cos(angle) * 80
+local y = math.sin(angle) * 80
+CourseMinimapBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
+</code>
+<h>Частые ошибки</h>
+<w>Ошибка 1:</w> родитель UIParent вместо Minimap. Кнопка не будет двигаться с миникартой.
+<w>Ошибка 2:</w> забыть GetEffectiveScale при работе с GetCursorPosition.
+<w>Ошибка 3:</w> не снять OnUpdate в OnDragStop. Кнопка продолжит двигаться после отпускания мыши.
 ]=],
 }
 
-ns_llua['lua'][102] = {
-type = "info",
-title = "Финальный проект: мини-панель",
-content = [=[
-<h>Финальный проект: мини-панель</h>
-<t>Соберём простую панель, которая показывает координаты, деньги и количество участников группы.</t>
-<h>Полный пример</h>
-<code>
-CourseDashboard = CreateFrame("Frame", "CourseDashboard", UIParent)
-CourseDashboard:SetSize(240, 160)
-CourseDashboard:SetPoint("CENTER")
-CourseDashboard:EnableMouse(true)
-CourseDashboard:SetMovable(true)
-CourseDashboard:RegisterForDrag("LeftButton")
-CourseDashboard:SetScript("OnDragStart", function(self) self:StartMoving() end)
-CourseDashboard:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-local bg = CourseDashboard:CreateTexture(nil, "BACKGROUND")
-bg:SetAllPoints(CourseDashboard)
-bg:SetTexture(0.08, 0.08, 0.12, 0.95)
-local title = CourseDashboard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-title:SetPoint("TOP", CourseDashboard, "TOP", 0, -10)
-title:SetText("Моя панель")
-title:SetTextColor(1, 0.84, 0, 1)
-local info = CourseDashboard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-info:SetPoint("TOP", title, "BOTTOM", 0, -10)
-info:SetJustifyH("LEFT")
-info:SetWidth(210)
-local button = CreateFrame("Button", "CourseDashboardButton", CourseDashboard, "UIPanelButtonTemplate")
-button:SetSize(120, 24)
-button:SetPoint("BOTTOM", CourseDashboard, "BOTTOM", 0, 10)
-button:SetText("Обновить")
-local function UpdateDashboard()
-    local x, y = GetPlayerMapPosition("player")
-    x = x or 0
-    y = y or 0
-    local money = GetMoney() or 0
-    local gold = math.floor(money / 10000)
-    local party = GetNumPartyMembers() or 0
-    info:SetText(string.format("X: %.1f Y: %.1f\nЗолото: %d\nГруппа: %d", x * 100, y * 100, gold, party))
+ns_llua['lua'][276] = {
+type = "vartest",
+title = "Тест: тригонометрия для миникарты",
+helpModules = {275, 10},
+tasks = {
+{
+var = "minimapRadius",
+desc = 'Создай глобальную переменную minimapRadius = 80',
+check = function(value)
+return type(value) == "number" and value == 80
+end,
+},
+{
+var = "angleRight",
+desc = 'Создай глобальную переменную angleRight = 0 (угол в радианах для позиции справа)',
+check = function(value)
+return type(value) == "number" and value == 0
+end,
+},
+{
+var = "posXRight",
+desc = 'Создай глобальную переменную posXRight = math.cos(0) * 80',
+check = function(value)
+return type(value) == "number" and math.abs(value - 80) < 0.01
+end,
+},
+{
+var = "posYRight",
+desc = 'Создай глобальную переменную posYRight = math.sin(0) * 80',
+check = function(value)
+return type(value) == "number" and math.abs(value) < 0.01
+end,
+},
+},
+}
+
+ns_llua['lua'][277] = {
+type = "commenttest",
+title = "Тест: кнопка на миникарте",
+helpModules = {275, 215, 227},
+preloadVars = {
+{var = "CourseMinimapButton", desc = "CourseMinimapButton очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 251-2: кнопка на миникарте</h>
+<t>Создай глобальную кнопку <k>CourseMinimapButton</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>"Button"</s>, глобальное имя: <s>"CourseMinimapButton"</s>;</t>
+<t>- родитель: <k>Minimap</k>;</t>
+<t>- размер: 32 на 32;</t>
+<t>- слой: <k>SetFrameStrata("HIGH")</k>;</t>
+<t>- позиция: <k>SetPoint("CENTER", Minimap, "CENTER", 80, 0)</k>;</t>
+<t>- создай текстуру слоем BACKGROUND, растяни через SetAllPoints;</t>
+<t>- установи текстуру: <s>"Interface\\Icons\\Spell_Frost_IceStorm"</s>;</t>
+<t>- включи мышку через EnableMouse(true);</t>
+<t>- покажи кнопку.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную кнопку CourseMinimapButton на миникарте
+]=],
+requireKeywords = {
+"CourseMinimapButton",
+"CreateFrame",
+"Button",
+"Minimap",
+"SetSize",
+"SetPoint",
+"SetFrameStrata",
+"CreateTexture",
+"SetTexture",
+"EnableMouse",
+"Show",
+},
+checkCode = function()
+_G.checkError = nil
+local btn = _G.CourseMinimapButton
+if not btn or type(btn.GetScript) ~= "function" then
+_G.checkError = "CourseMinimapButton не является кнопкой"
+return false
 end
-button:SetScript("OnClick", UpdateDashboard)
-CourseDashboard.nextUpdate = 0
-CourseDashboard:SetScript("OnUpdate", function(self, elapsed)
-    self.nextUpdate = self.nextUpdate - elapsed
-    if self.nextUpdate <= 0 then
-        self.nextUpdate = 1
-        UpdateDashboard()
-    end
-end)
-CourseDashboard:Show()
-UpdateDashboard()
+if not btn:IsShown() then
+_G.checkError = "Кнопка должна быть показана"
+return false
+end
+if btn:GetWidth() ~= 32 or btn:GetHeight() ~= 32 then
+_G.checkError = "Размер кнопки должен быть 32 на 32"
+return false
+end
+if btn:GetParent() ~= Minimap then
+_G.checkError = "Родитель кнопки должен быть Minimap"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][278] = {
+type = "commenttest",
+title = "Тест: функция PositionOnMinimap",
+helpModules = {275, 45, 10, 65},
+preloadVars = {
+{var = "PositionOnMinimap", desc = "PositionOnMinimap очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 251-3: функция PositionOnMinimap</h>
+<t>Создай глобальную функцию <k>PositionOnMinimap(frame, angleDegrees, radius)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>frame</k> не существует или у него нет метода <k>SetPoint</k>, верни <k>false</k>;</t>
+<t>- если <k>angleDegrees</k> не число, верни <k>false</k>;</t>
+<t>- если <k>radius</k> не число или меньше 10, верни <k>false</k>;</t>
+<t>- иначе переведи градусы в радианы: <k>math.rad(angleDegrees)</k>;</t>
+<t>- вычисли x = math.cos(radians) * radius;</t>
+<t>- вычисли y = math.sin(radians) * radius;</t>
+<t>- вызови <k>frame:SetPoint("CENTER", Minimap, "CENTER", x, y)</k>;</t>
+<t>- верни <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию PositionOnMinimap(frame, angleDegrees, radius)
+]=],
+requireKeywords = {
+"PositionOnMinimap",
+"function",
+"math.rad",
+"math.cos",
+"math.sin",
+"SetPoint",
+"Minimap",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.PositionOnMinimap) ~= "function" then
+_G.checkError = "PositionOnMinimap не является глобальной функцией"
+return false
+end
+local testFrame = CreateFrame("Frame", nil, Minimap)
+testFrame:SetSize(32, 32)
+local ok1, result1 = pcall(_G.PositionOnMinimap, testFrame, 45, 80)
+if not ok1 then
+_G.checkError = "Ошибка вызова PositionOnMinimap: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для корректных данных функция должна вернуть true"
+return false
+end
+local ok2, result2 = pcall(_G.PositionOnMinimap, nil, 45, 80)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil-фрейма функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.PositionOnMinimap, testFrame, "bad", 80)
+if not ok3 or result3 ~= false then
+_G.checkError = "Для нечислового угла функция должна вернуть false"
+return false
+end
+local ok4, result4 = pcall(_G.PositionOnMinimap, testFrame, 45, 5)
+if not ok4 or result4 ~= false then
+_G.checkError = "Для radius < 10 функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][279] = {
+type = "commenttest",
+title = "Тест: функция CreateMinimapButton",
+helpModules = {275, 215, 227, 233, 45, 65},
+preloadVars = {
+{var = "CreateMinimapButton", desc = "CreateMinimapButton очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 251-4: функция CreateMinimapButton</h>
+<t>Создай глобальную функцию <k>CreateMinimapButton(name, texturePath, angle)</k>.</t>
+<t>Требования:</t>
+<t>- если <k>name</k> не строка или пустая, верни <k>nil</k>;</t>
+<t>- если <k>texturePath</k> не строка или пустая, верни <k>nil</k>;</t>
+<t>- если <k>angle</k> не число, используй <n>0</n>;</t>
+<t>- создай кнопку типа <s>"Button"</s> с именем <k>name</k>, родитель <k>Minimap</k>;</t>
+<t>- размер: 32 на 32;</t>
+<t>- слой: HIGH;</t>
+<t>- создай текстуру BACKGROUND, SetAllPoints, SetTexture(texturePath);</t>
+<t>- создай текстуру OVERLAY для рамки: размер 54x54, CENTER, текстура <s>"Interface\\Minimap\\MiniMap-TrackingBorder"</s>;</t>
+<t>- вычисли позицию: x = cos(rad(angle)) * 80, y = sin(rad(angle)) * 80;</t>
+<t>- SetPoint("CENTER", Minimap, "CENTER", x, y);</t>
+<t>- EnableMouse(true);</t>
+<t>- покажи кнопку;</t>
+<t>- верни кнопку.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CreateMinimapButton(name, texturePath, angle)
+]=],
+requireKeywords = {
+"CreateMinimapButton",
+"function",
+"CreateFrame",
+"Button",
+"Minimap",
+"CreateTexture",
+"SetTexture",
+"math.cos",
+"math.sin",
+"math.rad",
+"SetPoint",
+"Show",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CreateMinimapButton) ~= "function" then
+_G.checkError = "CreateMinimapButton не является глобальной функцией"
+return false
+end
+local ok1, btn = pcall(_G.CreateMinimapButton, "NS_MM_Btn_1", "Interface\\Icons\\Spell_Frost_IceStorm", 45)
+if not ok1 then
+_G.checkError = "Ошибка вызова CreateMinimapButton: " .. tostring(btn)
+return false
+end
+if not btn or type(btn.GetScript) ~= "function" then
+_G.checkError = "Функция должна вернуть кнопку"
+return false
+end
+if not btn:IsShown() then
+_G.checkError = "Кнопка должна быть показана"
+return false
+end
+if btn:GetParent() ~= Minimap then
+_G.checkError = "Родитель должен быть Minimap"
+return false
+end
+if btn:GetWidth() ~= 32 or btn:GetHeight() ~= 32 then
+_G.checkError = "Размер кнопки должен быть 32 на 32"
+return false
+end
+local ok2, result2 = pcall(_G.CreateMinimapButton, "", "Interface\\Icons\\Test", 0)
+if not ok2 or result2 ~= nil then
+_G.checkError = "Для пустого имени функция должна вернуть nil"
+return false
+end
+local ok3, result3 = pcall(_G.CreateMinimapButton, "NS_MM_Btn_2", "", 0)
+if not ok3 or result3 ~= nil then
+_G.checkError = "Для пустой текстуры функция должна вернуть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][280] = {
+type = "commenttest",
+title = "Тест: кнопка миникарты с перетаскиванием",
+helpModules = {275, 221, 233, 45},
+preloadVars = {
+{var = "CourseDragMinimapBtn", desc = "CourseDragMinimapBtn очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 251-5: кнопка миникарты с перетаскиванием</h>
+<t>Создай глобальную кнопку <k>CourseDragMinimapBtn</k>.</t>
+<t>Требования:</t>
+<t>- тип: <s>"Button"</s>, родитель: <k>Minimap</k>;</t>
+<t>- размер: 32 на 32, слой HIGH;</t>
+<t>- позиция: CENTER, Minimap, CENTER, 80, 0;</t>
+<t>- текстура BACKGROUND: <s>"Interface\\Icons\\Inv_Sword_04"</s>, SetAllPoints;</t>
+<t>- EnableMouse(true);</t>
+<t>- RegisterForDrag("LeftButton");</t>
+<t>- скрипт <k>OnDragStart</k>: назначает OnUpdate, который:</t>
+<c>получает центр Minimap через GetCenter()</c>
+<c>получает позицию курсора через GetCursorPosition()</c>
+<c>делит на GetEffectiveScale()</c>
+<c>вычисляет angle через math.atan2</c>
+<c>вычисляет x, y через cos/sin с radius 80</c>
+<c>вызывает SetPoint("CENTER", Minimap, "CENTER", x, y)</c>
+<t>- скрипт <k>OnDragStop</k>: снимает OnUpdate через SetScript("OnUpdate", nil);</t>
+<t>- покажи кнопку.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную кнопку CourseDragMinimapBtn с перетаскиванием по миникарте
+]=],
+requireKeywords = {
+"CourseDragMinimapBtn",
+"CreateFrame",
+"Button",
+"Minimap",
+"EnableMouse",
+"RegisterForDrag",
+"OnDragStart",
+"OnDragStop",
+"OnUpdate",
+"GetCenter",
+"GetCursorPosition",
+"GetEffectiveScale",
+"math.atan2",
+"math.cos",
+"math.sin",
+"SetPoint",
+},
+checkCode = function()
+_G.checkError = nil
+local btn = _G.CourseDragMinimapBtn
+if not btn or type(btn.GetScript) ~= "function" then
+_G.checkError = "CourseDragMinimapBtn не является кнопкой"
+return false
+end
+if not btn:IsShown() then
+_G.checkError = "Кнопка должна быть показана"
+return false
+end
+if btn:GetParent() ~= Minimap then
+_G.checkError = "Родитель должен быть Minimap"
+return false
+end
+local onDragStart = btn:GetScript("OnDragStart")
+if type(onDragStart) ~= "function" then
+_G.checkError = "У кнопки должен быть OnDragStart"
+return false
+end
+local onDragStop = btn:GetScript("OnDragStop")
+if type(onDragStop) ~= "function" then
+_G.checkError = "У кнопки должен быть OnDragStop"
+return false
+end
+return true
+end,
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ns_llua['lua'][281] = {
+type = "info",
+title = "Таланты: вкладки и очки",
+helpModules = {65, 45, 31},
+content = [=[
+<h>Таланты: вкладки и очки</h>
+<t>Система талантов в WoW 3.3.5 позволяет настраивать специализацию персонажа. У каждого класса есть три ветки талантов.</t>
+<h>GetNumTalentTabs</h>
+<code>
+/run print(GetNumTalentTabs())
 </code>
-<h>Что можно добавить дальше</h>
-<t>- здоровье игрока;</t>
-<t>- имя цели;</t>
-<t>- свободные ячейки в сумках;</t>
-<t>- кулдауны заклинаний;</t>
-<t>- баффы;</t>
-<t>- слэш-команду <c>/mypanel</c>;</t>
-<t>- сохранение позиции в <k>nsMyAddon</k>.</t>
-<h>Итог второй части</h>
-<t>Ты прошёл путь от простых API-запросов до собственного интерактивного интерфейса:</t>
-<c>UnitName, UnitHealth, GetMoney, GetPlayerMapPosition</c>
-<c>таблицы, циклы, функции</c>
-<c>фреймы, текстуры, кнопки</c>
-<c>события и OnUpdate</c>
-<c>чат, слэш-команды, настройки</c>
+<t>Возвращает количество вкладок талантов. Обычно это <n>3</n>.</t>
+<h>GetNumTalents</h>
+<code>
+/run print(GetNumTalents(1))
+</code>
+<t>Возвращает количество талантов на указанной вкладке.</t>
+<t>Аргументы:</t>
+<c>1</c> — номер вкладки (1, 2 или 3).
+<c>false</c> — второй аргумент, если нужно считать только доступные таланты.
+<h>GetTalentInfo</h>
+<code>
+/run local name, rank, maxRank = GetTalentInfo(1, 1); print(name, rank, maxRank)
+</code>
+<t>Возвращает информацию о таланте:</t>
+<c>name</c> — название таланта.
+<c>rank</c> — текущий ранг.
+<c>maxRank</c> — максимальный ранг.
+<c>isExceptional</c> — является ли талантом исключительным.
+<c>meetsPrereq</c> — выполнены ли требования.
+<h>GetUnspentTalentPoints</h>
+<code>
+/run print(GetUnspentTalentPoints())
+</code>
+<t>Возвращает количество неиспользованных очков талантов.</t>
+<h>GetNumTalentGroups</h>
+<code>
+/run print(GetNumTalentGroups())
+</code>
+<t>Возвращает количество наборов талантов. Обычно <n>1</n> или <n>2</n> (если куплен второй набор).</t>
+<h>GetActiveTalentGroup</h>
+<code>
+/run print(GetActiveTalentGroup())
+</code>
+<t>Возвращает номер активного набора талантов: <n>1</n> или <n>2</n>.</t>
+<h>Перебор талантов</h>
+<code>
+/run local count = GetNumTalents(1); for i = 1, count do local name, rank, maxRank = GetTalentInfo(1, i); if rank > 0 then print(name, rank .. "/" .. maxRank) end end
+</code>
+<h>Подсчёт вложенных очков</h>
+<code>
+/run local total = 0; for tab = 1, 3 do local count = GetNumTalents(tab); for i = 1, count do local _, rank = GetTalentInfo(tab, i); total = total + (rank or 0) end end; print("Всего очков: " .. total)
+</code>
+<w>Важно:</w> если персонаж ещё не открыл таланты или данные ещё не загружены, некоторые функции могут вернуть <k>nil</k>.
+<h>Безопасный шаблон</h>
+<code>
+/run local points = GetUnspentTalentPoints() or 0; print("Неиспользованных очков: " .. points)
+</code>
 ]=],
 }
+
+ns_llua['lua'][282] = {
+type = "vartest",
+title = "Тест: количество вкладок и очков",
+helpModules = {281, 65},
+tasks = {
+{
+var = "talentTabCount",
+desc = 'Создай глобальную переменную talentTabCount = GetNumTalentTabs() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "unspentTalentPoints",
+desc = 'Создай глобальную переменную unspentTalentPoints = GetUnspentTalentPoints() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][283] = {
+type = "vartest",
+title = "Тест: активный набор талантов",
+helpModules = {281, 65},
+tasks = {
+{
+var = "talentGroupCount",
+desc = 'Создай глобальную переменную talentGroupCount = GetNumTalentGroups() or 1',
+check = function(value)
+return type(value) == "number" and value >= 1
+end,
+},
+{
+var = "activeTalentGroup",
+desc = 'Создай глобальную переменную activeTalentGroup = GetActiveTalentGroup() or 1',
+check = function(value)
+return type(value) == "number" and value >= 1
+end,
+},
+},
+}
+
+ns_llua['lua'][284] = {
+type = "commenttest",
+title = "Тест: функция GetTalentTabCountSafe",
+helpModules = {281, 45, 65},
+preloadVars = {
+{var = "GetTalentTabCountSafe", desc = "GetTalentTabCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 257-3: функция GetTalentTabCountSafe</h>
+<t>Создай глобальную функцию <k>GetTalentTabCountSafe()</k>.</t>
+<t>Функция должна вернуть количество вкладок талантов через:</t>
+<code>
+GetNumTalentTabs()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество вкладок.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTalentTabCountSafe()
+]=],
+requireKeywords = {
+"GetTalentTabCountSafe",
+"function",
+"GetNumTalentTabs",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetTalentTabCountSafe) ~= "function" then
+_G.checkError = "GetTalentTabCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetTalentTabCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetTalentTabCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество вкладок талантов не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][285] = {
+type = "commenttest",
+title = "Тест: функция GetActiveTalentGroupSafe",
+helpModules = {281, 45, 65},
+preloadVars = {
+{var = "GetActiveTalentGroupSafe", desc = "GetActiveTalentGroupSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 257-4: функция GetActiveTalentGroupSafe</h>
+<t>Создай глобальную функцию <k>GetActiveTalentGroupSafe()</k>.</t>
+<t>Функция должна вернуть номер активного набора талантов через:</t>
+<code>
+GetActiveTalentGroup()
+</code>
+<t>Если результат не является числом или меньше единицы, функция должна вернуть <n>1</n>.</t>
+<t>Иначе функция должна вернуть номер активного набора.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetActiveTalentGroupSafe()
+]=],
+requireKeywords = {
+"GetActiveTalentGroupSafe",
+"function",
+"GetActiveTalentGroup",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetActiveTalentGroupSafe) ~= "function" then
+_G.checkError = "GetActiveTalentGroupSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetActiveTalentGroupSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetActiveTalentGroupSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 1 then
+_G.checkError = "Номер активного набора талантов должен быть не меньше 1"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][286] = {
+type = "commenttest",
+title = "Тест: функция CountTalentsInTab",
+helpModules = {281, 45, 31, 65},
+preloadVars = {
+{var = "CountTalentsInTab", desc = "CountTalentsInTab очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 257-5: функция CountTalentsInTab</h>
+<t>Создай глобальную функцию <k>CountTalentsInTab(tab)</k>.</t>
+<t>Если <k>tab</k> не является числом, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество талантов на вкладке через:</t>
+<code>
+GetNumTalents(tab)
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество талантов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountTalentsInTab(tab)
+]=],
+requireKeywords = {
+"CountTalentsInTab",
+"function",
+"GetNumTalents",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountTalentsInTab) ~= "function" then
+_G.checkError = "CountTalentsInTab не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.CountTalentsInTab, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова CountTalentsInTab(1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для tab = 1 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.CountTalentsInTab, -1)
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для tab = -1 функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.CountTalentsInTab, "bad")
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нечислового tab функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][287] = {
+type = "info",
+title = "Репутация фракций",
+helpModules = {65, 45, 31},
+content = [=[
+<h>Репутация фракций</h>
+<t>В WoW у игрока есть репутация с различными фракциями. Чем выше репутация, тем больше наград доступно.</t>
+<w>Важно:</w> в списке репутации есть не только фракции, но и заголовки-категории. Их нужно отличать.
+<h>GetNumFactions</h>
+<code>
+/run print(GetNumFactions())
+</code>
+<t>Возвращает общее количество записей в списке репутации. Это и фракции, и заголовки.</t>
+<h>GetFactionInfo</h>
+<code>
+/run local name, desc, standingID, barMin, barMax, barValue = GetFactionInfo(1); print(name, standingID, barValue)
+</code>
+<t>Основные возвращаемые значения:</t>
+<c>name</c> — название фракции или заголовка.
+<c>description</c> — описание.
+<c>standingID</c> — числовой уровень репутации.
+<c>barMin</c> — минимальное значение полосы.
+<c>barMax</c> — максимальное значение полосы.
+<c>barValue</c> — текущее значение полосы.
+<h>Уровни репутации (standingID)</h>
+<c>1</c> — Ненависть (Hated).
+<c>2</c> — Враждебность (Hostile).
+<c>3</c> — Недружелюбие (Unfriendly).
+<c>4</c> — Нейтралитет (Neutral).
+<c>5</c> — Дружелюбие (Friendly).
+<c>6</c> — Уважение (Honored).
+<c>7</c> — Почтение (Revered).
+<c>8</c> — Превознесение (Exalted).
+<h>Заголовки и фракции</h>
+<t>GetFactionInfo возвращает поле <k>isHeader</k>. Если оно истинно, это заголовок-категория, а не фракция.</t>
+<code>
+/run local name, _, _, _, _, _, _, _, isHeader = GetFactionInfo(1); print(name, isHeader)
+</code>
+<h>Отслеживаемая фракция</h>
+<code>
+/run local name, standingID, barMin, barMax, barValue = GetWatchedFactionInfo(); print(name or "Ничего не отслеживается")
+</code>
+<h>Перебор фракций</h>
+<code>
+/run local count = GetNumFactions() or 0; for i = 1, count do local name, _, standingID, _, _, _, _, _, isHeader = GetFactionInfo(i); if name and not isHeader then print(name, standingID) end end
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local name = GetWatchedFactionInfo() or "Нет фракции"; print("Отслеживается: " .. name)
+</code>
+]=],
+}
+
+ns_llua['lua'][288] = {
+type = "vartest",
+title = "Тест: количество записей репутации",
+helpModules = {287, 65},
+tasks = {
+{
+var = "factionCount",
+desc = 'Создай глобальную переменную factionCount = GetNumFactions() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "firstFactionName",
+desc = 'Создай глобальную переменную firstFactionName = GetFactionInfo(1) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "firstFactionStanding",
+desc = 'Создай глобальную переменную firstFactionStanding = select(3, GetFactionInfo(1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 8
+end,
+},
+},
+}
+
+ns_llua['lua'][289] = {
+type = "vartest",
+title = "Тест: отслеживаемая фракция",
+helpModules = {287, 65},
+tasks = {
+{
+var = "watchedFactionName",
+desc = 'Создай глобальную переменную watchedFactionName = GetWatchedFactionInfo() or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "watchedFactionStanding",
+desc = 'Создай глобальную переменную watchedFactionStanding = select(2, GetWatchedFactionInfo()) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0 and value <= 8
+end,
+},
+{
+var = "watchedFactionBarValue",
+desc = 'Создай глобальную переменную watchedFactionBarValue = select(5, GetWatchedFactionInfo()) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][290] = {
+type = "commenttest",
+title = "Тест: функция GetFactionCountSafe",
+helpModules = {287, 45, 65},
+preloadVars = {
+{var = "GetFactionCountSafe", desc = "GetFactionCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 263-3: функция GetFactionCountSafe</h>
+<t>Создай глобальную функцию <k>GetFactionCountSafe()</k>.</t>
+<t>Функция должна вернуть количество записей в списке репутации через:</t>
+<code>
+GetNumFactions()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество записей.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetFactionCountSafe()
+]=],
+requireKeywords = {
+"GetFactionCountSafe",
+"function",
+"GetNumFactions",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetFactionCountSafe) ~= "function" then
+_G.checkError = "GetFactionCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetFactionCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetFactionCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество записей не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][291] = {
+type = "commenttest",
+title = "Тест: функция GetFactionNameSafe",
+helpModules = {287, 45, 65},
+preloadVars = {
+{var = "GetFactionNameSafe", desc = "GetFactionNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 263-4: функция GetFactionNameSafe</h>
+<t>Создай глобальную функцию <k>GetFactionNameSafe(index)</k>.</t>
+<t>Если <k>index</k> не является числом или меньше либо равно нуля, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна получить имя записи репутации через:</t>
+<code>
+GetFactionInfo(index)
+</code>
+<t>Если имя не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть имя записи.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetFactionNameSafe(index)
+]=],
+requireKeywords = {
+"GetFactionNameSafe",
+"function",
+"GetFactionInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetFactionNameSafe) ~= "function" then
+_G.checkError = "GetFactionNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetFactionNameSafe, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetFactionNameSafe(1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для index = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetFactionNameSafe, 0)
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для index = 0 функция должна вернуть 'нет'"
+return false
+end
+local ok3, result3 = pcall(_G.GetFactionNameSafe, "bad")
+if not ok3 or result3 ~= "нет" then
+_G.checkError = "Для нечислового index функция должна вернуть 'нет'"
+return false
+end
+local ok4, result4 = pcall(_G.GetFactionNameSafe, 999999)
+if not ok4 then
+_G.checkError = "Ошибка вызова GetFactionNameSafe(999999): " .. tostring(result4)
+return false
+end
+if result4 ~= "нет" then
+_G.checkError = "Для несуществующего index функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][292] = {
+type = "commenttest",
+title = "Тест: функция GetWatchedFactionNameSafe",
+helpModules = {287, 45, 65},
+preloadVars = {
+{var = "GetWatchedFactionNameSafe", desc = "GetWatchedFactionNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 263-5: функция GetWatchedFactionNameSafe</h>
+<t>Создай глобальную функцию <k>GetWatchedFactionNameSafe()</k>.</t>
+<t>Функция должна вернуть имя отслеживаемой фракции через:</t>
+<code>
+GetWatchedFactionInfo()
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть имя отслеживаемой фракции.</t>
+<t>Используй:</t>
+<c>GetWatchedFactionInfo</c>
+<c>type</c>
+<c>return</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetWatchedFactionNameSafe()
+]=],
+requireKeywords = {
+"GetWatchedFactionNameSafe",
+"function",
+"GetWatchedFactionInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetWatchedFactionNameSafe) ~= "function" then
+_G.checkError = "GetWatchedFactionNameSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetWatchedFactionNameSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetWatchedFactionNameSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "string" or result == "" then
+_G.checkError = "Функция должна вернуть непустую строку"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][293] = {
+type = "info",
+title = "Квесты: журнал и статусы",
+helpModules = {65, 45, 31},
+content = [=[
+<h>Квесты: журнал и статусы</h>
+<t>Журнал квестов содержит все активные квесты персонажа. Доступ к нему осуществляется через функции API.</t>
+<w>Важно:</w> в WoW 3.3.5 нет прямой функции поиска квеста по ID. Для поиска нужно перебирать журнал вручную.
+<h>GetNumQuestLogEntries</h>
+<code>
+/run print(GetNumQuestLogEntries())
+</code>
+<t>Возвращает количество записей в журнале квестов.</t>
+<h>GetQuestLogTitle</h>
+<code>
+/run print(GetQuestLogTitle(1))
+</code>
+<t>Возвращает название квеста по индексу.</t>
+<t>Если индекс неверный или квеста нет, функция может вернуть <k>nil</k>.</t>
+<h>GetQuestLogLevel</h>
+<code>
+/run print(GetQuestLogLevel(1))
+</code>
+<t>Возвращает уровень квеста.</t>
+<h>Перебор журнала квестов</h>
+<code>
+/run local count = GetNumQuestLogEntries() or 0; for i = 1, count do local title = GetQuestLogTitle(i); if title then print(i, title) end end
+</code>
+<h>GetQuestLogCompletionText</h>
+<t>Возвращает текст завершения квеста, если квест готов к сдаче.</t>
+<code>
+/run print(GetQuestLogCompletionText() or "Квест не завершён")
+</code>
+<w>Примечание:</w> эта функция работает для текущего выбранного квеста. Для работы с конкретным квестом нужно сначала выбрать его через <k>SelectQuestLogEntry</k>.
+<h>SelectQuestLogEntry</h>
+<code>
+/run SelectQuestLogEntry(1)
+</code>
+<t>Выбирает квест по индексу в журнале. После этого функции, работающие с текущим квестом, будут применяться к нему.</t>
+<h>Подсчёт квестов по уровню</h>
+<code>
+/run local count = GetNumQuestLogEntries() or 0; local highLevel = 0; for i = 1, count do local level = GetQuestLogLevel(i); if level and level >= 70 then highLevel = highLevel + 1 end end; print("Квестов 70+: " .. highLevel)
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local title = GetQuestLogTitle(1) or "Нет квеста"; print("Первый квест: " .. title)
+</code>
+]=],
+}
+
+ns_llua['lua'][294] = {
+type = "vartest",
+title = "Тест: количество квестов в журнале",
+helpModules = {293, 65},
+tasks = {
+{
+var = "questLogCount",
+desc = 'Создай глобальную переменную questLogCount = GetNumQuestLogEntries() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][295] = {
+type = "vartest",
+title = "Тест: первый квест в журнале",
+helpModules = {293, 65},
+tasks = {
+{
+var = "firstQuestTitle",
+desc = 'Создай глобальную переменную firstQuestTitle = GetQuestLogTitle(1) or "нет квеста"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "firstQuestLevel",
+desc = 'Создай глобальную переменную firstQuestLevel = GetQuestLogLevel(1) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][296] = {
+type = "commenttest",
+title = "Тест: функция GetQuestLogCountSafe",
+helpModules = {293, 45, 65},
+preloadVars = {
+{var = "GetQuestLogCountSafe", desc = "GetQuestLogCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 269-3: функция GetQuestLogCountSafe</h>
+<t>Создай глобальную функцию <k>GetQuestLogCountSafe()</k>.</t>
+<t>Функция должна вернуть количество записей в журнале квестов через:</t>
+<code>
+GetNumQuestLogEntries()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество записей.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetQuestLogCountSafe()
+]=],
+requireKeywords = {
+"GetQuestLogCountSafe",
+"function",
+"GetNumQuestLogEntries",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetQuestLogCountSafe) ~= "function" then
+_G.checkError = "GetQuestLogCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetQuestLogCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetQuestLogCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество квестов не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][297] = {
+type = "commenttest",
+title = "Тест: функция GetQuestTitleSafe",
+helpModules = {293, 45, 65},
+preloadVars = {
+{var = "GetQuestTitleSafe", desc = "GetQuestTitleSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 269-4: функция GetQuestTitleSafe</h>
+<t>Создай глобальную функцию <k>GetQuestTitleSafe(index)</k>.</t>
+<t>Если <k>index</k> не является числом или меньше либо равно нуля, функция должна вернуть строку:</t>
+<s>"нет квеста"</s>
+<t>Иначе функция должна получить название квеста через:</t>
+<code>
+GetQuestLogTitle(index)
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет квеста"</s>
+<t>Иначе функция должна вернуть название квеста.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetQuestTitleSafe(index)
+]=],
+requireKeywords = {
+"GetQuestTitleSafe",
+"function",
+"GetQuestLogTitle",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetQuestTitleSafe) ~= "function" then
+_G.checkError = "GetQuestTitleSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetQuestTitleSafe, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetQuestTitleSafe(1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для index = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetQuestTitleSafe, 0)
+if not ok2 or result2 ~= "нет квеста" then
+_G.checkError = "Для index = 0 функция должна вернуть 'нет квеста'"
+return false
+end
+local ok3, result3 = pcall(_G.GetQuestTitleSafe, "bad")
+if not ok3 or result3 ~= "нет квеста" then
+_G.checkError = "Для нечислового index функция должна вернуть 'нет квеста'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][298] = {
+type = "commenttest",
+title = "Тест: функция FindQuestInLog",
+helpModules = {293, 45, 31, 33, 65},
+preloadVars = {
+{var = "FindQuestInLog", desc = "FindQuestInLog очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 269-5: функция FindQuestInLog</h>
+<t>Создай глобальную функцию <k>FindQuestInLog(text)</k>.</t>
+<t>Если <k>text</k> не является строкой или является пустой строкой, функция должна вернуть <k>nil</k>.</t>
+<t>Иначе функция должна перебрать все записи журнала квестов и найти первый квест, в названии которого есть подстрока <k>text</k>.</t>
+<t>Алгоритм:</t>
+<t>1. Получи количество записей через <k>GetNumQuestLogEntries()</k>.</t>
+<t>2. Перебери индексы от 1 до количества.</t>
+<t>3. Для каждого индекса получи название через <k>GetQuestLogTitle(index)</k>.</t>
+<t>4. Если название содержит подстроку <k>text</k>, верни индекс этого квеста.</t>
+<t>5. Если ничего не найдено, верни <k>nil</k>.</t>
+<t>Используй:</t>
+<c>GetNumQuestLogEntries</c>
+<c>GetQuestLogTitle</c>
+<c>string.find</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию FindQuestInLog(text)
+]=],
+requireKeywords = {
+"FindQuestInLog",
+"function",
+"GetNumQuestLogEntries",
+"GetQuestLogTitle",
+"string.find",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.FindQuestInLog) ~= "function" then
+_G.checkError = "FindQuestInLog не является глобальной функцией"
+return false
+end
+-- Тест 1: пустая строка
+local ok1, result1 = pcall(_G.FindQuestInLog, "")
+if not ok1 or result1 ~= nil then
+_G.checkError = "Для пустой строки функция должна вернуть nil"
+return false
+end
+-- Тест 2: не строка
+local ok2, result2 = pcall(_G.FindQuestInLog, 123)
+if not ok2 or result2 ~= nil then
+_G.checkError = "Для нестрокового аргумента функция должна вернуть nil"
+return false
+end
+-- Тест 3: несуществующая подстрока
+local ok3, result3 = pcall(_G.FindQuestInLog, "zzz_no_such_quest_zzz")
+if not ok3 then
+_G.checkError = "Ошибка вызова FindQuestInLog с несуществующей строкой: " .. tostring(result3)
+return false
+end
+if result3 ~= nil then
+_G.checkError = "Для несуществующей подстроки функция должна вернуть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][299] = {
+type = "info",
+title = "Парсинг ссылок предметов",
+helpModules = {179, 33, 65},
+content = [=[
+<h>Парсинг ссылок предметов</h>
+<t>В WoW предметы часто представлены в виде строк-ссылок. Такие ссылки используются в чате, тултипах и интерфейсе.</t>
+<h>Как выглядит ссылка на предмет</h>
+<code>
+/run local name, link = GetItemInfo(6948); print(link)
+</code>
+<t>Типичная ссылка выглядит так:</t>
+<code>
+|cffA335EE|Hitem:6948:0:0:0:0:0:0:0|h[Камень возвращения]|h|r
+</code>
+<t>Разберём структуру:</t>
+<c>|cffA335EE</c> — цвет качества предмета в hex.
+<c>|Hitem:6948:0:0:0:0:0:0:0|h</c> — гиперссылка с ID предмета и параметрами.
+<c>[Камень возвращения]</c> — название предмета в квадратных скобках.
+<c>|h|r</c> — закрытие гиперссылки и сброс цвета.
+<h>Цвета качества</h>
+<c>9d9d9d</c> — бедный (0).
+<c>ffffff</c> — обычный (1).
+<c>1eff00</c> — необычный (2).
+<c>0070dd</c> — редкий (3).
+<c>a335ee</c> — эпический (4).
+<c>ff8000</c> — легендарный (5).
+<h>Получение ссылки на предмет</h>
+<t>Ссылку можно получить через GetItemInfo:</t>
+<code>
+/run local name, link = GetItemInfo(6948); print(link or "нет ссылки")
+</code>
+<t>Или через сумку:</t>
+<code>
+/run print(GetContainerItemLink(0, 1) or "пусто")
+</code>
+<h>Парсинг через string.match</h>
+<t>Функция string.match позволяет извлекать части строки по паттерну.</t>
+<h>Извлечение ID предмета</h>
+<code>
+/run local name, link = GetItemInfo(6948); if link then local id = link:match("|Hitem:(%d+)"); print("ID: " .. tostring(id)) end
+</code>
+<t>Паттерн <k>|Hitem:(%d+)</k> ищет подстроку после <s>|Hitem:</s> и захватывает цифры в скобки.</t>
+<w>Важно:</w> в Lua паттернах круглые скобки <k>()</k> означают захват, а <k>%d</k> означает цифру. Знак <k>+</k> означает один или более символов.
+<h>Извлечение названия</h>
+<code>
+/run local name, link = GetItemInfo(6948); if link then local itemName = link:match("%[(.+)%]"); print("Название: " .. tostring(itemName)) end
+</code>
+<t>Паттерн <k>%[(.+)%]</k> ищет текст между квадратными скобками.</t>
+<h>Извлечение цвета</h>
+<code>
+/run local name, link = GetItemInfo(6948); if link then local color = link:match("|cff(%x%x%x%x%x%x)"); print("Цвет: " .. tostring(color)) end
+</code>
+<t>Паттерн <k>|cff(%x%x%x%x%x%x)</k> захватывает 6 шестнадцатеричных символов после <s>|cff</s>.</t>
+<h>Ссылки на заклинания</h>
+<t>Ссылки на заклинания имеют другой формат:</t>
+<code>
+|cff71d5ff|Hspell:6603|h[Название заклинания]|h|r
+</code>
+<t>Здесь вместо <s>item</s> используется <s>spell</s>.</t>
+<h>Безопасный шаблон</h>
+<code>
+/run local name, link = GetItemInfo(6948); if link then local id = link:match("|Hitem:(%d+)"); print("ID: " .. (id or "нет")) else print("Ссылки нет") end
+</code>
+<w>Примечание:</w> если предмет ещё не загружен в кэш, GetItemInfo может вернуть nil для ссылки. Поэтому всегда проверяй результат.
+]=],
+}
+
+ns_llua['lua'][300] = {
+type = "vartest",
+title = "Тест: ссылка на камень возвращения",
+helpModules = {299, 179, 65},
+tasks = {
+{
+var = "hearthstoneLink",
+desc = 'Создай глобальную переменную hearthstoneLink = select(2, GetItemInfo(6948)) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "hearthstoneLinkIsString",
+desc = 'Создай глобальную переменную hearthstoneLinkIsString = type(select(2, GetItemInfo(6948)) or "нет") == "string"',
+check = function(value)
+return type(value) == "boolean" and value == true
+end,
+},
+},
+}
+
+ns_llua['lua'][301] = {
+type = "vartest",
+title = "Тест: парсинг ссылки",
+helpModules = {299, 33, 65},
+tasks = {
+{
+var = "hearthstoneItemID",
+desc = 'Создай глобальную переменную hearthstoneItemID: извлеки ID предмета из ссылки камня возвращения через string.match и паттерн "|Hitem:(%d+)". Если ссылки нет, используй 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "hearthstoneColor",
+desc = 'Создай глобальную переменную hearthstoneColor: извлеки цвет качества из ссылки камня возвращения через string.match и паттерн "|cff(%x%x%x%x%x%x)". Если ссылки нет, используй "ffffff"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "hearthstoneBracketName",
+desc = 'Создай глобальную переменную hearthstoneBracketName: извлеки название из квадратных скобок ссылки камня возвращения через string.match и паттерн "%[(.+)%]". Если ссылки нет, используй "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][302] = {
+type = "commenttest",
+title = "Тест: функция ExtractItemIDFromLink",
+helpModules = {299, 33, 45, 65},
+preloadVars = {
+{var = "ExtractItemIDFromLink", desc = "ExtractItemIDFromLink очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 275-3: функция ExtractItemIDFromLink</h>
+<t>Создай глобальную функцию <k>ExtractItemIDFromLink(link)</k>.</t>
+<t>Если <k>link</k> не является строкой или является пустой строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна извлечь ID предмета из ссылки через:</t>
+<code>
+link:match("|Hitem:(%d+)")
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть ID предмета как число.</t>
+<t>Используй <k>tonumber</k> для преобразования строки в число.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ExtractItemIDFromLink(link)
+]=],
+requireKeywords = {
+"ExtractItemIDFromLink",
+"function",
+"string.match",
+"tonumber",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ExtractItemIDFromLink) ~= "function" then
+_G.checkError = "ExtractItemIDFromLink не является глобальной функцией"
+return false
+end
+-- Тест 1: реальная ссылка камня возвращения
+local _, realLink = GetItemInfo(6948)
+if realLink then
+local ok1, result1 = pcall(_G.ExtractItemIDFromLink, realLink)
+if not ok1 then
+_G.checkError = "Ошибка вызова ExtractItemIDFromLink с реальной ссылкой: " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 ~= 6948 then
+_G.checkError = "Для ссылки камня возвращения функция должна вернуть 6948"
+return false
+end
+end
+-- Тест 2: пустая строка
+local ok2, result2 = pcall(_G.ExtractItemIDFromLink, "")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для пустой строки функция должна вернуть 0"
+return false
+end
+-- Тест 3: не строка
+local ok3, result3 = pcall(_G.ExtractItemIDFromLink, 123)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нестрокового аргумента функция должна вернуть 0"
+return false
+end
+-- Тест 4: строка без ссылки предмета
+local ok4, result4 = pcall(_G.ExtractItemIDFromLink, "просто текст")
+if not ok4 or result4 ~= 0 then
+_G.checkError = "Для строки без ссылки предмета функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][303] = {
+type = "commenttest",
+title = "Тест: функция ExtractItemNameFromLink",
+helpModules = {299, 33, 45, 65},
+preloadVars = {
+{var = "ExtractItemNameFromLink", desc = "ExtractItemNameFromLink очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 275-4: функция ExtractItemNameFromLink</h>
+<t>Создай глобальную функцию <k>ExtractItemNameFromLink(link)</k>.</t>
+<t>Если <k>link</k> не является строкой или является пустой строкой, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна извлечь название предмета из квадратных скобок через:</t>
+<code>
+link:match("%[(.+)%]")
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть название предмета.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ExtractItemNameFromLink(link)
+]=],
+requireKeywords = {
+"ExtractItemNameFromLink",
+"function",
+"string.match",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ExtractItemNameFromLink) ~= "function" then
+_G.checkError = "ExtractItemNameFromLink не является глобальной функцией"
+return false
+end
+-- Тест 1: реальная ссылка камня возвращения
+local realName, realLink = GetItemInfo(6948)
+if realLink then
+local ok1, result1 = pcall(_G.ExtractItemNameFromLink, realLink)
+if not ok1 then
+_G.checkError = "Ошибка вызова ExtractItemNameFromLink с реальной ссылкой: " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для ссылки камня возвращения функция должна вернуть строку"
+return false
+end
+end
+-- Тест 2: пустая строка
+local ok2, result2 = pcall(_G.ExtractItemNameFromLink, "")
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для пустой строки функция должна вернуть 'нет'"
+return false
+end
+-- Тест 3: не строка
+local ok3, result3 = pcall(_G.ExtractItemNameFromLink, 123)
+if not ok3 or result3 ~= "нет" then
+_G.checkError = "Для нестрокового аргумента функция должна вернуть 'нет'"
+return false
+end
+-- Тест 4: строка без квадратных скобок
+local ok4, result4 = pcall(_G.ExtractItemNameFromLink, "просто текст")
+if not ok4 or result4 ~= "нет" then
+_G.checkError = "Для строки без квадратных скобок функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][304] = {
+type = "commenttest",
+title = "Тест: функция IsItemLink",
+helpModules = {299, 33, 45, 65},
+preloadVars = {
+{var = "IsItemLink", desc = "IsItemLink очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 275-5: функция IsItemLink</h>
+<t>Создай глобальную функцию <k>IsItemLink(link)</k>.</t>
+<t>Если <k>link</k> не является строкой или является пустой строкой, функция должна вернуть <k>false</k>.</t>
+<t>Иначе функция должна проверить, является ли строка ссылкой на предмет.</t>
+<t>Строка считается ссылкой на предмет, если она содержит подстроку:</t>
+<s>"|Hitem:"</s>
+<t>Используй <k>string.find</k> с четвёртым аргументом <k>true</k> для поиска без паттернов.</t>
+<t>Функция должна вернуть <k>true</k> если строка является ссылкой на предмет, иначе <k>false</k>.</t>
+<t>Результат должен быть именно boolean. Используй приведение через <k>and true or false</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsItemLink(link)
+]=],
+requireKeywords = {
+"IsItemLink",
+"function",
+"string.find",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsItemLink) ~= "function" then
+_G.checkError = "IsItemLink не является глобальной функцией"
+return false
+end
+-- Тест 1: реальная ссылка камня возвращения
+local _, realLink = GetItemInfo(6948)
+if realLink then
+local ok1, result1 = pcall(_G.IsItemLink, realLink)
+if not ok1 then
+_G.checkError = "Ошибка вызова IsItemLink с реальной ссылкой: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для реальной ссылки предмета функция должна вернуть true"
+return false
+end
+end
+-- Тест 2: пустая строка
+local ok2, result2 = pcall(_G.IsItemLink, "")
+if not ok2 or result2 ~= false then
+_G.checkError = "Для пустой строки функция должна вернуть false"
+return false
+end
+-- Тест 3: не строка
+local ok3, result3 = pcall(_G.IsItemLink, 123)
+if not ok3 or result3 ~= false then
+_G.checkError = "Для нестрокового аргумента функция должна вернуть false"
+return false
+end
+-- Тест 4: обычный текст
+local ok4, result4 = pcall(_G.IsItemLink, "просто текст")
+if not ok4 or result4 ~= false then
+_G.checkError = "Для обычного текста функция должна вернуть false"
+return false
+end
+-- Тест 5: ссылка на заклинание (не предмет)
+local ok5, result5 = pcall(_G.IsItemLink, "|cff71d5ff|Hspell:6603|h[Тест]|h|r")
+if not ok5 or result5 ~= false then
+_G.checkError = "Для ссылки на заклинание функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][305] = {
+type = "info",
+title = "Статы персонажа и UnitStat",
+helpModules = {65, 45, 10},
+content = [=[
+<h>Статы персонажа и UnitStat</h>
+<t>Функция <k>UnitStat</k> возвращает характеристики персонажа: силу, ловкость, выносливость, интеллект и дух.</t>
+<h>Индексы статов</h>
+<c>1</c> — Сила (Strength).
+<c>2</c> — Ловкость (Agility).
+<c>3</c> — Выносливость (Stamina).
+<c>4</c> — Интеллект (Intellect).
+<c>5</c> — Дух (Spirit).
+<h>UnitStat</h>
+<code>
+/run local base, effective, modifier = UnitStat("player", 1); print(base, effective, modifier)
+</code>
+<t>Функция возвращает три значения:</t>
+<c>base</c> — базовое значение стата без баффов и дебаффов.
+<c>effective</c> — эффективное значение с учётом всех модификаторов.
+<c>modifier</c> — разница между эффективным и базовым значениями.
+<h>Безопасный шаблон</h>
+<code>
+/run local base, effective = UnitStat("player", 1); print(base or 0, effective or 0)
+</code>
+<h>Атака и броня</h>
+<code>
+/run print(UnitAttackPower("player"))
+/run print(UnitArmor("player"))
+/run print(UnitDamage("player"))
+/run print(UnitAttackSpeed("player"))
+</code>
+<t>Основные функции:</t>
+<c>UnitAttackPower</c> — сила атаки.
+<c>UnitRangedAttackPower</c> — сила дальней атаки.
+<c>UnitDamage</c> — минимальный и максимальный урон.
+<c>UnitAttackSpeed</c> — скорость атаки.
+<c>UnitArmor</c> — броня.
+<h>Сопротивления</h>
+<code>
+/run print(UnitResistance("player", 0))
+</code>
+<t>Индексы сопротивлений:</t>
+<c>0</c> — физическое.
+<c>1</c> — святое.
+<c>2</c> — огонь.
+<c>3</c> — природа.
+<c>4</c> — лёд.
+<c>5</c> — тьма.
+<c>6</c> — тайная магия.
+<h>Перебор всех статов</h>
+<code>
+/run for i = 1, 5 do local base, effective = UnitStat("player", i); print("Stat " .. i .. ": " .. (effective or 0)) end
+</code>
+<h>Таблица статов</h>
+<code>
+/run local stats = {}; for i = 1, 5 do local _, effective = UnitStat("player", i); stats[i] = effective or 0 end; print("Сила: " .. stats[1], "Ловкость: " .. stats[2])
+</code>
+<w>Важно:</w> значения статов зависят от баффов, экипировки и талантов. Эффективное значение может меняться в реальном времени.
+]=],
+}
+
+ns_llua['lua'][306] = {
+type = "vartest",
+title = "Тест: базовые статы",
+helpModules = {305, 65},
+tasks = {
+{
+var = "playerStrength",
+desc = 'Создай глобальную переменную playerStrength = select(2, UnitStat("player", 1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerAgility",
+desc = 'Создай глобальную переменную playerAgility = select(2, UnitStat("player", 2)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerStamina",
+desc = 'Создай глобальную переменную playerStamina = select(2, UnitStat("player", 3)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][307] = {
+type = "vartest",
+title = "Тест: интеллект, дух, атака и броня",
+helpModules = {305, 65},
+tasks = {
+{
+var = "playerIntellect",
+desc = 'Создай глобальную переменную playerIntellect = select(2, UnitStat("player", 4)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerSpirit",
+desc = 'Создай глобальную переменную playerSpirit = select(2, UnitStat("player", 5)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerAttackPower",
+desc = 'Создай глобальную переменную playerAttackPower = UnitAttackPower("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerArmor",
+desc = 'Создай глобальную переменную playerArmor = UnitArmor("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][308] = {
+type = "commenttest",
+title = "Тест: функция GetStatSafe",
+helpModules = {305, 45, 65},
+preloadVars = {
+{var = "GetStatSafe", desc = "GetStatSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 281-3: функция GetStatSafe</h>
+<t>Создай глобальную функцию <k>GetStatSafe(unit, statIndex)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Если <k>statIndex</k> не является числом или меньше 1 или больше 5, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить эффективное значение стата через:</t>
+<code>
+select(2, UnitStat(unit, statIndex))
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть эффективное значение стата.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetStatSafe(unit, statIndex)
+]=],
+requireKeywords = {
+"GetStatSafe",
+"function",
+"UnitStat",
+"select",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetStatSafe) ~= "function" then
+_G.checkError = "GetStatSafe не является глобальной функцией"
+return false
+end
+-- Тест 1: корректный вызов для всех статов
+for i = 1, 5 do
+local ok, result = pcall(_G.GetStatSafe, "player", i)
+if not ok then
+_G.checkError = "Ошибка вызова GetStatSafe('player', " .. i .. "): " .. tostring(result)
+return false
+end
+if type(result) ~= "number" or result < 0 then
+_G.checkError = "Для statIndex = " .. i .. " функция должна вернуть число больше или равное нулю"
+return false
+end
+end
+-- Тест 2: некорректный unit
+local ok2, result2 = pcall(_G.GetStatSafe, 123, 1)
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть 0"
+return false
+end
+-- Тест 3: некорректный statIndex
+local ok3, result3 = pcall(_G.GetStatSafe, "player", 0)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для statIndex = 0 функция должна вернуть 0"
+return false
+end
+local ok4, result4 = pcall(_G.GetStatSafe, "player", 6)
+if not ok4 or result4 ~= 0 then
+_G.checkError = "Для statIndex = 6 функция должна вернуть 0"
+return false
+end
+local ok5, result5 = pcall(_G.GetStatSafe, "player", "bad")
+if not ok5 or result5 ~= 0 then
+_G.checkError = "Для нечислового statIndex функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][309] = {
+type = "commenttest",
+title = "Тест: функция GetStatName",
+helpModules = {305, 45, 17, 19},
+preloadVars = {
+{var = "GetStatName", desc = "GetStatName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 281-4: функция GetStatName</h>
+<t>Создай глобальную функцию <k>GetStatName(statIndex)</k>.</t>
+<t>Функция должна вернуть название стата по индексу:</t>
+<c>1</c> — <s>"Сила"</s>
+<c>2</c> — <s>"Ловкость"</s>
+<c>3</c> — <s>"Выносливость"</s>
+<c>4</c> — <s>"Интеллект"</s>
+<c>5</c> — <s>"Дух"</s>
+<t>Если <k>statIndex</k> не является числом или меньше 1 или больше 5, функция должна вернуть:</t>
+<s>"Неизвестно"</s>
+<t>Используй:</t>
+<c>type</c>
+<c>if / elseif / else</c>
+<c>return</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetStatName(statIndex)
+]=],
+requireKeywords = {
+"GetStatName",
+"function",
+"type",
+"if",
+"elseif",
+"else",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetStatName) ~= "function" then
+_G.checkError = "GetStatName не является глобальной функцией"
+return false
+end
+local tests = {
+{input = 1, expected = "Сила"},
+{input = 2, expected = "Ловкость"},
+{input = 3, expected = "Выносливость"},
+{input = 4, expected = "Интеллект"},
+{input = 5, expected = "Дух"},
+{input = 0, expected = "Неизвестно"},
+{input = 6, expected = "Неизвестно"},
+{input = "bad", expected = "Неизвестно"},
+}
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.GetStatName, test.input)
+if not ok or result ~= test.expected then
+_G.checkError = "Тест " .. i .. " функции GetStatName не пройден"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][310] = {
+type = "commenttest",
+title = "Тест: функция GetStatReport",
+helpModules = {305, 45, 31, 65, 7},
+preloadVars = {
+{var = "GetStatReport", desc = "GetStatReport очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 281-5: функция GetStatReport</h>
+<t>Создай глобальную функцию <k>GetStatReport(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть строку:</t>
+<s>"Нет юнита"</s>
+<t>Иначе функция должна собрать строку с эффективными значениями всех пяти статов.</t>
+<t>Формат строки:</t>
+<s>"Сила: X, Ловкость: X, Выносливость: X, Интеллект: X, Дух: X"</s>
+<t>Где X — эффективное значение соответствующего стата.</t>
+<t>Используй:</t>
+<c>UnitStat(unit, index)</c>
+<c>select(2, ...)</c>
+<c>or 0</c>
+<c>string.format</c>
+<c>конкатенацию</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetStatReport(unit)
+]=],
+requireKeywords = {
+"GetStatReport",
+"function",
+"UnitStat",
+"select",
+"string.format",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetStatReport) ~= "function" then
+_G.checkError = "GetStatReport не является глобальной функцией"
+return false
+end
+-- Тест 1: корректный вызов
+local ok1, result1 = pcall(_G.GetStatReport, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetStatReport('player'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для player функция должна вернуть строку"
+return false
+end
+if not result1:find("Сила: ", 1, true) then
+_G.checkError = "Строка должна содержать 'Сила: '"
+return false
+end
+if not result1:find("Ловкость: ", 1, true) then
+_G.checkError = "Строка должна содержать 'Ловкость: '"
+return false
+end
+if not result1:find("Выносливость: ", 1, true) then
+_G.checkError = "Строка должна содержать 'Выносливость: '"
+return false
+end
+if not result1:find("Интеллект: ", 1, true) then
+_G.checkError = "Строка должна содержать 'Интеллект: '"
+return false
+end
+if not result1:find("Дух: ", 1, true) then
+_G.checkError = "Строка должна содержать 'Дух: '"
+return false
+end
+-- Тест 2: некорректный unit
+local ok2, result2 = pcall(_G.GetStatReport, 123)
+if not ok2 or result2 ~= "Нет юнита" then
+_G.checkError = "Для нестрокового unit функция должна вернуть 'Нет юнита'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][311] = {
+type = "info",
+title = "Атака, урон, броня и сопротивления",
+helpModules = {305, 65, 45},
+content = [=[
+<h>Атака, урон, броня и сопротивления</h>
+<t>WoW API предоставляет функции для получения боевых характеристик персонажа и других юнитов.</t>
+<h>UnitAttackPower</h>
+<code>
+/run print(UnitAttackPower("player"))
+</code>
+<t>Возвращает силу атаки юнита. Чем выше значение, тем больше физический урон.</t>
+<h>UnitRangedAttackPower</h>
+<code>
+/run print(UnitRangedAttackPower("player"))
+</code>
+<t>Возвращает силу дальней атаки. Актуально для классов с луками и арбалетами.</t>
+<h>UnitDamage</h>
+<code>
+/run local minDmg, maxDmg = UnitDamage("player"); print(minDmg, maxDmg)
+</code>
+<t>Возвращает минимальный и максимальный урон юнита.</t>
+<t>Если нужен средний урон, можно посчитать:</t>
+<code>
+/run local minDmg, maxDmg = UnitDamage("player"); if minDmg and maxDmg then print(string.format("Средний урон: %.1f", (minDmg + maxDmg) / 2)) end
+</code>
+<h>UnitAttackSpeed</h>
+<code>
+/run print(UnitAttackSpeed("player"))
+</code>
+<t>Возвращает скорость атаки в секундах. Меньшее значение — быстрее атака.</t>
+<h>UnitArmor</h>
+<code>
+/run print(UnitArmor("player"))
+</code>
+<t>Возвращает значение брони юнита. Броня уменьшает получаемый физический урон.</t>
+<h>UnitResistance</h>
+<t>Возвращает сопротивление юнита к школе магии.</t>
+<code>
+/run print(UnitResistance("player", 0))
+</code>
+<t>Школы магии:</t>
+<c>0</c> — физическое.
+<c>1</c> — святое (Holy).
+<c>2</c> — огонь (Fire).
+<c>3</c> — природа (Nature).
+<c>4</c> — лёд (Frost).
+<c>5</c> — тьма (Shadow).
+<c>6</c> — тайная магия (Arcane).
+<h>Перебор всех сопротивлений</h>
+<code>
+/run for school = 0, 6 do print("Школа " .. school .. ": " .. (UnitResistance("player", school) or 0)) end
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local ap = UnitAttackPower("player") or 0; local armor = UnitArmor("player") or 0; print(string.format("АП: %d, Броня: %d", ap, armor))
+</code>
+<w>Важно:</w> все эти функции могут вернуть <k>nil</k>, если юнит не существует или данные недоступны. Всегда используй <k>or 0</k> для безопасности.
+<h>Пример боевого отчёта</h>
+<code>
+/run local ap = UnitAttackPower("player") or 0; local minD, maxD = UnitDamage("player"); local armor = UnitArmor("player") or 0; local speed = UnitAttackSpeed("player") or 0; print(string.format("АП: %d | Урон: %.0f-%.0f | Броня: %d | Скорость: %.1f", ap, minD or 0, maxD or 0, armor, speed))
+</code>
+]=],
+}
+
+ns_llua['lua'][312] = {
+type = "vartest",
+title = "Тест: сила атаки и броня",
+helpModules = {311, 65},
+tasks = {
+{
+var = "playerAttackPower",
+desc = 'Создай глобальную переменную playerAttackPower = UnitAttackPower("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerRangedAttackPower",
+desc = 'Создай глобальную переменную playerRangedAttackPower = UnitRangedAttackPower("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerArmor",
+desc = 'Создай глобальную переменную playerArmor = UnitArmor("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][313] = {
+type = "vartest",
+title = "Тест: скорость атаки и урон",
+helpModules = {311, 65},
+tasks = {
+{
+var = "playerAttackSpeed",
+desc = 'Создай глобальную переменную playerAttackSpeed = UnitAttackSpeed("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerMinDamage",
+desc = 'Создай глобальную переменную playerMinDamage = UnitDamage("player") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "playerMaxDamage",
+desc = 'Создай глобальную переменную playerMaxDamage = select(2, UnitDamage("player")) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][314] = {
+type = "commenttest",
+title = "Тест: функция GetAttackPowerSafe",
+helpModules = {311, 45, 65},
+preloadVars = {
+{var = "GetAttackPowerSafe", desc = "GetAttackPowerSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 287-3: функция GetAttackPowerSafe</h>
+<t>Создай глобальную функцию <k>GetAttackPowerSafe(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить силу атаки через:</t>
+<code>
+UnitAttackPower(unit)
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть силу атаки.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetAttackPowerSafe(unit)
+]=],
+requireKeywords = {
+"GetAttackPowerSafe",
+"function",
+"UnitAttackPower",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetAttackPowerSafe) ~= "function" then
+_G.checkError = "GetAttackPowerSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetAttackPowerSafe, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetAttackPowerSafe('player'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для player функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetAttackPowerSafe, "ns_invalid_unit")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.GetAttackPowerSafe, 123)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][315] = {
+type = "commenttest",
+title = "Тест: функция GetDamageRange",
+helpModules = {311, 45, 65},
+preloadVars = {
+{var = "GetDamageRange", desc = "GetDamageRange очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 287-4: функция GetDamageRange</h>
+<t>Создай глобальную функцию <k>GetDamageRange(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть два значения: <n>0</n> и <n>0</n>.</t>
+<t>Иначе функция должна получить минимальный и максимальный урон через:</t>
+<code>
+UnitDamage(unit)
+</code>
+<t>Если минимальный урон не является числом или меньше нуля, верни <n>0</n> для минимального.</t>
+<t>Если максимальный урон не является числом или меньше нуля, верни <n>0</n> для максимального.</t>
+<t>Иначе функция должна вернуть два числа: минимальный урон и максимальный урон.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetDamageRange(unit)
+]=],
+requireKeywords = {
+"GetDamageRange",
+"function",
+"UnitDamage",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetDamageRange) ~= "function" then
+_G.checkError = "GetDamageRange не является глобальной функцией"
+return false
+end
+local ok1, minD, maxD = pcall(_G.GetDamageRange, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetDamageRange('player'): " .. tostring(minD)
+return false
+end
+if type(minD) ~= "number" or type(maxD) ~= "number" then
+_G.checkError = "Для player функция должна вернуть два числа"
+return false
+end
+if minD < 0 or maxD < 0 then
+_G.checkError = "Значения урона не должны быть отрицательными"
+return false
+end
+local ok2, invalidMin, invalidMax = pcall(_G.GetDamageRange, "ns_invalid_unit")
+if not ok2 then
+_G.checkError = "Ошибка вызова GetDamageRange('ns_invalid_unit'): " .. tostring(invalidMin)
+return false
+end
+if invalidMin ~= 0 or invalidMax ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0 и 0"
+return false
+end
+local ok3, badMin, badMax = pcall(_G.GetDamageRange, 123)
+if not ok3 or badMin ~= 0 or badMax ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть 0 и 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][316] = {
+type = "commenttest",
+title = "Тест: функция GetResistanceSafe",
+helpModules = {311, 45, 65},
+preloadVars = {
+{var = "GetResistanceSafe", desc = "GetResistanceSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 287-5: функция GetResistanceSafe</h>
+<t>Создай глобальную функцию <k>GetResistanceSafe(unit, school)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Если <k>school</k> не является числом или меньше нуля или больше 6, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна получить сопротивление через:</t>
+<code>
+UnitResistance(unit, school)
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть значение сопротивления.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetResistanceSafe(unit, school)
+]=],
+requireKeywords = {
+"GetResistanceSafe",
+"function",
+"UnitResistance",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetResistanceSafe) ~= "function" then
+_G.checkError = "GetResistanceSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetResistanceSafe, "player", 0)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetResistanceSafe('player', 0): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "number" or result1 < 0 then
+_G.checkError = "Для player и школы 0 функция должна вернуть число больше или равное нулю"
+return false
+end
+local ok2, result2 = pcall(_G.GetResistanceSafe, "ns_invalid_unit", 0)
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.GetResistanceSafe, "player", -1)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для школы -1 функция должна вернуть 0"
+return false
+end
+local ok4, result4 = pcall(_G.GetResistanceSafe, "player", 7)
+if not ok4 or result4 ~= 0 then
+_G.checkError = "Для школы 7 функция должна вернуть 0"
+return false
+end
+local ok5, result5 = pcall(_G.GetResistanceSafe, 123, 0)
+if not ok5 or result5 ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][317] = {
+type = "info",
+title = "Профессии и торговля",
+helpModules = {65, 45, 31},
+content = [=[
+<h>Профессии и торговля</h>
+<t>WoW API позволяет получать информацию о профессиях игрока и о товарах торговцев.</t>
+<w>Важно:</w> данные о навыках профессии доступны только когда окно профессии открыто. Данные о торговце доступны только когда окно торговца открыто. Если окно не открыто, функции могут вернуть <k>nil</k>.
+<h>GetNumTradeSkills</h>
+<code>
+/run print(GetNumTradeSkills())
+</code>
+<t>Возвращает количество рецептов в текущей профессии. Если окно профессии не открыто, может вернуть <k>nil</k>.</t>
+<h>GetTradeSkillLine</h>
+<code>
+/run local name, rank, maxRank = GetTradeSkillLine(); print(name or "нет", rank or 0, maxRank or 0)
+</code>
+<t>Возвращает три значения:</t>
+<c>name</c> — название профессии.
+<c>rank</c> — текущий уровень навыка.
+<c>maxRank</c> — максимальный уровень навыка.
+<h>GetTradeSkillInfo</h>
+<code>
+/run local name, skillType, available = GetTradeSkillInfo(1); print(name or "нет", skillType or "нет")
+</code>
+<t>Возвращает информацию о рецепте:</t>
+<c>name</c> — название рецепта.
+<c>skillType</c> — тип: <s>"header"</s> (заголовок категории) или <s>"spell"</s> (рецепт).
+<c>available</c> — доступно ли создание.
+<h>Перебор рецептов</h>
+<code>
+/run local count = GetNumTradeSkills() or 0; for i = 1, count do local name, skillType = GetTradeSkillInfo(i); if name and skillType == "spell" then print(name) end end
+</code>
+<t>Здесь мы пропускаем заголовки категорий и выводим только рецепты.</t>
+<h>GetMerchantNumItems</h>
+<code>
+/run print(GetMerchantNumItems())
+</code>
+<t>Возвращает количество предметов у торговца. Если окно торговца не открыто, может вернуть <k>nil</k> или <n>0</n>.</t>
+<h>GetMerchantItemInfo</h>
+<code>
+/run local name, texture, price, quantity = GetMerchantItemInfo(1); print(name or "нет", price or 0, quantity or 0)
+</code>
+<t>Возвращает информацию о предмете торговца:</t>
+<c>name</c> — название предмета.
+<c>texture</c> — иконка предмета.
+<c>price</c> — цена в меди.
+<c>quantity</c> — количество предметов в стопке.
+<c>numAvailable</c> — сколько штук доступно.
+<c>isUsable</c> — можно ли использовать.
+<h>Перебор товаров торговца</h>
+<code>
+/run local count = GetMerchantNumItems() or 0; for i = 1, count do local name, _, price = GetMerchantItemInfo(i); if name then print(i, name, price or 0) end end
+</code>
+<h>Цена в золоте</h>
+<t>Цена возвращается в меди. Чтобы перевести в золото, серебро и медь:</t>
+<code>
+/run local _, _, price = GetMerchantItemInfo(1); price = price or 0; local gold = math.floor(price / 10000); local silver = math.floor((price % 10000) / 100); local copper = price % 100; print(string.format("%dз %dс %dм", gold, silver, copper))
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local count = GetNumTradeSkills() or 0; local name = GetTradeSkillLine() or "нет"; print(string.format("Профессия: %s, рецептов: %d", name, count))
+</code>
+<w>Примечание:</w> если вы хотите получить данные о профессии или торговце в аддоне, вам нужно дождаться, пока игрок откроет соответствующее окно, и использовать события для отслеживания этого момента.
+]=],
+}
+
+ns_llua['lua'][318] = {
+type = "vartest",
+title = "Тест: профессия игрока",
+helpModules = {317, 65},
+tasks = {
+{
+var = "tradeSkillCount",
+desc = 'Создай глобальную переменную tradeSkillCount = GetNumTradeSkills() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "tradeSkillName",
+desc = 'Создай глобальную переменную tradeSkillName = GetTradeSkillLine() or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "tradeSkillRank",
+desc = 'Создай глобальную переменную tradeSkillRank = select(2, GetTradeSkillLine()) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][319] = {
+type = "vartest",
+title = "Тест: торговец и предметы",
+helpModules = {317, 65},
+tasks = {
+{
+var = "merchantItemCount",
+desc = 'Создай глобальную переменную merchantItemCount = GetMerchantNumItems() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "merchantFirstItemName",
+desc = 'Создай глобальную переменную merchantFirstItemName = GetMerchantItemInfo(1) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "merchantFirstItemPrice",
+desc = 'Создай глобальную переменную merchantFirstItemPrice = select(3, GetMerchantItemInfo(1)) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][320] = {
+type = "commenttest",
+title = "Тест: функция GetTradeSkillCountSafe",
+helpModules = {317, 45, 65},
+preloadVars = {
+{var = "GetTradeSkillCountSafe", desc = "GetTradeSkillCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 293-3: функция GetTradeSkillCountSafe</h>
+<t>Создай глобальную функцию <k>GetTradeSkillCountSafe()</k>.</t>
+<t>Функция должна вернуть количество рецептов в текущей профессии через:</t>
+<code>
+GetNumTradeSkills()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество рецептов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTradeSkillCountSafe()
+]=],
+requireKeywords = {
+"GetTradeSkillCountSafe",
+"function",
+"GetNumTradeSkills",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetTradeSkillCountSafe) ~= "function" then
+_G.checkError = "GetTradeSkillCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetTradeSkillCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetTradeSkillCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество рецептов не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][321] = {
+type = "commenttest",
+title = "Тест: функция GetTradeSkillNameSafe",
+helpModules = {317, 45, 65},
+preloadVars = {
+{var = "GetTradeSkillNameSafe", desc = "GetTradeSkillNameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 293-4: функция GetTradeSkillNameSafe</h>
+<t>Создай глобальную функцию <k>GetTradeSkillNameSafe(index)</k>.</t>
+<t>Если <k>index</k> не является числом или меньше либо равно нуля, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна получить имя рецепта через:</t>
+<code>
+GetTradeSkillInfo(index)
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть имя рецепта.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTradeSkillNameSafe(index)
+]=],
+requireKeywords = {
+"GetTradeSkillNameSafe",
+"function",
+"GetTradeSkillInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetTradeSkillNameSafe) ~= "function" then
+_G.checkError = "GetTradeSkillNameSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetTradeSkillNameSafe, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetTradeSkillNameSafe(1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для index = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetTradeSkillNameSafe, 0)
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для index = 0 функция должна вернуть 'нет'"
+return false
+end
+local ok3, result3 = pcall(_G.GetTradeSkillNameSafe, "bad")
+if not ok3 or result3 ~= "нет" then
+_G.checkError = "Для нечислового index функция должна вернуть 'нет'"
+return false
+end
+local ok4, result4 = pcall(_G.GetTradeSkillNameSafe, 999999)
+if not ok4 then
+_G.checkError = "Ошибка вызова GetTradeSkillNameSafe(999999): " .. tostring(result4)
+return false
+end
+if result4 ~= "нет" then
+_G.checkError = "Для несуществующего index функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][322] = {
+type = "commenttest",
+title = "Тест: функция GetMerchantItemCountSafe",
+helpModules = {317, 45, 65},
+preloadVars = {
+{var = "GetMerchantItemCountSafe", desc = "GetMerchantItemCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 293-5: функция GetMerchantItemCountSafe</h>
+<t>Создай глобальную функцию <k>GetMerchantItemCountSafe()</k>.</t>
+<t>Функция должна вернуть количество предметов у торговца через:</t>
+<code>
+GetMerchantNumItems()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество предметов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetMerchantItemCountSafe()
+]=],
+requireKeywords = {
+"GetMerchantItemCountSafe",
+"function",
+"GetMerchantNumItems",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetMerchantItemCountSafe) ~= "function" then
+_G.checkError = "GetMerchantItemCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetMerchantItemCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetMerchantItemCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество предметов торговца не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][323] = {
+type = "info",
+title = "Питомцы и тотемы",
+helpModules = {77, 83, 65},
+content = [=[
+<h>Питомцы и тотемы</h>
+<t>В WoW у некоторых классов есть питомцы и тотемы. WoW API позволяет получать информацию о них.</t>
+<h>Питомцы</h>
+<t>Питомец доступен через UnitID <s>"pet"</s>.</t>
+<code>
+/run print(UnitExists("pet"))
+/run print(UnitName("pet"))
+/run print(UnitLevel("pet"))
+</code>
+<h>Проверка наличия питомца</h>
+<t>Функция <k>UnitExists("pet")</k> проверяет, существует ли питомец в данный момент.</t>
+<code>
+/run if UnitExists("pet") then print("Питомец есть") else print("Питомца нет") end
+</code>
+<h>HasPetUI</h>
+<t>Функция <k>HasPetUI()</k> проверяет, есть ли у игрока интерфейс питомца. Это зависит от класса.</t>
+<code>
+/run print(HasPetUI())
+</code>
+<t>Для охотника, чернокнижника и некоторых других классов вернёт истинное значение. Для воина, разбойника и т.д. вернёт <k>nil</k> или <k>false</k>.</t>
+<h>Здоровье питомца</h>
+<code>
+/run local hp = UnitHealth("pet") or 0; local hpMax = UnitHealthMax("pet") or 0; print(hp, hpMax)
+</code>
+<h>Семейство питомца</h>
+<code>
+/run print(UnitCreatureFamily("pet") or "нет")
+</code>
+<t>Возвращает семейство существа, например "Волк", "Кошка", "Бес" и т.д.</t>
+<h>Тотемы</h>
+<t>Тотемы доступны через функцию <k>GetTotemInfo(slot)</k>.</t>
+<t>Слоты тотемов:</t>
+<c>1</c> — огонь.
+<c>2</c> — земля.
+<c>3</c> — вода.
+<c>4</c> — воздух.
+<h>GetTotemInfo</h>
+<code>
+/run local haveTotem, name = GetTotemInfo(1); print(haveTotem, name or "нет")
+</code>
+<t>Функция возвращает несколько значений:</t>
+<c>haveTotem</c> — есть ли тотем в этом слоте.
+<c>name</c> — название тотема.
+<c>startTime</c> — время установки.
+<c>duration</c> — длительность.
+<c>icon</c> — иконка тотема.
+<h>Оставшееся время тотема</h>
+<code>
+/run print(GetTotemTimeLeft(1) or 0)
+</code>
+<t>Функция <k>GetTotemTimeLeft(slot)</k> возвращает оставшееся время тотема в секундах.</t>
+<h>Перебор всех тотемов</h>
+<code>
+/run for slot = 1, 4 do local have, name = GetTotemInfo(slot); if have then print("Слот " .. slot .. ": " .. (name or "нет")) end end
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local have, name = GetTotemInfo(1); have = have or false; name = name or "нет"; print(have, name)
+</code>
+<w>Важно:</w> если класс игрока не может ставить тотемы, все значения <k>haveTotem</k> будут ложными.
+]=],
+}
+
+ns_llua['lua'][324] = {
+type = "vartest",
+title = "Тест: питомец игрока",
+helpModules = {323, 65},
+tasks = {
+{
+var = "petExists",
+desc = 'Создай глобальную переменную petExists = not not UnitExists("pet")',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "petName",
+desc = 'Создай глобальную переменную petName = UnitName("pet") or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "petLevel",
+desc = 'Создай глобальную переменную petLevel = UnitLevel("pet") or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][325] = {
+type = "vartest",
+title = "Тест: тотемы и HasPetUI",
+helpModules = {323, 65},
+tasks = {
+{
+var = "hasPetUI",
+desc = 'Создай глобальную переменную hasPetUI = not not HasPetUI()',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "totem1Exists",
+desc = 'Создай глобальную переменную totem1Exists = not not GetTotemInfo(1)',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "totem1Name",
+desc = 'Создай глобальную переменную totem1Name = select(2, GetTotemInfo(1)) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][326] = {
+type = "commenttest",
+title = "Тест: функция HasPetSafe",
+helpModules = {323, 45, 65},
+preloadVars = {
+{var = "HasPetSafe", desc = "HasPetSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 299-3: функция HasPetSafe</h>
+<t>Создай глобальную функцию <k>HasPetSafe()</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если у игрока есть питомец.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>UnitExists("pet")</c>
+<t>Чтобы результат был именно boolean, используй конструкцию:</t>
+<code>
+return UnitExists("pet") and true or false
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию HasPetSafe()
+]=],
+requireKeywords = {
+"HasPetSafe",
+"function",
+"UnitExists",
+"pet",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.HasPetSafe) ~= "function" then
+_G.checkError = "HasPetSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.HasPetSafe)
+if not ok then
+_G.checkError = "Ошибка вызова HasPetSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "boolean" then
+_G.checkError = "Функция должна вернуть boolean"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][327] = {
+type = "commenttest",
+title = "Тест: функция GetPetHealthPercent",
+helpModules = {323, 83, 65, 45},
+preloadVars = {
+{var = "GetPetHealthPercent", desc = "GetPetHealthPercent очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 299-4: функция GetPetHealthPercent</h>
+<t>Создай глобальную функцию <k>GetPetHealthPercent()</k>.</t>
+<t>Если питомца не существует, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть процент здоровья питомца от 0 до 100.</t>
+<t>Используй:</t>
+<c>UnitExists("pet")</c>
+<c>UnitHealth("pet")</c>
+<c>UnitHealthMax("pet")</c>
+<c>or 0</c>
+<c>math.floor</c>
+<t>Если максимальное здоровье меньше или равно нуля, функция должна вернуть <n>0</n>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetPetHealthPercent()
+]=],
+requireKeywords = {
+"GetPetHealthPercent",
+"function",
+"UnitExists",
+"UnitHealth",
+"UnitHealthMax",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetPetHealthPercent) ~= "function" then
+_G.checkError = "GetPetHealthPercent не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetPetHealthPercent)
+if not ok then
+_G.checkError = "Ошибка вызова GetPetHealthPercent: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 or result > 100 then
+_G.checkError = "Процент здоровья питомца должен быть от 0 до 100"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][328] = {
+type = "commenttest",
+title = "Тест: функция GetTotemInfoSafe",
+helpModules = {323, 45, 65},
+preloadVars = {
+{var = "GetTotemInfoSafe", desc = "GetTotemInfoSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 299-5: функция GetTotemInfoSafe</h>
+<t>Создай глобальную функцию <k>GetTotemInfoSafe(slot)</k>.</t>
+<t>Если <k>slot</k> не является числом или меньше 1 или больше 4, функция должна вернуть два значения: <k>false</k> и строку <s>"нет"</s>.</t>
+<t>Иначе функция должна получить данные тотема через:</t>
+<code>
+GetTotemInfo(slot)
+</code>
+<t>Если тотема нет, функция должна вернуть два значения: <k>false</k> и строку <s>"нет"</s>.</t>
+<t>Если тотем есть, функция должна вернуть два значения: <k>true</k> и имя тотема.</t>
+<t>Если имя тотема не является строкой или является пустой строкой, используй строку:</t>
+<s>"нет"</s>
+<t>Используй:</t>
+<c>GetTotemInfo</c>
+<c>select</c>
+<c>type</c>
+<c>return</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetTotemInfoSafe(slot)
+]=],
+requireKeywords = {
+"GetTotemInfoSafe",
+"function",
+"GetTotemInfo",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetTotemInfoSafe) ~= "function" then
+_G.checkError = "GetTotemInfoSafe не является глобальной функцией"
+return false
+end
+-- Тест 1: корректный слот
+local ok1, exists1, name1 = pcall(_G.GetTotemInfoSafe, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetTotemInfoSafe(1): " .. tostring(exists1)
+return false
+end
+if type(exists1) ~= "boolean" then
+_G.checkError = "Первое значение должно быть boolean"
+return false
+end
+if type(name1) ~= "string" then
+_G.checkError = "Второе значение должно быть строкой"
+return false
+end
+-- Тест 2: некорректный слот
+local ok2, exists2, name2 = pcall(_G.GetTotemInfoSafe, 0)
+if not ok2 then
+_G.checkError = "Ошибка вызова GetTotemInfoSafe(0): " .. tostring(exists2)
+return false
+end
+if exists2 ~= false then
+_G.checkError = "Для слота 0 первое значение должно быть false"
+return false
+end
+if name2 ~= "нет" then
+_G.checkError = "Для слота 0 второе значение должно быть 'нет'"
+return false
+end
+-- Тест 3: некорректный слот
+local ok3, exists3, name3 = pcall(_G.GetTotemInfoSafe, 5)
+if not ok3 then
+_G.checkError = "Ошибка вызова GetTotemInfoSafe(5): " .. tostring(exists3)
+return false
+end
+if exists3 ~= false then
+_G.checkError = "Для слота 5 первое значение должно быть false"
+return false
+end
+if name3 ~= "нет" then
+_G.checkError = "Для слота 5 второе значение должно быть 'нет'"
+return false
+end
+-- Тест 4: нечисловой слот
+local ok4, exists4, name4 = pcall(_G.GetTotemInfoSafe, "bad")
+if not ok4 then
+_G.checkError = "Ошибка вызова GetTotemInfoSafe('bad'): " .. tostring(exists4)
+return false
+end
+if exists4 ~= false then
+_G.checkError = "Для нечислового слота первое значение должно быть false"
+return false
+end
+if name4 ~= "нет" then
+_G.checkError = "Для нечислового слота второе значение должно быть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][329] = {
+type = "info",
+title = "Почта и банк",
+helpModules = {65, 45, 31},
+content = [=[
+<h>Почта и банк</h>
+<t>WoW API позволяет получать информацию о почте и банке персонажа.</t>
+<w>Важно:</w> данные о почте и банке доступны только когда окно почты или банка открыто. Если окно не открыто, функции могут вернуть <k>nil</k>.
+<h>CheckInbox</h>
+<code>
+/run CheckInbox()
+</code>
+<t>Эта функция обновляет данные почты. Её нужно вызвать перед получением информации о письмах.</t>
+<h>GetInboxNumItems</h>
+<code>
+/run print(GetInboxNumItems())
+</code>
+<t>Возвращает количество писем в почтовом ящике.</t>
+<h>GetInboxHeaderInfo</h>
+<code>
+/run local sender, subject = GetInboxHeaderInfo(1); print(sender or "нет", subject or "нет")
+</code>
+<t>Возвращает данные о письме:</t>
+<c>sender</c> — имя отправителя.
+<c>subject</c> — тема письма.
+<c>money</c> — сумма денег в письме.
+<c>COD</c> — сумма наложенного платежа.
+<c>daysLeft</c> — сколько дней осталось до удаления письма.
+<c>itemCount</c> — количество предметов в письме.
+<c>wasRead</c> — прочитано ли письмо.
+<c>wasReturned</c> — возвращено ли письмо.
+<c>textCreated</c> — создан ли текст письма.
+<c>canReply</c> — можно ли ответить.
+<h>GetInboxText</h>
+<code>
+/run local text = GetInboxText(1); print(text or "нет текста")
+</code>
+<t>Возвращает текст письма.</t>
+<h>Перебор писем</h>
+<code>
+/run local count = GetInboxNumItems() or 0; for i = 1, count do local sender, subject = GetInboxHeaderInfo(i); print(i, sender or "нет", subject or "нет") end
+</code>
+<h>GetNumBankSlots</h>
+<code>
+/run print(GetNumBankSlots())
+</code>
+<t>Возвращает количество слотов банка.</t>
+<h>GetBankSlotCost</h>
+<code>
+/run print(GetBankSlotCost(1))
+</code>
+<t>Возвращает стоимость слота банка в меди.</t>
+<h>Безопасный шаблон</h>
+<code>
+/run local count = GetInboxNumItems() or 0; print(string.format("Писем: %d", count))
+</code>
+<w>Примечание:</w> если вы хотите получить данные о почте или банке в аддоне, вам нужно дождаться, пока игрок откроет соответствующее окно, и использовать события для отслеживания этого момента.
+]=],
+}
+
+ns_llua['lua'][330] = {
+type = "vartest",
+title = "Тест: почта игрока",
+helpModules = {329, 65},
+tasks = {
+{
+var = "inboxItemCount",
+desc = 'Создай глобальную переменную inboxItemCount = GetInboxNumItems() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "firstMailSender",
+desc = 'Создай глобальную переменную firstMailSender = GetInboxHeaderInfo(1) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "firstMailSubject",
+desc = 'Создай глобальную переменную firstMailSubject = select(2, GetInboxHeaderInfo(1)) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][331] = {
+type = "vartest",
+title = "Тест: банк игрока",
+helpModules = {329, 65},
+tasks = {
+{
+var = "bankSlotCount",
+desc = 'Создай глобальную переменную bankSlotCount = GetNumBankSlots() or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+{
+var = "firstBankSlotCost",
+desc = 'Создай глобальную переменную firstBankSlotCost = GetBankSlotCost(1) or 0',
+check = function(value)
+return type(value) == "number" and value >= 0
+end,
+},
+},
+}
+
+ns_llua['lua'][332] = {
+type = "commenttest",
+title = "Тест: функция GetInboxItemCountSafe",
+helpModules = {329, 45, 65},
+preloadVars = {
+{var = "GetInboxItemCountSafe", desc = "GetInboxItemCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 305-3: функция GetInboxItemCountSafe</h>
+<t>Создай глобальную функцию <k>GetInboxItemCountSafe()</k>.</t>
+<t>Функция должна вернуть количество писем в почтовом ящике через:</t>
+<code>
+GetInboxNumItems()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество писем.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetInboxItemCountSafe()
+]=],
+requireKeywords = {
+"GetInboxItemCountSafe",
+"function",
+"GetInboxNumItems",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetInboxItemCountSafe) ~= "function" then
+_G.checkError = "GetInboxItemCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetInboxItemCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetInboxItemCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество писем не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][333] = {
+type = "commenttest",
+title = "Тест: функция GetMailSubjectSafe",
+helpModules = {329, 45, 65},
+preloadVars = {
+{var = "GetMailSubjectSafe", desc = "GetMailSubjectSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 305-4: функция GetMailSubjectSafe</h>
+<t>Создай глобальную функцию <k>GetMailSubjectSafe(index)</k>.</t>
+<t>Если <k>index</k> не является числом или меньше либо равно нуля, функция должна вернуть строку:</t>
+<s>"нет"</s>
+<t>Иначе функция должна получить тему письма через:</t>
+<code>
+select(2, GetInboxHeaderInfo(index))
+</code>
+<t>Если результат не является строкой или является пустой строкой, функция должна вернуть:</t>
+<s>"нет"</s>
+<t>Иначе функция должна вернуть тему письма.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetMailSubjectSafe(index)
+]=],
+requireKeywords = {
+"GetMailSubjectSafe",
+"function",
+"GetInboxHeaderInfo",
+"select",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetMailSubjectSafe) ~= "function" then
+_G.checkError = "GetMailSubjectSafe не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.GetMailSubjectSafe, 1)
+if not ok1 then
+_G.checkError = "Ошибка вызова GetMailSubjectSafe(1): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "string" or result1 == "" then
+_G.checkError = "Для index = 1 функция должна вернуть строку"
+return false
+end
+local ok2, result2 = pcall(_G.GetMailSubjectSafe, 0)
+if not ok2 or result2 ~= "нет" then
+_G.checkError = "Для index = 0 функция должна вернуть 'нет'"
+return false
+end
+local ok3, result3 = pcall(_G.GetMailSubjectSafe, "bad")
+if not ok3 or result3 ~= "нет" then
+_G.checkError = "Для нечислового index функция должна вернуть 'нет'"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][334] = {
+type = "commenttest",
+title = "Тест: функция GetBankSlotCountSafe",
+helpModules = {329, 45, 65},
+preloadVars = {
+{var = "GetBankSlotCountSafe", desc = "GetBankSlotCountSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 305-5: функция GetBankSlotCountSafe</h>
+<t>Создай глобальную функцию <k>GetBankSlotCountSafe()</k>.</t>
+<t>Функция должна вернуть количество слотов банка через:</t>
+<code>
+GetNumBankSlots()
+</code>
+<t>Если результат не является числом или меньше нуля, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна вернуть количество слотов банка.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetBankSlotCountSafe()
+]=],
+requireKeywords = {
+"GetBankSlotCountSafe",
+"function",
+"GetNumBankSlots",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetBankSlotCountSafe) ~= "function" then
+_G.checkError = "GetBankSlotCountSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.GetBankSlotCountSafe)
+if not ok then
+_G.checkError = "Ошибка вызова GetBankSlotCountSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "number" then
+_G.checkError = "Функция должна вернуть число"
+return false
+end
+if result < 0 then
+_G.checkError = "Количество слотов банка не может быть отрицательным"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][335] = {
+type = "info",
+title = "SavedVariables и сохранение данных",
+helpModules = {44, 65, 45},
+content = [=[
+<h>SavedVariables и сохранение данных</h>
+<t>В WoW 3.3.5 данные аддонов сохраняются между сессиями через механизм SavedVariables. Это позволяет аддону запоминать настройки, позиции, статистику и другие данные игрока.</t>
+<h>Как это работает</h>
+<t>В файле аддона с расширением <c>.toc</c> указываются имена глобальных переменных, которые нужно сохранять:</t>
+<code>
+## SavedVariables: MyAddonDB
+## SavedVariablesPerCharacter: MyAddonCharDB
+</code>
+<t>Разница:</t>
+<c>SavedVariables</c> — переменная общая для всех персонажей на аккаунте.
+<c>SavedVariablesPerCharacter</c> — переменная уникальная для каждого персонажа.
+<h>Когда данные сохраняются</h>
+<t>WoW сохраняет данные при:</t>
+<c>/reload</c> — перезагрузка интерфейса.
+Выход из игры.
+Смена персонажа.
+<w>Важно:</w> если игрок убьёт процесс игры через диспетчер задач, данные могут не сохраниться.
+<h>Глобальная переменная как хранилище</h>
+<t>Обычно для сохранения используют одну глобальную таблицу:</t>
+<code>
+MyAddonDB = MyAddonDB or {}
+</code>
+<t>Конструкция <k>or {}</k> гарантирует, что при первом запуске (когда переменная ещё <k>nil</k>) будет создана пустая таблица.</t>
+<h>Хранение данных в таблице</h>
+<code>
+MyAddonDB = MyAddonDB or {}
+MyAddonDB.settings = MyAddonDB.settings or {}
+MyAddonDB.settings.showMinimap = true
+MyAddonDB.settings.fontSize = 12
+MyAddonDB.lastLogin = time()
+</code>
+<h>Безопасная инициализация</h>
+<t>При загрузке аддона нужно проверить, существуют ли данные, и создать значения по умолчанию:</t>
+<code>
+MyAddonDB = MyAddonDB or {}
+MyAddonDB.settings = MyAddonDB.settings or {}
+if MyAddonDB.settings.fontSize == nil then
+    MyAddonDB.settings.fontSize = 12
+end
+</code>
+<h>Чтение сохранённых данных</h>
+<code>
+MyAddonDB = MyAddonDB or {}
+local fontSize = MyAddonDB.settings and MyAddonDB.settings.fontSize or 12
+print("Размер шрифта: " .. fontSize)
+</code>
+<w>Важно:</w> если <k>MyAddonDB.settings</k> равно <k>nil</k>, то попытка прочитать <k>MyAddonDB.settings.fontSize</k> вызовет ошибку. Поэтому сначала проверяем наличие <k>settings</k>.
+<h>Сохранение при выходе</h>
+<t>Данные сохраняются автоматически при выходе. Но если нужно сохранить что-то в момент события, можно использовать:</t>
+<code>
+local f = CreateFrame("Frame")
+f:RegisterEvent("PLAYER_LOGOUT")
+f:SetScript("OnEvent", function()
+    MyAddonDB = MyAddonDB or {}
+    MyAddonDB.lastLogout = time()
+end)
+</code>
+<h>Функция time()</h>
+<code>
+/run print(time())
+</code>
+<t>Возвращает текущее время в секундах с 1 января 1970 года (Unix timestamp).</t>
+]=],
+}
+
+ns_llua['lua'][336] = {
+type = "vartest",
+title = "Тест: структура для сохранения",
+helpModules = {335, 44},
+tasks = {
+{
+var = "nsCourseDB",
+desc = 'Создай глобальную переменную nsCourseDB = {} (пустая таблица, имитация хранилища)',
+check = function(value)
+return type(value) == "table"
+end,
+},
+{
+var = "nsCourseDB_settings",
+desc = 'Создай глобальную переменную nsCourseDB_settings: присвой nsCourseDB.settings = {} и затем сохрани ссылку в nsCourseDB_settings',
+check = function(value)
+return type(value) == "table"
+end,
+},
+},
+}
+
+ns_llua['lua'][337] = {
+type = "vartest",
+title = "Тест: безопасная инициализация",
+helpModules = {335, 44, 65},
+tasks = {
+{
+var = "nsSafeDB",
+desc = 'Создай глобальную переменную nsSafeDB: используй конструкцию nsSafeDB = nsSafeDB or {} для безопасной инициализации',
+check = function(value)
+return type(value) == "table"
+end,
+},
+{
+var = "nsSafeDB_defaultValue",
+desc = 'Создай глобальную переменную nsSafeDB_defaultValue: если nsSafeDB.value равно nil, присвой 42, иначе оставь как есть. Сохрани результат в nsSafeDB_defaultValue',
+check = function(value)
+return type(value) == "number" and value == 42
+end,
+},
+},
+}
+
+ns_llua['lua'][338] = {
+type = "commenttest",
+title = "Тест: функция SaveKeyValue",
+helpModules = {335, 44, 45},
+preloadVars = {
+{var = "SaveKeyValue", desc = "SaveKeyValue очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "nsTestDB", desc = "nsTestDB очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 311-3: функция SaveKeyValue</h>
+<t>Создай глобальную функцию <k>SaveKeyValue(db, key, value)</k>.</t>
+<t>Если <k>db</k> не является таблицей, функция должна вернуть <k>false</k>.</t>
+<t>Если <k>key</k> не является строкой или является пустой строкой, функция должна вернуть <k>false</k>.</t>
+<t>Иначе функция должна сохранить значение в таблицу: <k>db[key] = value</k> и вернуть <k>true</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SaveKeyValue(db, key, value)
+]=],
+requireKeywords = {
+"SaveKeyValue",
+"function",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SaveKeyValue) ~= "function" then
+_G.checkError = "SaveKeyValue не является глобальной функцией"
+return false
+end
+_G.nsTestDB = {}
+local ok1, result1 = pcall(_G.SaveKeyValue, _G.nsTestDB, "testKey", 123)
+if not ok1 then
+_G.checkError = "Ошибка вызова SaveKeyValue: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для корректных данных функция должна вернуть true"
+return false
+end
+if _G.nsTestDB.testKey ~= 123 then
+_G.checkError = "Значение не было сохранено в таблицу"
+return false
+end
+local ok2, result2 = pcall(_G.SaveKeyValue, nil, "key", 1)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil-таблицы функция должна вернуть false"
+return false
+end
+local ok3, result3 = pcall(_G.SaveKeyValue, _G.nsTestDB, "", 1)
+if not ok3 or result3 ~= false then
+_G.checkError = "Для пустого ключа функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][339] = {
+type = "commenttest",
+title = "Тест: функция LoadKeyValue",
+helpModules = {335, 44, 45, 65},
+preloadVars = {
+{var = "LoadKeyValue", desc = "LoadKeyValue очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 311-4: функция LoadKeyValue</h>
+<t>Создай глобальную функцию <k>LoadKeyValue(db, key, default)</k>.</t>
+<t>Если <k>db</k> не является таблицей, функция должна вернуть <k>default</k>.</t>
+<t>Если <k>key</k> не является строкой или является пустой строкой, функция должна вернуть <k>default</k>.</t>
+<t>Если <k>db[key]</k> равно <k>nil</k>, функция должна вернуть <k>default</k>.</t>
+<t>Иначе функция должна вернуть <k>db[key]</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию LoadKeyValue(db, key, default)
+]=],
+requireKeywords = {
+"LoadKeyValue",
+"function",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.LoadKeyValue) ~= "function" then
+_G.checkError = "LoadKeyValue не является глобальной функцией"
+return false
+end
+local testDB = { existingKey = "hello", numKey = 42 }
+local ok1, result1 = pcall(_G.LoadKeyValue, testDB, "existingKey", "default")
+if not ok1 then
+_G.checkError = "Ошибка вызова LoadKeyValue: " .. tostring(result1)
+return false
+end
+if result1 ~= "hello" then
+_G.checkError = "Для существующего ключа функция должна вернуть значение из таблицы"
+return false
+end
+local ok2, result2 = pcall(_G.LoadKeyValue, testDB, "missingKey", "default")
+if not ok2 or result2 ~= "default" then
+_G.checkError = "Для отсутствующего ключа функция должна вернуть default"
+return false
+end
+local ok3, result3 = pcall(_G.LoadKeyValue, nil, "key", "default")
+if not ok3 or result3 ~= "default" then
+_G.checkError = "Для nil-таблицы функция должна вернуть default"
+return false
+end
+local ok4, result4 = pcall(_G.LoadKeyValue, testDB, "", "default")
+if not ok4 or result4 ~= "default" then
+_G.checkError = "Для пустого ключа функция должна вернуть default"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][340] = {
+type = "commenttest",
+title = "Тест: функция InitSavedData",
+helpModules = {335, 44, 45, 17},
+preloadVars = {
+{var = "InitSavedData", desc = "InitSavedData очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 311-5: функция InitSavedData</h>
+<t>Создай глобальную функцию <k>InitSavedData(db)</k>.</t>
+<t>Если <k>db</k> не является таблицей, функция должна вернуть <k>nil</k>.</t>
+<t>Иначе функция должна проверить и создать поля по умолчанию:</t>
+<t>- если <k>db.settings</k> равно <k>nil</k>, создай пустую таблицу: <k>db.settings = {}</k>;</t>
+<t>- если <k>db.settings.fontSize</k> равно <k>nil</k>, присвой <n>12</n>;</t>
+<t>- если <k>db.settings.showMinimap</k> равно <k>nil</k>, присвой <k>true</k>;</t>
+<t>- если <k>db.stats</k> равно <k>nil</k>, создай пустую таблицу: <k>db.stats = {}</k>;</t>
+<t>- если <k>db.stats.loginCount</k> равно <k>nil</k>, присвой <n>0</n>;</t>
+<t>- верни таблицу <k>db</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию InitSavedData(db)
+]=],
+requireKeywords = {
+"InitSavedData",
+"function",
+"if",
+"then",
+"nil",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.InitSavedData) ~= "function" then
+_G.checkError = "InitSavedData не является глобальной функцией"
+return false
+end
+-- Тест 1: пустая таблица
+local testDB1 = {}
+local ok1, result1 = pcall(_G.InitSavedData, testDB1)
+if not ok1 then
+_G.checkError = "Ошибка вызова InitSavedData с пустой таблицей: " .. tostring(result1)
+return false
+end
+if type(result1) ~= "table" then
+_G.checkError = "Для пустой таблицы функция должна вернуть таблицу"
+return false
+end
+if type(result1.settings) ~= "table" then
+_G.checkError = "Поле settings должно быть таблицей"
+return false
+end
+if result1.settings.fontSize ~= 12 then
+_G.checkError = "Поле settings.fontSize должно быть 12"
+return false
+end
+if result1.settings.showMinimap ~= true then
+_G.checkError = "Поле settings.showMinimap должно быть true"
+return false
+end
+if type(result1.stats) ~= "table" then
+_G.checkError = "Поле stats должно быть таблицей"
+return false
+end
+if result1.stats.loginCount ~= 0 then
+_G.checkError = "Поле stats.loginCount должно быть 0"
+return false
+end
+-- Тест 2: таблица с уже существующими данными
+local testDB2 = {
+settings = { fontSize = 20 },
+stats = { loginCount = 5 },
+}
+local ok2, result2 = pcall(_G.InitSavedData, testDB2)
+if not ok2 then
+_G.checkError = "Ошибка вызова InitSavedData с заполненной таблицей: " .. tostring(result2)
+return false
+end
+if result2.settings.fontSize ~= 20 then
+_G.checkError = "Существующее значение fontSize не должно быть перезаписано"
+return false
+end
+if result2.stats.loginCount ~= 5 then
+_G.checkError = "Существующее значение loginCount не должно быть перезаписано"
+return false
+end
+if result2.settings.showMinimap ~= true then
+_G.checkError = "Отсутствующее поле showMinimap должно быть создано со значением true"
+return false
+end
+-- Тест 3: nil
+local ok3, result3 = pcall(_G.InitSavedData, nil)
+if not ok3 or result3 ~= nil then
+_G.checkError = "Для nil функция должна вернуть nil"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][341] = {
+type = "info",
+title = "Аддон-коммуникация: SendAddonMessage",
+helpModules = {239, 335},
+content = [=[
+<h>Аддон-коммуникация: SendAddonMessage</h>
+<t>Аддоны могут обмениваться скрытыми сообщениями между игроками. Это позволяет синхронизировать данные, передавать настройки, координировать действия в группе или рейде.</t>
+<h>Как это работает</h>
+<t>Один аддон отправляет сообщение через <k>SendAddonMessage</k>. Другой аддон с таким же префиксом получает его через событие <k>CHAT_MSG_ADDON</k>.</t>
+<code>
+-- Отправка
+SendAddonMessage("MyPrefix", "Hello", "GUILD")
+-- Получение (в другом аддоне или у другого игрока)
+-- Событие CHAT_MSG_ADDON с prefix = "MyPrefix"
+</code>
+<h>RegisterAddonMessagePrefix</h>
+<t>Перед получением сообщений нужно зарегистрировать префикс:</t>
+<code>
+RegisterAddonMessagePrefix("MyPrefix")
+</code>
+<t>Без регистрации событие <k>CHAT_MSG_ADDON</k> не придёт для этого префикса.</t>
+<h>SendAddonMessage</h>
+<code>
+SendAddonMessage(prefix, message, channel, target)
+</code>
+<t>Аргументы:</t>
+<c>prefix</c> — строка-префикс, идентификатор аддона.
+<c>message</c> — текст сообщения.
+<c>channel</c> — канал отправки.
+<c>target</c> — имя получателя (только для канала "WHISPER").
+<h>Каналы отправки</h>
+<c>"GUILD"</c> — всем членам гильдии.
+<c>"PARTY"</c> — всем членам группы.
+<c>"RAID"</c> — всем членам рейда.
+<c>"WHISPER"</c> — конкретному игроку (нужен аргумент target).
+<c>"BATTLEGROUND"</c> — всем на поле боя.
+<h>Пример отправки</h>
+<code>
+/run RegisterAddonMessagePrefix("NSCourse")
+/run SendAddonMessage("NSCourse", "ping", "GUILD")
+</code>
+<h>Пример получения</h>
+<code>
+local f = CreateFrame("Frame")
+f:RegisterEvent("CHAT_MSG_ADDON")
+f:SetScript("OnEvent", function(self, event, prefix, message, channel, sender)
+    if prefix == "NSCourse" then
+        print("От " .. sender .. ": " .. message)
+    end
+end)
+</code>
+<h>Ограничения</h>
+<w>Важно:</w> в WoW 3.3.5 максимальная длина сообщения ограничена. Префикс и сообщение вместе не должны превышать <n>255</n> байт.
+<t>Если сообщение длинное, его нужно разбивать на части и отправлять по очереди.</t>
+<h>Формат данных</h>
+<t>Сообщение — это просто строка. Для передачи структурированных данных используют разделение символом:</t>
+<code>
+local data = "key1:value1|key2:value2"
+SendAddonMessage("MyPrefix", data, "GUILD")
+</code>
+<t>Или сериализацию в строку:</t>
+<code>
+local msg = table.concat({"hp", "100", "mana", "50"}, ",")
+SendAddonMessage("MyPrefix", msg, "PARTY")
+</code>
+<h>Безопасный шаблон</h>
+<code>
+local function SafeSendAddonMessage(prefix, message, channel)
+    if type(prefix) ~= "string" or prefix == "" then
+        return false
+    end
+    if type(message) ~= "string" then
+        return false
+    end
+    if type(channel) ~= "string" or channel == "" then
+        return false
+    end
+    SendAddonMessage(prefix, message, channel)
+    return true
+end
+</code>
+<w>Примечание:</w> сообщения аддонов не видны в чате игрока. Они передаются только между аддонами.
+]=],
+}
+
+ns_llua['lua'][342] = {
+type = "vartest",
+title = "Тест: префикс и каналы",
+helpModules = {341},
+tasks = {
+{
+var = "addonPrefix",
+desc = 'Создай глобальную переменную addonPrefix = "NSCourse"',
+check = function(value)
+return type(value) == "string" and value == "NSCourse"
+end,
+},
+{
+var = "addonChannelGuild",
+desc = 'Создай глобальную переменную addonChannelGuild = "GUILD"',
+check = function(value)
+return type(value) == "string" and value == "GUILD"
+end,
+},
+{
+var = "addonChannelParty",
+desc = 'Создай глобальную переменную addonChannelParty = "PARTY"',
+check = function(value)
+return type(value) == "string" and value == "PARTY"
+end,
+},
+},
+}
+
+ns_llua['lua'][343] = {
+type = "vartest",
+title = "Тест: формат сообщения",
+helpModules = {341, 33, 31},
+tasks = {
+{
+var = "addonMessageData",
+desc = 'Создай глобальную переменную addonMessageData: объедини строки "hp", "100", "mana", "50" через запятую с помощью table.concat',
+check = function(value)
+return type(value) == "string" and value == "hp,100,mana,50"
+end,
+},
+{
+var = "addonMessageLength",
+desc = 'Создай глобальную переменную addonMessageLength: длина строки addonMessageData (используй оператор #)',
+check = function(value)
+return type(value) == "number" and value == 14
+end,
+},
+},
+}
+
+ns_llua['lua'][344] = {
+type = "commenttest",
+title = "Тест: функция BuildAddonMessage",
+helpModules = {341, 45, 31, 44},
+preloadVars = {
+{var = "BuildAddonMessage", desc = "BuildAddonMessage очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 317-3: функция BuildAddonMessage</h>
+<t>Создай глобальную функцию <k>BuildAddonMessage(data)</k>.</t>
+<t>Аргумент <k>data</k> — это таблица-массив со строками.</t>
+<t>Если <k>data</k> не является таблицей, функция должна вернуть пустую строку <s>""</s>.</t>
+<t>Иначе функция должна объединить все элементы таблицы через запятую с помощью:</t>
+<code>
+table.concat(data, ",")
+</code>
+<t>Если результат не является строкой, функция должна вернуть пустую строку <s>""</s>.</t>
+<t>Иначе функция должна вернуть полученную строку.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию BuildAddonMessage(data)
+]=],
+requireKeywords = {
+"BuildAddonMessage",
+"function",
+"table.concat",
+"type",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.BuildAddonMessage) ~= "function" then
+_G.checkError = "BuildAddonMessage не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.BuildAddonMessage, {"hp", "100", "mana", "50"})
+if not ok1 then
+_G.checkError = "Ошибка вызова BuildAddonMessage: " .. tostring(result1)
+return false
+end
+if result1 ~= "hp,100,mana,50" then
+_G.checkError = "Для таблицы {hp, 100, mana, 50} функция должна вернуть 'hp,100,mana,50'"
+return false
+end
+local ok2, result2 = pcall(_G.BuildAddonMessage, {})
+if not ok2 or result2 ~= "" then
+_G.checkError = "Для пустой таблицы функция должна вернуть пустую строку"
+return false
+end
+local ok3, result3 = pcall(_G.BuildAddonMessage, "bad")
+if not ok3 or result3 ~= "" then
+_G.checkError = "Для не-таблицы функция должна вернуть пустую строку"
+return false
+end
+local ok4, result4 = pcall(_G.BuildAddonMessage, {"one"})
+if not ok4 or result4 ~= "one" then
+_G.checkError = "Для таблицы с одним элементом функция должна вернуть этот элемент"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][345] = {
+type = "commenttest",
+title = "Тест: функция SplitLongMessage",
+helpModules = {341, 45, 31, 33, 10},
+preloadVars = {
+{var = "SplitLongMessage", desc = "SplitLongMessage очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 317-4: функция SplitLongMessage</h>
+<t>Создай глобальную функцию <k>SplitLongMessage(message, maxLen)</k>.</t>
+<t>Если <k>message</k> не является строкой, функция должна вернуть пустую таблицу <k>{}</k>.</t>
+<t>Если <k>maxLen</k> не является числом или меньше либо равно нуля, функция должна вернуть пустую таблицу <k>{}</k>.</t>
+<t>Иначе функция должна разбить строку <k>message</k> на части длиной не более <k>maxLen</k> символов каждая.</t>
+<t>Результат — таблица-массив со строками-частями.</t>
+<t>Используй:</t>
+<c>string.sub</c>
+<c>table.insert</c>
+<c>цикл while или for</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию SplitLongMessage(message, maxLen)
+]=],
+requireKeywords = {
+"SplitLongMessage",
+"function",
+"string.sub",
+"table.insert",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.SplitLongMessage) ~= "function" then
+_G.checkError = "SplitLongMessage не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.SplitLongMessage, "abcdefghij", 3)
+if not ok1 then
+_G.checkError = "Ошибка вызова SplitLongMessage: " .. tostring(result1)
+return false
+end
+if type(result1) ~= "table" then
+_G.checkError = "Функция должна вернуть таблицу"
+return false
+end
+if #result1 ~= 4 then
+_G.checkError = "Строка 'abcdefghij' с maxLen=3 должна дать 4 части"
+return false
+end
+if result1[1] ~= "abc" or result1[2] ~= "def" or result1[3] ~= "ghi" or result1[4] ~= "j" then
+_G.checkError = "Части строки разбиты неверно"
+return false
+end
+local ok2, result2 = pcall(_G.SplitLongMessage, "", 5)
+if not ok2 or type(result2) ~= "table" or #result2 ~= 0 then
+_G.checkError = "Для пустой строки функция должна вернуть пустую таблицу"
+return false
+end
+local ok3, result3 = pcall(_G.SplitLongMessage, 123, 5)
+if not ok3 or type(result3) ~= "table" or #result3 ~= 0 then
+_G.checkError = "Для не-строки функция должна вернуть пустую таблицу"
+return false
+end
+local ok4, result4 = pcall(_G.SplitLongMessage, "test", 0)
+if not ok4 or type(result4) ~= "table" or #result4 ~= 0 then
+_G.checkError = "Для maxLen=0 функция должна вернуть пустую таблицу"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][346] = {
+type = "commenttest",
+title = "Тест: функция ParseAddonMessage",
+helpModules = {341, 45, 33, 31, 44},
+preloadVars = {
+{var = "ParseAddonMessage", desc = "ParseAddonMessage очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 317-5: функция ParseAddonMessage</h>
+<t>Создай глобальную функцию <k>ParseAddonMessage(message)</k>.</t>
+<t>Если <k>message</k> не является строкой или является пустой строкой, функция должна вернуть пустую таблицу <k>{}</k>.</t>
+<t>Иначе функция должна разбить строку по запятым и вернуть таблицу-массив с частями.</t>
+<t>Например, строка <s>"hp,100,mana,50"</s> должна дать таблицу:</t>
+<code>
+{"hp", "100", "mana", "50"}
+</code>
+<t>Используй:</t>
+<c>string.gmatch</c> или <c>string.find</c>
+<c>table.insert</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию ParseAddonMessage(message)
+]=],
+requireKeywords = {
+"ParseAddonMessage",
+"function",
+"table.insert",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.ParseAddonMessage) ~= "function" then
+_G.checkError = "ParseAddonMessage не является глобальной функцией"
+return false
+end
+local ok1, result1 = pcall(_G.ParseAddonMessage, "hp,100,mana,50")
+if not ok1 then
+_G.checkError = "Ошибка вызова ParseAddonMessage: " .. tostring(result1)
+return false
+end
+if type(result1) ~= "table" then
+_G.checkError = "Функция должна вернуть таблицу"
+return false
+end
+if #result1 ~= 4 then
+_G.checkError = "Строка 'hp,100,mana,50' должна дать 4 элемента"
+return false
+end
+if result1[1] ~= "hp" or result1[2] ~= "100" or result1[3] ~= "mana" or result1[4] ~= "50" then
+_G.checkError = "Элементы таблицы неверны"
+return false
+end
+local ok2, result2 = pcall(_G.ParseAddonMessage, "")
+if not ok2 or type(result2) ~= "table" or #result2 ~= 0 then
+_G.checkError = "Для пустой строки функция должна вернуть пустую таблицу"
+return false
+end
+local ok3, result3 = pcall(_G.ParseAddonMessage, 123)
+if not ok3 or type(result3) ~= "table" or #result3 ~= 0 then
+_G.checkError = "Для не-строки функция должна вернуть пустую таблицу"
+return false
+end
+local ok4, result4 = pcall(_G.ParseAddonMessage, "single")
+if not ok4 or type(result4) ~= "table" or #result4 ~= 1 or result4[1] ~= "single" then
+_G.checkError = "Для строки без запятых функция должна вернуть таблицу с одним элементом"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][347] = {
+type = "info",
+title = "Защищённый код и InCombatLockdown",
+helpModules = {239, 89, 215},
+content = [=[
+<h>Защищённый код и InCombatLockdown</h>
+<t>В WoW есть механизм защиты интерфейса. Когда игрок находится в бою, некоторые действия с фреймами блокируются. Это сделано для того, чтобы аддоны не могли автоматически атаковать, кастовать или менять поведение кнопок без участия игрока.</t>
+<h>InCombatLockdown</h>
+<t>Функция <k>InCombatLockdown()</k> проверяет, находится ли интерфейс в состоянии блокировки боя.</t>
+<code>
+/run print(InCombatLockdown())
+</code>
+<w>Важно:</w> в WoW 3.3.5 функция возвращает <k>1</k> или <k>nil</k>, а не <k>true</k> / <k>false</k>. Для приведения к boolean используй <k>not not</k> или <k>and true or false</k>.
+<h>Что блокируется в бою</h>
+<t>В состоянии блокировки нельзя:</t>
+<c>Менять атрибуты protected-фреймов</c>
+<c>Создавать или удалять secure-фреймы</c>
+<c>Менять макросы</c>
+<c>Вызывать некоторые функции UI</c>
+<h>UnitAffectingCombat</h>
+<t>Альтернативный способ проверить, в бою ли юнит:</t>
+<code>
+/run print(UnitAffectingCombat("player"))
+</code>
+<t>Эта функция проверяет конкретного юнита, а не состояние интерфейса.</t>
+<h>Разница между InCombatLockdown и UnitAffectingCombat</h>
+<c>InCombatLockdown()</c> — состояние интерфейса. Блокирует изменение protected-фреймов.
+<c>UnitAffectingCombat("player")</c> — состояние юнита. Показывает, атакует ли юнит.
+<t>Обычно они совпадают, но не всегда. Например, интерфейс может быть в блокировке ещё короткое время после выхода из боя.</t>
+<h>CanChangeProtectedState</h>
+<code>
+/run print(CanChangeProtectedState())
+</code>
+<t>Функция проверяет, можно ли сейчас менять protected-фреймы. Возвращает истинное значение, если можно.</t>
+<h>События боя</h>
+<t>Для отслеживания входа и выхода из боя используются события:</t>
+<c>PLAYER_REGEN_DISABLED</c> — игрок вошёл в бой.
+<c>PLAYER_REGEN_ENABLED</c> — игрок вышел из боя.
+<code>
+local f = CreateFrame("Frame")
+f:RegisterEvent("PLAYER_REGEN_DISABLED")
+f:RegisterEvent("PLAYER_REGEN_ENABLED")
+f:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_DISABLED" then
+        print("Вошёл в бой")
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        print("Вышел из боя")
+    end
+end)
+</code>
+<h>Отложенные действия</h>
+<t>Если действие нельзя выполнить в бою, его можно отложить до выхода из боя:</t>
+<code>
+local pendingAction = nil
+local f = CreateFrame("Frame")
+f:RegisterEvent("PLAYER_REGEN_ENABLED")
+f:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_ENABLED" and pendingAction then
+        pendingAction()
+        pendingAction = nil
+    end
+end)
+</code>
+<h>Безопасный шаблон</h>
+<code>
+/run local inLockdown = InCombatLockdown() and true or false; print("Блокировка: " .. tostring(inLockdown))
+</code>
+]=],
+}
+
+ns_llua['lua'][348] = {
+type = "vartest",
+title = "Тест: InCombatLockdown и UnitAffectingCombat",
+helpModules = {347, 15},
+tasks = {
+{
+var = "inCombatLockdown",
+desc = 'Создай глобальную переменную inCombatLockdown = not not InCombatLockdown()',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "playerInCombat",
+desc = 'Создай глобальную переменную playerInCombat = not not UnitAffectingCombat("player")',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+},
+}
+
+ns_llua['lua'][349] = {
+type = "vartest",
+title = "Тест: CanChangeProtectedState",
+helpModules = {347, 15},
+tasks = {
+{
+var = "canChangeProtected",
+desc = 'Создай глобальную переменную canChangeProtected = not not CanChangeProtectedState()',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+{
+var = "lockdownOrCombat",
+desc = 'Создай глобальную переменную lockdownOrCombat = (not not InCombatLockdown()) or (not not UnitAffectingCombat("player"))',
+check = function(value)
+return type(value) == "boolean"
+end,
+},
+},
+}
+
+ns_llua['lua'][350] = {
+type = "commenttest",
+title = "Тест: функция IsInCombatLockdownSafe",
+helpModules = {347, 45, 21},
+preloadVars = {
+{var = "IsInCombatLockdownSafe", desc = "IsInCombatLockdownSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 323-3: функция IsInCombatLockdownSafe</h>
+<t>Создай глобальную функцию <k>IsInCombatLockdownSafe()</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если интерфейс находится в состоянии блокировки боя.</t>
+<t>Иначе функция должна вернуть <k>false</k>.</t>
+<t>Используй:</t>
+<c>InCombatLockdown()</c>
+<t>Чтобы результат был именно boolean, используй конструкцию:</t>
+<code>
+return InCombatLockdown() and true or false
+</code>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsInCombatLockdownSafe()
+]=],
+requireKeywords = {
+"IsInCombatLockdownSafe",
+"function",
+"InCombatLockdown",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.IsInCombatLockdownSafe) ~= "function" then
+_G.checkError = "IsInCombatLockdownSafe не является глобальной функцией"
+return false
+end
+local ok, result = pcall(_G.IsInCombatLockdownSafe)
+if not ok then
+_G.checkError = "Ошибка вызова IsInCombatLockdownSafe: " .. tostring(result)
+return false
+end
+if type(result) ~= "boolean" then
+_G.checkError = "Функция должна вернуть boolean"
+return false
+end
+local expected = InCombatLockdown() and true or false
+if result ~= expected then
+_G.checkError = "Результат не совпадает с текущим состоянием InCombatLockdown()"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][351] = {
+type = "commenttest",
+title = "Тест: функция CanModifyFrameSafe",
+helpModules = {347, 45, 21},
+preloadVars = {
+{var = "CanModifyFrameSafe", desc = "CanModifyFrameSafe очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 323-4: функция CanModifyFrameSafe</h>
+<t>Создай глобальную функцию <k>CanModifyFrameSafe(frame)</k>.</t>
+<t>Если <k>frame</k> не существует или у него нет метода <k>IsProtected</k>, функция должна вернуть <k>false</k>.</t>
+<t>Если фрейм не является protected, функция должна вернуть <k>true</k>.</t>
+<t>Если фрейм является protected, функция должна проверить, можно ли менять protected-фреймы через:</t>
+<code>
+CanChangeProtectedState()
+</code>
+<t>Если можно, верни <k>true</k>. Иначе верни <k>false</k>.</t>
+<t>Используй:</t>
+<c>frame:IsProtected()</c>
+<c>CanChangeProtectedState()</c>
+<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CanModifyFrameSafe(frame)
+]=],
+requireKeywords = {
+"CanModifyFrameSafe",
+"function",
+"IsProtected",
+"CanChangeProtectedState",
+"and",
+"or",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CanModifyFrameSafe) ~= "function" then
+_G.checkError = "CanModifyFrameSafe не является глобальной функцией"
+return false
+end
+-- Тест 1: обычный фрейм без защиты
+local normalFrame = CreateFrame("Frame", nil, UIParent)
+local ok1, result1 = pcall(_G.CanModifyFrameSafe, normalFrame)
+if not ok1 then
+_G.checkError = "Ошибка вызова CanModifyFrameSafe с обычным фреймом: " .. tostring(result1)
+return false
+end
+if result1 ~= true then
+_G.checkError = "Для обычного фрейма функция должна вернуть true"
+return false
+end
+-- Тест 2: nil
+local ok2, result2 = pcall(_G.CanModifyFrameSafe, nil)
+if not ok2 or result2 ~= false then
+_G.checkError = "Для nil функция должна вернуть false"
+return false
+end
+-- Тест 3: пустая таблица
+local ok3, result3 = pcall(_G.CanModifyFrameSafe, {})
+if not ok3 or result3 ~= false then
+_G.checkError = "Для пустой таблицы функция должна вернуть false"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][352] = {
+type = "commenttest",
+title = "Тест: функция DeferredAction",
+helpModules = {347, 45, 239},
+preloadVars = {
+{var = "DeferredAction", desc = "DeferredAction очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "deferredExecuted", desc = "deferredExecuted очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 323-5: функция DeferredAction</h>
+<t>Создай глобальную функцию <k>DeferredAction(callback)</k>.</t>
+<t>Если <k>callback</k> не является функцией, функция должна вернуть <k>false</k>.</t>
+<t>Если интерфейс НЕ находится в состоянии блокировки боя, функция должна немедленно вызвать <k>callback()</k> и вернуть <k>true</k>.</t>
+<t>Если интерфейс находится в состоянии блокировки боя, функция должна сохранить <k>callback</k> в глобальную переменную <k>pendingCallback</k> и вернуть <k>true</k>.</t>
+<t>Используй:</t>
+<c>InCombatLockdown()</c>
+<c>pendingCallback</c>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию DeferredAction(callback)
+]=],
+requireKeywords = {
+"DeferredAction",
+"function",
+"InCombatLockdown",
+"pendingCallback",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.DeferredAction) ~= "function" then
+_G.checkError = "DeferredAction не является глобальной функцией"
+return false
+end
+-- Тест 1: не функция
+local ok1, result1 = pcall(_G.DeferredAction, "bad")
+if not ok1 or result1 ~= false then
+_G.checkError = "Для не-функции функция должна вернуть false"
+return false
+end
+-- Тест 2: корректная функция вне боя
+_G.deferredExecuted = false
+local testCallback = function()
+_G.deferredExecuted = true
+end
+local ok2, result2 = pcall(_G.DeferredAction, testCallback)
+if not ok2 then
+_G.checkError = "Ошибка вызова DeferredAction: " .. tostring(result2)
+return false
+end
+if result2 ~= true then
+_G.checkError = "Для корректной функции DeferredAction должна вернуть true"
+return false
+end
+-- Если мы не в бою, callback должна была выполниться
+local inLockdown = InCombatLockdown() and true or false
+if not inLockdown then
+if _G.deferredExecuted ~= true then
+_G.checkError = "Вне боя callback должна была выполниться немедленно"
+return false
+end
+else
+-- В бою callback не должна была выполниться, но pendingCallback должна быть установлена
+if type(_G.pendingCallback) ~= "function" then
+_G.checkError = "В бою callback должна быть сохранена в pendingCallback"
+return false
+end
+end
+return true
+end,
+}
+
+ns_llua['lua'][353] = {
+type = "info",
+title = "Продвинутые баффы: фильтрация по кастеру",
+helpModules = {107, 203, 65},
+content = [=[
+<h>Продвинутые баффы: фильтрация по кастеру</h>
+<t>Раньше мы считали все баффы и дебаффы подряд. Теперь научимся фильтровать ауры по тому, кто их наложил.</t>
+<h>UnitAura с фильтром</h>
+<t>Функция <k>UnitAura</k> принимает третий аргумент — строку-фильтр.</t>
+<code>
+/run local name = UnitAura("player", 1, "HELPFUL"); print(name or "нет")
+</code>
+<h>Основные фильтры</h>
+<c>"HELPFUL"</c> — только баффы.
+<c>"HARMFUL"</c> — только дебаффы.
+<c>"PLAYER"</c> — только ауры, наложенные игроком.
+<h>Комбинация фильтров</h>
+<t>Фильтры можно комбинировать через символ <k>|</k>.</t>
+<code>
+/run local name = UnitAura("player", 1, "HELPFUL|PLAYER"); print(name or "нет")
+</code>
+<t>Это вернёт только баффы, которые наложил сам игрок.</t>
+<code>
+/run local name = UnitAura("target", 1, "HARMFUL|PLAYER"); print(name or "нет")
+</code>
+<t>Это вернёт только дебаффы на цели, которые наложил сам игрок.</t>
+<h>Кто наложил ауру</h>
+<t>Функция <k>UnitAura</k> возвращает много значений. Восьмое значение — <k>unitCaster</k>, UnitID того, кто наложил ауру.</t>
+<code>
+/run local name, _, _, _, _, _, _, caster = UnitAura("player", 1, "HELPFUL"); print(name or "нет", caster or "неизвестно")
+</code>
+<t>Если ауру наложил сам игрок, <k>caster</k> будет равен <s>"player"</s>.</t>
+<h>Подсчёт своих баффов</h>
+<code>
+/run local count = 0; for i = 1, 40 do local name = UnitAura("player", i, "HELPFUL|PLAYER"); if not name then break end; count = count + 1 end; print("Мои баффы: " .. count)
+</code>
+<h>Подсчёт своих дебаффов на цели</h>
+<code>
+/run local count = 0; for i = 1, 40 do local name = UnitAura("target", i, "HARMFUL|PLAYER"); if not name then break end; count = count + 1 end; print("Мои дебаффы на цели: " .. count)
+</code>
+<h>Проверка кастера вручную</h>
+<t>Если нужна более тонкая проверка, можно получить <k>unitCaster</k> и сравнить его.</t>
+<code>
+/run local name, _, _, _, _, _, _, caster = UnitAura("player", 1, "HELPFUL"); if name and caster == "player" then print("Мой бафф: " .. name) end
+</code>
+<h>Фильтр CANCELABLE и NOT_CANCELABLE</h>
+<t>В некоторых версиях WoW доступны дополнительные фильтры:</t>
+<c>"CANCELABLE"</c> — ауры, которые можно отменить.
+<c>"NOT_CANCELABLE"</c> — ауры, которые нельзя отменить.
+<w>Примечание:</w> в WoW 3.3.5 поддержка этих фильтров может отличаться. Проверяй через <k>/dump</k>.
+<h>Безопасный шаблон</h>
+<code>
+/run local count = 0; for i = 1, 40 do local name = UnitAura("player", i, "HELPFUL|PLAYER"); if not name then break end; count = count + 1 end; print(string.format("Своих баффов: %d", count))
+</code>
+]=],
+}
+
+ns_llua['lua'][354] = {
+type = "vartest",
+title = "Тест: фильтры аур",
+helpModules = {353},
+tasks = {
+{
+var = "filterHelpfulPlayer",
+desc = 'Создай глобальную переменную filterHelpfulPlayer = "HELPFUL|PLAYER"',
+check = function(value)
+return value == "HELPFUL|PLAYER"
+end,
+},
+{
+var = "filterHarmfulPlayer",
+desc = 'Создай глобальную переменную filterHarmfulPlayer = "HARMFUL|PLAYER"',
+check = function(value)
+return value == "HARMFUL|PLAYER"
+end,
+},
+},
+}
+
+ns_llua['lua'][355] = {
+type = "vartest",
+title = "Тест: первый бафф игрока и его кастер",
+helpModules = {353, 203, 65},
+tasks = {
+{
+var = "firstBuffCaster",
+desc = 'Создай глобальную переменную firstBuffCaster = select(8, UnitAura("player", 1, "HELPFUL")) or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+{
+var = "firstMyBuffName",
+desc = 'Создай глобальную переменную firstMyBuffName = UnitAura("player", 1, "HELPFUL|PLAYER") or "нет"',
+check = function(value)
+return type(value) == "string" and value ~= ""
+end,
+},
+},
+}
+
+ns_llua['lua'][356] = {
+type = "commenttest",
+title = "Тест: функция CountMyBuffs",
+helpModules = {353, 203, 45, 31},
+preloadVars = {
+{var = "CountMyBuffs", desc = "CountMyBuffs очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 329-3: функция CountMyBuffs</h>
+<t>Создай глобальную функцию <k>CountMyBuffs(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна посчитать количество баффов на юните, которые наложил сам игрок.</t>
+<t>Используй:</t>
+<code>
+UnitAura(unit, index, "HELPFUL|PLAYER")
+</code>
+<t>Проверяй индексы от 1 до 40.</t>
+<t>Если <k>UnitAura</k> вернул <k>nil</k>, прекрати подсчёт.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountMyBuffs(unit)
+]=],
+requireKeywords = {
+"CountMyBuffs",
+"function",
+"UnitAura",
+"HELPFUL",
+"PLAYER",
+"for",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountMyBuffs) ~= "function" then
+_G.checkError = "CountMyBuffs не является глобальной функцией"
+return false
+end
+local function countExpected(unit)
+if type(unit) ~= "string" then
+return 0
+end
+local count = 0
+for i = 1, 40 do
+if not UnitAura(unit, i, "HELPFUL|PLAYER") then
+break
+end
+count = count + 1
+end
+return count
+end
+local expected1 = countExpected("player")
+local ok1, result1 = pcall(_G.CountMyBuffs, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова CountMyBuffs('player'): " .. tostring(result1)
+return false
+end
+if result1 ~= expected1 then
+_G.checkError = "Для player функция вернула неверное количество своих баффов"
+return false
+end
+local ok2, result2 = pcall(_G.CountMyBuffs, "ns_invalid_unit")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.CountMyBuffs, 123)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][357] = {
+type = "commenttest",
+title = "Тест: функция CountMyDebuffs",
+helpModules = {353, 203, 45, 31},
+preloadVars = {
+{var = "CountMyDebuffs", desc = "CountMyDebuffs очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 329-4: функция CountMyDebuffs</h>
+<t>Создай глобальную функцию <k>CountMyDebuffs(unit)</k>.</t>
+<t>Если <k>unit</k> не является строкой, функция должна вернуть <n>0</n>.</t>
+<t>Иначе функция должна посчитать количество дебаффов на юните, которые наложил сам игрок.</t>
+<t>Используй:</t>
+<code>
+UnitAura(unit, index, "HARMFUL|PLAYER")
+</code>
+<t>Проверяй индексы от 1 до 40.</t>
+<t>Если <k>UnitAura</k> вернул <k>nil</k>, прекрати подсчёт.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию CountMyDebuffs(unit)
+]=],
+requireKeywords = {
+"CountMyDebuffs",
+"function",
+"UnitAura",
+"HARMFUL",
+"PLAYER",
+"for",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.CountMyDebuffs) ~= "function" then
+_G.checkError = "CountMyDebuffs не является глобальной функцией"
+return false
+end
+local function countExpected(unit)
+if type(unit) ~= "string" then
+return 0
+end
+local count = 0
+for i = 1, 40 do
+if not UnitAura(unit, i, "HARMFUL|PLAYER") then
+break
+end
+count = count + 1
+end
+return count
+end
+local expected1 = countExpected("player")
+local ok1, result1 = pcall(_G.CountMyDebuffs, "player")
+if not ok1 then
+_G.checkError = "Ошибка вызова CountMyDebuffs('player'): " .. tostring(result1)
+return false
+end
+if result1 ~= expected1 then
+_G.checkError = "Для player функция вернула неверное количество своих дебаффов"
+return false
+end
+local ok2, result2 = pcall(_G.CountMyDebuffs, "ns_invalid_unit")
+if not ok2 or result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
+return false
+end
+local ok3, result3 = pcall(_G.CountMyDebuffs, 123)
+if not ok3 or result3 ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть 0"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][358] = {
+type = "commenttest",
+title = "Тест: функция GetMyAuraList",
+helpModules = {353, 203, 45, 31, 44},
+preloadVars = {
+{var = "GetMyAuraList", desc = "GetMyAuraList очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Тест 329-5: функция GetMyAuraList</h>
+<t>Создай глобальную функцию <k>GetMyAuraList(unit, filter)</k>.</t>
+<t>Если <k>unit</k> не является строкой или <k>filter</k> не является строкой, функция должна вернуть пустую таблицу <k>{}</k>.</t>
+<t>Иначе функция должна собрать таблицу-массив с именами аур юнита, которые подходят под фильтр.</t>
+<t>Используй:</t>
+<code>
+UnitAura(unit, index, filter)
+</code>
+<t>Проверяй индексы от 1 до 40.</t>
+<t>Если <k>UnitAura</k> вернул <k>nil</k>, прекрати перебор.</t>
+<t>Добавляй только непустые строки через <k>table.insert</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию GetMyAuraList(unit, filter)
+]=],
+requireKeywords = {
+"GetMyAuraList",
+"function",
+"UnitAura",
+"table.insert",
+"for",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.GetMyAuraList) ~= "function" then
+_G.checkError = "GetMyAuraList не является глобальной функцией"
+return false
+end
+local function buildExpected(unit, filter)
+if type(unit) ~= "string" or type(filter) ~= "string" then
+return {}
+end
+local list = {}
+for i = 1, 40 do
+local name = UnitAura(unit, i, filter)
+if not name then
+break
+end
+if type(name) == "string" and name ~= "" then
+table.insert(list, name)
+end
+end
+return list
+end
+-- Тест 1: баффы игрока, наложенные игроком
+local expected1 = buildExpected("player", "HELPFUL|PLAYER")
+local ok1, result1 = pcall(_G.GetMyAuraList, "player", "HELPFUL|PLAYER")
+if not ok1 then
+_G.checkError = "Ошибка вызова GetMyAuraList('player', 'HELPFUL|PLAYER'): " .. tostring(result1)
+return false
+end
+if type(result1) ~= "table" then
+_G.checkError = "Функция должна вернуть таблицу"
+return false
+end
+if #result1 ~= #expected1 then
+_G.checkError = "Количество аур не совпадает с ожидаемым"
+return false
+end
+for i = 1, #expected1 do
+if result1[i] ~= expected1[i] then
+_G.checkError = "Элемент " .. i .. " не совпадает с ожидаемым"
+return false
+end
+end
+-- Тест 2: несуществующий юнит
+local ok2, result2 = pcall(_G.GetMyAuraList, "ns_invalid_unit", "HELPFUL|PLAYER")
+if not ok2 or type(result2) ~= "table" or #result2 ~= 0 then
+_G.checkError = "Для несуществующего юнита функция должна вернуть пустую таблицу"
+return false
+end
+-- Тест 3: нестроковый фильтр
+local ok3, result3 = pcall(_G.GetMyAuraList, "player", 123)
+if not ok3 or type(result3) ~= "table" or #result3 ~= 0 then
+_G.checkError = "Для нестрокового фильтра функция должна вернуть пустую таблицу"
+return false
+end
+-- Тест 4: нестроковый unit
+local ok4, result4 = pcall(_G.GetMyAuraList, 123, "HELPFUL|PLAYER")
+if not ok4 or type(result4) ~= "table" or #result4 ~= 0 then
+_G.checkError = "Для нестрокового unit функция должна вернуть пустую таблицу"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][359] = {
+type = "info",
+title = "Финальный проект: мини-аддон",
+helpModules = {215, 221, 227, 257, 263, 269},
+content = [=[
+<h>Финальный проект: мини-аддон</h>
+<t>Пришло время собрать все знания курса в один практический проект.</t>
+<t>Мы создадим простой информационный аддон — панель персонажа. Она будет показывать:</t>
+<c>Имя, уровень и класс игрока</c>
+<c>Здоровье и ресурс</c>
+<c>Координаты на карте</c>
+<c>Кнопку обновления данных</c>
+<t>Аддон будет обновляться по событию <k>PLAYER_TARGET_CHANGED</k> и по клику на кнопку.</t>
+<h>Структура проекта</h>
+<t>Проект состоит из пяти шагов:</t>
+<c>Шаг 1</c> — создание основного фрейма.
+<c>Шаг 2</c> — добавление текста с данными.
+<c>Шаг 3</c> — добавление кнопки обновления.
+<c>Шаг 4</c> — привязка событий.
+<c>Шаг 5</c> — финальная сборка и проверка.
+<h>Что мы используем</h>
+<t>Из предыдущих модулей курса:</t>
+<c>CreateFrame</c> — создание фреймов.
+<c>SetSize, SetPoint</c> — размер и позиция.
+<c>CreateFontString</c> — текст.
+<c>SetScript("OnClick", ...)</c> — обработчик клика.
+<c>RegisterEvent, SetScript("OnEvent", ...)</c> — события.
+<c>UnitName, UnitLevel, UnitClass</c> — данные игрока.
+<c>UnitHealth, UnitHealthMax</c> — здоровье.
+<c>GetPlayerMapPosition</c> — координаты.
+<h>Глобальные переменные проекта</h>
+<t>Для проверки система будет искать следующие глобальные переменные:</t>
+<c>NSPanelFrame</c> — основной фрейм.
+<c>NSPanelTitle</c> — FontString с заголовком.
+<c>NSPanelInfo</c> — FontString с информацией.
+<c>NSPanelButton</c> — кнопка обновления.
+<c>NSPanelUpdate</c> — функция обновления данных.
+<c>NSPanelEventFrame</c> — фрейм для событий.
+<w>Важно:</w> все переменные должны быть глобальными (без <k>local</k>), чтобы система могла их проверить.
+<h>Совет</h>
+<t>Выполняй шаги по порядку. Каждый шаг проверяется отдельно. Если шаг не проходится, вернись и исправь ошибку перед тем, как идти дальше.</t>
+]=],
+}
+
+ns_llua['lua'][360] = {
+type = "commenttest",
+title = "Проект шаг 1: основной фрейм",
+helpModules = {359, 215, 221},
+preloadVars = {
+{var = "NSPanelFrame", desc = "NSPanelFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Проект шаг 1: основной фрейм</h>
+<t>Создай глобальный фрейм <k>NSPanelFrame</k>.</t>
+<t>Требования:</t>
+<t>- тип фрейма: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"NSPanelFrame"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- размер: 280 на 200;</t>
+<t>- позиция: <k>SetPoint("CENTER")</k>;</t>
+<t>- слой: <k>SetFrameStrata("HIGH")</k>;</t>
+<t>- фрейм должен быть показан через <k>Show()</k>.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальный фрейм NSPanelFrame
+]=],
+requireKeywords = {
+"NSPanelFrame",
+"CreateFrame",
+"Frame",
+"UIParent",
+"SetSize",
+"SetPoint",
+"SetFrameStrata",
+"Show",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.NSPanelFrame
+if not f then
+_G.checkError = "NSPanelFrame не был создан"
+return false
+end
+if type(f.IsShown) ~= "function" then
+_G.checkError = "NSPanelFrame не похож на фрейм"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "Фрейм должен быть показан"
+return false
+end
+if f:GetWidth() ~= 280 then
+_G.checkError = "Ширина фрейма должна быть 280"
+return false
+end
+if f:GetHeight() ~= 200 then
+_G.checkError = "Высота фрейма должна быть 200"
+return false
+end
+if type(f.GetFrameStrata) ~= "function" or f:GetFrameStrata() ~= "HIGH" then
+_G.checkError = "Фрейм должен иметь слой HIGH"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][361] = {
+type = "commenttest",
+title = "Проект шаг 2: текст с данными",
+helpModules = {359, 227, 53, 83, 7},
+preloadVars = {
+{var = "NSPanelFrame", desc = "NSPanelFrame очищается перед проверкой"},
+{var = "NSPanelTitle", desc = "NSPanelTitle очищается перед проверкой"},
+{var = "NSPanelInfo", desc = "NSPanelInfo очищается перед проверкой"},
+{var = "NSPanelUpdate", desc = "NSPanelUpdate очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Проект шаг 2: текст с данными</h>
+<t>Сначала создай фрейм <k>NSPanelFrame</k> (если ещё не создан):</t>
+<t>- тип <s>"Frame"</s>, родитель <k>UIParent</k>, размер 280 на 200, позиция CENTER, показан.</t>
+<t>Затем создай два FontString на этом фрейме:</t>
+<t>1. Глобальная переменная <k>NSPanelTitle</k>:</t>
+<t>- слой <s>"OVERLAY"</s>, шаблон <s>"GameFontNormalLarge"</s>;</t>
+<t>- позиция: <k>SetPoint("TOP", 0, -10)</k>;</t>
+<t>- текст: <s>"Панель персонажа"</s>.</t>
+<t>2. Глобальная переменная <k>NSPanelInfo</k>:</t>
+<t>- слой <s>"OVERLAY"</s>, шаблон <s>"GameFontNormal"</s>;</t>
+<t>- позиция: <k>SetPoint("TOP", 0, -40)</k>;</t>
+<t>- выравнивание: <k>SetJustifyH("LEFT")</k>;</t>
+<t>- ширина: <k>SetWidth(260)</k>.</t>
+<t>Затем создай глобальную функцию <k>NSPanelUpdate()</k>, которая:</t>
+<t>- получает имя через <k>UnitName("player") or "Неизвестно"</k>;</t>
+<t>- получает уровень через <k>UnitLevel("player") or 0</k>;</t>
+<t>- получает здоровье через <k>UnitHealth("player") or 0</k> и <k>UnitHealthMax("player") or 0</k>;</t>
+<t>- собирает строку через <k>string.format</k>;</t>
+<t>- записывает её в <k>NSPanelInfo:SetText(...)</k>.</t>
+<t>Вызови <k>NSPanelUpdate()</k> один раз после создания.</t>
+<t>Ничего выводить через print не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай NSPanelFrame, NSPanelTitle, NSPanelInfo и NSPanelUpdate
+]=],
+requireKeywords = {
+"NSPanelFrame",
+"NSPanelTitle",
+"NSPanelInfo",
+"NSPanelUpdate",
+"CreateFontString",
+"SetText",
+"UnitName",
+"UnitLevel",
+"UnitHealth",
+"string.format",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.NSPanelFrame
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "NSPanelFrame не является фреймом"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "NSPanelFrame должен быть показан"
+return false
+end
+local title = _G.NSPanelTitle
+if not title or type(title.SetText) ~= "function" then
+_G.checkError = "NSPanelTitle не является FontString"
+return false
+end
+if title:GetText() ~= "Панель персонажа" then
+_G.checkError = "NSPanelTitle должен содержать текст 'Панель персонажа'"
+return false
+end
+local info = _G.NSPanelInfo
+if not info or type(info.SetText) ~= "function" then
+_G.checkError = "NSPanelInfo не является FontString"
+return false
+end
+if type(_G.NSPanelUpdate) ~= "function" then
+_G.checkError = "NSPanelUpdate должна быть глобальной функцией"
+return false
+end
+local ok, err = pcall(_G.NSPanelUpdate)
+if not ok then
+_G.checkError = "Ошибка вызова NSPanelUpdate: " .. tostring(err)
+return false
+end
+local infoText = info:GetText()
+if type(infoText) ~= "string" or infoText == "" then
+_G.checkError = "NSPanelInfo должен содержать текст после вызова NSPanelUpdate"
+return false
+end
+local playerName = UnitName("player")
+if playerName and not infoText:find(playerName, 1, true) then
+_G.checkError = "Текст NSPanelInfo должен содержать имя игрока"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][362] = {
+type = "commenttest",
+title = "Проект шаг 3: кнопка обновления",
+helpModules = {359, 233, 227, 215},
+preloadVars = {
+{var = "NSPanelFrame", desc = "NSPanelFrame очищается перед проверкой"},
+{var = "NSPanelInfo", desc = "NSPanelInfo очищается перед проверкой"},
+{var = "NSPanelButton", desc = "NSPanelButton очищается перед проверкой"},
+{var = "NSPanelUpdate", desc = "NSPanelUpdate очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Проект шаг 3: кнопка обновления</h>
+<t>Сначала создай фрейм <k>NSPanelFrame</k> и FontString <k>NSPanelInfo</k> (если ещё не созданы).</t>
+<t>Создай глобальную функцию <k>NSPanelUpdate()</k>, которая обновляет текст в <k>NSPanelInfo</k>.</t>
+<t>Затем создай глобальную кнопку <k>NSPanelButton</k>:</t>
+<t>- тип: <s>"Button"</s>;</t>
+<t>- глобальное имя: <s>"NSPanelButton"</s>;</t>
+<t>- родитель: <k>NSPanelFrame</k>;</t>
+<t>- размер: 120 на 30;</t>
+<t>- позиция: <k>SetPoint("BOTTOM", 0, 10)</k>;</t>
+<t>- создай FontString для кнопки с текстом <s>"Обновить"</s>;</t>
+<t>- назначь обработчик <k>OnClick</k>, который вызывает <k>NSPanelUpdate()</k>.</t>
+<t>Ничего выводить через print не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай NSPanelFrame, NSPanelInfo, NSPanelUpdate и NSPanelButton
+]=],
+requireKeywords = {
+"NSPanelFrame",
+"NSPanelInfo",
+"NSPanelButton",
+"NSPanelUpdate",
+"CreateFrame",
+"Button",
+"SetScript",
+"OnClick",
+},
+checkCode = function()
+_G.checkError = nil
+local f = _G.NSPanelFrame
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "NSPanelFrame не является фреймом"
+return false
+end
+local info = _G.NSPanelInfo
+if not info or type(info.SetText) ~= "function" then
+_G.checkError = "NSPanelInfo не является FontString"
+return false
+end
+if type(_G.NSPanelUpdate) ~= "function" then
+_G.checkError = "NSPanelUpdate должна быть глобальной функцией"
+return false
+end
+local btn = _G.NSPanelButton
+if not btn or type(btn.GetScript) ~= "function" then
+_G.checkError = "NSPanelButton не является кнопкой"
+return false
+end
+if btn:GetWidth() ~= 120 or btn:GetHeight() ~= 30 then
+_G.checkError = "Размер кнопки должен быть 120 на 30"
+return false
+end
+local script = btn:GetScript("OnClick")
+if type(script) ~= "function" then
+_G.checkError = "У кнопки должен быть обработчик OnClick"
+return false
+end
+-- Проверяем, что обработчик вызывает NSPanelUpdate
+local oldText = info:GetText()
+info:SetText("test_before_click")
+local ok, err = pcall(script, btn, "LeftButton")
+if not ok then
+_G.checkError = "Ошибка при вызове OnClick: " .. tostring(err)
+return false
+end
+local newText = info:GetText()
+if newText == "test_before_click" then
+_G.checkError = "OnClick должна вызывать NSPanelUpdate и менять текст"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][363] = {
+type = "commenttest",
+title = "Проект шаг 4: события",
+helpModules = {359, 239, 215},
+preloadVars = {
+{var = "NSPanelEventFrame", desc = "NSPanelEventFrame очищается перед проверкой"},
+{var = "NSPanelUpdate", desc = "NSPanelUpdate очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Проект шаг 4: события</h>
+<t>Создай глобальную функцию <k>NSPanelUpdate()</k> (если ещё не создана).</t>
+<t>Затем создай глобальный фрейм <k>NSPanelEventFrame</k>:</t>
+<t>- тип: <s>"Frame"</s>;</t>
+<t>- глобальное имя: <s>"NSPanelEventFrame"</s>;</t>
+<t>- родитель: <k>UIParent</k>;</t>
+<t>- зарегистрируй событие <s>"PLAYER_TARGET_CHANGED"</s> через <k>RegisterEvent</k>;</t>
+<t>- зарегистрируй событие <s>"PLAYER_REGEN_ENABLED"</s> через <k>RegisterEvent</k>;</t>
+<t>- назначь скрипт <k>OnEvent</k>, который вызывает <k>NSPanelUpdate()</k> при любом из этих событий.</t>
+<t>Ничего выводить через print не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай NSPanelUpdate и NSPanelEventFrame
+]=],
+requireKeywords = {
+"NSPanelEventFrame",
+"NSPanelUpdate",
+"CreateFrame",
+"Frame",
+"RegisterEvent",
+"PLAYER_TARGET_CHANGED",
+"PLAYER_REGEN_ENABLED",
+"SetScript",
+"OnEvent",
+},
+checkCode = function()
+_G.checkError = nil
+if type(_G.NSPanelUpdate) ~= "function" then
+_G.checkError = "NSPanelUpdate должна быть глобальной функцией"
+return false
+end
+local f = _G.NSPanelEventFrame
+if not f or type(f.GetScript) ~= "function" then
+_G.checkError = "NSPanelEventFrame не является фреймом"
+return false
+end
+local script = f:GetScript("OnEvent")
+if type(script) ~= "function" then
+_G.checkError = "У фрейма должен быть обработчик OnEvent"
+return false
+end
+-- Проверяем, что обработчик вызывает NSPanelUpdate
+local updateCalled = false
+local oldUpdate = _G.NSPanelUpdate
+_G.NSPanelUpdate = function()
+updateCalled = true
+end
+local ok, err = pcall(script, f, "PLAYER_TARGET_CHANGED")
+_G.NSPanelUpdate = oldUpdate
+if not ok then
+_G.checkError = "Ошибка при вызове OnEvent: " .. tostring(err)
+return false
+end
+if not updateCalled then
+_G.checkError = "OnEvent должна вызывать NSPanelUpdate"
+return false
+end
+return true
+end,
+}
+
+ns_llua['lua'][364] = {
+type = "commenttest",
+title = "Проект шаг 5: финальная сборка",
+helpModules = {359, 53, 83, 137, 215, 227, 233, 239},
+preloadVars = {
+{var = "NSPanelFrame", desc = "NSPanelFrame очищается перед проверкой"},
+{var = "NSPanelTitle", desc = "NSPanelTitle очищается перед проверкой"},
+{var = "NSPanelInfo", desc = "NSPanelInfo очищается перед проверкой"},
+{var = "NSPanelCoords", desc = "NSPanelCoords очищается перед проверкой"},
+{var = "NSPanelButton", desc = "NSPanelButton очищается перед проверкой"},
+{var = "NSPanelUpdate", desc = "NSPanelUpdate очищается перед проверкой"},
+{var = "NSPanelEventFrame", desc = "NSPanelEventFrame очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Проект шаг 5: финальная сборка</h>
+<t>Собери весь проект в одном блоке кода. Создай все глобальные переменные:</t>
+<t>1. <k>NSPanelFrame</k> — основной фрейм (280x220, CENTER, HIGH, показан).</t>
+<t>2. <k>NSPanelTitle</k> — FontString с заголовком <s>"Панель персонажа"</s>.</t>
+<t>3. <k>NSPanelInfo</k> — FontString с данными игрока (имя, уровень, HP).</t>
+<t>4. <k>NSPanelCoords</k> — FontString с координатами (X и Y в процентах).</t>
+<t>5. <k>NSPanelButton</k> — кнопка <s>"Обновить"</s>, вызывает NSPanelUpdate.</t>
+<t>6. <k>NSPanelUpdate</k> — функция, которая обновляет NSPanelInfo и NSPanelCoords.</t>
+<t>7. <k>NSPanelEventFrame</k> — фрейм с событиями PLAYER_TARGET_CHANGED и PLAYER_REGEN_ENABLED.</t>
+<t>Функция <k>NSPanelUpdate</k> должна:</t>
+<t>- получить имя, уровень, HP через UnitName, UnitLevel, UnitHealth, UnitHealthMax;</t>
+<t>- получить координаты через GetPlayerMapPosition("player");</t>
+<t>- обновить текст в NSPanelInfo и NSPanelCoords через SetText.</t>
+<t>Вызови <k>NSPanelUpdate()</k> один раз в конце.</t>
+<t>Ничего выводить через print не нужно.</t>
+]=],
+initialCode = [=[
+-- Собери весь проект здесь
+]=],
+requireKeywords = {
+"NSPanelFrame",
+"NSPanelTitle",
+"NSPanelInfo",
+"NSPanelCoords",
+"NSPanelButton",
+"NSPanelUpdate",
+"NSPanelEventFrame",
+"CreateFrame",
+"CreateFontString",
+"SetText",
+"UnitName",
+"UnitHealth",
+"GetPlayerMapPosition",
+"RegisterEvent",
+"SetScript",
+"OnClick",
+"OnEvent",
+},
+checkCode = function()
+_G.checkError = nil
+-- Проверяем фрейм
+local f = _G.NSPanelFrame
+if not f or type(f.IsShown) ~= "function" then
+_G.checkError = "NSPanelFrame не является фреймом"
+return false
+end
+if not f:IsShown() then
+_G.checkError = "NSPanelFrame должен быть показан"
+return false
+end
+-- Проверяем заголовок
+local title = _G.NSPanelTitle
+if not title or type(title.SetText) ~= "function" then
+_G.checkError = "NSPanelTitle не является FontString"
+return false
+end
+if title:GetText() ~= "Панель персонажа" then
+_G.checkError = "NSPanelTitle должен содержать 'Панель персонажа'"
+return false
+end
+-- Проверяем инфо
+local info = _G.NSPanelInfo
+if not info or type(info.SetText) ~= "function" then
+_G.checkError = "NSPanelInfo не является FontString"
+return false
+end
+-- Проверяем координаты
+local coords = _G.NSPanelCoords
+if not coords or type(coords.SetText) ~= "function" then
+_G.checkError = "NSPanelCoords не является FontString"
+return false
+end
+-- Проверяем функцию обновления
+if type(_G.NSPanelUpdate) ~= "function" then
+_G.checkError = "NSPanelUpdate должна быть глобальной функцией"
+return false
+end
+local ok1, err1 = pcall(_G.NSPanelUpdate)
+if not ok1 then
+_G.checkError = "Ошибка вызова NSPanelUpdate: " .. tostring(err1)
+return false
+end
+local infoText = info:GetText()
+if type(infoText) ~= "string" or infoText == "" then
+_G.checkError = "NSPanelInfo должен содержать текст"
+return false
+end
+local playerName = UnitName("player")
+if playerName and not infoText:find(playerName, 1, true) then
+_G.checkError = "NSPanelInfo должен содержать имя игрока"
+return false
+end
+local coordsText = coords:GetText()
+if type(coordsText) ~= "string" or coordsText == "" then
+_G.checkError = "NSPanelCoords должен содержать текст"
+return false
+end
+-- Проверяем кнопку
+local btn = _G.NSPanelButton
+if not btn or type(btn.GetScript) ~= "function" then
+_G.checkError = "NSPanelButton не является кнопкой"
+return false
+end
+local onClick = btn:GetScript("OnClick")
+if type(onClick) ~= "function" then
+_G.checkError = "У кнопки должен быть обработчик OnClick"
+return false
+end
+-- Проверяем, что OnClick вызывает NSPanelUpdate
+local updateCalled = false
+local oldUpdate = _G.NSPanelUpdate
+_G.NSPanelUpdate = function()
+updateCalled = true
+end
+pcall(onClick, btn, "LeftButton")
+_G.NSPanelUpdate = oldUpdate
+if not updateCalled then
+_G.checkError = "OnClick должна вызывать NSPanelUpdate"
+return false
+end
+-- Проверяем фрейм событий
+local ef = _G.NSPanelEventFrame
+if not ef or type(ef.GetScript) ~= "function" then
+_G.checkError = "NSPanelEventFrame не является фреймом"
+return false
+end
+local onEvent = ef:GetScript("OnEvent")
+if type(onEvent) ~= "function" then
+_G.checkError = "У NSPanelEventFrame должен быть обработчик OnEvent"
+return false
+end
+-- Проверяем, что OnEvent вызывает NSPanelUpdate
+updateCalled = false
+_G.NSPanelUpdate = function()
+updateCalled = true
+end
+pcall(onEvent, ef, "PLAYER_TARGET_CHANGED")
+_G.NSPanelUpdate = oldUpdate
+if not updateCalled then
+_G.checkError = "OnEvent должна вызывать NSPanelUpdate"
+return false
+end
+return true
+end,
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- ============================================================
 -- UI CLASS: MAIN WINDOW + HELP WINDOW + EDITOR
@@ -7240,125 +21881,6 @@ end
 -- ============================================================
 -- END UI CLASS
 -- ============================================================
-
-
--- ============================================================
--- TEST FUNCTION
--- ============================================================
-
-function TestCourseUI(moduleNumber)
-    moduleNumber = tonumber(moduleNumber) or 1
-
-    local db = ns_llua and ns_llua['lua'] or {}
-    local m = db[moduleNumber]
-
-    if not m then
-        print("TestCourseUI: модуль не найден: " .. tostring(moduleNumber))
-        return
-    end
-
-    if not TestCourseUIFrame or not TestCourseUIFrame.SetModuleContent then
-        TestCourseUIFrame = UI:new(UIParent)
-    end
-
-    local ui = TestCourseUIFrame
-
-    ui:SetCallbacks({
-        onPrev = function()
-            print("UI signal: prev")
-        end,
-
-        onNext = function()
-            print("UI signal: next")
-        end,
-
-        onClose = function()
-            print("UI signal: close")
-        end,
-
-        onHelp = function(helpModules)
-            ui:ShowHelp(helpModules or {1, 2})
-        end,
-
-        onExecute = function(editorName, code)
-            print("UI signal: execute " .. tostring(editorName))
-
-            ui:SetEditorResult(editorName, {
-                status = "diff",
-                message = "Заглушка: второй класс ещё не готов.",
-                expected = m.expectedOutput or "Ожидаемый результат",
-                current = code,
-            })
-        end,
-    })
-
-    local blocks = nil
-
-    if m.type == "vartest" then
-        blocks = {
-            {
-                type = "text",
-                content = "<h>Задание: типы переменных</h>\n"
-                    .. "Используй <k>/run</k> чтобы создать глобальные переменные нужного типа.\n"
-                    .. "<w>Важно:</w> переменные должны быть глобальными (без <k>local</k>)!\n"
-                    .. "<t>Пример:</t> <c>/run testNumber = 42</c>",
-            },
-        }
-
-        if m.preloadVars then
-            for _, v in ipairs(m.preloadVars) do
-                table.insert(blocks, {
-                    type = "text",
-                    content = "<c>[i] " .. (v.desc or v.var) .. "</c>",
-                })
-            end
-        end
-
-        for _, task in ipairs(m.tasks or {}) do
-            table.insert(blocks, {
-                type = "text",
-                content = "<t>[ ] " .. task.desc .. "</t>",
-            })
-        end
-
-        if m.formatTask then
-            table.insert(blocks, {
-                type = "text",
-                content = "<h>Задание на форматирование</h>\n" .. (m.formatTask.instruction or ""),
-            })
-        end
-
-    elseif m.type == "commenttest" then
-        blocks = {
-            {
-                type = "text",
-                content = "<h>Задание: комментарии</h>\n" .. (m.instruction or ""),
-            },
-            {
-                type = "editor",
-                name = "commenttest",
-                buttonText = "Проверить",
-                code = m.initialCode or "",
-            },
-        }
-    end
-
-    ui:SetModuleContent({
-        title = m.title,
-        index = moduleNumber,
-        total = #db,
-        prevEnabled = moduleNumber > 1,
-        nextEnabled = moduleNumber < #db,
-        helpModules = m.helpModules or {1, 2},
-        rawContent = blocks and nil or m.content,
-        blocks = blocks,
-    })
-end
-
--- ============================================================
--- END TEST FUNCTION
--- ============================================================
-
 
 function TestCourseUI(moduleNumber)
     moduleNumber = tonumber(moduleNumber) or 1
