@@ -3527,22 +3527,23 @@ content = [=[
 <t>WoW API — это готовые игровые функции. Они возвращают данные об игроке, цели, группе, сумках, заклинаниях и мире.</t>
 <h>Простые запросы</h>
 <code>
-/run print(UnitName("player"))
-/run print(UnitLevel("player"))
-/run print(UnitHealth("player"))
+/run print(UnitName("player")) -- вывести имя персонажа
+/run print(UnitLevel("player")) -- вывести уровень персонажа
+/run print(UnitHealth("player")) -- вывести текущее здоровье персонажа
 </code>
 <h>Несколько возвращаемых значений</h>
 <t>Некоторые API-функции возвращают сразу несколько значений. Для них используем множественное присваивание.</t>
 <code>
-/run local className, classToken = UnitClass("player"); print(className, classToken)
+/run local className, classToken = UnitClass("player"); print(className, classToken) -- получить имя класса и технический токен, затем вывести их
 </code>
 <t>Например, функция может вернуть название класса и технический токен:</t>
 <code>
-Воин   WARRIOR
+-- Пример возможного вывода:
+-- Воин   WARRIOR
 </code>
 <h>Таблица с данными API</h>
 <code>
-/run playerInfo = { name = UnitName("player"), level = UnitLevel("player") }; print(playerInfo.name, playerInfo.level)
+/run playerInfo = { name = UnitName("player"), level = UnitLevel("player") }; print(playerInfo.name, playerInfo.level) -- создать глобальную таблицу с полями name и level, затем вывести их
 </code>
 <w>Важно:</w> если практический модуль проверяет переменную, создавай её глобальной, то есть без <k>local</k>.
 <h>Зачем это нужно</h>
@@ -3552,19 +3553,19 @@ content = [=[
 
 ns_llua['lua'][54] = {
 type = "vartest",
-title = "Тест 53-1: имя и уровень игрока",
+title = "Практика: имя и уровень игрока",
 helpModules = {53},
 tasks = {
 {
 var = "apiPlayerName",
-desc = 'Создай глобальную переменную apiPlayerName = UnitName("player")',
+desc = 'Создай глобальную переменную apiPlayerName и помести в неё имя игрока. Значение получи через WoW API, команду /run составь самостоятельно.',
 check = function(value)
 return type(value) == "string" and value ~= ""
 end,
 },
 {
 var = "apiPlayerLevel",
-desc = 'Создай глобальную переменную apiPlayerLevel = UnitLevel("player")',
+desc = 'Создай глобальную переменную apiPlayerLevel и помести в неё уровень игрока. Значение получи через WoW API, команду /run составь самостоятельно.',
 check = function(value)
 return type(value) == "number" and value > 0
 end,
@@ -3574,12 +3575,12 @@ end,
 
 ns_llua['lua'][55] = {
 type = "vartest",
-title = "Тест 53-2: таблица результатов UnitClass",
+title = "Практика: таблица результатов класса",
 helpModules = {53, 45},
 tasks = {
 {
 var = "apiClassTable",
-desc = 'Создай глобальную таблицу apiClassTable = { UnitClass("player") }',
+desc = 'Создай глобальную таблицу apiClassTable и помести в неё оба результата API-функции класса игрока: название класса и технический токен. Выполни действие через /run, одним или двумя шагами.',
 check = function(value)
 return type(value) == "table"
 and type(value[1]) == "string"
@@ -3593,7 +3594,7 @@ end,
 
 ns_llua['lua'][56] = {
 type = "commenttest",
-title = "Тест 53-3: функция GetPlayerNameAndLevel",
+title = "Тест: функция GetPlayerNameAndLevel",
 helpModules = {53, 45},
 preloadVars = {
 {var = "GetPlayerNameAndLevel", desc = "GetPlayerNameAndLevel очищается перед проверкой"},
@@ -3645,7 +3646,7 @@ end,
 
 ns_llua['lua'][57] = {
 type = "commenttest",
-title = "Тест 53-4: строка playerSummary",
+title = "Тест: строка playerSummary",
 helpModules = {53, 7, 14},
 preloadVars = {
 {var = "playerSummary", desc = "playerSummary очищается перед проверкой"},
@@ -3656,10 +3657,10 @@ reportVars = {
 "playerSummary",
 },
 instruction = [=[
-<h>Тест 53-4: строка playerSummary</h>
+<h>Тест: строка playerSummary</h>
 <t>Создай глобальную переменную <k>playerSummary</k>.</t>
 <t>Используй <k>string.format</k> и шаблон:</t>
-<c>"%s|%d"</c>
+<c>"%s/%d"</c>
 <t>Первым аргументом подставь имя игрока через <k>UnitName("player")</k>.</t>
 <t>Вторым аргументом подставь уровень игрока через <k>UnitLevel("player")</k>.</t>
 <t>Ничего выводить не нужно.</t>
@@ -3675,27 +3676,29 @@ requireKeywords = {
 },
 checkCode = function()
 _G.checkError = nil
+
 local name = UnitName("player") or ""
-local levelText = tostring(UnitLevel("player") or 0)
+local level = UnitLevel("player") or 0
+
 if type(_G.playerSummary) ~= "string" or _G.playerSummary == "" then
 _G.checkError = "playerSummary должна быть непустой строкой"
 return false
 end
-if name ~= "" and not _G.playerSummary:find(name, 1, true) then
-_G.checkError = "playerSummary не содержит имя игрока"
+
+local expected = string.format("%s/%d", name, level)
+
+if _G.playerSummary ~= expected then
+_G.checkError = "playerSummary должна быть строкой вида имя/уровень, например Игрок/10"
 return false
 end
-if not _G.playerSummary:find(levelText, 1, true) then
-_G.checkError = "playerSummary не содержит уровень игрока"
-return false
-end
+
 return true
 end,
 }
 
 ns_llua['lua'][58] = {
 type = "commenttest",
-title = "Тест 53-5: таблица playerInfo",
+title = "Тест: таблица playerInfo",
 helpModules = {53, 44, 45},
 preloadVars = {
 {var = "playerInfo", desc = "playerInfo очищается перед проверкой"},
@@ -3754,39 +3757,42 @@ content = [=[
 <h>1. Многие функции возвращают 1 или nil</h>
 <t>В старых версиях WoW многие проверки возвращают не классический <k>true</k> или <k>false</k>, а <k>1</k> или <k>nil</k>.</t>
 <code>
-/run print(UnitExists("player"), type(UnitExists("player")))
+/run print(UnitExists("player"), type(UnitExists("player"))) -- результат: 1 number. То есть вернулась 1, и её тип — number, а не boolean
 </code>
 <t>Поэтому лучше писать так:</t>
 <code>
-/run if UnitExists("target") then print("Цель есть") end
+/run if UnitExists("target") then print("Цель есть") end -- если цель есть, выведет: Цель есть
 </code>
 <t>И не стоит писать так:</t>
 <code>
-/run if UnitExists("target") == true then print("Цель есть") end
+/run if UnitExists("target") == true then print("Цель есть") end -- выведет ничего: UnitExists вернул 1, а 1 == true даёт false
 </code>
 <w>Причина:</w> если функция вернула <k>1</k>, то <k>1 == true</k> даст <k>false</k>.
 <h>2. nil означает отсутствие данных</h>
 <t>Если юнита нет, API часто возвращает <k>nil</k>.</t>
 <code>
-/run print(UnitName("target"))
+/run print(UnitName("target")) -- с целью: Шеф nil (имя + сервер, на своём сервере — nil). Без цели: nil nil
 </code>
-<t>Если цели нет, вывод может быть <k>nil</k>.</t>
+<t>Если цели нет, оба значения будут <k>nil</k>. Обрати внимание: <k>UnitName</k> возвращает два значения, второе — сервер.</t>
 <h>3. Локализованные имена и технические токены</h>
 <t>Некоторые функции возвращают два значения: понятное имя и технический код.</t>
 <code>
-/run local name, token = UnitClass("player"); print(name, token)
+/run local name, token = UnitClass("player"); print(name, token) -- пример: Рыцарь смерти DEATHKNIGHT
 </code>
 <t>Для вывода игроку лучше использовать <k>name</k>.</t>
 <t>Для логики лучше использовать <k>token</k>, потому что он одинаковый у всех клиентов.</t>
 <code>
-/run local _, token = UnitClass("player"); if token == "WARRIOR" then print("Это воин") end
+/run local _, token = UnitClass("player"); if token == "WARRIOR" then print("Это воин") end -- у рыцаря смерти выведет ничего: токен DEATHKNIGHT, а не WARRIOR
 </code>
 <h>4. Отладка через /dump</h>
 <t>Если не знаешь, что возвращает функция, используй <k>/dump</k>.</t>
 <code>
 /dump UnitClass("player")
+-- результат: [1]="Рыцарь смерти", [2]="DEATHKNIGHT"
 /dump UnitHealth("player")
+-- результат: [1]=49045 — текущее здоровье
 /dump GetMoney()
+-- результат: [1]=205606460 — деньги в меди (примерно 20560 золота)
 </code>
 <h>5. Не все данные доступны мгновенно</h>
 <t>Некоторые функции могут вернуть <k>nil</k>, если данные ещё не загрузились или кэш ещё не готов. Позже мы встретим это у предметов и гильдии.</t>
@@ -3794,79 +3800,255 @@ content = [=[
 }
 
 ns_llua['lua'][60] = {
-type = "vartest",
-title = "Тест 54-1: UnitExists и nil",
-helpModules = {59},
-tasks = {
-{
-var = "existsPlayer",
-desc = 'Создай глобальную переменную existsPlayer = UnitExists("player")',
-check = function(value)
-return value ~= nil and value ~= false
+type = "commenttest",
+title = "Практика: имя цели, если цель есть",
+helpModules = {59, 77},
+preloadVars = {
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Практика: имя цели, если цель есть</h>
+<t>Напиши код, который проверяет, существует ли текущая цель.</t>
+<t>Если цель существует — выведи её имя через <k>print</k>.</t>
+<t>Если цели нет — ничего выводить не нужно.</t>
+<t>Перед запуском выбери кого-нибудь в таргет, например себя.</t>
+]=],
+initialCode = [=[
+-- Если цель есть, выведи её имя
+]=],
+requireKeywords = {
+"if",
+"then",
+"end",
+"UnitExists",
+"UnitName",
+"print",
+"\"target\"",
+},
+checkCode = function()
+_G.checkError = nil
+
+if not UnitExists("target") then
+_G.checkError = "Сейчас нет цели: выбери цель (например, себя) и запусти код ещё раз"
+return false
+end
+
+local name = UnitName("target")
+
+if type(name) ~= "string" or name == "" then
+_G.checkError = "Имя цели не читается: проверь, что цель выбрана, и запусти код ещё раз"
+return false
+end
+
+return true
 end,
-},
-{
-var = "existsInvalid",
-desc = 'Создай глобальную переменную existsInvalid = UnitExists("ns_invalid_unit")',
-check = function(value)
-return value == nil or value == false
-end,
-},
-},
 }
 
 ns_llua['lua'][61] = {
-type = "vartest",
-title = "Тест 54-2: технический токен класса",
-helpModules = {59, 45},
-tasks = {
-{
-var = "classTokenUpper",
-desc = 'Создай глобальную переменную classTokenUpper = select(2, UnitClass("player"))',
-check = function(value)
-return type(value) == "string"
-and value ~= ""
-and value == value:upper()
+type = "commenttest",
+title = "Практика: IsSameClass и таргет своего класса",
+helpModules = {59, 45, 77},
+preloadVars = {
+{var = "IsSameClass", desc = "IsSameClass очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {
+"checkError",
+},
+instruction = [=[
+<h>Практика: функция IsSameClass</h>
+<t>Найди другого игрока своего класса (например, в городе или в группе) и возьми его в таргет.</t>
+<t>Создай глобальную функцию <k>IsSameClass()</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если технический токен класса текущей цели совпадает с твоим токеном, и <k>false</k> иначе.</t>
+<t>Сравнивай именно технические токены — вторые значения <k>UnitClass</k>, а не локализованные названия классов.</t>
+<t>Ничего выводить не нужно.</t>
+]=],
+initialCode = [=[
+-- Создай глобальную функцию IsSameClass()
+]=],
+requireKeywords = {
+"IsSameClass",
+"function",
+"UnitClass",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+
+if type(_G.IsSameClass) ~= "function" then
+_G.checkError = "IsSameClass не является глобальной функцией"
+return false
+end
+
+-- Хитрая проверка на тестовых данных: временно подменяем UnitClass.
+local realUnitClass = UnitClass
+
+local function RunWithFakeTokens(playerToken, targetToken)
+_G.UnitClass = function(unit)
+if unit == "player" then
+return "Фейк", playerToken
+end
+if unit == "target" then
+return "Фейк", targetToken
+end
+return realUnitClass(unit)
+end
+local ok, result = pcall(_G.IsSameClass)
+_G.UnitClass = realUnitClass
+if not ok then
+return nil, result
+end
+return result, nil
+end
+
+local sameResult, sameErr = RunWithFakeTokens("WARRIOR", "WARRIOR")
+if sameResult == nil then
+_G.checkError = "Ошибка вызова IsSameClass на тестовых данных: " .. tostring(sameErr)
+return false
+end
+if sameResult ~= true then
+_G.checkError = "При совпадающих токенах классов функция должна вернуть true"
+return false
+end
+
+local diffResult, diffErr = RunWithFakeTokens("WARRIOR", "MAGE")
+if diffResult == nil then
+_G.checkError = "Ошибка вызова IsSameClass на тестовых данных: " .. tostring(diffErr)
+return false
+end
+if diffResult ~= false then
+_G.checkError = "При разных токенах функция должна вернуть false: проверь, что сравниваешь токены через UnitClass, а не захардкодил значение"
+return false
+end
+
+-- Теперь реальный мир: целью должен быть ДРУГОЙ игрок того же класса.
+if not UnitExists("target") then
+_G.checkError = "Нет цели: найди игрока своего класса и возьми его в таргет"
+return false
+end
+
+if not UnitIsPlayer("target") then
+_G.checkError = "Цель не является игроком: нужен другой игрок твоего класса"
+return false
+end
+
+if UnitIsUnit("player", "target") then
+_G.checkError = "Ты выбрал в таргет себя. Нужен другой игрок"
+return false
+end
+
+local playerToken = select(2, UnitClass("player"))
+local targetToken = select(2, UnitClass("target"))
+
+if playerToken ~= targetToken then
+_G.checkError = "Класс цели (" .. tostring(targetToken) .. ") не совпадает с твоим (" .. tostring(playerToken) .. "). Найди игрока своего класса"
+return false
+end
+
+local ok, result = pcall(_G.IsSameClass)
+if not ok then
+_G.checkError = "Ошибка вызова IsSameClass: " .. tostring(result)
+return false
+end
+
+if result ~= true then
+_G.checkError = "При цели своего класса функция должна вернуть true, получено: " .. tostring(result)
+return false
+end
+
+return true
 end,
-},
-},
 }
 
 ns_llua['lua'][62] = {
 type = "commenttest",
-title = "Тест 54-3: преобразование в boolean",
+title = "Практика: HasTarget и чистый boolean",
 helpModules = {59, 15},
 preloadVars = {
-{var = "truthyPlayer", desc = "truthyPlayer очищается перед проверкой"},
-{var = "truthyInvalid", desc = "truthyInvalid очищается перед проверкой"},
+{var = "HasTarget", desc = "HasTarget очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
 },
 reportVars = {
-"truthyPlayer",
-"truthyInvalid",
+"checkError",
 },
 instruction = [=[
-<h>Тест 54-3: преобразование в boolean</h>
-<t>Создай глобальную переменную <k>truthyPlayer</k>.</t>
-<t>Она должна быть <k>true</k>, если <k>UnitExists("player")</k> возвращает истинное значение.</t>
-<t>Используй двойное отрицание:</t>
+<h>Практика: функция HasTarget</h>
+<t>Создай глобальную функцию <k>HasTarget()</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если текущая цель существует, и <k>false</k>, если цели нет.</t>
+<t>Помни: <k>UnitExists</k> возвращает <k>1</k> или <k>nil</k>, а не boolean. Преобразуй результат в чистый boolean, например двойным отрицанием:</t>
 <code>
-not not значение
+return not not UnitExists("target")
 </code>
-<t>Создай глобальную переменную <k>truthyInvalid</k>.</t>
-<t>Она должна быть <k>false</k>, если <k>UnitExists("ns_invalid_unit")</k> возвращает ложное значение.</t>
 <t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
--- Создай глобальные переменные truthyPlayer и truthyInvalid
+-- Создай глобальную функцию HasTarget()
 ]=],
 requireKeywords = {
-"truthyPlayer",
-"truthyInvalid",
-"not",
+"HasTarget",
+"function",
 "UnitExists",
+"return",
 },
 checkCode = function()
-return _G.truthyPlayer == true and _G.truthyInvalid == false
+_G.checkError = nil
+
+if type(_G.HasTarget) ~= "function" then
+_G.checkError = "HasTarget не является глобальной функцией"
+return false
+end
+
+-- Проверяем логику на тестовых данных: временно подменяем UnitExists.
+local realUnitExists = UnitExists
+
+local function RunWithFakeExists(fakeValue)
+_G.UnitExists = function(unit)
+if unit == "target" then
+return fakeValue
+end
+return realUnitExists(unit)
+end
+local ok, result = pcall(_G.HasTarget)
+_G.UnitExists = realUnitExists
+return ok, result
+end
+
+local okYes, yesResult = RunWithFakeExists(1)
+if not okYes then
+_G.checkError = "Ошибка вызова HasTarget на тестовых данных: " .. tostring(yesResult)
+return false
+end
+if yesResult ~= true then
+_G.checkError = "При существующей цели функция должна вернуть true, получено: " .. tostring(yesResult) .. ". UnitExists вернул 1 — преобразуй его в boolean"
+return false
+end
+
+local okNo, noResult = RunWithFakeExists(nil)
+if not okNo then
+_G.checkError = "Ошибка вызова HasTarget на тестовых данных: " .. tostring(noResult)
+return false
+end
+if noResult ~= false then
+_G.checkError = "При отсутствии цели функция должна вернуть false, получено: " .. tostring(noResult) .. ". nil нужно преобразовать в false"
+return false
+end
+
+-- Контрольный вызов в реальном состоянии.
+local expected = UnitExists("target") and true or false
+local okReal, realResult = pcall(_G.HasTarget)
+if not okReal then
+_G.checkError = "Ошибка вызова HasTarget: " .. tostring(realResult)
+return false
+end
+if realResult ~= expected then
+_G.checkError = "Функция вернула неверное значение для текущего состояния цели"
+return false
+end
+
+return true
 end,
 }
 
