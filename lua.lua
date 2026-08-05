@@ -2747,21 +2747,22 @@ ns_llua['lua'][41.2] = {
 
 <t>Создай глобальную переменную <k>removedCount</k> и присвой ей 0.</t>
 
-<t>Удали из <k>safeLoot</k> все элементы <s>"Щит"</s>.</t>
-<t>Сделай это безопасным проходом с конца таблицы:</t>
+<t>Удали из <k>safeLoot</k> все элементы <s>"Щит"</s> и посчитай количество удалений в <k>removedCount</k>.</t>
 
-<code>
-for i = #safeLoot, 1, -1 do
-    if safeLoot[i] == "Щит" then
-        table.remove(safeLoot, i)
-        removedCount = removedCount + 1
-    end
-end
-</code>
+<h>Почему обычный перебор может быть опасным?</h>
+<t>Когда ты удаляешь элемент из таблицы, все элементы после него сдвигаются влево.</t>
+<t>Если в этот момент идти по таблице обычным циклом вперёд, можно пропустить элемент, который встал на место удалённого.</t>
 
-<t>Почему с конца?</t>
-<t>Когда ты удаляешь элемент, индексы следующих элементов сдвигаются.</t>
-<t>Если идти с конца, сдвиги не ломают ещё не обработанные индексы.</t>
+<h>Безопасная идея</h>
+<t>Чтобы не пропускать элементы, удалять их нужно при проходе с конца таблицы к началу.</t>
+<t>То есть нужно начать с последнего индекса, затем уменьшать индекс на 1 и остановиться на 1.</t>
+<t>При таком проходе удаление элемента не ломает индексы тех элементов, которые ещё не обработаны.</t>
+
+<h>Что нужно сделать</h>
+<t>1. Пройди по таблице <k>safeLoot</k> с конца к началу.</t>
+<t>2. На каждом шаге проверяй, равен ли текущий элемент строке <s>"Щит"</s>.</t>
+<t>3. Если равен — удали этот элемент из таблицы.</t>
+<t>4. После удаления увеличь <k>removedCount</k> на 1.</t>
 
 <t>Ожидаемый результат:</t>
 <code>
@@ -2773,7 +2774,7 @@ removedCount = 2
 <w>Не используй <k>local</k>, переменные нужны глобальные.</w>
 ]=],
     initialCode = [=[
--- Создай safeLoot и удали все элементы "Щит" безопасным способом
+-- Напиши код здесь
 ]=],
     requireKeywords = {
         "safeLoot",
@@ -3342,33 +3343,57 @@ ns_llua['lua'][46.1] = {
     },
     reportVars = {"sortPlayers"},
     instruction = [=[
-<h>Практика: сортировка таблицы объектов</h>
+<h>Практика: сортировка таблицы объектов через компаратор</h>
 <t>Создай глобальную таблицу <k>sortPlayers</k>.</t>
-<t>Внутри неё должны быть три таблицы-объекта с полями <k>name</k> и <k>level</k>:</t>
+
+<t>Добавь в неё три элемента. Каждый элемент должен быть таблицей с полями <k>name</k> и <k>level</k>.</t>
+
+<t>Данные для заполнения:</t>
+<t>- первый игрок: имя <s>"Тралл"</s>, уровень 60;</t>
+<t>- второй игрок: имя <s>"Артас"</s>, уровень 80;</t>
+<t>- третий игрок: имя <s>"Джайна"</s>, уровень 75.</t>
+
+<t>После этого отсортируй таблицу <k>sortPlayers</k> так, чтобы первыми шли игроки с более высоким уровнем.</t>
+
+<h>Как сортировать подтаблицы по нужному ключу</h>
+<t>Если внутри таблицы лежат таблицы-объекты, сортировать нужно саму внешнюю таблицу, а не каждый внутренний объект отдельно.</t>
+
+<t>Функция сравнения получает два элемента внешней таблицы. В этой задаче каждый элемент — это таблица с полями <k>name</k> и <k>level</k>.</t>
+
+<t>Абстрактный приём сортировки по нужному ключу:</t>
 
 <code>
-sortPlayers = {
-    {name = "Тралл", level = 60},
-    {name = "Артас", level = 80},
-    {name = "Джайна", level = 75},
-}
+local sortKey = "someField"
+
+table.sort(outerTable, function(a, b)
+    return a[sortKey] > b[sortKey]
+end)
 </code>
 
-<t>Отсортируй <k>sortPlayers</k> так, чтобы первыми шли игроки с большим уровнем.</t>
-<t>Используй <k>table.sort</k> и функцию сравнения, которая сравнивает поля <k>level</k>.</t>
+<t>Или напрямую через строковый ключ:</t>
 
-<t>Ожидаемый порядок:</t>
 <code>
-sortPlayers[1].name = "Артас"
-sortPlayers[2].name = "Джайна"
-sortPlayers[3].name = "Тралл"
+table.sort(outerTable, function(a, b)
+    return a["someField"] > b["someField"]
+end)
 </code>
+
+<t>Замени <k>someField</k> на имя того поля, по которому нужно сортировать.</t>
+
+<t>Знак больше даёт сортировку по убыванию. Знак меньше даёт сортировку по возрастанию.</t>
+
+<w>Цикл для сортировки не нужен: <k>table.sort</k> вызывается один раз для всей таблицы <k>sortPlayers</k>.</w>
+
+<t>Ожидаемый порядок после сортировки:</t>
+<t>1. Артас, уровень 80</t>
+<t>2. Джайна, уровень 75</t>
+<t>3. Тралл, уровень 60</t>
 
 <t>Ничего выводить не нужно.</t>
-<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+<w>Не используй <k>local</k> для таблицы <k>sortPlayers</k>, она нужна глобальная.</w>
 ]=],
     initialCode = [=[
--- Создай sortPlayers и отсортируй её по убыванию level
+-- Создай sortPlayers, добавь игроков и отсортируй их по нужному полю
 ]=],
     requireKeywords = {
         "sortPlayers",
@@ -4081,18 +4106,18 @@ ns_llua['lua'][52.1] = {
 <t>Создай глобальную таблицу <k>finalCart</k>.</t>
 
 <t>Порядок действий:</t>
-<t>1. Добавь через <k>table.insert</k> четыре предмета:</t>
+<t>1. Добавь четыре предмета:</t>
 <s>"Меч", "Зелье", "Щит", "Факел"</s>
 
-<t>2. Удали третий элемент через <k>table.remove(finalCart, 3)</k>.</t>
+<t>2. Удали третий элемент.</t>
 
-<t>3. Добавь в конец предмет <s>"Компас"</s> через <k>table.insert</k>.</t>
+<t>3. Добавь в конец предмет <s>"Компас"</s>.</t>
 
-<t>4. Отсортируй таблицу <k>finalCart</k> через <k>table.sort</k>.</t>
+<t>4. Отсортируй таблицу <k>finalCart</k>.</t>
 
 <t>5. Создай глобальную переменную <k>finalCartCount</k> с количеством элементов в корзине.</t>
 
-<t>6. Создай глобальную переменную <k>finalCartText</k> через <k>table.concat</k> с разделителем <s>", "</s>.</t>
+<t>6. Собери все текущие элементы корзины в одну строку с разделителем из запятой и пробела и сохрани результат в глобальную переменную <k>finalCartText</k>.</t>
 
 <t>Ожидаемый результат после сортировки:</t>
 <code>
@@ -4116,6 +4141,13 @@ finalCartText = "Зелье, Компас, Меч, Факел"
         "table.sort",
         "table.concat",
         "3",
+        "#",
+        "finalCartText=table.concat(finalCart",
+    },
+    forbidKeywords = {
+        "finalCartCount=4",
+        'finalCartText="Зелье,Компас,Меч,Факел"',
+        "finalCartText='Зелье,Компас,Меч,Факел'",
     },
     checkCode = function()
         return type(_G.finalCart) == "table"
@@ -22732,7 +22764,80 @@ function UI:ShowHelp(helpModules)
 
     self:_CreateHelp()
 
-    local key = table.concat(helpModules, ",")
+    local db = ns_llua and ns_llua['lua'] or {}
+
+    local keyParts = {}
+    local helpTexts = {}
+    local seen = {}
+
+    local function resolveModule(id)
+        if id == nil then
+            return nil, nil
+        end
+
+        -- Прямое совпадение, если ID уже числовой.
+        if type(id) == "number" then
+            if db[id] ~= nil then
+                return db[id], id
+            end
+        end
+
+        -- Поддержка строковых ID: "45.1", "45", и т.д.
+        local num = tonumber(id)
+
+        if num ~= nil and db[num] ~= nil then
+            return db[num], num
+        end
+
+        -- Поддержка случая, если модуль вдруг хранится по строковому ключу.
+        if db[id] ~= nil then
+            return db[id], id
+        end
+
+        return nil, id
+    end
+
+    local function getHelpText(module)
+        if type(module) ~= "table" then
+            return ""
+        end
+
+        local text = module.content
+
+        -- У commenttest-модулей основной текст обычно находится в instruction.
+        if type(text) ~= "string" or text == "" then
+            text = module.instruction
+        end
+
+        -- Если нет ни content, ни instruction, показываем хотя бы заголовок.
+        if type(text) ~= "string" or text == "" then
+            if type(module.title) == "string" and module.title ~= "" then
+                text = "<h>" .. module.title .. "</h>"
+            else
+                text = ""
+            end
+        end
+
+        return text
+    end
+
+    for _, moduleId in ipairs(helpModules) do
+        local module, resolvedId = resolveModule(moduleId)
+
+        local key = tostring(resolvedId ~= nil and resolvedId or moduleId)
+        table.insert(keyParts, key)
+
+        if module and not seen[key] then
+            local text = getHelpText(module)
+
+            if text ~= "" then
+                seen[key] = true
+                table.insert(helpTexts, text)
+            end
+        end
+    end
+
+    local key = table.concat(keyParts, ",")
 
     if self.helpFrame:IsShown() and self.helpKey == key then
         self.helpFrame:Hide()
@@ -22741,20 +22846,10 @@ function UI:ShowHelp(helpModules)
 
     self.helpKey = key
 
-    local db = ns_llua and ns_llua['lua'] or {}
-    local raw = ""
-
-    for _, moduleNumber in ipairs(helpModules) do
-        local module = db[moduleNumber]
-
-        if module and module.content then
-            if raw ~= "" then
-                raw = raw .. "\n\n<c>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</c>\n\n"
-            end
-
-            raw = raw .. module.content
-        end
-    end
+    local raw = table.concat(
+        helpTexts,
+        "\n\n<c>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</c>\n\n"
+    )
 
     if raw == "" then
         self.helpFrame:Hide()
