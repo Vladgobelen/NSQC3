@@ -1643,57 +1643,55 @@ check3 = false
 
 ns_llua['lua'][21.5] = {
     type = "commenttest",
-    title = "Практика: цепочка or",
+    title = "Практика: or возвращает первое истинное",
     helpModules = {21.1},
     preloadVars = {
-        {var = "primary", value = nil, desc = "primary = nil"},
-        {var = "secondary", value = false, desc = "secondary = false"},
-        {var = "fallback", value = "Резерв", desc = 'fallback = "Резерв"'},
+        {var = "playerName", value = "Артас", desc = 'playerName = "Артас"'},
+        {var = "defaultName", value = "Странник", desc = 'defaultName = "Странник"'},
         {var = "gold", value = nil, desc = "gold = nil"},
         {var = "defaultGold", value = 100, desc = "defaultGold = 100"},
-        {var = "result", desc = "result очищается перед проверкой"},
-        {var = "finalGold", desc = "finalGold очищается перед проверкой"},
+        {var = "safeName", desc = "safeName очищается перед проверкой"},
+        {var = "safeGold", desc = "safeGold очищается перед проверкой"},
     },
-    reportVars = {"result", "finalGold"},
+    reportVars = {"safeName", "safeGold"},
     instruction = [=[
-<h>Практика: цепочка or</h>
+<h>Практика: or возвращает первое истинное</h>
 <t>Уже созданы переменные:</t>
 <code>
-primary = nil
-secondary = false
-fallback = "Резерв"
+playerName = "Артас"
+defaultName = "Странник"
 gold = nil
 defaultGold = 100
 </code>
-<t>1. Создай глобальную переменную <k>result</k>.</t>
-<t>Используй цепочку из трёх значений через <k>or</k>: <k>primary</k>, затем <k>secondary</k>, затем <k>fallback</k>.</t>
-<t>Подумай: <k>primary</k> — nil (ложный), <k>secondary</k> — false (ложный). Какое значение будет первым истинным?</t>
-<t>2. Создай глобальную переменную <k>finalGold</k>.</t>
+<t>1. Создай глобальную переменную <k>safeName</k>.</t>
+<t>Используй <k>or</k> между <k>playerName</k> и <k>defaultName</k>.</t>
+<t>Подумай: <k>playerName</k> — строка, а любая строка в Lua истинная. Значит <k>or</k> вернёт её и до второго значения дело не дойдёт.</t>
+<t>2. Создай глобальную переменную <k>safeGold</k>.</t>
 <t>Используй <k>or</k> между <k>gold</k> и <k>defaultGold</k>.</t>
+<t>Подумай: <k>gold</k> — это <k>nil</k>, а <k>nil</k> в Lua ложный. Значит <k>or</k> перейдёт ко второму значению.</t>
 <t>Ожидаемый результат:</t>
 <code>
-result = "Резерв"
-finalGold = 100
+safeName = "Артас"
+safeGold = 100
 </code>
 <t>Ничего выводить не нужно.</t>
 <w>Не используй <k>local</k>, переменные нужны глобальные.</w>
 ]=],
     initialCode = [=[
--- Создай result и finalGold через or
+-- Создай safeName и safeGold через or
 ]=],
     requireKeywords = {
-        "result",
-        "finalGold",
-        "primary",
-        "secondary",
-        "fallback",
+        "safeName",
+        "safeGold",
+        "playerName",
+        "defaultName",
         "gold",
         "defaultGold",
         "or",
     },
     checkCode = function()
-        return _G.result == "Резерв"
-            and _G.finalGold == 100
+        return _G.safeName == "Артас"
+            and _G.safeGold == 100
     end,
 }
 
