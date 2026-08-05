@@ -1673,6 +1673,304 @@ print(#example) -- 2
     end,
 }
 
+ns_llua['lua'][29.1] = {
+    type = "info",
+    title = "Изменение таблиц: table.insert, table.remove и ручное управление",
+    helpModules = {4, 29},
+    content = [=[
+<h>Изменение таблиц</h>
+<t>Таблицу можно не только создать сразу со значениями. Её можно менять: добавлять элементы, удалять их и сдвигать индексы.</t>
+
+<h>table.insert</h>
+<t>Функция <k>table.insert</k> добавляет элемент в таблицу.</t>
+
+<t>Вариант 1: добавить в конец таблицы.</t>
+<code>
+local items = {"Меч"}
+table.insert(items, "Щит")
+
+print(items[1]) -- "Меч"
+print(items[2]) -- "Щит"
+print(#items)   -- 2
+</code>
+
+<t>Вариант 2: вставить элемент по позиции.</t>
+<code>
+local items = {"Меч", "Зелье"}
+table.insert(items, 2, "Щит")
+
+print(items[1]) -- "Меч"
+print(items[2]) -- "Щит"
+print(items[3]) -- "Зелье"
+print(#items)   -- 3
+</code>
+
+<w>Важно:</w> при вставке по позиции элементы, начиная с этой позиции, сдвигаются вправо.
+
+<h>table.remove</h>
+<t>Функция <k>table.remove</k> удаляет элемент из таблицы.</t>
+
+<t>Вариант 1: удалить последний элемент.</t>
+<code>
+local items = {"Меч", "Щит", "Зелье"}
+table.remove(items)
+
+print(items[1]) -- "Меч"
+print(items[2]) -- "Щит"
+print(items[3]) -- nil
+print(#items)   -- 2
+</code>
+
+<t>Вариант 2: удалить элемент по позиции.</t>
+<code>
+local items = {"Меч", "Щит", "Зелье"}
+table.remove(items, 2)
+
+print(items[1]) -- "Меч"
+print(items[2]) -- "Зелье"
+print(#items)   -- 2
+</code>
+
+<t>Функция <k>table.remove</k> также возвращает удалённый элемент.</t>
+<code>
+local items = {"Меч", "Щит", "Зелье"}
+local removed = table.remove(items, 2)
+
+print(removed) -- "Щит"
+print(#items)  -- 2
+</code>
+
+<h>Добавление через t[#t + 1]</h>
+<t>Добавить элемент в конец таблицы можно и без <k>table.insert</k>:</t>
+<code>
+local items = {"Меч"}
+items[#items + 1] = "Щит"
+
+print(items[2]) -- "Щит"
+print(#items)   -- 2
+</code>
+
+<t>Запись <k>t[#t + 1] = value</k> означает:</t>
+<t>- взять текущую длину таблицы;</t>
+<t>- прибавить 1;</t>
+<t>- записать значение в следующий свободный индекс.</t>
+
+<h>Удаление последнего элемента вручную</h>
+<t>Последний элемент можно удалить, записав <k>nil</k> в последний индекс:</t>
+<code>
+local items = {"Меч", "Щит", "Зелье"}
+items[#items] = nil
+
+print(#items) -- 2
+</code>
+
+<w>Важно:</w> так безопасно удалять только последний элемент. Если просто записать <k>nil</k> где-нибудь в середине массива, можно получить "дырку", и оператор <k>#</k> может работать непредсказуемо.
+
+<h>Что выбрать?</h>
+<t>Для большинства задач:</t>
+<t>- добавление в конец: <k>table.insert(t, value)</k> или <k>t[#t + 1] = value</k>;</t>
+<t>- вставка по позиции: <k>table.insert(t, pos, value)</k>;</t>
+<t>- удаление: <k>table.remove(t)</k> или <k>table.remove(t, pos)</k>.</t>
+
+<t>Ручное управление индексами полезно для понимания, как устроена таблица, но в реальном коде чаще используют <k>table.insert</k> и <k>table.remove</k>.</t>
+]=],
+}
+
+ns_llua['lua'][29.2] = {
+    type = "commenttest",
+    title = "Практика: вставка элементов через table.insert",
+    helpModules = {29.1},
+    preloadVars = {
+        {var = "insertBox", desc = "insertBox очищается перед проверкой"},
+    },
+    reportVars = {"insertBox"},
+    instruction = [=[
+<h>Практика: вставка элементов через table.insert</h>
+<t>Создай глобальную таблицу <k>insertBox</k>.</t>
+<t>Затем добавь в неё элементы через <k>table.insert</k>.</t>
+
+<t>Порядок действий:</t>
+<t>1. Создай пустую таблицу <k>insertBox</k>.</t>
+<t>2. Добавь в конец строку <s>"Меч"</s>.</t>
+<t>3. Добавь в конец строку <s>"Зелье"</s>.</t>
+<t>4. Вставь между ними вторым элементом строку <s>"Щит"</s>.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+insertBox = {"Меч", "Щит", "Зелье"}
+</code>
+
+<w>Используй только <k>table.insert</k>. Циклы не нужны.</w>
+<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай insertBox и добавь элементы через table.insert
+]=],
+    requireKeywords = {
+        "table.insert",
+        "insertBox",
+        "2",
+    },
+    checkCode = function()
+        return type(_G.insertBox) == "table"
+            and #_G.insertBox == 3
+            and _G.insertBox[1] == "Меч"
+            and _G.insertBox[2] == "Щит"
+            and _G.insertBox[3] == "Зелье"
+    end,
+}
+
+ns_llua['lua'][29.3] = {
+    type = "commenttest",
+    title = "Практика: удаление элементов через table.remove",
+    helpModules = {29.1},
+    preloadVars = {
+        {var = "removeBox", desc = "removeBox очищается перед проверкой"},
+        {var = "removedItem", desc = "removedItem очищается перед проверкой"},
+    },
+    reportVars = {"removeBox", "removedItem"},
+    instruction = [=[
+<h>Практика: удаление элементов через table.remove</h>
+<t>Создай глобальную таблицу <k>removeBox</k> с четырьмя строками:</t>
+<s>"Меч", "Щит", "Зелье", "Факел"</s>
+
+<t>Затем выполни удаления через <k>table.remove</k>:</t>
+<t>1. Удали последний элемент.</t>
+<t>2. Удали элемент с индексом 2.</t>
+<t>3. Удали элемент с индексом 1 и сохрани результат в глобальную переменную <k>removedItem</k>.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+removeBox = {"Зелье"}
+removedItem = "Меч"
+</code>
+
+<w>Используй только <k>table.remove</k>. Циклы не нужны.</w>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай removeBox и выполни удаления через table.remove
+]=],
+    requireKeywords = {
+        "table.remove",
+        "removeBox",
+        "removedItem",
+        "2",
+        "1",
+    },
+    checkCode = function()
+        return type(_G.removeBox) == "table"
+            and #_G.removeBox == 1
+            and _G.removeBox[1] == "Зелье"
+            and _G.removedItem == "Меч"
+    end,
+}
+
+ns_llua['lua'][29.4] = {
+    type = "commenttest",
+    title = "Практика: ручное добавление элементов через t[#t + 1]",
+    helpModules = {29.1},
+    preloadVars = {
+        {var = "manualBox", desc = "manualBox очищается перед проверкой"},
+    },
+    reportVars = {"manualBox"},
+    instruction = [=[
+<h>Практика: ручное добавление элементов</h>
+<t>В этом задании нельзя использовать <k>table.insert</k> и <k>table.remove</k>.</t>
+<t>Будем управлять таблицей вручную через индексы.</t>
+
+<t>Создай глобальную таблицу <k>manualBox</k>.</t>
+
+<t>Порядок действий:</t>
+<t>1. Добавь в конец строку <s>"Меч"</s> через <k>manualBox[#manualBox + 1]</k>.</t>
+<t>2. Добавь в конец строку <s>"Зелье"</s> тем же способом.</t>
+<t>3. Вставь вторым элементом строку <s>"Щит"</s> вручную.</t>
+<t>4. Добавь в конец строку <s>"Факел"</s> через <k>manualBox[#manualBox + 1]</k>.</t>
+
+<h>Подсказка по ручной вставке</h>
+<t>Чтобы вставить элемент в позицию 2, сначала сдвинь текущий второй элемент в третий индекс:</t>
+<code>
+manualBox[3] = manualBox[2]
+manualBox[2] = "Щит"
+</code>
+
+<t>Ожидаемый результат:</t>
+<code>
+manualBox = {"Меч", "Щит", "Зелье", "Факел"}
+</code>
+
+<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+<w>Циклы не нужны.</w>
+]=],
+    initialCode = [=[
+-- Создай manualBox и заполни её вручную
+]=],
+    requireKeywords = {
+        "manualBox",
+        "#manualBox",
+        "manualBox[3]",
+        "manualBox[2]",
+    },
+    forbidKeywords = {
+        "table.insert",
+        "table.remove",
+    },
+    checkCode = function()
+        return type(_G.manualBox) == "table"
+            and #_G.manualBox == 4
+            and _G.manualBox[1] == "Меч"
+            and _G.manualBox[2] == "Щит"
+            and _G.manualBox[3] == "Зелье"
+            and _G.manualBox[4] == "Факел"
+    end,
+}
+
+ns_llua['lua'][29.5] = {
+    type = "commenttest",
+    title = "Практика: ручное удаление элементов",
+    helpModules = {29.1},
+    preloadVars = {
+        {var = "manualRemove", desc = "manualRemove очищается перед проверкой"},
+    },
+    reportVars = {"manualRemove"},
+    instruction = [=[
+<h>Практика: ручное удаление элементов</h>
+<t>Создай глобальную таблицу <k>manualRemove</k> с четырьмя строками по порядку:</t>
+<s>"Меч", "Щит", "Зелье", "Факел"</s>
+
+<t>Затем вручную удали из неё два элемента:</t>
+<t>1. Последний элемент.</t>
+<t>2. Второй элемент. Для этого сначала сдвинь третий элемент на место второго, затем убери лишний последний элемент.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+manualRemove = {"Меч", "Зелье"}
+</code>
+
+<w>Нельзя использовать <k>table.remove</k>, <k>table.insert</k>, <k>local</k> и циклы.</w>
+]=],
+    initialCode = [=[
+-- Напиши код здесь
+]=],
+    requireKeywords = {
+        "manualRemove",
+        "#manualRemove",
+        "nil",
+        "manualRemove[2]",
+        "manualRemove[3]",
+    },
+    forbidKeywords = {
+        "table.remove",
+        "table.insert",
+    },
+    checkCode = function()
+        return type(_G.manualRemove) == "table"
+            and #_G.manualRemove == 2
+            and _G.manualRemove[1] == "Меч"
+            and _G.manualRemove[2] == "Зелье"
+    end,
+}
+
 ns_llua['lua'][30] = {
     type = "commenttest",
     title = "Итоговый комбо-тест",
@@ -1768,6 +2066,120 @@ end -- завершаем цикл
 <t>В практических модулях курса проверяются глобальные переменные.</t>
 <t>Поэтому нужные переменные создавай без <k>local</k>, если задание просит сохранить результат для проверки.</t>
 ]=],
+}
+
+ns_llua['lua'][31.1] = {
+    type = "commenttest",
+    title = "Практика: table.insert и цикл for",
+    helpModules = {31, 29.1},
+    preloadVars = {
+        {var = "loopNumbers", desc = "loopNumbers очищается перед проверкой"},
+    },
+    reportVars = {"loopNumbers"},
+    instruction = [=[
+<h>Практика: table.insert и цикл for</h>
+<t>Создай глобальную таблицу <k>loopNumbers</k>.</t>
+<t>Заполни её числами от 1 до 5 с помощью цикла <k>for</k> и функции <k>table.insert</k>.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+loopNumbers = {1, 2, 3, 4, 5}
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай loopNumbers и заполни её через for и table.insert
+]=],
+    requireKeywords = {
+        "loopNumbers",
+        "for",
+        "do",
+        "end",
+        "table.insert",
+        "1",
+        "5",
+    },
+    checkCode = function()
+        if type(_G.loopNumbers) ~= "table" then
+            return false
+        end
+
+        if #_G.loopNumbers ~= 5 then
+            return false
+        end
+
+        for i = 1, 5 do
+            if _G.loopNumbers[i] ~= i then
+                return false
+            end
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][31.2] = {
+    type = "commenttest",
+    title = "table.concat: склейка таблицы в строку",
+    helpModules = {31, 29.1, 7},
+    preloadVars = {
+        {var = "concatWords", desc = "concatWords очищается перед проверкой"},
+        {var = "concatSpace", desc = "concatSpace очищается перед проверкой"},
+        {var = "concatComma", desc = "concatComma очищается перед проверкой"},
+    },
+    reportVars = {"concatWords", "concatSpace", "concatComma"},
+    instruction = [=[
+<h>table.concat</h>
+<t>Функция <k>table.concat</k> склеивает элементы таблицы в одну строку.</t>
+<t>Первым аргументом передаётся таблица, вторым — разделитель.</t>
+
+<code>
+local words = {"Меч", "Щит", "Зелье"}
+print(table.concat(words, " "))  -- "Меч Щит Зелье"
+print(table.concat(words, ", ")) -- "Меч, Щит, Зелье"
+</code>
+
+<t>Это удобнее, чем вручную собирать строку через конкатенацию в цикле.</t>
+
+<h>Практика</h>
+<t>Создай глобальную таблицу <k>concatWords</k> с тремя строками:</t>
+<s>"Меч", "Щит", "Зелье"</s>
+
+<t>Создай глобальную переменную <k>concatSpace</k>:</t>
+<t>Используй <k>table.concat</k> с разделителем <s>" "</s> (пробел).</t>
+
+<t>Создай глобальную переменную <k>concatComma</k>:</t>
+<t>Используй <k>table.concat</k> с разделителем <s>", "</s> (запятая и пробел).</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+concatSpace = "Меч Щит Зелье"
+concatComma = "Меч, Щит, Зелье"
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай concatWords, concatSpace и concatComma
+]=],
+    requireKeywords = {
+        "concatWords",
+        "concatSpace",
+        "concatComma",
+        "table.concat",
+    },
+    checkCode = function()
+        return type(_G.concatWords) == "table"
+            and #_G.concatWords == 3
+            and _G.concatWords[1] == "Меч"
+            and _G.concatWords[2] == "Щит"
+            and _G.concatWords[3] == "Зелье"
+            and _G.concatSpace == "Меч Щит Зелье"
+            and _G.concatComma == "Меч, Щит, Зелье"
+    end,
 }
 
 ns_llua['lua'][32] = {
@@ -2258,6 +2670,132 @@ ns_llua['lua'][41] = {
     end,
 }
 
+ns_llua['lua'][41.1] = {
+    type = "commenttest",
+    title = "Практика: фильтрация таблицы через string.find и table.insert",
+    helpModules = {31, 33, 29.1},
+    preloadVars = {
+        {var = "filterItems", desc = "filterItems очищается перед проверкой"},
+        {var = "filteredItems", desc = "filteredItems очищается перед проверкой"},
+        {var = "filteredCount", desc = "filteredCount очищается перед проверкой"},
+    },
+    reportVars = {"filterItems", "filteredItems", "filteredCount"},
+    instruction = [=[
+<h>Практика: фильтрация таблицы</h>
+<t>Создай глобальную таблицу <k>filterItems</k> с пятью строками по порядку:</t>
+<s>"Меч", "Молот", "Кольцо", "Щит", "Плащ"</s>
+
+<t>Создай пустую глобальную таблицу <k>filteredItems</k>.</t>
+
+<t>Пройди по <k>filterItems</k> циклом <k>for</k> с <k>ipairs</k>.</t>
+<t>Если строка содержит подстроку <s>"ол"</s>, добавь её в <k>filteredItems</k> через <k>table.insert</k>.</t>
+
+<t>После цикла создай глобальную переменную <k>filteredCount</k> с количеством элементов в <k>filteredItems</k>.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+filteredItems = {"Молот", "Кольцо"}
+filteredCount = 2
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай filterItems, filteredItems и filteredCount
+]=],
+    requireKeywords = {
+        "filterItems",
+        "filteredItems",
+        "filteredCount",
+        "for",
+        "ipairs",
+        "do",
+        "end",
+        "string.find",
+        "table.insert",
+    },
+    checkCode = function()
+        return type(_G.filterItems) == "table"
+            and #_G.filterItems == 5
+            and _G.filterItems[1] == "Меч"
+            and _G.filterItems[2] == "Молот"
+            and _G.filterItems[3] == "Кольцо"
+            and _G.filterItems[4] == "Щит"
+            and _G.filterItems[5] == "Плащ"
+            and type(_G.filteredItems) == "table"
+            and #_G.filteredItems == 2
+            and _G.filteredItems[1] == "Молот"
+            and _G.filteredItems[2] == "Кольцо"
+            and _G.filteredCount == 2
+    end,
+}
+
+ns_llua['lua'][41.2] = {
+    type = "commenttest",
+    title = "Практика: безопасное удаление элементов при переборе",
+    helpModules = {31, 32, 29.1, 40},
+    preloadVars = {
+        {var = "safeLoot", desc = "safeLoot очищается перед проверкой"},
+        {var = "removedCount", desc = "removedCount очищается перед проверкой"},
+    },
+    reportVars = {"safeLoot", "removedCount"},
+    instruction = [=[
+<h>Практика: безопасное удаление элементов</h>
+<t>Создай глобальную таблицу <k>safeLoot</k> с пятью строками по порядку:</t>
+<s>"Меч", "Щит", "Зелье", "Щит", "Свиток"</s>
+
+<t>Создай глобальную переменную <k>removedCount</k> и присвой ей 0.</t>
+
+<t>Удали из <k>safeLoot</k> все элементы <s>"Щит"</s>.</t>
+<t>Сделай это безопасным проходом с конца таблицы:</t>
+
+<code>
+for i = #safeLoot, 1, -1 do
+    if safeLoot[i] == "Щит" then
+        table.remove(safeLoot, i)
+        removedCount = removedCount + 1
+    end
+end
+</code>
+
+<t>Почему с конца?</t>
+<t>Когда ты удаляешь элемент, индексы следующих элементов сдвигаются.</t>
+<t>Если идти с конца, сдвиги не ломают ещё не обработанные индексы.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+safeLoot = {"Меч", "Зелье", "Свиток"}
+removedCount = 2
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай safeLoot и удали все элементы "Щит" безопасным способом
+]=],
+    requireKeywords = {
+        "safeLoot",
+        "removedCount",
+        "for",
+        "#safeLoot",
+        "-1",
+        "do",
+        "end",
+        "if",
+        "table.remove",
+    },
+    checkCode = function()
+        return type(_G.safeLoot) == "table"
+            and #_G.safeLoot == 3
+            and _G.safeLoot[1] == "Меч"
+            and _G.safeLoot[2] == "Зелье"
+            and _G.safeLoot[3] == "Свиток"
+            and _G.removedCount == 2
+    end,
+}
+
 ns_llua['lua'][42] = {
     type = "commenttest",
     title = "Практика: поиск по подстроке через string.find",
@@ -2451,6 +2989,49 @@ end
 ]=],
 }
 
+ns_llua['lua'][44.1] = {
+    type = "commenttest",
+    title = "Практика: базовая сортировка через table.sort",
+    helpModules = {44, 29.1},
+    preloadVars = {
+        {var = "sortNumbers", desc = "sortNumbers очищается перед проверкой"},
+    },
+    reportVars = {"sortNumbers"},
+    instruction = [=[
+<h>Практика: базовая сортировка</h>
+<t>Функция <k>table.sort</k> сортирует массив на месте.</t>
+<t>То есть она меняет саму таблицу, а не возвращает новую.</t>
+
+<t>Создай глобальную таблицу <k>sortNumbers</k> с числами:</t>
+<s>7, 1, 5, 3</s>
+
+<t>Отсортируй её по возрастанию через <k>table.sort</k>.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+sortNumbers = {1, 3, 5, 7}
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай sortNumbers и отсортируй её через table.sort
+]=],
+    requireKeywords = {
+        "sortNumbers",
+        "table.sort",
+    },
+    checkCode = function()
+        return type(_G.sortNumbers) == "table"
+            and #_G.sortNumbers == 4
+            and _G.sortNumbers[1] == 1
+            and _G.sortNumbers[2] == 3
+            and _G.sortNumbers[3] == 5
+            and _G.sortNumbers[4] == 7
+    end,
+}
+
 ns_llua['lua'][45] = {
     type = "info",
     title = "Функции",
@@ -2533,6 +3114,61 @@ end
 <t>- одну функцию можно использовать с разными данными;</t>
 <t>- проще искать ошибки.</t>
 ]=],
+}
+
+ns_llua['lua'][45.1] = {
+    type = "commenttest",
+    title = "Практика: сортировка со своим условием",
+    helpModules = {45, 44.1},
+    preloadVars = {
+        {var = "sortDesc", desc = "sortDesc очищается перед проверкой"},
+    },
+    reportVars = {"sortDesc"},
+    instruction = [=[
+<h>Практика: сортировка со своим условием</h>
+<t>По умолчанию <k>table.sort</k> сортирует элементы по возрастанию.</t>
+<t>Если нужен другой порядок, в функцию сравнения передают вторым аргументом.</t>
+
+<t>Функция сравнения должна вернуть <k>true</k>, если первый аргумент должен стоять раньше второго.</t>
+
+<t>Пример сортировки по убыванию:</t>
+<code>
+table.sort(t, function(a, b)
+    return a > b
+end)
+</code>
+
+<h>Задание</h>
+<t>Создай глобальную таблицу <k>sortDesc</k> с числами:</t>
+<s>3, 8, 1, 5</s>
+
+<t>Отсортируй её по убыванию через <k>table.sort</k> и свою функцию сравнения.</t>
+
+<t>Ожидаемый результат:</t>
+<code>
+sortDesc = {8, 5, 3, 1}
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай sortDesc и отсортируй её по убыванию
+]=],
+    requireKeywords = {
+        "sortDesc",
+        "table.sort",
+        "function",
+        "return",
+    },
+    checkCode = function()
+        return type(_G.sortDesc) == "table"
+            and #_G.sortDesc == 4
+            and _G.sortDesc[1] == 8
+            and _G.sortDesc[2] == 5
+            and _G.sortDesc[3] == 3
+            and _G.sortDesc[4] == 1
+    end,
 }
 
 ns_llua['lua'][46] = {
@@ -2694,6 +3330,65 @@ ns_llua['lua'][46] = {
         end
 
         return allOk
+    end,
+}
+
+ns_llua['lua'][46.1] = {
+    type = "commenttest",
+    title = "Практика: сортировка таблицы объектов через компаратор",
+    helpModules = {45, 45.1, 44.1},
+    preloadVars = {
+        {var = "sortPlayers", desc = "sortPlayers очищается перед проверкой"},
+    },
+    reportVars = {"sortPlayers"},
+    instruction = [=[
+<h>Практика: сортировка таблицы объектов</h>
+<t>Создай глобальную таблицу <k>sortPlayers</k>.</t>
+<t>Внутри неё должны быть три таблицы-объекта с полями <k>name</k> и <k>level</k>:</t>
+
+<code>
+sortPlayers = {
+    {name = "Тралл", level = 60},
+    {name = "Артас", level = 80},
+    {name = "Джайна", level = 75},
+}
+</code>
+
+<t>Отсортируй <k>sortPlayers</k> так, чтобы первыми шли игроки с большим уровнем.</t>
+<t>Используй <k>table.sort</k> и функцию сравнения, которая сравнивает поля <k>level</k>.</t>
+
+<t>Ожидаемый порядок:</t>
+<code>
+sortPlayers[1].name = "Артас"
+sortPlayers[2].name = "Джайна"
+sortPlayers[3].name = "Тралл"
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, таблица нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай sortPlayers и отсортируй её по убыванию level
+]=],
+    requireKeywords = {
+        "sortPlayers",
+        "table.sort",
+        "function",
+        "return",
+        "level",
+    },
+    checkCode = function()
+        return type(_G.sortPlayers) == "table"
+            and #_G.sortPlayers == 3
+            and type(_G.sortPlayers[1]) == "table"
+            and type(_G.sortPlayers[2]) == "table"
+            and type(_G.sortPlayers[3]) == "table"
+            and _G.sortPlayers[1].name == "Артас"
+            and _G.sortPlayers[1].level == 80
+            and _G.sortPlayers[2].name == "Джайна"
+            and _G.sortPlayers[2].level == 75
+            and _G.sortPlayers[3].name == "Тралл"
+            and _G.sortPlayers[3].level == 60
     end,
 }
 
@@ -3371,7 +4066,68 @@ ns_llua['lua'][52] = {
     end,
 }
 
+ns_llua['lua'][52.1] = {
+    type = "commenttest",
+    title = "Итоговый комбо-тест: таблицы, insert, remove, sort и concat",
+    helpModules = {29.1, 31.1, 31.2, 44.1, 52},
+    preloadVars = {
+        {var = "finalCart", desc = "finalCart очищается перед проверкой"},
+        {var = "finalCartCount", desc = "finalCartCount очищается перед проверкой"},
+        {var = "finalCartText", desc = "finalCartText очищается перед проверкой"},
+    },
+    reportVars = {"finalCart", "finalCartCount", "finalCartText"},
+    instruction = [=[
+<h>Итоговый комбо-тест: таблицы</h>
+<t>Создай глобальную таблицу <k>finalCart</k>.</t>
 
+<t>Порядок действий:</t>
+<t>1. Добавь через <k>table.insert</k> четыре предмета:</t>
+<s>"Меч", "Зелье", "Щит", "Факел"</s>
+
+<t>2. Удали третий элемент через <k>table.remove(finalCart, 3)</k>.</t>
+
+<t>3. Добавь в конец предмет <s>"Компас"</s> через <k>table.insert</k>.</t>
+
+<t>4. Отсортируй таблицу <k>finalCart</k> через <k>table.sort</k>.</t>
+
+<t>5. Создай глобальную переменную <k>finalCartCount</k> с количеством элементов в корзине.</t>
+
+<t>6. Создай глобальную переменную <k>finalCartText</k> через <k>table.concat</k> с разделителем <s>", "</s>.</t>
+
+<t>Ожидаемый результат после сортировки:</t>
+<code>
+finalCart = {"Зелье", "Компас", "Меч", "Факел"}
+finalCartCount = 4
+finalCartText = "Зелье, Компас, Меч, Факел"
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай finalCart и выполни все операции
+]=],
+    requireKeywords = {
+        "finalCart",
+        "finalCartCount",
+        "finalCartText",
+        "table.insert",
+        "table.remove",
+        "table.sort",
+        "table.concat",
+        "3",
+    },
+    checkCode = function()
+        return type(_G.finalCart) == "table"
+            and #_G.finalCart == 4
+            and _G.finalCart[1] == "Зелье"
+            and _G.finalCart[2] == "Компас"
+            and _G.finalCart[3] == "Меч"
+            and _G.finalCart[4] == "Факел"
+            and _G.finalCartCount == 4
+            and _G.finalCartText == "Зелье, Компас, Меч, Факел"
+    end,
+}
 
 
 
