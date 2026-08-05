@@ -1408,6 +1408,425 @@ end
 ]=],
 }
 
+ns_llua['lua'][21.1] = {
+    type = "info",
+    title = "Присваивание через and и or",
+    helpModules = {21, 15},
+    content = [=[
+<h>and и or возвращают значения</h>
+<t>В модуле 21 мы использовали <k>and</k> и <k>or</k> внутри условий <k>if</k>. Но на самом деле эти операторы возвращают не <k>true</k>/<k>false</k>, а одно из своих значений.</t>
+<h>Как работает or</h>
+<t>Оператор <k>or</k> возвращает первое истинное значение. Если левая часть истинная — вернётся она. Если левая часть ложная — вернётся правая.</t>
+<code>
+print(5 or 10)     -- 5
+print(nil or 10)   -- 10
+print(false or 10) -- 10
+</code>
+<h>Как работает and</h>
+<t>Оператор <k>and</k> возвращает первое ложное значение. Если левая часть ложная — вернётся она. Если левая часть истинная — вернётся правая.</t>
+<code>
+print(5 and 10)     -- 10
+print(nil and 10)   -- nil
+print(false and 10) -- false
+</code>
+<h>Запасное значение через or</h>
+<t>Самый частый приём: <k>x = value or default</k>.</t>
+<t>Если <k>value</k> равно <k>nil</k> или <k>false</k>, переменная получит запасное значение.</t>
+<code>
+local name = nil
+local result = name or "Неизвестный"
+print(result) -- Неизвестный
+</code>
+<code>
+local level = 80
+local result = level or 0
+print(result) -- 80
+</code>
+<t>Это короче, чем:</t>
+<code>
+local result
+if name == nil then
+    result = "Неизвестный"
+else
+    result = name
+end
+</code>
+<h>Защита через and</h>
+<t>Приём: <k>x = condition and value</k>.</t>
+<t>Если условие ложное, переменная получит <k>false</k> или <k>nil</k>. Если истинное — получит значение.</t>
+<code>
+local isAlive = true
+local hp = 5000
+local result = isAlive and hp
+print(result) -- 5000
+</code>
+<code>
+local isAlive = false
+local hp = 5000
+local result = isAlive and hp
+print(result) -- false
+</code>
+<h>Шпаргалка</h>
+<c>a or b — вернёт a, если a истинное, иначе b</c>
+<c>a and b — вернёт a, если a ложное, иначе b</c>
+<c>x = value or default — запасное значение</c>
+]=],
+}
+
+ns_llua['lua'][21.2] = {
+    type = "info",
+    title = "Тернарный оператор",
+    helpModules = {21, 21.1, 15},
+    content = [=[
+<h>Тернарный оператор</h>
+<t>В Lua нет встроенного тернарного оператора как в других языках, но его можно имитировать через <k>and</k> и <k>or</k>.</t>
+<h>Паттерн</h>
+<code>
+результат = условие and значение_если_да or значение_если_нет
+</code>
+<t>Как это работает:</t>
+<t>1. Если условие истинное, <k>and</k> вернёт <k>значение_если_да</k>.</t>
+<t>2. Затем <k>or</k> увидит истинное значение слева и вернёт его.</t>
+<t>3. Если условие ложное, <k>and</k> вернёт <k>false</k>.</t>
+<t>4. Затем <k>or</k> увидит ложное значение слева и вернёт <k>значение_если_нет</k>.</t>
+<h>Пример</h>
+<code>
+local hp = 80
+local status = (hp > 0) and "Жив" or "Мёртв"
+print(status) -- Жив
+</code>
+<code>
+local hp = 0
+local status = (hp > 0) and "Жив" or "Мёртв"
+print(status) -- Мёртв
+</code>
+<h>Сравнение с if/else</h>
+<t>Тернарный паттерн заменяет:</t>
+<code>
+local status
+if hp > 50 then
+    status = "Жив"
+else
+    status = "Мёртв"
+end
+</code>
+<t>на одну строку:</t>
+<code>
+local status = (hp > 50) and "Жив" or "Мёртв"
+</code>
+<h>Ловушка</h>
+<w>Внимание:</w> если <k>значение_если_да</k> равно <k>false</k> или <k>nil</k>, паттерн сломается.
+<code>
+local cond = true
+local result = cond and false or "запасной"
+print(result) -- "запасной", хотя ожидалось false!
+</code>
+<t>Почему: <k>cond and false</k> вернёт <k>false</k>. Затем <k>false or "запасной"</k> вернёт <k>"запасной"</k>.</t>
+<t>Поэтому тернарный паттерн безопасен, только если <k>значение_если_да</k> не может быть <k>false</k> или <k>nil</k>.</t>
+<h>Когда использовать</h>
+<t>- выбор из двух строковых значений;</t>
+<t>- выбор из двух чисел;</t>
+<t>- короткие выражения внутри return.</t>
+<t>Если значения могут быть <k>false</k> или <k>nil</k> — лучше использовать обычный <k>if/else</k>.</t>
+]=],
+}
+
+ns_llua['lua'][21.3] = {
+    type = "commenttest",
+    title = "Практика: запасное значение через or",
+    helpModules = {21.1},
+    preloadVars = {
+        {var = "rawName", value = nil, desc = "rawName = nil"},
+        {var = "rawLevel", value = 80, desc = "rawLevel = 80"},
+        {var = "rawGuild", value = nil, desc = "rawGuild = nil"},
+        {var = "safeName", desc = "safeName очищается перед проверкой"},
+        {var = "safeLevel", desc = "safeLevel очищается перед проверкой"},
+        {var = "safeGuild", desc = "safeGuild очищается перед проверкой"},
+    },
+    reportVars = {"safeName", "safeLevel", "safeGuild"},
+    instruction = [=[
+<h>Практика: запасное значение через or</h>
+<t>Уже созданы переменные:</t>
+<code>
+rawName = nil
+rawLevel = 80
+rawGuild = nil
+</code>
+<t>Создай глобальные переменные, используя <k>or</k> для запасного значения:</t>
+<t><k>safeName</k> = rawName или <s>"Неизвестный"</s>, если rawName равно nil.</t>
+<t><k>safeLevel</k> = rawLevel или <n>0</n>, если rawLevel равно nil.</t>
+<t><k>safeGuild</k> = rawGuild или <s>"Без гильдии"</s>, если rawGuild равно nil.</t>
+<t>Ожидаемый результат:</t>
+<code>
+safeName = "Неизвестный"
+safeLevel = 80
+safeGuild = "Без гильдии"
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай safeName, safeLevel и safeGuild через or
+]=],
+    requireKeywords = {
+        "safeName",
+        "safeLevel",
+        "safeGuild",
+        "rawName",
+        "rawLevel",
+        "rawGuild",
+        "or",
+    },
+    checkCode = function()
+        return _G.safeName == "Неизвестный"
+            and _G.safeLevel == 80
+            and _G.safeGuild == "Без гильдии"
+    end,
+}
+
+ns_llua['lua'][21.4] = {
+    type = "commenttest",
+    title = "Практика: and возвращает значения",
+    helpModules = {21.1},
+    preloadVars = {
+        {var = "isAlive", value = true, desc = "isAlive = true"},
+        {var = "hp", value = 5000, desc = "hp = 5000"},
+        {var = "isDead", value = false, desc = "isDead = false"},
+        {var = "mana", value = 3000, desc = "mana = 3000"},
+        {var = "check1", desc = "check1 очищается перед проверкой"},
+        {var = "check2", desc = "check2 очищается перед проверкой"},
+        {var = "check3", desc = "check3 очищается перед проверкой"},
+    },
+    reportVars = {"check1", "check2", "check3"},
+    instruction = [=[
+<h>Практика: and возвращает значения</h>
+<t>Уже созданы переменные:</t>
+<code>
+isAlive = true
+hp = 5000
+isDead = false
+mana = 3000
+</code>
+<t>Создай глобальные переменные, используя <k>and</k>:</t>
+<t><k>check1</k> = isAlive and hp</t>
+<t><k>check2</k> = isDead and mana</t>
+<t><k>check3</k> = isAlive and isDead</t>
+<t>Подумай, что вернёт <k>and</k> в каждом случае, прежде чем писать код.</t>
+<t>Ожидаемый результат:</t>
+<code>
+check1 = 5000
+check2 = false
+check3 = false
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай check1, check2 и check3 через and
+]=],
+    requireKeywords = {
+        "check1",
+        "check2",
+        "check3",
+        "isAlive",
+        "hp",
+        "isDead",
+        "mana",
+        "and",
+    },
+    checkCode = function()
+        return _G.check1 == 5000
+            and _G.check2 == false
+            and _G.check3 == false
+    end,
+}
+
+ns_llua['lua'][21.5] = {
+    type = "commenttest",
+    title = "Практика: цепочка or",
+    helpModules = {21.1},
+    preloadVars = {
+        {var = "primary", value = nil, desc = "primary = nil"},
+        {var = "secondary", value = false, desc = "secondary = false"},
+        {var = "fallback", value = "Резерв", desc = 'fallback = "Резерв"'},
+        {var = "gold", value = nil, desc = "gold = nil"},
+        {var = "defaultGold", value = 100, desc = "defaultGold = 100"},
+        {var = "result", desc = "result очищается перед проверкой"},
+        {var = "finalGold", desc = "finalGold очищается перед проверкой"},
+    },
+    reportVars = {"result", "finalGold"},
+    instruction = [=[
+<h>Практика: цепочка or</h>
+<t>Уже созданы переменные:</t>
+<code>
+primary = nil
+secondary = false
+fallback = "Резерв"
+gold = nil
+defaultGold = 100
+</code>
+<t>1. Создай глобальную переменную <k>result</k>.</t>
+<t>Используй цепочку: <k>primary or secondary or fallback</k>.</t>
+<t>Подумай: primary — nil (ложный), secondary — false (ложный). Что вернёт цепочка?</t>
+<t>2. Создай глобальную переменную <k>finalGold</k>.</t>
+<t>Используй: <k>gold or defaultGold</k>.</t>
+<t>Ожидаемый результат:</t>
+<code>
+result = "Резерв"
+finalGold = 100
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай result и finalGold через or
+]=],
+    requireKeywords = {
+        "result",
+        "finalGold",
+        "primary",
+        "secondary",
+        "fallback",
+        "gold",
+        "defaultGold",
+        "or",
+    },
+    checkCode = function()
+        return _G.result == "Резерв"
+            and _G.finalGold == 100
+    end,
+}
+
+ns_llua['lua'][21.6] = {
+    type = "commenttest",
+    title = "Практика: тернарный оператор — статус здоровья",
+    helpModules = {21.2},
+    preloadVars = {
+        {var = "hp", value = 80, desc = "hp = 80"},
+        {var = "status", desc = "status очищается перед проверкой"},
+    },
+    reportVars = {"status"},
+    instruction = [=[
+<h>Практика: тернарный оператор — статус здоровья</h>
+<t>Уже создана переменная:</t>
+<code>
+hp = 80
+</code>
+<t>Создай глобальную переменную <k>status</k> через тернарный паттерн.</t>
+<t>Если <k>hp</k> больше <n>50</n>, значение должно быть <s>"Жив"</s>.</t>
+<t>Иначе значение должно быть <s>"Мёртв"</s>.</t>
+<t>Используй паттерн: <k>условие and "Жив" or "Мёртв"</k>.</t>
+<t>Ожидаемый результат:</t>
+<code>
+status = "Жив"
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменная нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай status через тернарный паттерн
+]=],
+    requireKeywords = {
+        "status",
+        "hp",
+        "and",
+        "or",
+        "50",
+    },
+    checkCode = function()
+        return _G.status == "Жив"
+    end,
+}
+
+ns_llua['lua'][21.7] = {
+    type = "commenttest",
+    title = "Практика: тернарный оператор — уровень",
+    helpModules = {21.2},
+    preloadVars = {
+        {var = "playerLevel", value = 80, desc = "playerLevel = 80"},
+        {var = "maxLevel", value = 80, desc = "maxLevel = 80"},
+        {var = "levelText", desc = "levelText очищается перед проверкой"},
+    },
+    reportVars = {"levelText"},
+    instruction = [=[
+<h>Практика: тернарный оператор — уровень</h>
+<t>Уже созданы переменные:</t>
+<code>
+playerLevel = 80
+maxLevel = 80
+</code>
+<t>Создай глобальную переменную <k>levelText</k> через тернарный паттерн.</t>
+<t>Если <k>playerLevel</k> больше или равно <k>maxLevel</k>, значение должно быть <s>"Максимум"</s>.</t>
+<t>Иначе значение должно быть <s>"Расти"</s>.</t>
+<t>Ожидаемый результат:</t>
+<code>
+levelText = "Максимум"
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменная нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай levelText через тернарный паттерн
+]=],
+    requireKeywords = {
+        "levelText",
+        "playerLevel",
+        "maxLevel",
+        "and",
+        "or",
+        ">=",
+    },
+    checkCode = function()
+        return _G.levelText == "Максимум"
+    end,
+}
+
+ns_llua['lua'][21.8] = {
+    type = "commenttest",
+    title = "Практика: тернарный оператор — хватает ли золота",
+    helpModules = {21.2, 10},
+    preloadVars = {
+        {var = "price", value = "250", desc = 'price = "250" (строка)'},
+        {var = "gold", value = 500, desc = "gold = 500"},
+        {var = "canBuy", desc = "canBuy очищается перед проверкой"},
+    },
+    reportVars = {"canBuy"},
+    instruction = [=[
+<h>Практика: тернарный оператор — хватает ли золота</h>
+<t>Уже созданы переменные:</t>
+<code>
+price = "250"
+gold = 500
+</code>
+<t>Цена лежит в переменной как строка. Чтобы сравнить её с золотом, нужно преобразование.</t>
+<t>Создай глобальную переменную <k>canBuy</k> через тернарный паттерн.</t>
+<t>Если <k>gold</k> больше или равно цене (преобразованной в число через <k>tonumber</k>), значение должно быть <s>"Хватает"</s>.</t>
+<t>Иначе значение должно быть <s>"Не хватает"</s>.</t>
+<t>Ожидаемый результат:</t>
+<code>
+canBuy = "Хватает"
+</code>
+<t>Подсказка: можно написать <k>gold >= tonumber(price)</k> прямо внутри условия.</t>
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменная нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Создай canBuy через tonumber и тернарный паттерн
+]=],
+    requireKeywords = {
+        "canBuy",
+        "tonumber",
+        "price",
+        "gold",
+        "and",
+        "or",
+        ">=",
+    },
+    checkCode = function()
+        return _G.canBuy == "Хватает"
+    end,
+}
+
 ns_llua['lua'][22] = {
     type = "printtest",
     title = "Практика: and / or / not",
@@ -5410,7 +5829,7 @@ end,
 
 ns_llua['lua'][64] = {
 type = "commenttest",
-title = "Тест 54-5: функция SafeUnitName",
+title = "Тест: функция SafeUnitName",
 helpModules = {59},
 preloadVars = {
 {var = "SafeUnitName", desc = "SafeUnitName очищается перед проверкой"},
@@ -5420,7 +5839,7 @@ reportVars = {
 "checkError",
 },
 instruction = [=[
-<h>Тест 54-5: функция SafeUnitName</h>
+<h>Тест: функция SafeUnitName</h>
 <t>Создай глобальную функцию <k>SafeUnitName(unit)</k>.</t>
 <t>Функция должна вернуть имя юнита через <k>UnitName(unit)</k>.</t>
 <t>Если имени нет, функция должна вернуть строку:</t>
