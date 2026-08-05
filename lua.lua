@@ -1643,95 +1643,109 @@ check3 = false
 
 ns_llua['lua'][21.5] = {
     type = "commenttest",
-    title = "Практика: or возвращает первое истинное",
+    title = "Практика: предскажи результат or",
     helpModules = {21.1},
     preloadVars = {
-        {var = "playerName", value = "Артас", desc = 'playerName = "Артас"'},
-        {var = "defaultName", value = "Странник", desc = 'defaultName = "Странник"'},
-        {var = "gold", value = nil, desc = "gold = nil"},
-        {var = "defaultGold", value = 100, desc = "defaultGold = 100"},
-        {var = "safeName", desc = "safeName очищается перед проверкой"},
-        {var = "safeGold", desc = "safeGold очищается перед проверкой"},
+        {var = "answer1", desc = "answer1 очищается перед проверкой"},
+        {var = "answer2", desc = "answer2 очищается перед проверкой"},
+        {var = "answer3", desc = "answer3 очищается перед проверкой"},
+        {var = "answer4", desc = "answer4 очищается перед проверкой"},
+        {var = "answer5", desc = "answer5 очищается перед проверкой"},
+        {var = "answer6", desc = "answer6 очищается перед проверкой"},
     },
-    reportVars = {"safeName", "safeGold"},
+    reportVars = {
+        "answer1",
+        "answer2",
+        "answer3",
+        "answer4",
+        "answer5",
+        "answer6",
+    },
     instruction = [=[
-<h>Практика: or возвращает первое истинное</h>
-<t>Уже созданы переменные:</t>
+<h>Практика: предскажи результат or</h>
+<t>Ниже даны выражения с <k>or</k>. Не нужно использовать print или сам оператор <k>or</k>.</t>
+<t>Твоя задача — написать, что вернёт каждое выражение.</t>
+<t>Если результат — строка, пиши её в кавычках. Если число — без кавычек. Если nil — пиши nil. Если false — пиши false.</t>
 <code>
-playerName = "Артас"
-defaultName = "Странник"
-gold = nil
-defaultGold = 100
+nil or "Запасной"
+false or "Запасной"
+"Артас" or "Странник"
+0 or "Запасной"
+"" or "Запасной"
+nil or false
 </code>
-<t>1. Создай глобальную переменную <k>safeName</k>.</t>
-<t>Используй <k>or</k> между <k>playerName</k> и <k>defaultName</k>.</t>
-<t>Сначала должно идти основное значение, затем запасное.</t>
-<t>2. Создай глобальную переменную <k>safeGold</k>.</t>
-<t>Используй <k>or</k> между <k>gold</k> и <k>defaultGold</k>.</t>
-<t>Сначала должно идти основное значение, затем запасное.</t>
-<t>Ожидаемый результат:</t>
-<code>
-safeName = "Артас"
-safeGold = 100
-</code>
-<t>Ничего выводить не нужно.</t>
-<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+<w>Помни: в Lua только nil и false считаются ложными. Число 0, пустая строка "" и пустая таблица {} — это истина.</w>
 ]=],
     initialCode = [=[
--- Создай safeName и safeGold через or
+answer1 = nil -- nil or "Запасной"
+answer2 = nil -- false or "Запасной"
+answer3 = nil -- "Артас" or "Странник"
+answer4 = nil -- 0 or "Запасной"
+answer5 = nil -- "" or "Запасной"
+answer6 = nil -- nil or false
 ]=],
     requireKeywords = {
-        "safeName",
-        "safeGold",
-        "playerNameordefaultName",
-        "goldordefaultGold",
+        "answer1",
+        "answer2",
+        "answer3",
+        "answer4",
+        "answer5",
+        "answer6",
+        "=",
+    },
+    forbidKeywords = {
         "or",
+        "print",
     },
     checkCode = function()
-        return _G.safeName == "Артас"
-            and _G.safeGold == 100
+        return _G.answer1 == "Запасной"
+            and _G.answer2 == "Запасной"
+            and _G.answer3 == "Артас"
+            and _G.answer4 == 0
+            and _G.answer5 == ""
+            and _G.answer6 == false
     end,
 }
 
 ns_llua['lua'][21.6] = {
     type = "commenttest",
-    title = "Практика: тернарный оператор — статус здоровья",
+    title = "Практика: тернарный оператор — прочность предмета",
     helpModules = {21.2},
     preloadVars = {
-        {var = "hp", value = 80, desc = "hp = 80"},
-        {var = "status", desc = "status очищается перед проверкой"},
+        {var = "durability", value = 0, desc = "durability = 0"},
+        {var = "itemStatus", desc = "itemStatus очищается перед проверкой"},
     },
-    reportVars = {"status"},
+    reportVars = {"itemStatus"},
     instruction = [=[
-<h>Практика: тернарный оператор — статус здоровья</h>
+<h>Практика: тернарный оператор — прочность предмета</h>
 <t>Уже создана переменная:</t>
 <code>
-hp = 80
+durability = 0
 </code>
-<t>Создай глобальную переменную <k>status</k> через тернарный паттерн.</t>
-<t>Условие: <k>hp</k> больше <n>50</n>.</t>
-<t>Если условие истинно, значение должно быть <s>"Жив"</s>.</t>
-<t>Если условие ложно, значение должно быть <s>"Мёртв"</s>.</t>
+<t>Создай глобальную переменную <k>itemStatus</k> через тернарный паттерн.</t>
+<t>Условие: <k>durability</k> больше <n>0</n>.</t>
+<t>Если условие истинно, значение должно быть <s>"Исправно"</s>.</t>
+<t>Если условие ложно, значение должно быть <s>"Сломано"</s>.</t>
 <t>Используй паттерн: условие <k>and</k> значение_если_да <k>or</k> значение_если_нет.</t>
 <t>Ожидаемый результат:</t>
 <code>
-status = "Жив"
+itemStatus = "Сломано"
 </code>
 <t>Ничего выводить не нужно.</t>
 <w>Не используй <k>local</k>, переменная нужна глобальная.</w>
 ]=],
     initialCode = [=[
--- Создай status через тернарный паттерн
+-- Создай itemStatus через тернарный паттерн
 ]=],
     requireKeywords = {
-        "status",
-        "hp",
+        "itemStatus",
+        "durability",
         "and",
         "or",
-        "50",
+        "0",
     },
     checkCode = function()
-        return _G.status == "Жив"
+        return _G.itemStatus == "Сломано"
     end,
 }
 
@@ -1798,7 +1812,7 @@ gold = 500
 </code>
 <t>Цена лежит в переменной как строка. Чтобы сравнить её с золотом, нужно преобразование.</t>
 <t>Создай глобальную переменную <k>canBuy</k> через тернарный паттерн.</t>
-<t>Условие: <k>gold</k> больше или равно цене, преобразованной в число через <k>tonumber</k>.</t>
+<t>Условие: <k>gold</k> больше или равно цене.</t>
 <t>Если условие истинно, значение должно быть <s>"Хватает"</s>.</t>
 <t>Если условие ложно, значение должно быть <s>"Не хватает"</s>.</t>
 <t>Ожидаемый результат:</t>
@@ -1813,7 +1827,6 @@ canBuy = "Хватает"
 ]=],
     requireKeywords = {
         "canBuy",
-        "tonumber",
         "price",
         "gold",
         "and",
