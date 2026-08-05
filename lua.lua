@@ -5840,7 +5840,7 @@ end,
 
 ns_llua['lua'][64] = {
 type = "commenttest",
-title = "Тест: функция SafeUnitName",
+title = ": функция SafeUnitName",
 helpModules = {59},
 preloadVars = {
 {var = "SafeUnitName", desc = "SafeUnitName очищается перед проверкой"},
@@ -5870,10 +5870,50 @@ requireKeywords = {
 },
 checkCode = function()
 _G.checkError = nil
+
 if type(_G.SafeUnitName) ~= "function" then
 _G.checkError = "SafeUnitName не является глобальной функцией"
 return false
 end
+
+-- Ловим хардкод: функция должна использовать аргумент, а не фиксированный юнит.
+local realUnitName = UnitName
+
+local function RunWithFakeNames(unit)
+_G.UnitName = function(u)
+if u == "player" then
+return "МаркерИгрока", nil
+end
+if u == "target" then
+return "МаркерЦели", nil
+end
+return nil, nil
+end
+local ok, result = pcall(_G.SafeUnitName, unit)
+_G.UnitName = realUnitName
+return ok, result
+end
+
+local okFake1, fake1 = RunWithFakeNames("player")
+if not okFake1 then
+_G.checkError = "Ошибка вызова SafeUnitName на тестовых данных: " .. tostring(fake1)
+return false
+end
+if fake1 ~= "МаркерИгрока" then
+_G.checkError = "Функция должна запрашивать имя того юнита, что передан аргументом. Не подставляй \"target\" внутрь функции — используй unit"
+return false
+end
+
+local okFake2, fake2 = RunWithFakeNames("ns_invalid_unit")
+if not okFake2 then
+_G.checkError = "Ошибка вызова SafeUnitName на тестовых данных: " .. tostring(fake2)
+return false
+end
+if fake2 ~= "Нет юнита" then
+_G.checkError = "Для юнита без имени функция должна вернуть \"Нет юнита\", даже в тестовых данных"
+return false
+end
+
 local ok1, result1 = pcall(_G.SafeUnitName, "player")
 if not ok1 then
 _G.checkError = "Ошибка вызова SafeUnitName('player'): " .. tostring(result1)
@@ -5883,6 +5923,7 @@ if result1 ~= UnitName("player") then
 _G.checkError = "Для player функция должна вернуть имя игрока"
 return false
 end
+
 local ok2, result2 = pcall(_G.SafeUnitName, "ns_invalid_unit")
 if not ok2 then
 _G.checkError = "Ошибка вызова SafeUnitName('ns_invalid_unit'): " .. tostring(result2)
@@ -5892,6 +5933,7 @@ if result2 ~= "Нет юнита" then
 _G.checkError = "Для несуществующего юнита функция должна вернуть 'Нет юнита'"
 return false
 end
+
 return true
 end,
 }
@@ -5942,40 +5984,268 @@ end
 }
 
 ns_llua['lua'][66] = {
-type = "vartest",
-title = "Тест 65-1: безопасное имя цели",
-helpModules = {65, 53, 59},
-tasks = {
-{
-var = "safeTargetName",
-desc = 'Создай глобальную переменную safeTargetName = UnitName("target") or "нет цели"',
-check = function(value)
-return type(value) == "string" and value ~= ""
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 65-1: безопасный снимок юнита",
+    helpModules = {65, 53, 59, 45},
+    preloadVars = {
+        {var = "GetSafeUnitSnapshot", desc = "GetSafeUnitSnapshot очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "targetSnapshot", desc = "targetSnapshot очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "targetSnapshot"},
+    instruction = [=[
+<h>Тест 65-1: безопасный снимок юнита</h>
+<t>Создай глобальную функцию <k>GetSafeUnitSnapshot(unit)</k>.</t>
+<t>Функция должна вернуть новую таблицу с полями:</t>
+<c>exists</c> — <k>true</k>, если юнит существует, иначе <k>false</k>.
+<c>name</c> — имя юнита или <s>"Нет юнита"</s>.
+<c>level</c> — уровень юнита. Если уровня нет или он меньше нуля, верни <n>0</n>.
+<t>Используй:</t>
+<c>UnitExists(unit)</c>
+<c>UnitName(unit)</c>
+<c>UnitLevel(unit)</c>
+<t>Для boolean приведи результат <k>UnitExists</k> к чистому <k>true</k>/<k>false</k>.</t>
+<t>Для имени используй запасное значение через <k>or</k>.</t>
+<t>Для уровня сделай защиту от <k>nil</k> и отрицательного значения.</t>
+<w>Не создавай глобальные переменные внутри функции. Используй <k>local</k> или сразу возвращай таблицу через <k>return</k>.</w>
+<t>Ничего выводить не нужно.</t>
+]=],
+    initialCode = [=[
+-- Создай глобальную функцию GetSafeUnitSnapshot(unit)
+]=],
+    requireKeywords = {
+        "GetSafeUnitSnapshot",
+        "function",
+        "UnitExists",
+        "UnitName",
+        "UnitLevel",
+        "or",
+        "return",
+        "Нет юнита",
+        "0",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.targetSnapshot = nil
+
+        if type(_G.GetSafeUnitSnapshot) ~= "function" then
+            _G.checkError = "GetSafeUnitSnapshot не является глобальной функцией"
+            return false
+        end
+
+        local function getExpectedExists(unit)
+            return UnitExists(unit) and true or false
+        end
+
+        local function getExpectedName(unit)
+            local name = UnitName(unit)
+
+            if name == nil then
+                return "Нет юнита"
+            end
+
+            return name
+        end
+
+        local function getExpectedLevel(unit)
+            local level = tonumber(UnitLevel(unit))
+
+            if level == nil or level < 0 then
+                return 0
+            end
+
+            return math.floor(level)
+        end
+
+        local function checkSnapshot(unit, caseName)
+            local ok, snapshot = pcall(_G.GetSafeUnitSnapshot, unit)
+
+            if not ok then
+                _G.checkError = caseName .. ": ошибка вызова GetSafeUnitSnapshot: " .. tostring(snapshot)
+                return nil
+            end
+
+            if type(snapshot) ~= "table" then
+                _G.checkError = caseName .. ": функция должна вернуть таблицу"
+                return nil
+            end
+
+            local expectedExists = getExpectedExists(unit)
+            local expectedName = getExpectedName(unit)
+            local expectedLevel = getExpectedLevel(unit)
+
+            if type(snapshot.exists) ~= "boolean" then
+                _G.checkError = caseName .. ": поле exists должно быть boolean"
+                return nil
+            end
+
+            if snapshot.exists ~= expectedExists then
+                _G.checkError = caseName .. ": поле exists должно быть " .. tostring(expectedExists)
+                return nil
+            end
+
+            if type(snapshot.name) ~= "string" or snapshot.name ~= expectedName then
+                _G.checkError = caseName .. ": поле name должно быть \"" .. expectedName .. "\""
+                return nil
+            end
+
+            if type(snapshot.level) ~= "number" or snapshot.level ~= expectedLevel then
+                _G.checkError = caseName .. ": поле level должно быть " .. tostring(expectedLevel)
+                return nil
+            end
+
+            return snapshot
+        end
+
+        local playerSnapshot = checkSnapshot("player", "Тест с player")
+        if not playerSnapshot then
+            return false
+        end
+
+        local invalidSnapshot = checkSnapshot("ns_invalid_unit", "Тест с несуществующим юнитом")
+        if not invalidSnapshot then
+            return false
+        end
+
+        local currentTargetSnapshot = checkSnapshot("target", "Тест с target")
+        if not currentTargetSnapshot then
+            return false
+        end
+
+        if playerSnapshot == invalidSnapshot
+            or playerSnapshot == currentTargetSnapshot
+            or invalidSnapshot == currentTargetSnapshot then
+            _G.checkError = "Функция должна возвращать новую таблицу при каждом вызове"
+            return false
+        end
+
+        if _G.targetSnapshot ~= nil then
+            _G.checkError = "Функция не должна создавать глобальную переменную targetSnapshot"
+            return false
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][67] = {
-type = "vartest",
-title = "Тест 65-2: безопасное здоровье игрока",
-helpModules = {65, 53, 59},
-tasks = {
-{
-var = "safeHealth",
-desc = 'Создай глобальную переменную safeHealth = UnitHealth("player") or 0',
-check = function(value)
-return type(value) == "number" and value >= 0
-end,
-},
-{
-var = "safeHealthMax",
-desc = 'Создай глобальную переменную safeHealthMax = UnitHealthMax("player") or 0',
-check = function(value)
-return type(value) == "number" and value >= 0
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 67: версия клиента через GetBuildInfo",
+    helpModules = {53, 7, 10, 45},
+    preloadVars = {
+        {var = "GetClientVersionSafe", desc = "GetClientVersionSafe очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "testVersion", desc = "testVersion очищается перед проверкой"},
+        {var = "testToc", desc = "testToc очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "testVersion",
+        "testToc",
+    },
+    instruction = [=[
+<h>Тест 67: версия клиента через GetBuildInfo</h>
+<t>Создай глобальную функцию <k>GetClientVersionSafe()</k>.</t>
+
+<t>Функция должна использовать WoW API:</t>
+<c>GetBuildInfo()</c>
+
+<t>Эта функция возвращает несколько значений:</t>
+<c>version, build, date, toc</c>
+
+<t>Твоя функция должна вернуть два значения:</t>
+<c>version, toc</c>
+
+<t>Если <k>version</k> равно <k>nil</k>, верни строку:</t>
+<s>"неизвестно"</s>
+
+<t>Если <k>toc</k> не является числом, верни:</t>
+<n>0</n>
+
+<t>Для преобразования <k>toc</k> в число используй:</t>
+<c>tonumber</c>
+
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = [=[
+function GetClientVersionSafe()
+
+end
+]=],
+    requireKeywords = {
+        "GetClientVersionSafe",
+        "function",
+        "GetBuildInfo",
+        "tonumber",
+        "return",
+    },
+    forbidKeywords = {
+        "print",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.testVersion = nil
+        _G.testToc = nil
+
+        if type(_G.GetClientVersionSafe) ~= "function" then
+            _G.checkError = "GetClientVersionSafe не является глобальной функцией"
+            return false
+        end
+
+        local expectedVersion = "неизвестно"
+        local expectedToc = 0
+
+        local okApi, apiVersion, apiBuild, apiDate, apiToc = pcall(GetBuildInfo)
+
+        if okApi then
+            if type(apiVersion) == "string" and apiVersion ~= "" then
+                expectedVersion = apiVersion
+            else
+                expectedVersion = "неизвестно"
+            end
+
+            expectedToc = tonumber(apiToc) or 0
+        end
+
+        local ok, version, toc = pcall(_G.GetClientVersionSafe)
+
+        _G.testVersion = "Получено: "
+            .. tostring(version)
+            .. " | Ожидалось: "
+            .. tostring(expectedVersion)
+
+        _G.testToc = "Получено: "
+            .. tostring(toc)
+            .. " | Ожидалось: "
+            .. tostring(expectedToc)
+
+        if not ok then
+            _G.checkError = "Ошибка вызова GetClientVersionSafe: " .. tostring(version)
+            return false
+        end
+
+        if type(version) ~= "string" then
+            _G.checkError = "Первое возвращаемое значение должно быть строкой"
+            return false
+        end
+
+        if version ~= expectedVersion then
+            _G.checkError = "Неверное значение version"
+            return false
+        end
+
+        if type(toc) ~= "number" then
+            _G.checkError = "Второе возвращаемое значение должно быть числом"
+            return false
+        end
+
+        if toc ~= expectedToc then
+            _G.checkError = "Неверное значение toc"
+            return false
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][68] = {
@@ -23747,14 +24017,6 @@ function UI:SetTitle(text)
     self.titleText:SetText(text or "")
 end
 
-function UI:SetModuleInfo(index, total)
-    self.moduleText:SetText(string.format(
-        "Модуль %s из %s",
-        tostring(index or "?"),
-        tostring(total or "?")
-    ))
-end
-
 function UI:SetPrevEnabled(enabled)
     setButtonEnabled(self.prevButton, enabled)
 end
@@ -24197,6 +24459,27 @@ function UI:RefreshSidePanel()
     updateScroll(self.sideScroll, self.sideContent, self.sideBar)
 end
 
+function UI:SetModuleInfo(index, total, position)
+    local indexText = tostring(index or "?")
+    local totalText = tostring(total or "?")
+    local positionNumber = tonumber(position)
+
+    if positionNumber and positionNumber > 0 then
+        self.moduleText:SetText(string.format(
+            "Модуль %s(%d) из %s",
+            indexText,
+            positionNumber,
+            totalText
+        ))
+    else
+        self.moduleText:SetText(string.format(
+            "Модуль %s из %s",
+            indexText,
+            totalText
+        ))
+    end
+end
+
 function UI:SetModuleContent(data)
     data = data or {}
 
@@ -24222,7 +24505,8 @@ function UI:SetModuleContent(data)
     local moduleType = data.moduleType
 
     if moduleType == nil and moduleIndex ~= nil then
-        local m = self:_GetModuleById(moduleIndex)
+        local db = ns_llua and ns_llua['lua'] or {}
+        local m = db[moduleIndex]
 
         if type(m) == "table" then
             moduleType = m.type
@@ -24232,7 +24516,7 @@ function UI:SetModuleContent(data)
     self.currentModuleType = moduleType
 
     self:SetTitle(data.title)
-    self:SetModuleInfo(data.index, data.total)
+    self:SetModuleInfo(data.index, data.total, data.position)
     self:SetPrevEnabled(data.prevEnabled)
     self:SetNextEnabled(data.nextEnabled)
     self:SetHelpData(data.helpModules)
@@ -24243,7 +24527,10 @@ function UI:SetModuleContent(data)
         self:Render(data.blocks, not sameModule)
     end
 
-    self:RefreshSidePanel()
+    if self.RefreshSidePanel then
+        self:RefreshSidePanel()
+    end
+
     self:Show()
 end
 
@@ -25446,10 +25733,12 @@ function Logic:SendModuleToUI()
     local data = {
         title = m.title or "",
         index = n,
+        position = currentIndex,
         total = self.total or 0,
         prevEnabled = currentIndex > 1,
         nextEnabled = nextEnabled,
         helpModules = m.helpModules,
+        moduleType = m.type,
     }
 
     if mtype == "commenttest" then
