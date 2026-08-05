@@ -3172,6 +3172,519 @@ sortDesc = {8, 5, 3, 1}
     end,
 }
 
+ns_llua['lua'][45.2] = {
+type = "info",
+title = "Функция select",
+helpModules = {45},
+content = [=[
+<h>Функция select</h>
+<t>Функция <k>select</k> позволяет доставать значения из списка аргументов.</t>
+<h>Выбор значений</h>
+<t>Первый аргумент <k>select</k> — это позиция. Возвращаются все значения, начиная с этой позиции.</t>
+<code>
+print(select(2, "a", "b", "c")) -- b c
+</code>
+<t>Если присвоить результат одной переменной, возьмётся первое из возвращённых значений:</t>
+<code>
+local x = select(2, "a", "b", "c")
+print(x) -- b
+</code>
+<h>select и несколько возвращаемых значений</h>
+<t>Если функция возвращает несколько значений, с помощью <k>select</k> можно достать конкретное значение.</t>
+<code>
+local function getPlayerInfo()
+return "Артас", 80, "Воин"
+end
+local name = select(1, getPlayerInfo())
+local level = select(2, getPlayerInfo())
+local class = select(3, getPlayerInfo())
+print(name)  -- Артас
+print(level) -- 80
+print(class) -- Воин
+</code>
+<t>Здесь <k>select(2, getPlayerInfo())</k> возвращает второе и все последующие значения.</t>
+<t>Но так как результат присваивается одной переменной, сохраняется только первое из них, то есть второе значение функции.</t>
+<h>Количество аргументов</h>
+<t>Внутри функций с многоточием <k>...</k> можно получить количество переданных аргументов через <k>select('#', ...)</k>.</t>
+<code>
+local function countArgs(...)
+return select('#', ...)
+end
+print(countArgs())          -- 0
+print(countArgs("a"))       -- 1
+print(countArgs(1, 2, 3))   -- 3
+</code>
+<w>Важно:</w> конструкция <k>#...</k> в Lua недопустима. Для подсчёта аргументов используют именно <k>select('#', ...)</k>.
+<t>Также <k>select('#', ...)</k> считает и <k>nil</k>-аргументы:</t>
+<code>
+local function countArgs(...)
+return select('#', ...)
+end
+print(countArgs(nil))        -- 1
+print(countArgs(1, 2, nil))  -- 3
+</code>
+<h>Доступ к аргументам по индексу</h>
+<t>Чтобы достать конкретный аргумент из <k>...</k>, используй <k>select</k> с номером позиции:</t>
+<code>
+local function showArgs(...)
+local n = select('#', ...)
+for i = 1, n do
+local arg = select(i, ...)
+print(i, arg)
+end
+end
+showArgs("a", "b", "c")
+-- 1  a
+-- 2  b
+-- 3  c
+</code>
+<w>Важно:</w> <k>select(i, ...)</k> возвращает все значения, начиная с позиции <k>i</k>. Но если присвоить результат одной переменной, сохранится только первое из них — то есть именно <k>i</k>-й аргумент.
+<h>Зачем это нужно</h>
+<t>- получить конкретное значение из функции, которая возвращает несколько результатов;</t>
+<t>- посчитать количество аргументов в функции с <k>...</k>;</t>
+<t>- достать конкретный аргумент из <k>...</k> по его номеру;</t>
+<t>- работать со списком аргументов без создания промежуточных таблиц.</t>
+]=],
+}
+
+ns_llua['lua'][45.3] = {
+    type = "commenttest",
+    title = "Практика: select — выбор значения по номеру",
+    helpModules = {45, 45.2},
+    preloadVars = {
+        {var = "selectSecond", desc = "selectSecond очищается перед проверкой"},
+        {var = "selectThird", desc = "selectThird очищается перед проверкой"},
+    },
+    reportVars = {"selectSecond", "selectThird"},
+    instruction = [=[
+<h>Практика: select — выбор значения по номеру</h>
+
+<t>В этом задании нужно использовать <k>select</k> со строками, перечисленными прямо в вызове.</t>
+
+<t>Здесь "список строк" — это не таблица.</t>
+<t>Это три строки, которые ты пишешь через запятую внутри вызова <k>select</k>:</t>
+
+<s>"Меч", "Щит", "Зелье"</s>
+
+<t>1. Создай глобальную переменную <k>selectSecond</k>.</t>
+<t>Используй <k>select</k> с номером 2 и этими тремя строками.</t>
+<t>Ожидаемое значение переменной <k>selectSecond</k>:</t>
+<s>"Щит"</s>
+
+<t>2. Создай глобальную переменную <k>selectThird</k>.</t>
+<t>Используй <k>select</k> с номером 3 и этими тремя строками.</t>
+<t>Ожидаемое значение переменной <k>selectThird</k>:</t>
+<s>"Зелье"</s>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Создай selectSecond и selectThird через select
+]=],
+    requireKeywords = {
+        "selectSecond",
+        "selectThird",
+        "select(2",
+        "select(3",
+    },
+    forbidKeywords = {
+        'selectSecond="Щит"',
+        "selectSecond='Щит'",
+        'selectThird="Зелье"',
+        "selectThird='Зелье'",
+    },
+    checkCode = function()
+        return _G.selectSecond == "Щит"
+            and _G.selectThird == "Зелье"
+    end,
+}
+
+ns_llua['lua'][45.4] = {
+    type = "commenttest",
+    title = "Практика: select('#', ...) и количество возвращаемых значений WoW API",
+    helpModules = {45, 45.2},
+    preloadVars = {
+        {var = "unitClassCount", desc = "unitClassCount очищается перед проверкой"},
+        {var = "unitRaceCount", desc = "unitRaceCount очищается перед проверкой"},
+        {var = "unitHealthCount", desc = "unitHealthCount очищается перед проверкой"},
+    },
+    reportVars = {"unitClassCount", "unitRaceCount", "unitHealthCount"},
+    instruction = [=[
+<h>Практика: количество возвращаемых значений функций WoW API</h>
+
+<t>В Lua нельзя напрямую узнать, сколько параметров принимает функция.</t>
+<t>Но можно узнать, сколько значений функция возвращает.</t>
+
+<t>Для этого используется конструкция:</t>
+
+<code>
+select('#', SomeFunction())
+</code>
+
+<t>В этом задании нужно посчитать количество возвращаемых значений у трёх функций WoW API.</t>
+
+<t>1. Создай глобальную переменную <k>unitClassCount</k>.</t>
+<t>Сохрани в неё количество значений, которое возвращает функция:</t>
+<k>UnitClass("player")</k>
+
+<t>2. Создай глобальную переменную <k>unitRaceCount</k>.</t>
+<t>Сохрани в неё количество значений, которое возвращает функция:</t>
+<k>UnitRace("player")</k>
+
+<t>3. Создай глобальную переменную <k>unitHealthCount</k>.</t>
+<t>Сохрани в неё количество значений, которое возвращает функция:</t>
+<k>UnitHealth("player")</k>
+
+<t>Форма вызова:</t>
+
+<code>
+unitClassCount = select('#', UnitClass("player"))
+</code>
+
+<t>Числа руками не вписывай. Их должен вернуть <k>select</k>.</t>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k>, переменные нужны глобальные.</w>
+]=],
+    initialCode = [=[
+-- Посчитай количество возвращаемых значений функций WoW API
+]=],
+    requireKeywords = {
+        "unitClassCount=select(",
+        "unitRaceCount=select(",
+        "unitHealthCount=select(",
+        "#",
+        "UnitClass(",
+        "UnitRace(",
+        "UnitHealth(",
+        "player",
+    },
+    forbidKeywords = {
+        "unitClassCount=2",
+        "unitRaceCount=2",
+        "unitHealthCount=1",
+    },
+    checkCode = function()
+        local okClass, expectedClass = pcall(function()
+            return select('#', UnitClass("player"))
+        end)
+
+        local okRace, expectedRace = pcall(function()
+            return select('#', UnitRace("player"))
+        end)
+
+        local okHealth, expectedHealth = pcall(function()
+            return select('#', UnitHealth("player"))
+        end)
+
+        if not okClass or not okRace or not okHealth then
+            return false
+        end
+
+        return _G.unitClassCount == expectedClass
+            and _G.unitRaceCount == expectedRace
+            and _G.unitHealthCount == expectedHealth
+    end,
+}
+
+ns_llua['lua'][45.5] = {
+    type = "commenttest",
+    title = "Практика: select и второй результат UnitClass",
+    helpModules = {45, 45.2, 45.4},
+    preloadVars = {
+        {var = "playerClassToken", desc = "playerClassToken очищается перед проверкой"},
+    },
+    reportVars = {"playerClassToken"},
+    instruction = [=[
+<h>Практика: второй результат UnitClass</h>
+
+<t>Функция <k>UnitClass("player")</k> возвращает несколько значений: имя класса и код класса.</t>
+
+<t>Создай глобальную переменную <k>playerClassToken</k>.</t>
+<t>Сохрани в неё второй результат функции <k>UnitClass("player")</k> через <k>select</k>.</t>
+
+<t>Форма вызова:</t>
+<code>
+playerClassToken = select(2, UnitClass("player"))
+</code>
+
+<t>Ничего выводить не нужно.</t>
+<w>Не используй <k>local</k> для переменной <k>playerClassToken</k>, она нужна глобальная.</w>
+]=],
+    initialCode = [=[
+-- Получи второй результат UnitClass("player")
+]=],
+    requireKeywords = {
+        "playerClassToken=select(",
+        "select(2",
+        "UnitClass(",
+        "player",
+    },
+    forbidKeywords = {
+        'playerClassToken="',
+        "playerClassToken='",
+    },
+    checkCode = function()
+        local ok, expected = pcall(function()
+            return select(2, UnitClass("player"))
+        end)
+
+        if not ok then
+            return false
+        end
+
+        return type(_G.playerClassToken) == "string"
+            and _G.playerClassToken ~= ""
+            and _G.playerClassToken == expected
+    end,
+}
+
+ns_llua['lua'][45.6] = {
+type = "commenttest",
+title = "Практика: select и конкретные аргументы из (...)",
+helpModules = {45, 45.2},
+preloadVars = {
+{var = "getFirst", desc = "getFirst очищается перед проверкой"},
+{var = "getThird", desc = "getThird очищается перед проверкой"},
+},
+reportVars = {},
+instruction = [=[
+<h>Практика: select и конкретные аргументы из (...)</h>
+<t>В этом задании циклы не нужны.</t>
+<t>Нужно просто достать конкретный аргумент из <k>...</k> по его номеру через <k>select</k>.</t>
+<t>Напоминание:</t>
+<code>
+select(1, ...) -- первый аргумент
+select(2, ...) -- второй аргумент
+select(3, ...) -- третий аргумент
+</code>
+<t>Если присвоить результат одной переменной, сохранится только первое из возвращённых значений, то есть именно аргумент под этим номером.</t>
+<t>1. Создай глобальную функцию <k>getFirst(...)</k>.</t>
+<t>Функция должна вернуть первый переданный аргумент.</t>
+<t>Используй <k>select(1, ...)</k>.</t>
+<t>2. Создай глобальную функцию <k>getThird(...)</k>.</t>
+<t>Функция должна вернуть третий переданный аргумент.</t>
+<t>Используй <k>select(3, ...)</k>.</t>
+<t>Если аргумента под нужным номером нет, функция вернёт <k>nil</k> — это нормально.</t>
+<t>Ожидаемое поведение:</t>
+<code>
+getFirst(10, 20, 30)    -- 10
+getFirst("a")           -- a
+getFirst()              -- nil
+getThird(10, 20, 30)    -- 30
+getThird("x", "y", "z") -- z
+getThird(1)             -- nil
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Сама функция должна быть глобальной. Вспомогательные переменные внутри функции могут быть <k>local</k>.</w>
+]=],
+initialCode = [=[
+-- Создай функции getFirst(...) и getThird(...)
+]=],
+requireKeywords = {
+"getFirst",
+"getThird",
+"function",
+"...",
+"select(1",
+"select(3",
+"return",
+},
+checkCode = function()
+local details = {}
+if type(_G.getFirst) ~= "function" then
+return "getFirst не является функцией"
+end
+if type(_G.getThird) ~= "function" then
+return "getThird не является функцией"
+end
+local ok, r
+ok, r = pcall(_G.getFirst, 10, 20, 30)
+if not ok or r ~= 10 then
+table.insert(details, "getFirst(10, 20, 30): получилось " .. tostring(r) .. ", ожидалось 10")
+end
+ok, r = pcall(_G.getFirst, "a")
+if not ok or r ~= "a" then
+table.insert(details, "getFirst(\"a\"): получилось " .. tostring(r) .. ", ожидалось \"a\"")
+end
+ok, r = pcall(_G.getFirst)
+if not ok or r ~= nil then
+table.insert(details, "getFirst(): получилось " .. tostring(r) .. ", ожидалось nil")
+end
+ok, r = pcall(_G.getThird, 10, 20, 30)
+if not ok or r ~= 30 then
+table.insert(details, "getThird(10, 20, 30): получилось " .. tostring(r) .. ", ожидалось 30")
+end
+ok, r = pcall(_G.getThird, "x", "y", "z")
+if not ok or r ~= "z" then
+table.insert(details, "getThird(\"x\", \"y\", \"z\"): получилось " .. tostring(r) .. ", ожидалось \"z\"")
+end
+ok, r = pcall(_G.getThird, 1)
+if not ok or r ~= nil then
+table.insert(details, "getThird(1): получилось " .. tostring(r) .. ", ожидалось nil")
+end
+if #details > 0 then
+return table.concat(details, "\n")
+end
+return true
+end,
+}
+
+ns_llua['lua'][45.7] = {
+type = "commenttest",
+title = "Практика: функция getLast(...)",
+helpModules = {45, 45.2, 45.6},
+preloadVars = {
+{var = "getLast", desc = "getLast очищается перед проверкой"},
+},
+reportVars = {},
+instruction = [=[
+<h>Практика: функция getLast(...)</h>
+<t>Создай глобальную функцию <k>getLast(...)</k>.</t>
+<t>Функция должна возвращать последний переданный ей аргумент.</t>
+<t>Если аргументов нет, функция должна вернуть <k>nil</k>.</t>
+<t>Цикл здесь не нужен.</t>
+<t>Алгоритм:</t>
+<t>1. Узнай количество аргументов через <k>select('#', ...)</k>.</t>
+<t>2. Если количество равно 0, верни <k>nil</k>.</t>
+<t>3. Иначе достань последний аргумент через <k>select(n, ...)</k>, где <k>n</k> — количество аргументов.</t>
+<t>Ожидаемое поведение:</t>
+<code>
+getLast(1, 2, 3)     -- 3
+getLast("a")         -- a
+getLast()            -- nil
+getLast(1, nil, 3)   -- 3
+getLast(nil, "x")    -- x
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Сама функция должна быть глобальной. Вспомогательные переменные внутри функции могут быть <k>local</k>.</w>
+]=],
+initialCode = [=[
+-- Создай функцию getLast(...)
+]=],
+requireKeywords = {
+"getLast",
+"function",
+"...",
+"select",
+"#",
+"return",
+},
+checkCode = function()
+local details = {}
+if type(_G.getLast) ~= "function" then
+return "getLast не является функцией"
+end
+local ok, r
+ok, r = pcall(_G.getLast, 1, 2, 3)
+if not ok or r ~= 3 then
+table.insert(details, "getLast(1, 2, 3): получилось " .. tostring(r) .. ", ожидалось 3")
+end
+ok, r = pcall(_G.getLast, "a")
+if not ok or r ~= "a" then
+table.insert(details, "getLast(\"a\"): получилось " .. tostring(r) .. ", ожидалось \"a\"")
+end
+ok, r = pcall(_G.getLast)
+if not ok or r ~= nil then
+table.insert(details, "getLast(): получилось " .. tostring(r) .. ", ожидалось nil")
+end
+ok, r = pcall(_G.getLast, 1, nil, 3)
+if not ok or r ~= 3 then
+table.insert(details, "getLast(1, nil, 3): получилось " .. tostring(r) .. ", ожидалось 3")
+end
+ok, r = pcall(_G.getLast, nil, "x")
+if not ok or r ~= "x" then
+table.insert(details, "getLast(nil, \"x\"): получилось " .. tostring(r) .. ", ожидалось \"x\"")
+end
+if #details > 0 then
+return table.concat(details, "\n")
+end
+return true
+end,
+}
+
+ns_llua['lua'][45.8] = {
+type = "commenttest",
+title = "Практика: функция sumNumbers(...)",
+helpModules = {45, 45.2, 31},
+preloadVars = {
+{var = "sumNumbers", desc = "sumNumbers очищается перед проверкой"},
+},
+reportVars = {},
+instruction = [=[
+<h>Практика: функция sumNumbers(...)</h>
+<t>Создай глобальную функцию <k>sumNumbers(...)</k>.</t>
+<t>Функция должна вернуть сумму только тех аргументов, у которых тип <k>number</k>.</t>
+<t>Если числовых аргументов нет, функция должна вернуть 0.</t>
+<t>Здесь уже нужен цикл.</t>
+<t>Алгоритм:</t>
+<t>1. Узнай количество аргументов через <k>select('#', ...)</k>.</t>
+<t>2. Запусти цикл <k>for</k> от 1 до этого количества.</t>
+<t>3. На каждом шаге достань аргумент через <k>select(i, ...)</k>.</t>
+<t>4. Проверь тип через <k>type</k>. Если это <k>number</k>, прибавь к сумме.</t>
+<t>Ожидаемое поведение:</t>
+<code>
+sumNumbers(1, 2, 3)        -- 6
+sumNumbers(10, "x", 5)     -- 15
+sumNumbers("a", "b")       -- 0
+sumNumbers(1.5, 2.5)       -- 4
+sumNumbers(nil, 5)         -- 5
+sumNumbers()               -- 0
+</code>
+<t>Ничего выводить не нужно.</t>
+<w>Сама функция должна быть глобальной. Вспомогательные переменные внутри функции могут быть <k>local</k>.</w>
+]=],
+initialCode = [=[
+-- Создай функцию sumNumbers(...)
+]=],
+requireKeywords = {
+"sumNumbers",
+"function",
+"...",
+"select",
+"#",
+"type",
+"for",
+"return",
+},
+checkCode = function()
+local details = {}
+if type(_G.sumNumbers) ~= "function" then
+return "sumNumbers не является функцией"
+end
+local ok, r
+ok, r = pcall(_G.sumNumbers)
+if not ok or r ~= 0 then
+table.insert(details, "sumNumbers(): получилось " .. tostring(r) .. ", ожидалось 0")
+end
+ok, r = pcall(_G.sumNumbers, 1, 2, 3)
+if not ok or r ~= 6 then
+table.insert(details, "sumNumbers(1, 2, 3): получилось " .. tostring(r) .. ", ожидалось 6")
+end
+ok, r = pcall(_G.sumNumbers, 10, "x", 5)
+if not ok or r ~= 15 then
+table.insert(details, "sumNumbers(10, \"x\", 5): получилось " .. tostring(r) .. ", ожидалось 15")
+end
+ok, r = pcall(_G.sumNumbers, "a", "b")
+if not ok or r ~= 0 then
+table.insert(details, "sumNumbers(\"a\", \"b\"): получилось " .. tostring(r) .. ", ожидалось 0")
+end
+ok, r = pcall(_G.sumNumbers, 1.5, 2.5)
+if not ok or r ~= 4 then
+table.insert(details, "sumNumbers(1.5, 2.5): получилось " .. tostring(r) .. ", ожидалось 4")
+end
+ok, r = pcall(_G.sumNumbers, nil, 5)
+if not ok or r ~= 5 then
+table.insert(details, "sumNumbers(nil, 5): получилось " .. tostring(r) .. ", ожидалось 5")
+end
+if #details > 0 then
+return table.concat(details, "\n")
+end
+return true
+end,
+}
+
 ns_llua['lua'][46] = {
     type = "commenttest",
     title = "Практика: функция sumStats",
@@ -4766,10 +5279,14 @@ instruction = [=[
 <h>Практика: функция HasTarget</h>
 <t>Создай глобальную функцию <k>HasTarget()</k>.</t>
 <t>Функция должна вернуть <k>true</k>, если текущая цель существует, и <k>false</k>, если цели нет.</t>
-<t>Помни: <k>UnitExists</k> возвращает <k>1</k> или <k>nil</k>, а не boolean. Преобразуй результат в чистый boolean, например двойным отрицанием:</t>
+<t>Помни: <k>UnitExists</k> возвращает <k>1</k> или <k>nil</k>, а не boolean. Значит, тебе нужно преобразовать значение в чистый boolean.</t>
+<h>Двойное отрицание</h>
+<t>Первый <k>not</k> превращает любое значение в boolean и переворачивает его: всё истинное становится <k>false</k>, а <k>nil</k> — <k>true</k>. Второй <k>not</k> переворачивает обратно. Смысл значения сохраняется, но тип становится строго boolean.</t>
 <code>
-return not not UnitExists("target")
+/run print(not 1, not nil) -- false true
+/run print(not not 1, not not nil) -- true false
 </code>
+<t>Примени двойное отрицание к результату проверки существования цели, чтобы функция вернула именно <k>true</k> или <k>false</k>.</t>
 <t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
@@ -4842,7 +5359,7 @@ end,
 
 ns_llua['lua'][63] = {
 type = "commenttest",
-title = "Тест 54-4: функция GetPlayerClassToken",
+title = "Тест: функция GetPlayerClassToken",
 helpModules = {59, 45},
 preloadVars = {
 {var = "GetPlayerClassToken", desc = "GetPlayerClassToken очищается перед проверкой"},
@@ -4852,10 +5369,10 @@ reportVars = {
 "checkError",
 },
 instruction = [=[
-<h>Тест 54-4: функция GetPlayerClassToken</h>
+<h>Тест: функция GetPlayerClassToken</h>
 <t>Создай глобальную функцию <k>GetPlayerClassToken()</k>.</t>
 <t>Функция должна вернуть только токен класса игрока.</t>
-<t>Используй <k>select(2, UnitClass("player"))</k>.</t>
+<t>Используй <k>select</k>.</t>
 <t>Ничего выводить не нужно.</t>
 ]=],
 initialCode = [=[
@@ -24035,7 +24552,6 @@ function Logic:CheckVars()
 end
 
 function Logic:CheckCode(editorName, code)
-    -- Если задание уже выполнено, ничего не делаем.
     if self.commentTestPassed then
         return
     end
@@ -24046,7 +24562,6 @@ function Logic:CheckCode(editorName, code)
 
     local function Normalize(s)
         s = tostring(s or ""):gsub("\r\n", "\n")
-
         local lines = {}
         for line in s:gmatch("[^\n]+") do
             line = Trim(line)
@@ -24054,13 +24569,11 @@ function Logic:CheckCode(editorName, code)
                 table.insert(lines, line)
             end
         end
-
         return table.concat(lines, "\n")
     end
 
     local m = self.db and self.db[self.current]
     local mtype = Trim(m and m.type)
-
     if not m or mtype ~= "commenttest" then
         return
     end
@@ -24068,8 +24581,6 @@ function Logic:CheckCode(editorName, code)
     editorName = editorName or "commenttest"
     code = code or ""
 
-    -- Сбрасываем preloadVars перед каждой проверкой,
-    -- чтобы предыдущая неудачная попытка не портила следующую.
     if m.preloadVars then
         for _, v in ipairs(m.preloadVars) do
             local var = Trim(v.var)
@@ -24079,7 +24590,6 @@ function Logic:CheckCode(editorName, code)
         end
     end
 
-    -- Универсальная проверка ключевых слов для commenttest.
     if m.requireKeywords or m.onlyCodePatterns or m.onlyKeywords or m.singleLine then
         local keywordOk, keywordErr = CheckCodeKeywords(
             code,
@@ -24087,7 +24597,6 @@ function Logic:CheckCode(editorName, code)
             m.onlyCodePatterns or m.onlyKeywords,
             m.singleLine
         )
-
         if not keywordOk then
             self.commentTestPassed = false
             self:SaveCommentTest(code, false)
@@ -24141,9 +24650,7 @@ function Logic:CheckCode(editorName, code)
 
     local function FormatValue(value, depth)
         depth = depth or 0
-
         local valueType = type(value)
-
         if valueType == "string" then
             return '"' .. value .. '"'
         elseif valueType == "number" then
@@ -24156,43 +24663,32 @@ function Logic:CheckCode(editorName, code)
             if depth >= 1 then
                 return "{...}"
             end
-
             local parts = {}
             local arraySize = #value
-
             if arraySize > 0 then
                 local maxSize = math.min(arraySize, 5)
-
                 for i = 1, maxSize do
                     table.insert(parts, FormatValue(value[i], depth + 1))
                 end
-
                 if arraySize > 5 then
                     table.insert(parts, "...")
                 end
-
                 return "{" .. table.concat(parts, ", ") .. "}"
             end
-
             local count = 0
             for k, v in pairs(value) do
                 count = count + 1
-
                 if count > 5 then
                     table.insert(parts, "...")
                     break
                 end
-
                 table.insert(parts, tostring(k) .. "=" .. FormatValue(v, depth + 1))
             end
-
             if count == 0 then
                 return "{}"
             end
-
             return "{" .. table.concat(parts, ", ") .. "}"
         end
-
         return "<" .. valueType .. ">"
     end
 
@@ -24215,19 +24711,15 @@ function Logic:CheckCode(editorName, code)
 
     _G.__ns_trace_loop = function(label, ...)
         iterationCount = iterationCount + 1
-
         local argCount = select("#", ...)
-
         if argCount == 0 then
             AddIterationLine("Итерация " .. iterationCount .. ": " .. tostring(label))
             return
         end
-
         local parts = {}
         for i = 1, argCount do
             parts[i] = FormatValue(select(i, ...))
         end
-
         AddIterationLine(
             "Итерация " .. iterationCount .. ": " .. tostring(label) .. " = " .. table.concat(parts, ", ")
         )
@@ -24235,25 +24727,19 @@ function Logic:CheckCode(editorName, code)
 
     _G.__ns_trace_while = function(condText, vars)
         iterationCount = iterationCount + 1
-
         local parts = {}
-
         if type(vars) == "table" then
             local keys = {}
-
             for k in pairs(vars) do
                 table.insert(keys, k)
             end
-
             table.sort(keys)
-
             for _, k in ipairs(keys) do
                 if type(vars[k]) ~= "function" then
                     table.insert(parts, tostring(k) .. " = " .. FormatValue(vars[k]))
                 end
             end
         end
-
         if #parts > 0 then
             AddIterationLine(
                 "Итерация " .. iterationCount .. ": while " .. tostring(condText) .. " | " .. table.concat(parts, ", ")
@@ -24265,21 +24751,13 @@ function Logic:CheckCode(editorName, code)
 
     local function InstrumentCode(source)
         local out = {}
-
         for line in source:gmatch("[^\r\n]+") do
             table.insert(out, line)
-
             local indent = line:match("^%s*") or ""
             local header = Trim(line)
-
-            -- Убираем однострочный комментарий из конца строки,
-            -- чтобы не реагировать на do внутри комментария.
             header = Trim((header:gsub("%-%-.*$", "")))
-
             if header ~= "" then
-                -- Generic for: for i, v in ipairs(t) do
                 local vars = header:match("^for%s+(.-)%s+in%s+.-%s+do%s*$")
-
                 if vars then
                     local args = vars:gsub("%s+", "")
                     table.insert(
@@ -24287,34 +24765,27 @@ function Logic:CheckCode(editorName, code)
                         indent .. "    __ns_trace_loop(" .. string.format("%q", args) .. ", " .. args .. ")"
                     )
                 else
-                    -- Numeric for: for i = 1, 10 do
                     local numVar = header:match("^for%s+(%w+)%s*=%s*.-do%s*$")
-
                     if numVar then
                         table.insert(
                             out,
                             indent .. "    __ns_trace_loop(" .. string.format("%q", numVar) .. ", " .. numVar .. ")"
                         )
                     else
-                        -- while: while count < 5 do
                         local cond = header:match("^while%s+(.-)%s+do%s*$")
-
                         if cond then
                             local names = {}
                             local seen = {}
-
                             for word in cond:gmatch("[%a_][%w_]*") do
                                 if not keywords[word] and not seen[word] then
                                     seen[word] = true
                                     table.insert(names, word)
                                 end
                             end
-
                             local varParts = {}
                             for _, word in ipairs(names) do
                                 table.insert(varParts, word .. " = " .. word)
                             end
-
                             table.insert(
                                 out,
                                 indent .. "    __ns_trace_while("
@@ -24326,20 +24797,17 @@ function Logic:CheckCode(editorName, code)
                 end
             end
         end
-
         return table.concat(out, "\n")
     end
 
     local function ExecuteSource(source)
         local output = {}
-
         local oldPrint = print
         print = function(...)
             local parts = {}
             for i = 1, select("#", ...) do
                 parts[i] = tostring(select(i, ...))
             end
-
             table.insert(output, table.concat(parts, " "))
         end
 
@@ -24351,7 +24819,6 @@ function Logic:CheckCode(editorName, code)
         end
 
         local ok, runErr = false, nil
-
         if fn then
             ok, runErr = pcall(fn)
         else
@@ -24359,33 +24826,26 @@ function Logic:CheckCode(editorName, code)
         end
 
         print = oldPrint
-
         return ok, runErr, table.concat(output, "\n")
     end
 
-    -- Собираем имена переменных, которые потом покажем в итоговом отчёте.
     local candidateOrder = {}
     local candidateSeen = {}
 
     local function AddCandidate(name)
         name = Trim(name)
-
         if name == "" then
             return
         end
-
         if candidateSeen[name] then
             return
         end
-
         if keywords[name] then
             return
         end
-
         if not name:match("^[%a_][%w_]*$") then
             return
         end
-
         candidateSeen[name] = true
         table.insert(candidateOrder, name)
     end
@@ -24403,7 +24863,6 @@ function Logic:CheckCode(editorName, code)
     end
 
     local searchText = tostring(m.instruction or "") .. "\n" .. tostring(m.content or "")
-
     for name in searchText:gmatch("<k>([%a_][%w_]*)</k>") do
         AddCandidate(name)
     end
@@ -24430,33 +24889,22 @@ function Logic:CheckCode(editorName, code)
                 end
             end
         end
-
         for _, name in ipairs(candidateOrder) do
             _G[name] = oldValues[name]
         end
     end
 
     local instrumentedCode = InstrumentCode(code)
-
     local ok, runErr, rawOutput = ExecuteSource(instrumentedCode)
 
-    -- Если инструментированный код вдруг не собрался или упал,
-    -- пробуем выполнить оригинальный код.
     if not ok and instrumentedCode ~= code then
         iterationLines = {}
         iterationCount = 0
         traceOverflow = false
-
         ResetInputs()
-
         ok, runErr, rawOutput = ExecuteSource(code)
     end
 
-    -- ВАЖНО: не удаляем служебные функции трассировки, а ставим заглушки.
-    -- Иначе если checkCode потом вызовет пользовательскую функцию,
-    -- в теле которой остался __ns_trace_loop, получим ошибку
-    -- "attempt to call global '__ns_trace_loop' (a nil value)".
-    -- Заглушка ничего не делает, но и выполнение не ломает.
     _G.__ns_trace_loop = oldTraceLoop or function() end
     _G.__ns_trace_while = oldTraceWhile or function() end
 
@@ -24465,7 +24913,6 @@ function Logic:CheckCode(editorName, code)
     local outputOk = true
     if m.expectedOutput then
         outputOk = Normalize(rawOutput) == Normalize(m.expectedOutput)
-
         if not outputOk then
             table.insert(problems, "Неверный вывод.")
         end
@@ -24474,30 +24921,23 @@ function Logic:CheckCode(editorName, code)
     local printCount = 0
     local templateOk = true
     local needPrint = tonumber(m.requiredPrintCount)
-
     if needPrint then
         local codeForCheck = code:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''")
         local searchPos = 1
-
         while true do
             local startPos, endPos = codeForCheck:find("print", searchPos, true)
             if not startPos then
                 break
             end
-
             local before = startPos > 1 and codeForCheck:sub(startPos - 1, startPos - 1) or ""
             local after = codeForCheck:sub(endPos + 1, endPos + 1) or ""
-
             local beforeIsWord = before ~= "" and before:match("[%w_]") ~= nil
             local afterIsWord = after ~= "" and after:match("[%w_]") ~= nil
-
             if not beforeIsWord and not afterIsWord then
                 printCount = printCount + 1
             end
-
             searchPos = endPos + 1
         end
-
         if printCount ~= needPrint then
             templateOk = false
             table.insert(
@@ -24508,23 +24948,27 @@ function Logic:CheckCode(editorName, code)
     end
 
     local runtimeOk = true
+    local checkDetails = nil
     if type(m.checkCode) == "function" then
         if not ok then
             runtimeOk = false
         else
             local success, result = pcall(m.checkCode)
-            runtimeOk = success and result == true
+            if success and result == true then
+                runtimeOk = true
+            else
+                runtimeOk = false
+                if type(result) == "string" then
+                    checkDetails = result
+                end
+            end
         end
-
         if not runtimeOk then
             table.insert(problems, "Проверка результата не пройдена.")
         end
     end
 
     local runOk = true
-
-    -- Если модуль не проверяет вывод и не проверяет результат функцией,
-    -- то код как минимум должен выполниться без ошибки.
     if not ok and not m.expectedOutput and type(m.checkCode) ~= "function" then
         runOk = false
         table.insert(problems, "Ошибка выполнения кода.")
@@ -24532,12 +24976,10 @@ function Logic:CheckCode(editorName, code)
 
     local passed = outputOk and templateOk and runtimeOk and runOk
 
-    -- Собираем подробный отчёт.
     local reportLines = {}
 
     if #iterationLines > 0 then
         table.insert(reportLines, "Итерации:")
-
         for _, line in ipairs(iterationLines) do
             table.insert(reportLines, "  " .. line)
         end
@@ -24545,26 +24987,28 @@ function Logic:CheckCode(editorName, code)
 
     if rawOutput ~= "" then
         table.insert(reportLines, "Вывод:")
-
         for line in rawOutput:gmatch("[^\n]+") do
             table.insert(reportLines, "  " .. line)
         end
     end
 
     local finalLines = {}
-
     for _, name in ipairs(candidateOrder) do
         local newValue = _G[name]
-
         if type(newValue) ~= "function" and newValue ~= nil then
             table.insert(finalLines, name .. " = " .. FormatValue(newValue))
         end
     end
-
     if #finalLines > 0 then
         table.insert(reportLines, "Итог:")
-
         for _, line in ipairs(finalLines) do
+            table.insert(reportLines, "  " .. line)
+        end
+    end
+
+    if checkDetails then
+        table.insert(reportLines, "Детали проверки:")
+        for line in checkDetails:gmatch("[^\n]+") do
             table.insert(reportLines, "  " .. line)
         end
     end
@@ -24574,14 +25018,12 @@ function Logic:CheckCode(editorName, code)
     end
 
     local reportText = table.concat(reportLines, "\n")
-
     local displayCurrent = reportText
 
     if not ok then
         if displayCurrent ~= "" then
-            displayCurrent = displayCurrent .. "\n\n"
+            displayCurrent = displayCurrent .. "\n"
         end
-
         displayCurrent = displayCurrent .. "Ошибка: " .. tostring(runErr)
     end
 
@@ -24596,31 +25038,25 @@ function Logic:CheckCode(editorName, code)
             current = reportText,
             footerSuccess = true,
         })
-
         self.ui:SetNextEnabled(true)
         self.ui:SetEditorButtonEnabled(editorName, false)
-
         if PlaySoundFile then
             PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
         end
-
         if SendAddonMessage then
             SendAddonMessage("ns_Win", tostring(self.current), "GUILD")
         end
     else
         local message = table.concat(problems, " ")
-
         if message == "" then
             message = "Неверно."
         end
-
         self.ui:SetEditorResult(editorName, {
             status = "diff",
             message = message,
             expected = m.expectedCode or m.expectedOutput or "",
             current = displayCurrent,
         })
-
         self.ui:SetNextEnabled(false)
     end
 end
