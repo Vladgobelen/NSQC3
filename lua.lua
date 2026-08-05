@@ -1608,8 +1608,8 @@ isDead = false
 mana = 3000
 </code>
 <t>Создай три глобальные переменные, используя оператор <k>and</k>.</t>
-<t><k>check1</k> — примени <k>and</k> между <k>isAlive</k> и <k>hp</k>.</t>
-<t><k>check2</k> — примени <k>and</k> между <k>isDead</k> и <k>mana</k>.</t>
+<t><k>check1</k> — примени <k>and</k> между <k>hp</k> и <k>isAlive</k>.</t>
+<t><k>check2</k> — примени <k>and</k> между <k>mana</k> и <k>isDead</k>.</t>
 <t><k>check3</k> — примени <k>and</k> между <k>isAlive</k> и <k>isDead</k>.</t>
 <t>Подумай, что вернёт <k>and</k> в каждом случае: первое ложное значение или последнее истинное.</t>
 <t>Ожидаемый результат:</t>
