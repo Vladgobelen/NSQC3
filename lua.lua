@@ -1665,10 +1665,10 @@ defaultGold = 100
 </code>
 <t>1. Создай глобальную переменную <k>safeName</k>.</t>
 <t>Используй <k>or</k> между <k>playerName</k> и <k>defaultName</k>.</t>
-<t>Подумай: <k>playerName</k> — строка, а любая строка в Lua истинная. Значит <k>or</k> вернёт её и до второго значения дело не дойдёт.</t>
+<t>Сначала должно идти основное значение, затем запасное.</t>
 <t>2. Создай глобальную переменную <k>safeGold</k>.</t>
 <t>Используй <k>or</k> между <k>gold</k> и <k>defaultGold</k>.</t>
-<t>Подумай: <k>gold</k> — это <k>nil</k>, а <k>nil</k> в Lua ложный. Значит <k>or</k> перейдёт ко второму значению.</t>
+<t>Сначала должно идти основное значение, затем запасное.</t>
 <t>Ожидаемый результат:</t>
 <code>
 safeName = "Артас"
@@ -1683,10 +1683,8 @@ safeGold = 100
     requireKeywords = {
         "safeName",
         "safeGold",
-        "playerName",
-        "defaultName",
-        "gold",
-        "defaultGold",
+        "playerNameordefaultName",
+        "goldordefaultGold",
         "or",
     },
     checkCode = function()
@@ -22631,6 +22629,7 @@ local function applyTags(text, tags, closeColor)
         text = text:gsub("<" .. tag .. ">", color)
         text = text:gsub("</" .. tag .. ">", closeColor)
     end
+
     return text
 end
 
@@ -22660,7 +22659,6 @@ local LUA_KEYWORDS = {
     ["true"] = true,
     ["until"] = true,
     ["while"] = true,
-
     ["print"] = true,
     ["string"] = true,
     ["table"] = true,
@@ -22693,6 +22691,8 @@ local function highlightLuaCode(code)
     local OPERATOR = "|cFFCC88FF"
     local RESET    = "|r"
 
+    local newlinePattern = "[" .. string.char(13) .. string.char(10) .. "]"
+
     table.insert(out, DEFAULT)
 
     while i <= n do
@@ -22705,14 +22705,13 @@ local function highlightLuaCode(code)
                 local close = code:find("]]", i + 4, true)
                 j = close and (close + 2) or (n + 1)
             else
-                local nl = code:find("[\r\n]", i)
+                local nl = code:find(newlinePattern, i)
                 j = nl or (n + 1)
             end
 
             local token = code:sub(i, j - 1)
             table.insert(out, COMMENT .. escapePipes(token) .. RESET .. DEFAULT)
             i = j
-
         elseif c == '"' or c == "'" then
             local quote = c
             local j = i + 1
@@ -22733,7 +22732,6 @@ local function highlightLuaCode(code)
             local token = code:sub(i, j - 1)
             table.insert(out, STRING .. escapePipes(token) .. RESET .. DEFAULT)
             i = j
-
         elseif c == "[" and code:sub(i + 1, i + 1) == "[" then
             local close = code:find("]]", i + 2, true)
             local j = close and (close + 2) or (n + 1)
@@ -22741,7 +22739,6 @@ local function highlightLuaCode(code)
             local token = code:sub(i, j - 1)
             table.insert(out, STRING .. escapePipes(token) .. RESET .. DEFAULT)
             i = j
-
         elseif c:match("%d") or (c == "." and code:sub(i + 1, i + 1):match("%d")) then
             local num = code:match("^%d+%.%d+", i)
                 or code:match("^%d+", i)
@@ -22750,7 +22747,6 @@ local function highlightLuaCode(code)
 
             table.insert(out, NUMBER .. escapePipes(num) .. RESET .. DEFAULT)
             i = i + #num
-
         elseif c:match("[%a_]") then
             local word = code:match("^[%a_][%w_]*", i)
 
@@ -22761,11 +22757,9 @@ local function highlightLuaCode(code)
             end
 
             i = i + #word
-
         elseif c:match("[%p]") then
             table.insert(out, OPERATOR .. escapePipes(c) .. RESET .. DEFAULT)
             i = i + 1
-
         else
             table.insert(out, escapePipes(c))
             i = i + 1
@@ -22791,6 +22785,7 @@ local function markupText(text)
     end
 
     text = escapePipes(text)
+
     return "|cFFFFFFFF" .. applyTags(text, TEXT_TAGS, "|cFFFFFFFF") .. "|r"
 end
 
@@ -22907,6 +22902,7 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
 
         local editHeight = math.max(60, (block._measure:GetStringHeight() or 0) + 12)
         block._editBox:SetHeight(editHeight)
+
         innerY = innerY - editHeight - 8
 
         block._button:ClearAllPoints()
@@ -23113,7 +23109,7 @@ local function createEditorBlock(parent, data, ui)
         if IsControlKeyDown and IsControlKeyDown() then
             button:Click()
         else
-            self:Insert("\n")
+            self:Insert(string.char(10))
         end
     end)
 
@@ -23167,6 +23163,7 @@ local function createScrollArea(parent, contentWidth, topX, topY, bottomX, botto
     content:SetWidth(contentWidth)
     content:SetHeight(100)
     content:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+
     scrollFrame:SetScrollChild(content)
 
     local bar = CreateFrame("Slider", nil, parent)
@@ -23189,6 +23186,7 @@ local function createScrollArea(parent, contentWidth, topX, topY, bottomX, botto
     end)
 
     scrollFrame:EnableMouseWheel(true)
+
     scrollFrame:SetScript("OnMouseWheel", function(_, delta)
         local maxScroll = select(2, bar:GetMinMaxValues())
         local value = math.max(0, math.min(bar:GetValue() - delta * 25, maxScroll))
@@ -23213,18 +23211,30 @@ function UI:new(parent)
 
     self.parent = parent or UIParent
     self.callbacks = {}
+
     self.helpModules = nil
     self.helpKey = nil
 
     self.blocks = {}
     self.helpBlocks = {}
     self.editors = {}
+    self.sideRows = {}
+
+    self.moduleStates = {}
+
+    self.currentModuleIndex = nil
+    self.currentModuleType = nil
 
     self.layoutDirty = false
     self.isScaling = false
     self.scaleStartScale = 1
     self.scaleStartX = 0
     self.scaleStartY = 0
+
+    self.baseFrameWidth = 620
+    self.sidePanelWidth = 180
+    self.sidePanelVisible = false
+    self.stateLoaded = false
 
     self:_CreateMain()
 
@@ -23248,7 +23258,10 @@ function UI:SaveState()
         x = x or 0,
         y = y or 0,
         scale = self.frame:GetScale() or 1,
+        sidePanelCollapsed = not self.sidePanelVisible,
     }
+
+    nsDbc.luaTest.moduleStates = self.moduleStates or {}
 end
 
 function UI:LoadState()
@@ -23256,34 +23269,162 @@ function UI:LoadState()
         return
     end
 
-    local state = nsDbc and nsDbc.luaTest and nsDbc.luaTest.windowState
+    local saved = nsDbc and nsDbc.luaTest
+    local state = saved and saved.windowState
 
-    if type(state) ~= "table" then
+    if type(state) == "table" then
+        local scale = tonumber(state.scale)
+        if scale then
+            scale = math.max(0.75, math.min(2.0, scale))
+            self.frame:SetScale(scale)
+        end
+
+        local point = tostring(state.point or "CENTER")
+        local relativePoint = tostring(state.relativePoint or point)
+        local relativeTo = _G[state.relativeTo or "UIParent"] or UIParent
+        local x = tonumber(state.x) or tonumber(state.xOfs) or 0
+        local y = tonumber(state.y) or tonumber(state.yOfs) or 0
+
+        self.frame:ClearAllPoints()
+        self.frame:SetPoint(point, relativeTo, relativePoint, x, y)
+    end
+
+    if type(saved) == "table" and type(saved.moduleStates) == "table" then
+        self.moduleStates = saved.moduleStates
+    else
+        self.moduleStates = self.moduleStates or {}
+    end
+
+    local visible = false
+
+    if type(state) == "table" then
+        visible = not (state.sidePanelCollapsed == true)
+    end
+
+    if self.SetSidePanelVisible then
+        self:SetSidePanelVisible(visible, true)
+    end
+
+    if self.RefreshSidePanel then
+        self:RefreshSidePanel()
+    end
+end
+
+function UI:_CreateSidePanel()
+    if self.sidePanel or not self.frame then
         return
     end
 
-    local scale = tonumber(state.scale)
+    local panel = CreateFrame("Frame", nil, self.frame)
+    panel:SetWidth(self.sidePanelWidth or 180)
+    panel:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 8, -45)
+    panel:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 8, 45)
 
-    if scale then
-        scale = math.max(0.75, math.min(2.0, scale))
-        self.frame:SetScale(scale)
+    local bg = panel:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(panel)
+    bg:SetTexture(0.06, 0.07, 0.10, 0.95)
+
+    local border = panel:CreateTexture(nil, "ARTWORK")
+    border:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
+    border:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 0)
+    border:SetWidth(1)
+    border:SetTexture(0.28, 0.30, 0.45, 1)
+
+    local label = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -6)
+    label:SetText("|cFFB3B3B3Модули:|r")
+
+    self.sidePanel = panel
+
+    self.sideScroll, self.sideContent, self.sideBar = createScrollArea(
+        panel,
+        math.max(80, (self.sidePanelWidth or 180) - 36),
+        8,
+        -26,
+        -20,
+        8
+    )
+
+    panel:Hide()
+end
+
+function UI:_ApplySidePanelLayout()
+    if not self.frame or not self.sidePanel or not self.scrollFrame then
+        return
     end
 
-    local point = tostring(state.point or "CENTER")
-    local relativePoint = tostring(state.relativePoint or point)
-    local relativeTo = _G[state.relativeTo or "UIParent"] or UIParent
+    local visible = self.sidePanelVisible
 
-    local x = tonumber(state.x) or tonumber(state.xOfs) or 0
-    local y = tonumber(state.y) or tonumber(state.yOfs) or 0
+    if visible then
+        self.sidePanel:Show()
+    else
+        self.sidePanel:Hide()
+    end
 
-    self.frame:ClearAllPoints()
-    self.frame:SetPoint(point, relativeTo, relativePoint, x, y)
+    if self.sideToggleText then
+        self.sideToggleText:SetText(visible and "<" or ">")
+    elseif self.sideToggleButton then
+        self.sideToggleButton:SetText(visible and "<" or ">")
+    end
+
+    local baseWidth = self.baseFrameWidth or 620
+    local panelWidth = self.sidePanelWidth or 180
+    local newWidth = baseWidth + (visible and panelWidth or 0)
+
+    self.frame:SetWidth(newWidth)
+
+    self.scrollFrame:ClearAllPoints()
+    self.scrollFrame:SetPoint(
+        "TOPLEFT",
+        self.frame,
+        "TOPLEFT",
+        (visible and (panelWidth + 18) or 18),
+        -45
+    )
+    self.scrollFrame:SetPoint(
+        "BOTTOMRIGHT",
+        self.frame,
+        "BOTTOMRIGHT",
+        -28,
+        45
+    )
+
+    self.layoutDirty = true
+end
+
+function UI:SetSidePanelVisible(visible, skipSave)
+    visible = visible and true or false
+
+    if not self.sidePanel then
+        self:_CreateSidePanel()
+    end
+
+    if not self.sidePanel then
+        return
+    end
+
+    if self.sidePanelVisible == visible then
+        self:_ApplySidePanelLayout()
+        return
+    end
+
+    self.sidePanelVisible = visible
+    self:_ApplySidePanelLayout()
+
+    if not skipSave then
+        self:SaveState()
+    end
+end
+
+function UI:ToggleSidePanel()
+    self:SetSidePanelVisible(not self.sidePanelVisible)
 end
 
 function UI:_CreateMain()
     local f = CreateFrame("Frame", nil, self.parent)
+    self.frame = f
 
-    f:SetSize(620, 450)
+    f:SetSize(self.baseFrameWidth or 620, 450)
     f:SetPoint("CENTER")
     f:EnableMouse(true)
     f:SetMovable(true)
@@ -23316,8 +23457,34 @@ function UI:_CreateMain()
     bottomSeparator:SetHeight(2)
     bottomSeparator:SetTexture(0.30, 0.30, 0.50, 1)
 
+    local sideToggleButton = CreateFrame("Button", nil, f)
+    sideToggleButton:EnableMouse(true)
+    sideToggleButton:SetSize(24, 24)
+    sideToggleButton:SetPoint("TOPLEFT", f, "TOPLEFT", 5, -5)
+
+    local toggleBg = sideToggleButton:CreateTexture(nil, "BACKGROUND")
+    toggleBg:SetAllPoints(sideToggleButton)
+    toggleBg:SetTexture(0.18, 0.18, 0.24, 1)
+
+    local toggleText = sideToggleButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    toggleText:SetAllPoints(sideToggleButton)
+    toggleText:SetText(">")
+    toggleText:SetTextColor(0.80, 0.80, 0.20, 1)
+
+    local toggleHighlight = sideToggleButton:CreateTexture(nil, "HIGHLIGHT")
+    toggleHighlight:SetAllPoints(sideToggleButton)
+    toggleHighlight:SetTexture(0.35, 0.35, 0.50, 0.40)
+
+    sideToggleButton:SetScript("OnClick", function()
+        self:ToggleSidePanel()
+    end)
+
+    self.sideToggleButton = sideToggleButton
+    self.sideToggleText = toggleText
+
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
+
     closeButton:SetScript("OnClick", function()
         self:HideHelp()
 
@@ -23346,12 +23513,21 @@ function UI:_CreateMain()
     self.helpButton = helpButton
 
     self.titleText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    self.titleText:SetPoint("LEFT", f, "LEFT", 15, 0)
+    self.titleText:SetPoint("LEFT", sideToggleButton, "RIGHT", 8, 0)
     self.titleText:SetPoint("RIGHT", helpButton, "LEFT", -8, 0)
     self.titleText:SetPoint("TOP", titleBg, "TOP", 0, -8)
     self.titleText:SetJustifyH("LEFT")
 
-    self.scrollFrame, self.contentFrame, self.scrollBar = createScrollArea(f, 560, 18, -45, -28, 45)
+    self.scrollFrame, self.contentFrame, self.scrollBar = createScrollArea(
+        f,
+        560,
+        18,
+        -45,
+        -28,
+        45
+    )
+
+    self:_CreateSidePanel()
 
     self.moduleText = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.moduleText:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
@@ -23361,6 +23537,7 @@ function UI:_CreateMain()
     self.prevButton:SetSize(110, 24)
     self.prevButton:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 15, 8)
     self.prevButton:SetText("<  Назад")
+
     self.prevButton:SetScript("OnClick", function()
         if self.callbacks.onPrev then
             self.callbacks.onPrev()
@@ -23371,7 +23548,12 @@ function UI:_CreateMain()
     self.nextButton:SetSize(110, 24)
     self.nextButton:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -15, 8)
     self.nextButton:SetText("Вперед  >")
+
     self.nextButton:SetScript("OnClick", function()
+        if self.currentModuleIndex then
+            self:MarkModuleReadIfInfo(self.currentModuleIndex)
+        end
+
         if self.callbacks.onNext then
             self.callbacks.onNext()
         end
@@ -23450,8 +23632,7 @@ function UI:_CreateMain()
         self.layoutDirty = true
     end)
 
-    self.frame = f
-
+    self:_ApplySidePanelLayout()
     self:LoadState()
 
     f:SetScript("OnHide", function()
@@ -23468,7 +23649,6 @@ function UI:_CreateHelp()
     end
 
     local f = CreateFrame("Frame", nil, UIParent)
-
     f:SetSize(700, 580)
     f:SetPoint("CENTER", 40, 0)
     f:EnableMouse(true)
@@ -23492,6 +23672,7 @@ function UI:_CreateHelp()
 
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
+
     closeButton:SetScript("OnClick", function()
         f:Hide()
     end)
@@ -23502,7 +23683,14 @@ function UI:_CreateHelp()
     titleText:SetPoint("TOP", titleBg, "TOP", 0, -5)
     titleText:SetText("Справка")
 
-    self.helpScroll, self.helpContent, self.helpBar = createScrollArea(f, 650, 15, -40, -25, 15)
+    self.helpScroll, self.helpContent, self.helpBar = createScrollArea(
+        f,
+        650,
+        15,
+        -40,
+        -25,
+        15
+    )
 
     f:RegisterForDrag("LeftButton")
 
@@ -23515,6 +23703,7 @@ function UI:_CreateHelp()
     end)
 
     self.helpFrame = f
+
     f:Hide()
 end
 
@@ -23576,7 +23765,6 @@ function UI:Layout()
     if self.pendingScrollValue then
         local maxScroll = select(2, self.scrollBar:GetMinMaxValues()) or 0
         local value = math.max(0, math.min(self.pendingScrollValue, maxScroll))
-
         self.scrollBar:SetValue(value)
         self.pendingScrollValue = nil
     end
@@ -23658,15 +23846,355 @@ function UI:RenderHelp(raw)
     end)
 end
 
+function UI:_IsPracticeType(moduleType)
+    moduleType = moduleType and tostring(moduleType):match("^%s*(.-)%s*$") or ""
+
+    return moduleType == "vartest"
+        or moduleType == "printtest"
+        or moduleType == "customtest"
+        or moduleType == "commenttest"
+end
+
+function UI:_IsModuleInfo(moduleOrType)
+    local moduleType = moduleOrType
+
+    if type(moduleOrType) == "table" then
+        moduleType = moduleOrType.type
+    end
+
+    return not self:_IsPracticeType(moduleType)
+end
+
+function UI:_GetModuleById(index)
+    local db = ns_llua and ns_llua['lua'] or {}
+    return db[index]
+end
+
+function UI:_GetTaskDetails(index)
+    local saved = nsDbc and nsDbc.luaTest and nsDbc.luaTest.taskDetails
+
+    if type(saved) ~= "table" then
+        return {}
+    end
+
+    local details = saved[index]
+
+    if details == nil then
+        details = saved[tostring(index)]
+    end
+
+    if details == nil then
+        details = saved[tonumber(index)]
+    end
+
+    return type(details) == "table" and details or {}
+end
+
+function UI:_IsModuleDoneByTaskDetails(index)
+    local m = self:_GetModuleById(index)
+
+    if type(m) ~= "table" then
+        return false
+    end
+
+    local details = self:_GetTaskDetails(index)
+    local mtype = m.type and tostring(m.type):match("^%s*(.-)%s*$") or ""
+
+    if mtype == "commenttest" then
+        return details.completed == true or details.commentTestPassed == true
+    end
+
+    if mtype == "vartest" or mtype == "customtest" or mtype == "printtest" then
+        if type(m.tasks) == "table" then
+            for i in ipairs(m.tasks) do
+                local done = details.done and (details.done[i] or details.done[tostring(i)])
+
+                if not done then
+                    return false
+                end
+            end
+        else
+            if details.completed ~= true then
+                return false
+            end
+        end
+
+        if mtype == "vartest" and m.formatTask and details.formatDone ~= true then
+            return false
+        end
+
+        return true
+    end
+
+    return details.read == true or details.completed == true
+end
+
+function UI:_IsModuleDone(index)
+    index = tonumber(index)
+
+    if not index then
+        return false
+    end
+
+    if type(self.completedChecker) == "function" then
+        local ok, done = pcall(self.completedChecker, index)
+
+        if ok and done then
+            return true
+        end
+    end
+
+    if self.callbacks and type(self.callbacks.isModuleCompleted) == "function" then
+        local ok, done = pcall(self.callbacks.isModuleCompleted, index)
+
+        if ok and done then
+            return true
+        end
+    end
+
+    if self:_IsModuleDoneByTaskDetails(index) then
+        return true
+    end
+
+    local state = self.moduleStates and self.moduleStates[index]
+
+    if type(state) == "table" then
+        if state.completed then
+            return true
+        end
+
+        if self:_IsModuleInfo(self:_GetModuleById(index)) and state.read then
+            return true
+        end
+    end
+
+    return false
+end
+
+function UI:SetCompletedChecker(fn)
+    if type(fn) == "function" then
+        self.completedChecker = fn
+    else
+        self.completedChecker = nil
+    end
+
+    self:RefreshSidePanel()
+end
+
+function UI:SetModuleState(index, state)
+    index = tonumber(index)
+
+    if not index or type(state) ~= "table" then
+        return
+    end
+
+    self.moduleStates = self.moduleStates or {}
+    self.moduleStates[index] = self.moduleStates[index] or {}
+
+    if state.completed ~= nil then
+        self.moduleStates[index].completed = state.completed and true or false
+    end
+
+    if state.read ~= nil then
+        self.moduleStates[index].read = state.read and true or false
+    end
+
+    -- Дублируем важные пометки в основную структуру сейвов курса.
+    nsDbc = nsDbc or {}
+    nsDbc.luaTest = nsDbc.luaTest or {}
+    nsDbc.luaTest.taskDetails = nsDbc.luaTest.taskDetails or {}
+    nsDbc.luaTest.taskDetails[index] = nsDbc.luaTest.taskDetails[index] or {}
+
+    if state.read ~= nil then
+        nsDbc.luaTest.taskDetails[index].read = state.read and true or false
+    end
+
+    if state.completed ~= nil then
+        nsDbc.luaTest.taskDetails[index].completed = state.completed and true or false
+    end
+
+    self:RefreshSidePanel()
+    self:SaveState()
+end
+
+function UI:SetModuleCompleted(index, completed)
+    self:SetModuleState(index, {
+        completed = completed ~= false,
+    })
+end
+
+function UI:MarkModuleRead(index)
+    self:SetModuleState(index, {
+        read = true,
+    })
+end
+
+function UI:MarkModuleReadIfInfo(index)
+    index = tonumber(index)
+
+    if not index then
+        return
+    end
+
+    local m = self:_GetModuleById(index)
+
+    local moduleType = self.currentModuleType
+
+    if moduleType == nil and type(m) == "table" then
+        moduleType = m.type
+    end
+
+    if self:_IsPracticeType(moduleType) then
+        return
+    end
+
+    -- Если модуль не найден и тип неизвестен, лучше не помечать.
+    if type(m) ~= "table" and moduleType == nil then
+        return
+    end
+
+    self:MarkModuleRead(index)
+end
+
+function UI:RefreshSidePanel()
+    if not self.sidePanel or not self.sideContent then
+        return
+    end
+
+    self.moduleStates = self.moduleStates or {}
+
+    clearBlocks(self.sideRows)
+    self.sideRows = {}
+
+    local db = ns_llua and ns_llua['lua'] or {}
+    local indices = {}
+
+    for k in pairs(db) do
+        if type(k) == "number" then
+            table.insert(indices, k)
+        end
+    end
+
+    table.sort(indices)
+
+    local width = math.max(
+        10,
+        self.sideContent:GetWidth() or ((self.sidePanelWidth or 180) - 40)
+    )
+
+    local y = -2
+    local contentLevel = self.sideContent:GetFrameLevel() or 0
+
+    for _, idx in ipairs(indices) do
+        local m = db[idx] or {}
+        local isInfo = self:_IsModuleInfo(m)
+        local done = self:_IsModuleDone(idx)
+
+        local button = CreateFrame("Button", nil, self.sideContent)
+        button:EnableMouse(true)
+        button:RegisterForClicks("LeftButtonUp")
+        button:RegisterForDrag("LeftButton")
+
+        -- Чтобы клик по строке не уходил в перетаскивание основного окна.
+        button:SetScript("OnDragStart", function() end)
+        button:SetScript("OnDragStop", function() end)
+
+        button:SetHeight(20)
+        button:SetWidth(width)
+        button:SetPoint("TOPLEFT", self.sideContent, "TOPLEFT", 0, y)
+        button:SetFrameLevel(contentLevel + 5)
+
+        local bg = button:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(button)
+
+        if self.currentModuleIndex == idx then
+            bg:SetTexture(0.20, 0.28, 0.45, 0.90)
+        else
+            bg:SetTexture(0.10, 0.11, 0.16, 0.60)
+        end
+
+        local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+        highlight:SetAllPoints(button)
+        highlight:SetTexture(0.30, 0.35, 0.55, 0.35)
+
+        local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetPoint("LEFT", button, "LEFT", 8, 0)
+        fs:SetPoint("RIGHT", button, "RIGHT", -8, 0)
+        fs:SetJustifyH("LEFT")
+        fs:SetJustifyV("MIDDLE")
+
+        local title = tostring(m.title or ("Модуль " .. idx))
+
+        -- Убираем возможные теги и переводы строк для ровного отображения.
+        title = (title:gsub("<[^>]+>", ""))
+        title = (title:gsub("\n", " "))
+        title = (title:gsub("\r", " "))
+
+        local prefix = (self.currentModuleIndex == idx and "> " or "")
+        local color = done and "|cFF00FF00" or "|cFF999999"
+
+        fs:SetText(color .. prefix .. idx .. ". " .. escapePipes(title) .. "|r")
+
+        local statusText
+        local statusR, statusG, statusB
+
+        if done then
+            statusText = "Пройден"
+            statusR, statusG, statusB = 0.2, 1.0, 0.2
+        elseif isInfo then
+            statusText = "Не прочитан"
+            statusR, statusG, statusB = 0.7, 0.7, 0.7
+        else
+            statusText = "Не пройден"
+            statusR, statusG, statusB = 0.7, 0.7, 0.7
+        end
+
+        button:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+            GameTooltip:ClearLines()
+            GameTooltip:AddLine(escapePipes(title), 1, 1, 1, true)
+            GameTooltip:AddLine(statusText, statusR, statusG, statusB, true)
+            GameTooltip:AddLine("ЛКМ — открыть", 0.6, 0.6, 0.6, true)
+            GameTooltip:Show()
+        end)
+
+        button:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        button:SetScript("OnClick", function()
+            if self.callbacks and type(self.callbacks.onSelectModule) == "function" then
+                self.callbacks.onSelectModule(idx)
+            elseif logic and type(logic.ManageCourse) == "function" then
+                logic:ManageCourse(idx)
+            elseif type(TestCourseUI) == "function" then
+                TestCourseUI(idx)
+            else
+                self.currentModuleIndex = idx
+                self:RefreshSidePanel()
+            end
+        end)
+
+        table.insert(self.sideRows, button)
+
+        y = y - 22
+    end
+
+    self.sideContent:SetHeight(math.max(100, -y + 4))
+    updateScroll(self.sideScroll, self.sideContent, self.sideBar)
+end
+
 function UI:SetModuleContent(data)
     data = data or {}
 
     self:HideHelp()
 
+    local moduleIndex = tonumber(data.index) or data.index
+
     -- Если мы обновляем тот же самый модуль, который уже открыт,
     -- не надо прыгать в начало. Сохраняем текущую позицию скролла.
     local sameModule = self.currentModuleIndex ~= nil
-        and self.currentModuleIndex == data.index
+        and self.currentModuleIndex == moduleIndex
         and self.frame
         and self.frame:IsShown()
 
@@ -23676,7 +24204,19 @@ function UI:SetModuleContent(data)
         self.pendingScrollValue = nil
     end
 
-    self.currentModuleIndex = data.index
+    self.currentModuleIndex = moduleIndex
+
+    local moduleType = data.moduleType
+
+    if moduleType == nil and moduleIndex ~= nil then
+        local m = self:_GetModuleById(moduleIndex)
+
+        if type(m) == "table" then
+            moduleType = m.type
+        end
+    end
+
+    self.currentModuleType = moduleType
 
     self:SetTitle(data.title)
     self:SetModuleInfo(data.index, data.total)
@@ -23690,6 +24230,7 @@ function UI:SetModuleContent(data)
         self:Render(data.blocks, not sameModule)
     end
 
+    self:RefreshSidePanel()
     self:Show()
 end
 
@@ -23720,7 +24261,6 @@ function UI:ShowHelp(helpModules)
 
         -- Поддержка строковых ID: "45.1", "45", и т.д.
         local num = tonumber(id)
-
         if num ~= nil and db[num] ~= nil then
             return db[num], num
         end
@@ -23759,8 +24299,8 @@ function UI:ShowHelp(helpModules)
 
     for _, moduleId in ipairs(helpModules) do
         local module, resolvedId = resolveModule(moduleId)
-
         local key = tostring(resolvedId ~= nil and resolvedId or moduleId)
+
         table.insert(keyParts, key)
 
         if module and not seen[key] then
@@ -23784,7 +24324,7 @@ function UI:ShowHelp(helpModules)
 
     local raw = table.concat(
         helpTexts,
-        "\n\n<c>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</c>\n\n"
+        "\n<c>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</c>\n"
     )
 
     if raw == "" then
@@ -23857,6 +24397,7 @@ end
 
 function UI:SetEditorResult(name, result)
     local editor = self:GetEditor(name)
+
     if not editor then
         return
     end
@@ -23896,7 +24437,7 @@ function UI:SetEditorResult(name, result)
         if result.footerSuccess then
             editor._currentLabel:SetText("|cFFFFD700Результат выполнения:|r")
             editor._currentText:SetText(
-                "|cFFFFFFFF" .. escapePipes(current) .. "|r\n\n|cFF00FF00Задание выполнено!|r"
+                "|cFFFFFFFF" .. escapePipes(current) .. "|r\n|cFF00FF00Задание выполнено!|r"
             )
         else
             editor._currentLabel:SetText("|cFFFFD700Текущий результат:|r")
@@ -23930,6 +24471,29 @@ function TestCourseUI(moduleNumber)
         return
     end
 
+    local indices = {}
+
+    for k in pairs(db) do
+        if type(k) == "number" then
+            table.insert(indices, k)
+        end
+    end
+
+    table.sort(indices)
+
+    local total = #indices
+    local position
+
+    for i, idx in ipairs(indices) do
+        if idx == moduleNumber then
+            position = i
+            break
+        end
+    end
+
+    local prevIndex = (position and position > 1) and indices[position - 1] or nil
+    local nextIndex = (position and position < total) and indices[position + 1] or nil
+
     if not TestCourseUIFrame or not TestCourseUIFrame.SetModuleContent then
         TestCourseUIFrame = UI:new(UIParent)
     end
@@ -23938,19 +24502,26 @@ function TestCourseUI(moduleNumber)
 
     ui:SetCallbacks({
         onPrev = function()
-            print("UI signal: prev")
+            if prevIndex then
+                TestCourseUI(prevIndex)
+            end
         end,
 
         onNext = function()
-            print("UI signal: next")
+            if nextIndex then
+                TestCourseUI(nextIndex)
+            end
         end,
 
         onClose = function()
-            print("UI signal: close")
         end,
 
         onHelp = function(helpModules)
             ui:ShowHelp(helpModules or {1, 2})
+        end,
+
+        onSelectModule = function(index)
+            TestCourseUI(index)
         end,
 
         onExecute = function(editorName, code)
@@ -23964,6 +24535,10 @@ function TestCourseUI(moduleNumber)
                 expected = m.expectedOutput or "Ожидаемый результат",
                 current = code,
             })
+
+            -- Когда реальная проверка сможет подтвердить успех,
+            -- нужно будет вызвать примерно это:
+            -- ui:SetModuleCompleted(moduleNumber, true)
         end,
     })
 
@@ -24002,7 +24577,6 @@ function TestCourseUI(moduleNumber)
                 content = "<h>Задание на форматирование</h>\n" .. (m.formatTask.instruction or ""),
             })
         end
-
     elseif m.type == "commenttest" then
         blocks = {
             {
@@ -24021,10 +24595,11 @@ function TestCourseUI(moduleNumber)
     ui:SetModuleContent({
         title = m.title,
         index = moduleNumber,
-        total = #db,
-        prevEnabled = moduleNumber > 1,
-        nextEnabled = moduleNumber < #db,
-        helpModules = {1, 2},
+        total = total,
+        prevEnabled = prevIndex ~= nil,
+        nextEnabled = nextIndex ~= nil,
+        helpModules = m.helpModules or {1, 2},
+        moduleType = m.type,
         rawContent = blocks and nil or m.content,
         blocks = blocks,
     })
@@ -24195,6 +24770,134 @@ function Logic:SaveModuleProgress()
     nsDbc.luaTest.taskDetails[n].formatDone = self.formatDone == true
 end
 
+function Logic:IsInfoModule(moduleOrType)
+    local mtype = moduleOrType
+
+    if type(moduleOrType) == "table" then
+        mtype = moduleOrType.type
+    end
+
+    mtype = TrimString(mtype)
+
+    return mtype ~= "vartest"
+        and mtype ~= "printtest"
+        and mtype ~= "customtest"
+        and mtype ~= "commenttest"
+end
+
+function Logic:MarkInfoRead(moduleId)
+    local id = tonumber(moduleId) or moduleId
+    local m = self.db and self.db[id]
+
+    if type(m) ~= "table" then
+        return
+    end
+
+    if not self:IsInfoModule(m) then
+        return
+    end
+
+    self:EnsureSaved()
+
+    nsDbc.luaTest.taskDetails[id] = nsDbc.luaTest.taskDetails[id] or {}
+
+    if nsDbc.luaTest.taskDetails[id].read ~= true then
+        nsDbc.luaTest.taskDetails[id].read = true
+
+        if self.ui and self.ui.RefreshSidePanel then
+            self.ui:RefreshSidePanel()
+        end
+    end
+end
+
+function Logic:IsModuleCompleted(moduleId)
+    local id = tonumber(moduleId)
+
+    if not id then
+        return false
+    end
+
+    local m = self.db and self.db[id]
+
+    if type(m) ~= "table" then
+        return false
+    end
+
+    local mtype = TrimString(m.type)
+
+    self:EnsureSaved()
+
+    local details = nsDbc.luaTest.taskDetails[id]
+
+    if details == nil then
+        details = nsDbc.luaTest.taskDetails[tostring(id)]
+    end
+
+    details = type(details) == "table" and details or {}
+
+    -- Текущий модуль можно проверять по живому состоянию.
+    if id == self.current then
+        if mtype == "commenttest" then
+            return self.commentTestPassed == true
+        end
+
+        if mtype == "vartest" or mtype == "customtest" or mtype == "printtest" then
+            if type(m.tasks) == "table" then
+                self.done = self.done or {}
+
+                for i in ipairs(m.tasks) do
+                    if not self.done[i] then
+                        return false
+                    end
+                end
+            else
+                if not (self.allDone == true or details.completed == true) then
+                    return false
+                end
+            end
+
+            if mtype == "vartest" and m.formatTask then
+                return self.formatDone == true
+            end
+
+            return true
+        end
+
+        return details.read == true or details.completed == true
+    end
+
+    -- Остальные модули проверяем по сейвам.
+    if mtype == "commenttest" then
+        return details.completed == true or details.commentTestPassed == true
+    end
+
+    if mtype == "vartest" or mtype == "customtest" or mtype == "printtest" then
+        if type(m.tasks) == "table" then
+            for i in ipairs(m.tasks) do
+                local done = details.done and (details.done[i] or details.done[tostring(i)])
+
+                if not done then
+                    return false
+                end
+            end
+        else
+            if details.completed ~= true then
+                return false
+            end
+        end
+
+        if mtype == "vartest" and m.formatTask then
+            if details.formatDone ~= true then
+                return false
+            end
+        end
+
+        return true
+    end
+
+    return details.read == true or details.completed == true
+end
+
 function Logic:SaveCommentTest(code, passed)
     self:EnsureSaved()
 
@@ -24206,6 +24909,10 @@ function Logic:SaveCommentTest(code, passed)
     if passed ~= nil then
         nsDbc.luaTest.taskDetails[n].commentTestPassed = passed == true
         nsDbc.luaTest.taskDetails[n].completed = passed == true
+    end
+
+    if self.ui and self.ui.RefreshSidePanel then
+        self.ui:RefreshSidePanel()
     end
 end
 
@@ -24459,16 +25166,28 @@ function Logic:new(ui, modules)
 
     self.ui:SetCallbacks({
         onNext = function()
+            self:MarkInfoRead(self.current)
             self:ManageCourse("next")
         end,
+
         onPrev = function()
             self:ManageCourse("prev")
         end,
+
         onHelp = function(helpModules)
             self.ui:ShowHelp(helpModules)
         end,
+
         onExecute = function(editorName, code)
             self:CheckCode(editorName, code)
+        end,
+
+        onSelectModule = function(index)
+            self:ManageCourse(index)
+        end,
+
+        isModuleCompleted = function(index)
+            return self:IsModuleCompleted(index)
         end,
     })
 
