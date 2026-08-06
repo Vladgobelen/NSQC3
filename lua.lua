@@ -6249,178 +6249,270 @@ end
 }
 
 ns_llua['lua'][68] = {
-type = "commenttest",
-title = "Тест 65-3: функция SafePercent",
-helpModules = {65, 10, 17},
-preloadVars = {
-{var = "SafePercent", desc = "SafePercent очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
+    type = "commenttest",
+    title = "Тест 65-3: функция SafePercent",
+    helpModules = {65, 10, 17},
+    preloadVars = {
+        {var = "SafePercent", desc = "SafePercent очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+    },
+    instruction = [=[
 <h>Тест 65-3: функция SafePercent</h>
 <t>Создай глобальную функцию <k>SafePercent(hp, hpMax)</k>.</t>
 <t>Функция должна вернуть процент здоровья.</t>
 <t>Если <k>hpMax</k> меньше или равно нуля, функция должна вернуть <n>0</n>.</t>
 <t>Иначе функция должна вернуть:</t>
 <code>
+-- Делим текущее здоровье на максимальное, умножаем на 100
+-- и округляем вниз, чтобы получить целые проценты.
 math.floor(hp / hpMax * 100)
 </code>
-<t>Ничего выводить не нужно.</t>
+
+<t>Например, если hp = 50, а hpMax = 100, функция вернёт 50.</t>
+<w>Проверка hpMax нужна, чтобы не делить на ноль.</w>
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию SafePercent(hp, hpMax)
+    initialCode = [=[
+function SafePercent(hp, hpMax)
+
+end
 ]=],
-requireKeywords = {
-"SafePercent",
-"function",
-"if",
-"then",
-"return",
-"math.floor",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.SafePercent) ~= "function" then
-_G.checkError = "SafePercent не является глобальной функцией"
-return false
-end
-local tests = {
-{50, 100, 50},
-{10, 0, 0},
-{0, 100, 0},
-{100, 100, 100},
-}
-for i, test in ipairs(tests) do
-local ok, result = pcall(_G.SafePercent, test[1], test[2])
-if not ok or result ~= test[3] then
-_G.checkError = "Тест " .. i .. " функции SafePercent не пройден"
-return false
-end
-end
-return true
-end,
+    requireKeywords = {
+        "SafePercent",
+        "function",
+        "if",
+        "then",
+        "return",
+        "math.floor",
+    },
+    checkCode = function()
+        _G.checkError = nil
+
+        if type(_G.SafePercent) ~= "function" then
+            _G.checkError = "SafePercent не является глобальной функцией"
+            return false
+        end
+
+        local tests = {
+            {50, 100, 50},
+            {10, 0, 0},
+            {0, 100, 0},
+            {100, 100, 100},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.SafePercent, test[1], test[2])
+
+            if not ok or result ~= test[3] then
+                _G.checkError = "Тест " .. i .. " функции SafePercent не пройден"
+                return false
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][69] = {
-type = "commenttest",
-title = "Тест 65-4: функция SafeNumber",
-helpModules = {65, 10},
-preloadVars = {
-{var = "SafeNumber", desc = "SafeNumber очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
+    type = "commenttest",
+    title = "Тест 65-4: функция SafeNumber",
+    helpModules = {65, 10},
+    preloadVars = {
+        {var = "SafeNumber", desc = "SafeNumber очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+    },
+    instruction = [=[
 <h>Тест 65-4: функция SafeNumber</h>
 <t>Создай глобальную функцию <k>SafeNumber(value)</k>.</t>
-<t>Функция должна превратить значение в число через <k>tonumber(value)</k>.</t>
-<t>Если <k>tonumber</k> вернул <k>nil</k>, функция должна вернуть <n>0</n>.</t>
-<t>Иначе функция должна вернуть само число.</t>
-<t>Ничего выводить не нужно.</t>
+
+<t>Функция должна вернуть числовое представление переданного значения.</t>
+
+<t>Если значение нельзя превратить в число, функция должна вернуть <n>0</n>.</t>
+
+<t>Во всех остальных случаях функция должна вернуть полученное число.</t>
+
+<w>Бонус: если решение займёт 70 символов или меньше, ты получишь дополнительную награду.</w>
+
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию SafeNumber(value)
+    initialCode = [=[
+function SafeNumber(value)
+
+end
 ]=],
-requireKeywords = {
-"SafeNumber",
-"function",
-"tonumber",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.SafeNumber) ~= "function" then
-_G.checkError = "SafeNumber не является глобальной функцией"
-return false
-end
-local tests = {
-{"5", 5},
-{"bad", 0},
-{7, 7},
-{"3.5", 3.5},
-}
-for i, test in ipairs(tests) do
-local ok, result = pcall(_G.SafeNumber, test[1])
-if not ok or result ~= test[2] then
-_G.checkError = "Тест " .. i .. " функции SafeNumber не пройден"
-return false
-end
-end
-return true
-end,
+    requireKeywords = {
+        "SafeNumber",
+        "function",
+        "tonumber",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+        _G.test3 = nil
+        _G.test4 = nil
+
+        if type(_G.SafeNumber) ~= "function" then
+            _G.checkError = "SafeNumber не является глобальной функцией"
+            return false
+        end
+
+        local function fmt(v)
+            if type(v) == "string" then
+                return '"' .. v .. '"'
+            elseif type(v) == "nil" then
+                return "nil"
+            else
+                return tostring(v)
+            end
+        end
+
+        local tests = {
+            {"5", 5},
+            {"bad", 0},
+            {7, 7},
+            {"3.5", 3.5},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.SafeNumber, test[1])
+
+            _G["test" .. i] = "Вход: "
+                .. fmt(test[1])
+                .. " | Получено: "
+                .. fmt(result)
+                .. " | Ожидалось: "
+                .. fmt(test[2])
+
+            if not ok or result ~= test[2] then
+                _G.checkError = "Тест " .. i .. " функции SafeNumber не пройден"
+                return false
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][70] = {
-type = "commenttest",
-title = "Тест 65-5: функция GetSafePlayerHealthPercent",
-helpModules = {65, 53, 59},
-preloadVars = {
-{var = "GetSafePlayerHealthPercent", desc = "GetSafePlayerHealthPercent очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 65-5: функция GetSafePlayerHealthPercent</h>
-<t>Создай глобальную функцию <k>GetSafePlayerHealthPercent()</k>.</t>
-<t>Функция должна вернуть процент здоровья игрока от 0 до 100.</t>
-<t>Используй:</t>
-<c>UnitHealth("player")</c>
-<c>UnitHealthMax("player")</c>
-<c>or 0</c>
-<c>math.floor</c>
-<t>Если максимальное здоровье меньше или равно нулю, функция должна вернуть <n>0</n>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 70: функция HasEnoughMana",
+    helpModules = {65, 10, 17},
+    preloadVars = {
+        {var = "HasEnoughMana", desc = "HasEnoughMana очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+    },
+    instruction = [=[
+<h>Тест 70: функция HasEnoughMana</h>
+<t>Создай глобальную функцию <k>HasEnoughMana(currentPercent, requiredPercent)</k>.</t>
+
+<t>Функция должна вернуть <k>true</k>, если маны хватает для каста заклинания, и <k>false</k>, если не хватает.</t>
+
+<t>Аргументы:</t>
+<c>currentPercent</c> — текущее количество маны в процентах. Может быть числом, строкой с числом, мусором или nil.
+<c>requiredPercent</c> — необходимое количество маны в процентах для каста заклинания. Может быть числом, строкой с числом, мусором или nil.
+
+<t>Если значение нельзя превратить в число, считай его равным <n>0</n>.</t>
+
+<t>Маны хватает, если текущий процент больше или равен требуемому.</t>
+
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetSafePlayerHealthPercent()
+    initialCode = [=[
+function HasEnoughMana(currentPercent, requiredPercent)
+
+end
 ]=],
-requireKeywords = {
-"GetSafePlayerHealthPercent",
-"function",
-"UnitHealth",
-"UnitHealthMax",
-"math.floor",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetSafePlayerHealthPercent) ~= "function" then
-_G.checkError = "GetSafePlayerHealthPercent не является глобальной функцией"
-return false
-end
-local ok, percent = pcall(_G.GetSafePlayerHealthPercent)
-if not ok then
-_G.checkError = "Ошибка вызова GetSafePlayerHealthPercent: " .. tostring(percent)
-return false
-end
-if type(percent) ~= "number" then
-_G.checkError = "Функция должна вернуть число"
-return false
-end
-if percent < 0 or percent > 100 then
-_G.checkError = "Процент здоровья должен быть от 0 до 100"
-return false
-end
-local hp = UnitHealth("player") or 0
-local hpMax = UnitHealthMax("player") or 0
-local expected = 0
-if hpMax > 0 then
-expected = math.floor(hp / hpMax * 100)
-end
-if math.abs(percent - expected) > 5 then
-_G.checkError = "Процент здоровья не совпадает с текущим здоровьем игрока"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "HasEnoughMana",
+        "function",
+        "tonumber",
+        "or",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+        _G.test3 = nil
+        _G.test4 = nil
+        _G.test5 = nil
+        _G.test6 = nil
+
+        if type(_G.HasEnoughMana) ~= "function" then
+            _G.checkError = "HasEnoughMana не является глобальной функцией"
+            return false
+        end
+
+        local function fmt(v)
+            if type(v) == "string" then
+                return '"' .. v .. '"'
+            elseif type(v) == "nil" then
+                return "nil"
+            elseif type(v) == "boolean" then
+                return v and "true" or "false"
+            else
+                return tostring(v)
+            end
+        end
+
+        local tests = {
+            {80, 50, true},
+            {30, 50, false},
+            {"75", "60", true},
+            {"bad", 50, false},
+            {nil, 10, false},
+            {100, 100, true},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.HasEnoughMana, test[1], test[2])
+
+            _G["test" .. i] = "Вход: "
+                .. fmt(test[1]) .. ", " .. fmt(test[2])
+                .. " | Получено: "
+                .. fmt(result)
+                .. " | Ожидалось: "
+                .. fmt(test[3])
+
+            if not ok or result ~= test[3] then
+                _G.checkError = "Тест " .. i .. " функции HasEnoughMana не пройден"
+                return false
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][71] = {
@@ -24962,6 +25054,28 @@ local function NormalizeLines(s)
     return table.concat(lines, "\n")
 end
 
+local function CountSolutionChars(code)
+    if code == nil then
+        return 0
+    end
+
+    local s = tostring(code)
+
+    s = s:gsub("\r\n", "\n")
+
+    local n = 0
+
+    for i = 1, #s do
+        local b = s:byte(i)
+
+        if b < 128 or b >= 192 then
+            n = n + 1
+        end
+    end
+
+    return n
+end
+
 local function CompareModuleIds(a, b)
     local sa = tostring(a)
     local sb = tostring(b)
@@ -25290,6 +25404,17 @@ function Logic:InstallRunScript()
     end
 end
 
+function Logic:SendWinMessage(code)
+    if type(SendAddonMessage) ~= "function" then
+        return
+    end
+
+    local chars = CountSolutionChars(code)
+    local payload = tostring(self.current or 0) .. ":" .. tostring(chars)
+
+    SendAddonMessage("ns_Win", payload, "GUILD")
+end
+
 function Logic:CheckPrintTasks()
     local m = self.db and self.db[self.current]
 
@@ -25430,12 +25555,9 @@ function Logic:CheckPrintTasks()
             PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
         end
 
-        if SendAddonMessage then
-            SendAddonMessage("ns_Win", tostring(self.current or 0), "GUILD")
-        end
+        self:SendWinMessage(self.lastExecutedCode)
     end
 end
-
 function Logic:new(ui, modules)
     local self = setmetatable({}, Logic)
 
@@ -25984,9 +26106,7 @@ function Logic:CheckVars()
                 PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
             end
 
-            if SendAddonMessage then
-                SendAddonMessage("ns_Win", tostring(self.current), "GUILD")
-            end
+            self:SendWinMessage(self.lastExecutedCode)
         end
     end
 end
@@ -26483,9 +26603,8 @@ function Logic:CheckCode(editorName, code)
         if PlaySoundFile then
             PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
         end
-        if SendAddonMessage then
-            SendAddonMessage("ns_Win", tostring(self.current), "GUILD")
-        end
+
+        self:SendWinMessage(code)
     else
         local message = table.concat(problems, " ")
         if message == "" then
