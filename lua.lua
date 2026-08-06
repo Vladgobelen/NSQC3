@@ -7098,56 +7098,65 @@ end
 
 ns_llua['lua'][75] = {
     type = "commenttest",
-    title = "Тест 71-4: функция AreUnitsSame",
+    title = "Тест 71-5: функция IsTargetAnotherPlayer",
     helpModules = {71, 17, 45},
     preloadVars = {
-        {var = "AreUnitsSame", desc = "AreUnitsSame очищается перед проверкой"},
+        {var = "IsTargetAnotherPlayer", desc = "IsTargetAnotherPlayer очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
-        {var = "test1", desc = "test1 очищается перед проверкой"},
-        {var = "test2", desc = "test2 очищается перед проверкой"},
-        {var = "test3", desc = "test3 очищается перед проверкой"},
-        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "testResult", desc = "testResult очищается перед проверкой"},
     },
     reportVars = {
         "checkError",
-        "test1",
-        "test2",
-        "test3",
-        "test4",
+        "testResult",
     },
     instruction = [=[
-<h>Тест 71-4: функция AreUnitsSame</h>
-<t>Создай глобальную функцию <k>AreUnitsSame(unit1, unit2)</k>.</t>
+<h>Тест 71-5: функция IsTargetAnotherPlayer</h>
+<t>Создай глобальную функцию <k>IsTargetAnotherPlayer()</k>.</t>
 
-<t>Аргументы — две строки UnitID.</t>
+<t>Перед проверкой выбери цель.</t>
 
-<t>Функция должна вернуть <k>true</k>, если оба юнита существуют и являются одним и тем же юнитом.</t>
+<t>Функция должна сравнить имя игрока и имя цели.</t>
 
-<t>Во всех остальных случаях функция должна вернуть <k>false</k>.</t>
+<t>Если имена совпадают (цель — сам игрок), функция должна вернуть <k>nil</k>.</t>
 
+<t>Если имена разные, функция должна вернуть <k>true</k>.</t>
+
+<w>Сравнивай именно по имени через UnitName.</w>
 <w>Ничего выводить не нужно.</w>
 ]=],
     initialCode = [=[
-function AreUnitsSame(unit1, unit2)
+function IsTargetAnotherPlayer()
 
 end
 ]=],
     requireKeywords = {
-        "AreUnitsSame",
+        "IsTargetAnotherPlayer",
         "function",
-        "UnitIsUnit",
+        "UnitName",
+        "player",
+        "target",
         "return",
+    },
+    forbidKeywords = {
+        "print",
     },
     checkCode = function()
         _G.checkError = nil
-        _G.test1 = nil
-        _G.test2 = nil
-        _G.test3 = nil
-        _G.test4 = nil
+        _G.testResult = nil
 
-        if type(_G.AreUnitsSame) ~= "function" then
-            _G.checkError = "AreUnitsSame не является глобальной функцией"
-            return false
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.IsTargetAnotherPlayer) ~= "function" then
+            return fail("IsTargetAnotherPlayer не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+
+        if not okExists or not exists then
+            return fail("Нет цели. Выбери цель и нажми проверку снова.")
         end
 
         local function fmt(v)
@@ -7162,35 +7171,38 @@ end
             end
         end
 
-        local function getExpected(u1, u2)
-            if not UnitExists(u1) or not UnitExists(u2) then
-                return false
-            end
-            return UnitIsUnit(u1, u2) and true or false
+        local okName1, playerName = pcall(UnitName, "player")
+        local okName2, targetName = pcall(UnitName, "target")
+
+        if not okName1 or not okName2 then
+            return fail("Не удалось получить имена игрока или цели.")
         end
 
-        local tests = {
-            {u1 = "player", u2 = "player"},
-            {u1 = "player", u2 = "ns_fake_unit"},
-            {u1 = "ns_fake_unit", u2 = "ns_fake_unit"},
-            {u1 = "player", u2 = "target"},
-        }
+        local expected
 
-        for i, test in ipairs(tests) do
-            local expected = getExpected(test.u1, test.u2)
-            local ok, result = pcall(_G.AreUnitsSame, test.u1, test.u2)
+        if playerName == targetName then
+            expected = nil
+        else
+            expected = true
+        end
 
-            _G["test" .. i] = "Вход: "
-                .. fmt(test.u1) .. ", " .. fmt(test.u2)
-                .. " | Получено: "
-                .. fmt(result)
-                .. " | Ожидалось: "
-                .. fmt(expected)
+        local ok, result = pcall(_G.IsTargetAnotherPlayer)
 
-            if not ok or result ~= expected then
-                _G.checkError = "Тест " .. i .. " функции AreUnitsSame не пройден"
-                return false
-            end
+        _G.testResult = "Игрок: "
+            .. fmt(playerName)
+            .. " | Цель: "
+            .. fmt(targetName)
+            .. " | Получено: "
+            .. fmt(result)
+            .. " | Ожидалось: "
+            .. fmt(expected)
+
+        if not ok then
+            return fail("Ошибка вызова IsTargetAnotherPlayer: " .. tostring(result))
+        end
+
+        if result ~= expected then
+            return fail("Результат не совпадает с ожидаемым")
         end
 
         return true
@@ -7199,59 +7211,73 @@ end
 
 ns_llua['lua'][76] = {
     type = "commenttest",
-    title = "Тест 71-5: функция GetVisibleUnitsReport",
-    helpModules = {71, 31, 12},
+    title = "Практика: Отчёт по классам в рейде",
+    helpModules = {71, 44, 44.1, 57},
     preloadVars = {
-        {var = "GetVisibleUnitsReport", desc = "GetVisibleUnitsReport очищается перед проверкой"},
+        {var = "GetRaidClassReport", desc = "GetRaidClassReport очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
-        {var = "test1", desc = "test1 очищается перед проверкой"},
-        {var = "test2", desc = "test2 очищается перед проверкой"},
-        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "expectedResult", desc = "expectedResult очищается перед проверкой"},
+        {var = "testResult", desc = "testResult очищается перед проверкой"},
     },
     reportVars = {
         "checkError",
-        "test1",
-        "test2",
-        "test3",
+        "expectedResult",
+        "testResult",
     },
     instruction = [=[
-<h>Тест 71-5: функция GetVisibleUnitsReport</h>
-<t>Создай глобальную функцию <k>GetVisibleUnitsReport(units)</k>.</t>
+<h>Практика: Отчёт по классам в рейде</h>
+<t>Создай глобальную функцию <k>GetRaidClassReport()</k>.</t>
 
-<t>Аргумент <k>units</k> — таблица со строками UnitID.</t>
+<t>Перед проверкой убедись, что ты состоишь в рейде.</t>
 
-<t>Для каждого юнита функция должна добавить в отчёт строку вида:</t>
-<s>"UnitID: виден"</s>
-<t>если юнит виден, или</t>
-<s>"UnitID: не виден"</s>
-<t>если юнит не виден.</t>
+<t>Функция должна посчитать, сколько представителей каждого класса есть в рейде, и вернуть одну строку.</t>
 
-<t>Элементы отчёта должны быть объединены через точку с запятой и пробел.</t>
+<t>Формат каждого элемента:</t>
+<s>Класс: N</s>
 
-<t>Если таблица пустая или аргумент не является таблицей, функция должна вернуть пустую строку.</t>
+<t>Элементы должны быть объединены через запятую и пробел.</t>
 
+<t>Классы должны идти в алфавитном порядке.</t>
+
+<t>В строку попадают только те классы, которые реально присутствуют в рейде.</t>
+
+<t>Класс должен быть читаемым (локализованным), а не токеном.</t>
+
+<t>Пример результата:</t>
+<s>Воин: 2, Рыцарь смерти: 1, Паладин: 3</s>
+
+<w>Если ты не в рейде, проверка выдаст предупреждение.</w>
 <w>Ничего выводить не нужно.</w>
 ]=],
     initialCode = [=[
-function GetVisibleUnitsReport(units)
+function GetRaidClassReport()
 
 end
 ]=],
     requireKeywords = {
-        "GetVisibleUnitsReport",
+        "GetRaidClassReport",
         "function",
-        "UnitIsVisible",
+        "raid",
+        "UnitExists",
+        "UnitClass",
+        "table.sort",
         "return",
+    },
+    forbidKeywords = {
+        "print",
     },
     checkCode = function()
         _G.checkError = nil
-        _G.test1 = nil
-        _G.test2 = nil
-        _G.test3 = nil
+        _G.expectedResult = nil
+        _G.testResult = nil
 
-        if type(_G.GetVisibleUnitsReport) ~= "function" then
-            _G.checkError = "GetVisibleUnitsReport не является глобальной функцией"
-            return false
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetRaidClassReport) ~= "function" then
+            return fail("GetRaidClassReport не является глобальной функцией")
         end
 
         local function fmt(v)
@@ -7261,55 +7287,67 @@ end
                 return "nil"
             elseif type(v) == "boolean" then
                 return v and "true" or "false"
-            elseif type(v) == "table" then
-                local parts = {}
-                for i = 1, #v do
-                    parts[i] = fmt(v[i])
-                end
-                return "{" .. table.concat(parts, ", ") .. "}"
             else
                 return tostring(v)
             end
         end
 
-        local function getExpected(units)
-            if type(units) ~= "table" then
-                return ""
-            end
-
-            local parts = {}
-            for _, unit in ipairs(units) do
-                if UnitIsVisible(unit) then
-                    table.insert(parts, unit .. ": виден")
-                else
-                    table.insert(parts, unit .. ": не виден")
-                end
-            end
-
-            return table.concat(parts, "; ")
+        local function normalize(s)
+            s = tostring(s)
+            s = s:gsub("%s+", " ")
+            return s:match("^%s*(.-)%s*$")
         end
 
-        local tests = {
-            {input = {"player", "ns_fake_unit"}},
-            {input = {"player", "player"}},
-            {input = "bad"},
-        }
+        local counts = {}
+        local total = 0
 
-        for i, test in ipairs(tests) do
-            local expected = getExpected(test.input)
-            local ok, result = pcall(_G.GetVisibleUnitsReport, test.input)
+        for i = 1, 40 do
+            local unit = "raid" .. i
 
-            _G["test" .. i] = "Вход: "
-                .. fmt(test.input)
-                .. " | Получено: "
-                .. fmt(result)
-                .. " | Ожидалось: "
-                .. fmt(expected)
+            if UnitExists(unit) then
+                total = total + 1
 
-            if not ok or result ~= expected then
-                _G.checkError = "Тест " .. i .. " функции GetVisibleUnitsReport не пройден"
-                return false
+                local okClass, className = pcall(UnitClass, unit)
+
+                if okClass and type(className) == "string" and className ~= "" then
+                    counts[className] = (counts[className] or 0) + 1
+                end
             end
+        end
+
+        if total == 0 then
+            return fail("Ты не в рейде. Собери рейд и нажми проверку снова.")
+        end
+
+        local keys = {}
+        for k in pairs(counts) do
+            table.insert(keys, k)
+        end
+        table.sort(keys)
+
+        local parts = {}
+        for _, k in ipairs(keys) do
+            table.insert(parts, k .. ": " .. counts[k])
+        end
+
+        local expected = table.concat(parts, ", ")
+
+        _G.expectedResult = fmt(expected)
+
+        local ok, result = pcall(_G.GetRaidClassReport)
+
+        _G.testResult = fmt(result)
+
+        if not ok then
+            return fail("Ошибка вызова GetRaidClassReport: " .. tostring(result))
+        end
+
+        if type(result) ~= "string" then
+            return fail("Функция должна вернуть строку")
+        end
+
+        if normalize(result) ~= normalize(expected) then
+            return fail("Строка не совпадает с ожидаемой")
         end
 
         return true
@@ -24964,6 +25002,124 @@ function UI:MarkModuleReadIfInfo(index)
     self:MarkModuleRead(index)
 end
 
+function UI:_GetSortedModuleIndices()
+    local db = ns_llua and ns_llua["lua"] or {}
+    local indices = {}
+
+    for k in pairs(db) do
+        if type(k) == "number" then
+            table.insert(indices, k)
+        end
+    end
+
+    table.sort(indices)
+
+    return indices
+end
+
+function UI:_GetModulePosition(index, indices)
+    index = tonumber(index)
+
+    if not index then
+        return nil
+    end
+
+    indices = indices or self:_GetSortedModuleIndices()
+
+    for pos, idx in ipairs(indices) do
+        if idx == index then
+            return pos
+        end
+    end
+
+    return nil
+end
+
+function UI:_GetFirstIncompleteModuleIndex(indices)
+    indices = indices or self:_GetSortedModuleIndices()
+
+    for _, idx in ipairs(indices) do
+        if not self:_IsModuleDone(idx) then
+            return idx
+        end
+    end
+
+    return nil
+end
+
+function UI:CanSelectModule(index, indices, firstIncomplete)
+    index = tonumber(index)
+
+    if not index then
+        return false
+    end
+
+    local db = ns_llua and ns_llua["lua"] or {}
+
+    if db[index] == nil then
+        return false
+    end
+
+    local current = tonumber(self.currentModuleIndex)
+
+    if current == nil then
+        return true
+    end
+
+    if index == current then
+        return true
+    end
+
+    indices = indices or self:_GetSortedModuleIndices()
+    firstIncomplete = firstIncomplete or self:_GetFirstIncompleteModuleIndex(indices)
+
+    local currentPos = self:_GetModulePosition(current, indices)
+    local targetPos = self:_GetModulePosition(index, indices)
+
+    -- Запасной вариант, если вдруг позиция не найдена.
+    if not currentPos or not targetPos then
+        if index < current then
+            if self:_IsModuleDone(index) then
+                return true
+            end
+
+            return index == firstIncomplete
+        end
+
+        if not self:_IsModuleDone(current) then
+            return false
+        end
+
+        return self:_IsModuleDone(index)
+    end
+
+    -- Переход назад.
+    if targetPos < currentPos then
+        -- Зелёные модули назад доступны.
+        if self:_IsModuleDone(index) then
+            return true
+        end
+
+        -- Серый модуль назад доступен только если он самый первый непройденный.
+        return index == firstIncomplete
+    end
+
+    -- Переход вперёд.
+    -- Нельзя идти вперёд, если текущий модуль ещё не пройден.
+    if not self:_IsModuleDone(current) then
+        return false
+    end
+
+    -- Нельзя перепрыгивать через непройденные модули.
+    for pos = currentPos + 1, targetPos do
+        if not self:_IsModuleDone(indices[pos]) then
+            return false
+        end
+    end
+
+    return true
+end
+
 function UI:RefreshSidePanel()
     if not self.sidePanel or not self.sideContent then
         return
@@ -24974,16 +25130,10 @@ function UI:RefreshSidePanel()
     clearBlocks(self.sideRows)
     self.sideRows = {}
 
-    local db = ns_llua and ns_llua['lua'] or {}
-    local indices = {}
-
-    for k in pairs(db) do
-        if type(k) == "number" then
-            table.insert(indices, k)
-        end
-    end
-
-    table.sort(indices)
+    local db = ns_llua and ns_llua["lua"] or {}
+    local indices = self:_GetSortedModuleIndices()
+    local firstIncomplete = self:_GetFirstIncompleteModuleIndex(indices)
+    local currentIndex = tonumber(self.currentModuleIndex)
 
     local width = math.max(
         10,
@@ -24997,6 +25147,7 @@ function UI:RefreshSidePanel()
         local m = db[idx] or {}
         local isInfo = self:_IsModuleInfo(m)
         local done = self:_IsModuleDone(idx)
+        local allowed = self:CanSelectModule(idx, indices, firstIncomplete)
 
         local button = CreateFrame("Button", nil, self.sideContent)
         button:EnableMouse(true)
@@ -25011,11 +25162,12 @@ function UI:RefreshSidePanel()
         button:SetWidth(width)
         button:SetPoint("TOPLEFT", self.sideContent, "TOPLEFT", 0, y)
         button:SetFrameLevel(contentLevel + 5)
+        button:SetAlpha(allowed and 1.0 or 0.55)
 
         local bg = button:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints(button)
 
-        if self.currentModuleIndex == idx then
+        if currentIndex == idx then
             bg:SetTexture(0.20, 0.28, 0.45, 0.90)
         else
             bg:SetTexture(0.10, 0.11, 0.16, 0.60)
@@ -25038,15 +25190,26 @@ function UI:RefreshSidePanel()
         title = (title:gsub("\n", " "))
         title = (title:gsub("\r", " "))
 
-        local prefix = (self.currentModuleIndex == idx and "> " or "")
-        local color = done and "|cFF00FF00" or "|cFF999999"
+        local prefix = (currentIndex == idx and "> " or "")
+        local textColor
 
-        fs:SetText(color .. prefix .. idx .. ". " .. escapePipes(title) .. "|r")
+        if not allowed then
+            textColor = "|cFF555555"
+        elseif done then
+            textColor = "|cFF00FF00"
+        else
+            textColor = "|cFF999999"
+        end
+
+        fs:SetText(textColor .. prefix .. idx .. ". " .. escapePipes(title) .. "|r")
 
         local statusText
         local statusR, statusG, statusB
 
-        if done then
+        if not allowed then
+            statusText = "Недоступен"
+            statusR, statusG, statusB = 0.80, 0.35, 0.35
+        elseif done then
             statusText = "Пройден"
             statusR, statusG, statusB = 0.2, 1.0, 0.2
         elseif isInfo then
@@ -25062,7 +25225,13 @@ function UI:RefreshSidePanel()
             GameTooltip:ClearLines()
             GameTooltip:AddLine(escapePipes(title), 1, 1, 1, true)
             GameTooltip:AddLine(statusText, statusR, statusG, statusB, true)
-            GameTooltip:AddLine("ЛКМ — открыть", 0.6, 0.6, 0.6, true)
+
+            if allowed then
+                GameTooltip:AddLine("ЛКМ — открыть", 0.6, 0.6, 0.6, true)
+            else
+                GameTooltip:AddLine("Модуль пока недоступен", 0.65, 0.35, 0.35, true)
+            end
+
             GameTooltip:Show()
         end)
 
@@ -25071,6 +25240,12 @@ function UI:RefreshSidePanel()
         end)
 
         button:SetScript("OnClick", function()
+            -- Дополнительная проверка на случай, если состояние изменилось,
+            -- но панель ещё не была полностью обновлена.
+            if not self:CanSelectModule(idx) then
+                return
+            end
+
             if self.callbacks and type(self.callbacks.onSelectModule) == "function" then
                 self.callbacks.onSelectModule(idx)
             elseif logic and type(logic.ManageCourse) == "function" then
