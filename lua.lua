@@ -6422,6 +6422,8 @@ ns_llua['lua'][70] = {
         {var = "test4", desc = "test4 очищается перед проверкой"},
         {var = "test5", desc = "test5 очищается перед проверкой"},
         {var = "test6", desc = "test6 очищается перед проверкой"},
+        {var = "test7", desc = "test7 очищается перед проверкой"},
+        {var = "test8", desc = "test8 очищается перед проверкой"},
     },
     reportVars = {
         "checkError",
@@ -6431,33 +6433,40 @@ ns_llua['lua'][70] = {
         "test4",
         "test5",
         "test6",
+        "test7",
+        "test8",
     },
     instruction = [=[
 <h>Тест 70: функция HasEnoughMana</h>
-<t>Создай глобальную функцию <k>HasEnoughMana(currentPercent, requiredPercent)</k>.</t>
-
-<t>Функция должна вернуть <k>true</k>, если маны хватает для каста заклинания, и <k>false</k>, если не хватает.</t>
+<t>Создай глобальную функцию <k>HasEnoughMana(currentMana, requiredPercent, maxMana)</k>.</t>
 
 <t>Аргументы:</t>
-<c>currentPercent</c> — текущее количество маны в процентах. Может быть числом, строкой с числом, мусором или nil.
-<c>requiredPercent</c> — необходимое количество маны в процентах для каста заклинания. Может быть числом, строкой с числом, мусором или nil.
+<c>currentMana</c> — текущее количество маны. Может быть числом, строкой с числом, мусором или nil.
+<c>requiredPercent</c> — необходимый процент маны для каста заклинания. Может быть числом, строкой с числом, мусором или nil.
+<c>maxMana</c> — максимальное количество маны. Может быть числом, строкой с числом, мусором или nil.
+
+<t>Функция должна:</t>
+<t>1. Безопасно преобразовать все три аргумента в числа.</t>
+<t>2. Вычислить текущий процент маны от максимума.</t>
+<t>3. Вернуть <k>true</k>, если текущего процента хватает для каста, и <k>false</k>, если не хватает.</t>
 
 <t>Если значение нельзя превратить в число, считай его равным <n>0</n>.</t>
+<t>Если максимальное количество маны равно нулю или меньше, функция должна вернуть <k>false</k>.</t>
 
-<t>Маны хватает, если текущий процент больше или равен требуемому.</t>
+<w>Бонусная награда за компактное решение:</w>
+<t>Меньше <n>210</n> символов — <n>2</n> опыта и <n>300</n> репутации.</t>
+<t>Меньше <n>140</n> символов — <n>3</n> опыта и <n>500</n> репутации.</t>
 
 <w>Ничего выводить не нужно.</w>
 ]=],
     initialCode = [=[
-function HasEnoughMana(currentPercent, requiredPercent)
+function HasEnoughMana(currentMana, requiredPercent, maxMana)
 
 end
 ]=],
     requireKeywords = {
         "HasEnoughMana",
         "function",
-        "tonumber",
-        "or",
         "return",
     },
     checkCode = function()
@@ -6468,6 +6477,8 @@ end
         _G.test4 = nil
         _G.test5 = nil
         _G.test6 = nil
+        _G.test7 = nil
+        _G.test8 = nil
 
         if type(_G.HasEnoughMana) ~= "function" then
             _G.checkError = "HasEnoughMana не является глобальной функцией"
@@ -6487,25 +6498,37 @@ end
         end
 
         local tests = {
-            {80, 50, true},
-            {30, 50, false},
-            {"75", "60", true},
-            {"bad", 50, false},
-            {nil, 10, false},
-            {100, 100, true},
+            {750, 30, 1000, true},
+            {200, 50, 1000, false},
+            {"800", "60", "1000", true},
+            {"bad", 30, 1000, false},
+            {nil, 10, 1000, false},
+            {500, 100, 500, true},
+            {300, 50, 500, true},
+            {100, 50, 0, false},
         }
 
         for i, test in ipairs(tests) do
-            local ok, result = pcall(_G.HasEnoughMana, test[1], test[2])
+            local ok, result = pcall(_G.HasEnoughMana, test[1], test[2], test[3])
+
+            local rawMana = tonumber(test[1]) or 0
+            local rawMax = tonumber(test[3]) or 0
+            local currentPercent = 0
+
+            if rawMax > 0 then
+                currentPercent = rawMana / rawMax * 100
+            end
 
             _G["test" .. i] = "Вход: "
-                .. fmt(test[1]) .. ", " .. fmt(test[2])
+                .. fmt(test[1]) .. ", " .. fmt(test[2]) .. ", " .. fmt(test[3])
+                .. " | Мана: " .. fmt(rawMana) .. "/" .. fmt(rawMax)
+                .. " (" .. fmt(currentPercent) .. "%)"
                 .. " | Получено: "
                 .. fmt(result)
                 .. " | Ожидалось: "
-                .. fmt(test[3])
+                .. fmt(test[4])
 
-            if not ok or result ~= test[3] then
+            if not ok or result ~= test[4] then
                 _G.checkError = "Тест " .. i .. " функции HasEnoughMana не пройден"
                 return false
             end
