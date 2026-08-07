@@ -6282,6 +6282,7 @@ function NSPauk:FlushSessionRecordQueue()
         level,
         left
     ))
+    SendAddonMessage("nsCountP", count, "GUILD")
 end
 
 function NSPauk:ResetProgress()
@@ -9217,62 +9218,51 @@ end
 
 function NSPauk:NP_BuildRoute(from, to)
     local S = self.S
-
     local sw, sh = self:GetScreenSize()
     S.SW, S.SH = sw, sh
-
     local gap = self:NP_GetGap()
-
     local frames = self:NP_GetVisibleFrameRects(from, to, 280)
     local threads = self:NP_GetWebThreads(from, to, 260)
-
     local nodes = {}
     local edges = {}
-
+    
     local function addNode(n)
         table.insert(nodes, n)
         edges[#nodes] = {}
         return #nodes
     end
-
+    
     local function pointNearWeb(point)
         if not point
             or type(point.x) ~= "number"
             or type(point.y) ~= "number" then
             return false
         end
-
         local checkDist = gap * 1.5
-
         for _, info in ipairs(threads) do
             if info.thread then
                 local _, d = self:NP_NearestThreadT(info.thread, point.x, point.y)
-
                 if d <= checkDist then
                     return true
                 end
             end
         end
-
         return false
     end
-
+    
     -- Если обе точки уже возле паутины, маршрутизатор должен сначала
     -- пытаться идти по паутине, а не по фреймам/краям экрана.
-    local preferWeb = pointNearWeb(from) and pointNearWeb(to)
-
-    local EDGE_PENALTY = preferWeb and 2.40 or 1.60
-    local WEB_BONUS = preferWeb and 0.42 or 0.70
-    local FRAME_BONUS = preferWeb and 1.25 or 1.05
-    local GAP_PENALTY = preferWeb and 1.45 or 1.10
-    local HUB_BONUS = preferWeb and 0.30 or 0.55
-
+    local EDGE_PENALTY = 2.00
+    local WEB_BONUS    = 0.30
+    local FRAME_BONUS  = 0.70
+    local GAP_PENALTY  = 1.00
+    local HUB_BONUS    = 2.50
+    
     local function addEdge(a, b, w, kind)
         if a and b and a ~= b then
             if not w or w < 0 then
                 w = 0
             end
-
             if kind == "edge" then
                 w = w * EDGE_PENALTY
             elseif kind == "web" then
@@ -9284,12 +9274,11 @@ function NSPauk:NP_BuildRoute(from, to)
             elseif kind == "hub" then
                 w = w * HUB_BONUS
             end
-
             table.insert(edges[a], { to = b, w = w })
             table.insert(edges[b], { to = a, w = w })
         end
     end
-
+    
     local function addEdgeNode(x, y, side)
         addNode({
             x = x,
@@ -9298,30 +9287,25 @@ function NSPauk:NP_BuildRoute(from, to)
             edgeSide = side,
         })
     end
-
+    
     addEdgeNode(0, 0, "bottom")
     addEdgeNode(sw * 0.5, 0, "bottom")
     addEdgeNode(sw, 0, "bottom")
-
     addEdgeNode(sw, 0, "right")
     addEdgeNode(sw, sh * 0.5, "right")
     addEdgeNode(sw, sh, "right")
-
     addEdgeNode(sw, sh, "top")
     addEdgeNode(sw * 0.5, sh, "top")
     addEdgeNode(0, sh, "top")
-
     addEdgeNode(0, sh, "left")
     addEdgeNode(0, sh * 0.5, "left")
     addEdgeNode(0, 0, "left")
-
+    
     local function addEdgeProjection(id)
         local n = nodes[id]
-
         if not n or n.kind == "edge" then
             return
         end
-
         if n.x <= gap then
             local eid = addNode({
                 x = 0,
@@ -9329,10 +9313,8 @@ function NSPauk:NP_BuildRoute(from, to)
                 kind = "edge",
                 edgeSide = "left",
             })
-
             addEdge(id, eid, math.abs(n.x), "edge")
         end
-
         if n.x >= sw - gap then
             local eid = addNode({
                 x = sw,
@@ -9340,10 +9322,8 @@ function NSPauk:NP_BuildRoute(from, to)
                 kind = "edge",
                 edgeSide = "right",
             })
-
             addEdge(id, eid, math.abs(sw - n.x), "edge")
         end
-
         if n.y <= gap then
             local eid = addNode({
                 x = n.x,
@@ -9351,10 +9331,8 @@ function NSPauk:NP_BuildRoute(from, to)
                 kind = "edge",
                 edgeSide = "bottom",
             })
-
             addEdge(id, eid, math.abs(n.y), "edge")
         end
-
         if n.y >= sh - gap then
             local eid = addNode({
                 x = n.x,
@@ -9362,15 +9340,13 @@ function NSPauk:NP_BuildRoute(from, to)
                 kind = "edge",
                 edgeSide = "top",
             })
-
             addEdge(id, eid, math.abs(sh - n.y), "edge")
         end
     end
-
+    
     for fi, rect in ipairs(frames) do
         local cx = (rect.left + rect.right) / 2
         local cy = (rect.bottom + rect.top) / 2
-
         local pts = {
             { x = rect.left, y = rect.bottom },
             { x = cx, y = rect.bottom },
@@ -9381,9 +9357,7 @@ function NSPauk:NP_BuildRoute(from, to)
             { x = rect.left, y = rect.top },
             { x = rect.left, y = cy },
         }
-
         local ids = {}
-
         for _, p in ipairs(pts) do
             local id = addNode({
                 x = p.x,
@@ -9393,34 +9367,28 @@ function NSPauk:NP_BuildRoute(from, to)
                 name = rect.name,
                 frame = rect.frame,
             })
-
             ids[#ids + 1] = id
         end
-
         frames[fi].nodeIds = ids
-
+        
         for a = 1, #ids do
             for b = a + 1, #ids do
                 local na = nodes[ids[a]]
                 local nb = nodes[ids[b]]
-
                 local dx = na.x - nb.x
                 local dy = na.y - nb.y
-
                 addEdge(ids[a], ids[b], math.sqrt(dx * dx + dy * dy), "frame")
             end
-
             addEdgeProjection(ids[a])
         end
     end
-
+    
     local threadNodeIdByThread = {}
     local threadSamplesByThread = {}
-
+    
     for wi, info in ipairs(threads) do
         local ids = {}
         local prevId = nil
-
         for _, p in ipairs(info.samples) do
             local id = addNode({
                 x = p.x,
@@ -9429,58 +9397,44 @@ function NSPauk:NP_BuildRoute(from, to)
                 webId = wi,
                 thread = info.thread,
             })
-
             ids[#ids + 1] = id
-
             if prevId then
                 local pp = nodes[prevId]
-
                 local dx = pp.x - p.x
                 local dy = pp.y - p.y
-
                 addEdge(prevId, id, math.sqrt(dx * dx + dy * dy), "web")
             end
-
             addEdgeProjection(id)
-
             prevId = id
         end
-
         threads[wi].nodeIds = ids
-
         if info.thread then
             threadNodeIdByThread[info.thread] = ids
             threadSamplesByThread[info.thread] = info.samples
         end
     end
-
+    
     local function nearestNodeIdTo(ids, samples, x, y)
         if not ids or not samples then
             return nil
         end
-
         local bestId = nil
         local bestD2 = math.huge
-
         for i, p in ipairs(samples) do
             local id = ids[i]
-
             if id then
                 local dx = p.x - x
                 local dy = p.y - y
-
                 local d2 = dx * dx + dy * dy
-
                 if d2 < bestD2 then
                     bestD2 = d2
                     bestId = id
                 end
             end
         end
-
         return bestId, bestD2
     end
-
+    
     -- Хаб-коннекторы.
     -- Для живой паутины с реальным хаб-фреймом добавляем условную точку
     -- в центре хаба и соединяем её с началами основных нитей.
@@ -9494,7 +9448,6 @@ function NSPauk:NP_BuildRoute(from, to)
             and #inst.conns > 0 then
             local hubX = inst.hub.rect.cx
             local hubY = inst.hub.rect.cy
-
             if type(hubX) == "number" and type(hubY) == "number" then
                 local hubId = addNode({
                     x = hubX,
@@ -9502,7 +9455,6 @@ function NSPauk:NP_BuildRoute(from, to)
                     kind = "hub",
                     hubInstance = inst.id,
                 })
-
                 for _, conn in ipairs(inst.conns) do
                     if conn.alive
                         and conn.thread
@@ -9511,7 +9463,6 @@ function NSPauk:NP_BuildRoute(from, to)
                         and #conn.textures > 0 then
                         local ids = threadNodeIdByThread[conn.thread]
                         local samples = threadSamplesByThread[conn.thread]
-
                         if ids and samples then
                             local nodeId = nearestNodeIdTo(
                                 ids,
@@ -9519,19 +9470,14 @@ function NSPauk:NP_BuildRoute(from, to)
                                 conn.thread.p0.x,
                                 conn.thread.p0.y
                             )
-
                             if nodeId then
                                 local n = nodes[nodeId]
-
                                 local dx = hubX - n.x
                                 local dy = hubY - n.y
-
                                 local d = math.sqrt(dx * dx + dy * dy)
-
                                 if d < 1 then
                                     d = 1
                                 end
-
                                 addEdge(hubId, nodeId, d, "hub")
                             end
                         end
@@ -9540,43 +9486,34 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
     end
-
+    
     local supportCount = #nodes
-
     for i = 1, supportCount do
         local ni = nodes[i]
-
         if ni.kind == "frame" or ni.kind == "web" or ni.kind == "hub" then
             for j = i + 1, supportCount do
                 local nj = nodes[j]
-
                 if nj.kind == "frame" or nj.kind == "web" or nj.kind == "hub" then
                     local same = false
-
                     if ni.kind == "frame"
                         and nj.kind == "frame"
                         and ni.frameId == nj.frameId then
                         same = true
                     end
-
                     if ni.kind == "web"
                         and nj.kind == "web"
                         and ni.webId == nj.webId then
                         same = true
                     end
-
                     if ni.kind == "hub"
                         and nj.kind == "hub"
                         and ni.hubInstance == nj.hubInstance then
                         same = true
                     end
-
                     if not same then
                         local dx = ni.x - nj.x
                         local dy = ni.y - nj.y
-
                         local d2 = dx * dx + dy * dy
-
                         if d2 <= gap * gap then
                             addEdge(i, j, math.sqrt(d2), "gap")
                         end
@@ -9585,62 +9522,55 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
     end
-
+    
     local sides = {
         bottom = {},
         top = {},
         left = {},
         right = {},
     }
-
+    
     for i, n in ipairs(nodes) do
         if n.kind == "edge" and n.edgeSide and sides[n.edgeSide] then
             table.insert(sides[n.edgeSide], i)
         end
     end
-
+    
     local function connectSide(list, useX)
         table.sort(list, function(a, b)
             if useX then
                 if nodes[a].x == nodes[b].x then
                     return nodes[a].y < nodes[b].y
                 end
-
                 return nodes[a].x < nodes[b].x
             else
                 if nodes[a].y == nodes[b].y then
                     return nodes[a].x < nodes[b].x
                 end
-
                 return nodes[a].y < nodes[b].y
             end
         end)
-
         for k = 1, #list - 1 do
             local a = list[k]
             local b = list[k + 1]
-
             local dx = nodes[a].x - nodes[b].x
             local dy = nodes[a].y - nodes[b].y
-
             addEdge(a, b, math.sqrt(dx * dx + dy * dy), "edge")
         end
     end
-
+    
     connectSide(sides.bottom, true)
     connectSide(sides.top, true)
     connectSide(sides.left, false)
     connectSide(sides.right, false)
-
+    
     for i = 1, #nodes do
         if nodes[i].kind == "edge" then
             for j = i + 1, #nodes do
                 if nodes[j].kind == "edge" then
                     local dx = nodes[i].x - nodes[j].x
                     local dy = nodes[i].y - nodes[j].y
-
                     local d2 = dx * dx + dy * dy
-
                     if d2 <= gap * gap then
                         addEdge(i, j, math.sqrt(d2), "edge")
                     end
@@ -9648,163 +9578,129 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
     end
-
+    
     local startIdx = addNode({
         x = from.x,
         y = from.y,
         kind = "start",
     })
-
     local targetIdx = addNode({
         x = to.x,
         y = to.y,
         kind = "target",
     })
-
     local topX = to.x
-
     if topX < 0 then
         topX = 0
     elseif topX > sw then
         topX = sw
     end
-
     local topIdx = addNode({
         x = topX,
         y = sh,
         kind = "edge",
         edgeSide = "top",
     })
-
+    
     for i, n in ipairs(nodes) do
         if i ~= topIdx and n.kind == "edge" and n.edgeSide == "top" then
             addEdge(topIdx, i, math.abs(n.x - topX), "edge")
         end
     end
-
+    
     local function connectPoint(idx, point)
         for fi, rect in ipairs(frames) do
             local inside = point.x >= rect.left - 1
                 and point.x <= rect.right + 1
                 and point.y >= rect.bottom - 1
                 and point.y <= rect.top + 1
-
             if inside and rect.nodeIds then
                 for _, nid in ipairs(rect.nodeIds) do
                     local n = nodes[nid]
-
                     local dx = point.x - n.x
                     local dy = point.y - n.y
-
                     local d = math.sqrt(dx * dx + dy * dy)
-
                     if d < 1 then
                         d = 1
                     end
-
                     addEdge(idx, nid, d, "frame")
                 end
             elseif rect.nodeIds then
                 for _, nid in ipairs(rect.nodeIds) do
                     local n = nodes[nid]
-
                     local dx = point.x - n.x
                     local dy = point.y - n.y
-
                     local d2 = dx * dx + dy * dy
-
                     if d2 <= gap * gap then
                         addEdge(idx, nid, math.sqrt(d2), "gap")
                     end
                 end
             end
         end
-
+        
         -- Если точка рядом с центром хаба, даём ей подключиться к хабу напрямую.
         local hubPickGap = gap * 2.5
-
         for i, n in ipairs(nodes) do
             if n.kind == "hub" then
                 local dx = point.x - n.x
                 local dy = point.y - n.y
-
                 local d2 = dx * dx + dy * dy
-
                 if d2 <= hubPickGap * hubPickGap then
                     local d = math.sqrt(d2)
-
                     if d < 1 then
                         d = 1
                     end
-
                     addEdge(idx, i, d, "hub")
                 end
             end
         end
-
+        
         -- Подключение к паутине.
         -- Сначала пробуем найти ближайшую точку именно по кривой нити,
         -- а уже затем подключаемся к соседним сэмплам этой нити.
         local webPickGap = gap * 1.5
-
         for _, info in ipairs(threads) do
             if info.nodeIds
                 and info.thread
                 and info.samples
                 and #info.samples > 0 then
                 local attached = false
-
                 local _, curveDist = self:NP_NearestThreadT(info.thread, point.x, point.y)
-
                 if curveDist <= webPickGap then
                     local bestSampleIdx = nil
                     local bestD2 = math.huge
-
                     for si, sp in ipairs(info.samples) do
                         local dx = point.x - sp.x
                         local dy = point.y - sp.y
-
                         local d2 = dx * dx + dy * dy
-
                         if d2 < bestD2 then
                             bestD2 = d2
                             bestSampleIdx = si
                         end
                     end
-
                     if bestSampleIdx then
                         for offset = -1, 1 do
                             local nid = info.nodeIds[bestSampleIdx + offset]
-
                             if nid then
                                 local n = nodes[nid]
-
                                 local dx = point.x - n.x
                                 local dy = point.y - n.y
-
                                 local d = math.sqrt(dx * dx + dy * dy)
-
                                 if d < 1 then
                                     d = 1
                                 end
-
                                 addEdge(idx, nid, d, "web")
-
                                 attached = true
                             end
                         end
                     end
                 end
-
                 if not attached then
                     for _, nid in ipairs(info.nodeIds) do
                         local n = nodes[nid]
-
                         local dx = point.x - n.x
                         local dy = point.y - n.y
-
                         local d2 = dx * dx + dy * dy
-
                         if d2 <= webPickGap * webPickGap then
                             addEdge(idx, nid, math.sqrt(d2), "web")
                         end
@@ -9812,7 +9708,7 @@ function NSPauk:NP_BuildRoute(from, to)
                 end
             end
         end
-
+        
         local function connectEdgeProj(side, px, py, weight)
             local eid = addNode({
                 x = px,
@@ -9820,83 +9716,69 @@ function NSPauk:NP_BuildRoute(from, to)
                 kind = "edge",
                 edgeSide = side,
             })
-
             addEdge(idx, eid, weight, "edge")
-
             for i, n in ipairs(nodes) do
                 if i ~= eid and n.kind == "edge" and n.edgeSide == side then
                     local d
-
                     if side == "bottom" or side == "top" then
                         d = math.abs(px - n.x)
                     else
                         d = math.abs(py - n.y)
                     end
-
                     addEdge(eid, i, d, "edge")
                 end
             end
         end
-
+        
         if point.x <= gap then
             connectEdgeProj("left", 0, point.y, point.x)
         end
-
         if point.x >= sw - gap then
             connectEdgeProj("right", sw, point.y, sw - point.x)
         end
-
         if point.y <= gap then
             connectEdgeProj("bottom", point.x, 0, point.y)
         end
-
         if point.y >= sh - gap then
             connectEdgeProj("top", point.x, sh, sh - point.y)
         end
     end
-
+    
     connectPoint(startIdx, from)
     connectPoint(targetIdx, to)
-
+    
     local distArr, prev = self:NP_Dijkstra(startIdx, nodes, edges)
-
+    
     local directPath = nil
     local directLen = nil
-
     if distArr[targetIdx] and distArr[targetIdx] < math.huge then
         directLen = distArr[targetIdx]
         directPath = self:NP_ReconstructPath(prev, startIdx, targetIdx, nodes)
     end
-
+    
     local topPath = nil
     local topLen = nil
-
     if distArr[topIdx] and distArr[topIdx] < math.huge then
         topLen = distArr[topIdx]
         topPath = self:NP_ReconstructPath(prev, startIdx, topIdx, nodes)
     end
-
+    
     local fallbackLen = nil
-
     if topLen and topPath then
         fallbackLen = topLen + math.abs(sh - to.y)
     end
-
+    
     local function actualLen(pts)
         local total = 0
-
         for i = 1, #pts - 1 do
             local dx = pts[i].x - pts[i + 1].x
             local dy = pts[i].y - pts[i + 1].y
-
             total = total + math.sqrt(dx * dx + dy * dy)
         end
-
         return total
     end
-
+    
     local route = nil
-
     if directPath and fallbackLen and directLen <= fallbackLen then
         route = {
             points = directPath,
@@ -9921,11 +9803,10 @@ function NSPauk:NP_BuildRoute(from, to)
             kind = "direct",
         }
     end
-
+    
     if route then
         local fromSup = self:NP_FindSupportAt(from.x, from.y)
         local toSup = self:NP_FindSupportAt(to.x, to.y)
-
         S.nspLastRoute = {
             fromName = self:NP_SupportDescription(fromSup),
             toName = self:NP_SupportDescription(toSup),
@@ -9934,7 +9815,7 @@ function NSPauk:NP_BuildRoute(from, to)
             kind = route.kind or "?",
         }
     end
-
+    
     return route
 end
 
@@ -11785,7 +11666,6 @@ end
 function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
     local C = self.C
     local N = #inst.conns
-
     if N < 2 then
         return
     end
@@ -11806,8 +11686,8 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
     if not spacing or spacing < 0.5 then
         spacing = 0.5
     end
-
     local eps = spacing * 0.5
+
     rowDir = (rowDir == -1) and -1 or 1
 
     local function getPoint(conn, len)
@@ -11815,17 +11695,14 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         if total <= 0 then
             return nil
         end
-
         local target = len
         if target > total then
             target = total
         end
-
         local t = self:ThreadTAtLength(conn, target)
         if not t then
             return nil
         end
-
         local x, y = self:BzThread(conn.thread, t)
         return t, x, y
     end
@@ -11838,7 +11715,6 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         else
             self:AddTravelPointTask(tasks, cursor.point, point, connA, owner)
         end
-
         cursor.idx = idxA
         cursor.t = tA
         cursor.point = point
@@ -11846,16 +11722,13 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
 
     local function makeDrawThread(seg, reverse)
         local th = seg.thread
-
         if not reverse then
             return th
         end
-
         local p1 = th.p1 and copyPoint(th.p1) or {
             x = (th.p0.x + th.p2.x) / 2,
             y = (th.p0.y + th.p2.y) / 2,
         }
-
         return {
             p0 = copyPoint(th.p2),
             p1 = p1,
@@ -11865,9 +11738,31 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         }
     end
 
-    -----------------------------------------------------------------------
+    -------------------------------------------------------------------
+    -- Выбор направления плетения по близости к текущей позиции.
+    --
+    -- Если конец перемычки (p2) ближе к пауку, чем начало (p0),
+    -- плетём от конца к началу. Разницы в результате никакой,
+    -- но паук не бежит через всю паутину к дальнему концу.
+    -------------------------------------------------------------------
+    local function chooseReverse(seg)
+        local th = seg.thread
+        if not th or not cursor or not cursor.point then
+            return false
+        end
+        local cp = cursor.point
+        local d0x = th.p0.x - cp.x
+        local d0y = th.p0.y - cp.y
+        local d0 = d0x * d0x + d0y * d0y
+        local d2x = th.p2.x - cp.x
+        local d2y = th.p2.y - cp.y
+        local d2 = d2x * d2x + d2y * d2y
+        return d2 < d0
+    end
+
+    -------------------------------------------------------------------
     -- 2 нити: отдельный простой случай
-    -----------------------------------------------------------------------
+    -------------------------------------------------------------------
     if N == 2 then
         if inst.sectorAllowed and inst.sectorAllowed[1] == false then
             inst.crossRowsList[rowIdx] = rowSegs
@@ -11886,28 +11781,16 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                 local dx = bx - ax
                 local dy = by - ay
                 local minLen = C.MIN_CROSS_LEN
-
                 if (dx * dx + dy * dy) >= (minLen * minLen) then
                     local seg = self:CreateCrossSegArc(
-                        inst,
-                        connA,
-                        connB,
-                        tA,
-                        tB,
-                        minLen
+                        inst, connA, connB, tA, tB, minLen
                     )
-
                     if seg then
                         seg.planArcLen = arcLen
                         seg.planSector = 1
                         seg.planPair = "1-2"
 
-                        local reverse
-                        if cursor and cursor.idx == 2 then
-                            reverse = true
-                        else
-                            reverse = (rowDir < 0)
-                        end
+                        local reverse = chooseReverse(seg)
 
                         local startConn, startIdx, startT, startX, startY
                         local endConn, endIdx, endT, endX, endY
@@ -11919,13 +11802,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                             startT = tB
                             startX = bx
                             startY = by
-
                             endConn = connA
                             endIdx = 1
                             endT = tA
                             endX = ax
                             endY = ay
-
                             drawThread = makeDrawThread(seg, true)
                         else
                             startConn = connA
@@ -11933,28 +11814,21 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                             startT = tA
                             startX = ax
                             startY = ay
-
                             endConn = connB
                             endIdx = 2
                             endT = tB
                             endX = bx
                             endY = by
-
                             drawThread = makeDrawThread(seg, false)
                         end
 
                         moveTo(
-                            startConn,
-                            startIdx,
-                            startT,
+                            startConn, startIdx, startT,
                             { x = startX, y = startY },
                             seg
                         )
-
                         self:AddThreadTask(tasks, seg, drawThread)
-
                         rowSegs[1] = seg
-
                         cursor.idx = endIdx
                         cursor.t = endT
                         cursor.point = { x = endX, y = endY }
@@ -11962,14 +11836,13 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                 end
             end
         end
-
         inst.crossRowsList[rowIdx] = rowSegs
         return
     end
 
-    -----------------------------------------------------------------------
+    -------------------------------------------------------------------
     -- N > 2: обход sectors в прямом или обратном направлении
-    -----------------------------------------------------------------------
+    -------------------------------------------------------------------
     local curIdx = (cursor and cursor.idx) or 1
     if curIdx < 1 or curIdx > N then
         curIdx = 1
@@ -11991,11 +11864,9 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
         end
 
         local skip = inst.sectorAllowed and inst.sectorAllowed[i] == false
-
         if not skip then
             local aIdx = i
             local bIdx = (i % N) + 1
-
             local connA = inst.conns[aIdx]
             local connB = inst.conns[bIdx]
             local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
@@ -12008,27 +11879,20 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                     local dx = bx - ax
                     local dy = by - ay
                     local minLen = C.MIN_CROSS_LEN
-
                     if i == N and minLen > 1 then
                         minLen = math.max(1, minLen * 0.5)
                     end
 
                     if (dx * dx + dy * dy) >= (minLen * minLen) then
                         local seg = self:CreateCrossSegArc(
-                            inst,
-                            connA,
-                            connB,
-                            tA,
-                            tB,
-                            minLen
+                            inst, connA, connB, tA, tB, minLen
                         )
-
                         if seg then
                             seg.planArcLen = arcLen
                             seg.planSector = aIdx
                             seg.planPair = aIdx .. "-" .. bIdx
 
-                            local reverse = (rowDir < 0)
+                            local reverse = chooseReverse(seg)
 
                             local startConn, startIdx, startT, startX, startY
                             local endConn, endIdx, endT, endX, endY
@@ -12040,13 +11904,11 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                                 startT = tB
                                 startX = bx
                                 startY = by
-
                                 endConn = connA
                                 endIdx = aIdx
                                 endT = tA
                                 endX = ax
                                 endY = ay
-
                                 drawThread = makeDrawThread(seg, true)
                             else
                                 startConn = connA
@@ -12054,28 +11916,21 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
                                 startT = tA
                                 startX = ax
                                 startY = ay
-
                                 endConn = connB
                                 endIdx = bIdx
                                 endT = tB
                                 endX = bx
                                 endY = by
-
                                 drawThread = makeDrawThread(seg, false)
                             end
 
                             moveTo(
-                                startConn,
-                                startIdx,
-                                startT,
+                                startConn, startIdx, startT,
                                 { x = startX, y = startY },
                                 seg
                             )
-
                             self:AddThreadTask(tasks, seg, drawThread)
-
                             rowSegs[aIdx] = seg
-
                             cursor.idx = endIdx
                             cursor.t = endT
                             cursor.point = { x = endX, y = endY }
@@ -12085,7 +11940,6 @@ function NSPauk:AddArcRowTasks(tasks, inst, cursor, arcLen, rowIdx, rowDir)
             end
         end
     end
-
     inst.crossRowsList[rowIdx] = rowSegs
 end
 
@@ -16790,155 +16644,80 @@ function NSPauk:NP_ChooseLoopDetourPoint(from, to, variant)
     local S = self.S
     local gap = self:NP_GetGap()
     local sw, sh = self:GetScreenSize()
-
     from = from or {
         x = S.lastSpiderX or 0,
         y = S.lastSpiderY or 0,
     }
-
     to = to or {
         x = from.x,
         y = from.y,
     }
-
     variant = math.max(1, tonumber(variant) or 1)
-
+    
     local dx = (to.x or 0) - (from.x or 0)
     local dy = (to.y or 0) - (from.y or 0)
     local len = math.sqrt(dx * dx + dy * dy)
-
+    
     if len < 1 then
         local ang = math.random() * 2 * math.pi
         local radius = gap * (2 + variant)
-
         local x = from.x + math.cos(ang) * radius
         local y = from.y + math.sin(ang) * radius
-
-        if x < 0 then
-            x = 0
-        elseif x > sw then
-            x = sw
-        end
-
-        if y < 0 then
-            y = 0
-        elseif y > sh then
-            y = sh
-        end
-
+        if x < 0 then x = 0 elseif x > sw then x = sw end
+        if y < 0 then y = 0 elseif y > sh then y = sh end
         return { x = x, y = y }
     end
-
-    -- Перпендикуляр к направлению from -> to.
+    
+    -- Перпендикуляр к направлению from -> to
     local nx = -dy / len
     local ny = dx / len
-
-    -- Чередуем сторону обхода.
-    local sign = 1
-    if variant % 2 == 0 then
-        sign = -1
-    end
-
-    -- Немного меняем точку вдоль линии, чтобы обход был разным.
-    local ts = { 0.28, 0.52, 0.74, 0.38, 0.62 }
-    local t = ts[((variant - 1) % #ts) + 1]
-
-    local baseX = from.x + dx * t
-    local baseY = from.y + dy * t
-
-    local offset = gap * (2.0 + 1.35 * variant)
-    local maxOffset = math.min(
-        gap * 12,
-        math.min(sw, sh) * 0.22,
-        len * 0.45
-    )
-
+    
+    -- Чередуем сторону обхода
+    local sign = (variant % 2 == 0) and -1 or 1
+    
+    -- Фиксированное смещение вместо случайного
+    local offset = gap * (2.5 + variant * 0.5)
+    local maxOffset = math.min(gap * 8, math.min(sw, sh) * 0.15)
     if offset > maxOffset then
         offset = maxOffset
     end
-
-    if offset < gap then
-        offset = math.min(gap, maxOffset)
-    end
-
-    local candX = baseX + nx * sign * offset
-    local candY = baseY + ny * sign * offset
-
-    -- Сначала пробуем найти видимый фрейм рядом с желаемой точкой детура.
+    
+    -- Точка обхода на середине пути
+    local midX = from.x + dx * 0.5
+    local midY = from.y + dy * 0.5
+    
+    local candX = midX + nx * sign * offset
+    local candY = midY + ny * sign * offset
+    
+    -- Ищем ближайший видимый фрейм рядом с точкой обхода
     local rects = self:NP_EnsureFrameCache()
     local best = nil
     local bestD = math.huge
-
+    
     for _, r in ipairs(rects) do
         local pad = gap * 2
-
-        if r.left - pad <= candX
-            and r.right + pad >= candX
-            and r.bottom - pad <= candY
-            and r.top + pad >= candY then
-
-            local ix = (r.right - r.left) * 0.15
-            local iy = (r.top - r.bottom) * 0.15
-
-            local left = r.left + ix
-            local right = r.right - ix
-            local bottom = r.bottom + iy
-            local top = r.top - iy
-
-            if right < left then
-                left = r.left
-                right = r.right
-            end
-
-            if top < bottom then
-                bottom = r.bottom
-                top = r.top
-            end
-
-            local x = candX
-            local y = candY
-
-            if x < left then
-                x = left
-            elseif x > right then
-                x = right
-            end
-
-            if y < bottom then
-                y = bottom
-            elseif y > top then
-                y = top
-            end
-
+        if r.left - pad <= candX and r.right + pad >= candX
+           and r.bottom - pad <= candY and r.top + pad >= candY then
+            -- Берём ближайшую точку на границе фрейма
+            local x = math.max(r.left, math.min(r.right, candX))
+            local y = math.max(r.bottom, math.min(r.top, candY))
+            
             local d = (x - candX) * (x - candX) + (y - candY) * (y - candY)
-
-            local dFrom = (x - from.x) * (x - from.x) + (y - from.y) * (y - from.y)
-            local dTo = (x - to.x) * (x - to.x) + (y - to.y) * (y - to.y)
-
-            if d < bestD and dFrom > gap * gap * 4 and dTo > gap * gap * 4 then
+            if d < bestD then
                 bestD = d
                 best = { x = x, y = y }
             end
         end
     end
-
+    
     if best then
         return best
     end
-
-    -- Если фрейм не нашли, просто клампаем точку к экрану.
-    if candX < 0 then
-        candX = 0
-    elseif candX > sw then
-        candX = sw
-    end
-
-    if candY < 0 then
-        candY = 0
-    elseif candY > sh then
-        candY = sh
-    end
-
+    
+    -- Если фрейм не нашли, просто клампаем к экрану
+    if candX < 0 then candX = 0 elseif candX > sw then candX = sw end
+    if candY < 0 then candY = 0 elseif candY > sh then candY = sh end
+    
     return { x = candX, y = candY }
 end
 
@@ -17170,13 +16949,8 @@ function NSPauk:NP_ExecutePlan(task)
                 end
             end
         else
-            local direct = self:NP_MakeCrawlTask(fromPoint, toPoint, plan)
-            direct.nspNoSupportCheck = true
-            if dragMode then
-                direct.nspDuringDrag = true
-            end
-            insert(direct)
-            made = made + 1
+            -- Маршрута по объектам нет. По пустоте не ползём.
+            return 0
         end
 
         return made
