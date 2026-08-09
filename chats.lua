@@ -1117,6 +1117,8 @@ function nsModuleCode(channel, text, sender, prefix)
     local owner = tokens[3]
     local moduleId = tonumber(tokens[4])
     local variantKey = tostring(tokens[5] or "1")
+    local lineIndex = tonumber(tokens[6])
+    local lineCount = tonumber(tokens[7])
 
     if not requester or not owner or not moduleId then
         return
@@ -1134,19 +1136,52 @@ function nsModuleCode(channel, text, sender, prefix)
         return
     end
 
+    local line = tostring(text or "")
+
     nsCodeViewerData[moduleId] = nsCodeViewerData[moduleId] or {}
     nsCodeViewerData[moduleId][owner] = nsCodeViewerData[moduleId][owner] or {}
 
-    -- Под каждый вариант отдельная хэш-таблица.
-    nsCodeViewerData[moduleId][owner][variantKey] =
-        nsCodeViewerData[moduleId][owner][variantKey] or {
+    local entry = nsCodeViewerData[moduleId][owner][variantKey]
+
+    if type(entry) ~= "table" then
+        entry = {
+            raw = {},
             lines = {},
         }
 
-    local line = tostring(text or "")
+        nsCodeViewerData[moduleId][owner][variantKey] = entry
+    end
 
-    if line ~= "" then
-        table.insert(nsCodeViewerData[moduleId][owner][variantKey].lines, line)
+    entry.raw = entry.raw or {}
+    entry.lines = entry.lines or {}
+
+    if lineIndex ~= nil then
+        -- Новый формат: строка кладётся строго по своему номеру.
+        -- Дубли и повторные ответы просто перезаписывают ту же позицию
+        -- и не ломают текст.
+        if line ~= "" then
+            entry.raw[lineIndex] = line
+        end
+
+        if lineCount ~= nil then
+            entry.lineCount = lineCount
+        end
+
+        -- Собираем непрерывное начало: 1..N без дырок.
+        local lines = {}
+        local i = 1
+
+        while entry.raw[i] ~= nil and (entry.lineCount == nil or i <= entry.lineCount) do
+            lines[i] = entry.raw[i]
+            i = i + 1
+        end
+
+        entry.lines = lines
+    else
+        -- Старый формат без номеров строк.
+        if line ~= "" then
+            table.insert(entry.lines, line)
+        end
     end
 
     local ui = (logic and logic.ui) or TestCourseUIFrame

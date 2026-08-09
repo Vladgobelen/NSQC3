@@ -4866,6 +4866,408 @@ ns_llua['lua'][51] = {
     end,
 }
 
+ns_llua['lua'][51.1] = {
+    type = "info",
+    title = "Извлечение части строки: string.sub",
+    content = [=[
+<h>string.sub</h>
+<t>Функция <k>string.sub</k> возвращает часть строки.</t>
+<t>Первый аргумент — строка, второй — позиция начала, третий — позиция конца.</t>
+<t>Позиции считаются с 1.</t>
+<code>
+local word = "molot"
+print(string.sub(word, 1, 2)) -- "mo"
+print(string.sub(word, 3, 5)) -- "lot"
+</code>
+<h>Синтаксический сахар через двоеточие</h>
+<t>У строк в Lua есть метатаблица, поэтому функции из библиотеки <k>string</k> можно вызывать как методы самой строки.</t>
+<code>
+local word = "molot"
+print(word:sub(1, 2)) -- "mo"
+print(word:sub(3))    -- "lot"
+</code>
+<c>word:sub(1, 2)</c> — это сокращённая запись для <c>string.sub(word, 1, 2)</c>.
+<t>То есть строка сама подставляется первым аргументом.</t>
+<h>Если конец не указан</h>
+<t>Без третьего аргумента берётся всё до конца строки.</t>
+<code>
+print(string.sub("molot", 3)) -- "lot"
+print(("molot"):sub(3))       -- "lot"
+</code>
+<h>Отрицательные позиции</h>
+<code>
+print(string.sub("molot", -2)) -- "ot"
+print(("molot"):sub(-2))       -- "ot"
+</code>
+<h>Проверка префикса</h>
+<code>
+local guid = "0x0000000000000001"
+if string.sub(guid, 1, 6) == "0x0000" then
+    print("Это игрок")
+end
+</code>
+<t>Для латиницы, цифр и GUID позиции совпадают с символами — используй <k>string.sub</k> смело.</t>
+]=],
+}
+
+ns_llua['lua'][51.2] = {
+    type = "info",
+    title = "Кириллица без боли: string.utf8len и string.utf8sub",
+    content = [=[
+<h>В чём проблема</h>
+<t><k>string.len</k> и <k>string.sub</k> считают байты. Кириллица занимает 2 байта на символ, поэтому на русском и смешанном тексте позиции съезжают.</t>
+<h>Готовое решение из аддона</h>
+<t>Чтобы не возиться с байтами, в аддоне есть две функции, которые работают по символам:</t>
+<t><k>string.utf8len(s)</k> — количество символов, а не байтов.</t>
+<t><k>string.utf8sub(s, i, j)</k> — символы с i по j, как <k>string.sub</k>, но по символам. Поддерживает отрицательные индексы.</t>
+<code>
+print(string.utf8len("Меч"))          -- 3
+print(string.utf8len("molot"))        -- 5
+print(string.utf8sub("Меч", 1, 1))    -- "М"
+print(string.utf8sub("Меч", 2, 3))    -- "еч"
+print(string.utf8sub("Меч", -1))      -- "ч"
+print(string.utf8len("Меч sword"))    -- 9: смешанный текст считается правильно
+</code>
+<h>Синтаксический сахар через двоеточие</h>
+<code>
+local word = "Меч"
+print(word:utf8len())       -- 3
+print(word:utf8sub(1, 1))   -- "М"
+print(word:utf8sub(2, 3))   -- "еч"
+print(word:utf8sub(-1))     -- "ч"
+</code>
+<c>word:utf8len()</c> — это сокращённая запись для <c>string.utf8len(word)</c>.
+<c>word:utf8sub(1, 1)</c> — это сокращённая запись для <c>string.utf8sub(word, 1, 1)</c>.
+<h>Когда что брать</h>
+<t>Латиница, цифры, GUID — <k>string.sub</k> / <k>string.len</k>.</t>
+<t>Кириллица или смешанный/неизвестный текст — <k>string.utf8sub</k> / <k>string.utf8len</k>.</t>
+]=],
+}
+
+ns_llua['lua'][51.3] = {
+    type = "commenttest",
+    title = "Тест: функция BuildPrefixes",
+    helpModules = {51.1, 31, 44, 45},
+    preloadVars = {
+        {var = "BuildPrefixes", desc = "BuildPrefixes очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3"},
+    instruction = [=[
+<h>Тест: функция BuildPrefixes</h>
+<t>Создай глобальную функцию <k>BuildPrefixes(word)</k>.</t>
+<t>Функция должна вернуть массив нарастающих префиксов слова.</t>
+<t>Используй цикл <k>for</k>, <k>string.sub</k> и <k>table.insert</k>.</t>
+<t>Пример: для <s>"molot"</s> верни <c>{"m", "mo", "mol", "molo", "molot"}</c>.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = [=[
+function BuildPrefixes(word)
+
+end
+]=],
+    requireKeywords = {"BuildPrefixes", "function", "for", "string.utf8sub", "table.insert", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 3 do _G["test" .. i] = nil end
+        if type(_G.BuildPrefixes) ~= "function" then
+            _G.checkError = "BuildPrefixes не является глобальной функцией"; return false
+        end
+        local function fmt(t)
+            local p = {}
+            for i = 1, #t do p[i] = '"' .. t[i] .. '"' end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
+        local function expected(word)
+            local r = {}
+            for i = 1, #word do table.insert(r, string.sub(word, 1, i)) end
+            return r
+        end
+        local tests = {{"molot"}, {"ab"}, {""}}
+        for i, test in ipairs(tests) do
+            local exp = expected(test[1])
+            local ok, res = pcall(_G.BuildPrefixes, test[1])
+            _G["test" .. i] = "Вход: \"" .. test[1] .. "\" | Получено: " .. (type(res)=="table" and fmt(res) or tostring(res)) .. " | Ожидалось: " .. fmt(exp)
+            if not ok or type(res) ~= "table" or #res ~= #exp then
+                _G.checkError = "Тест " .. i .. " не пройден"; return false
+            end
+            for j = 1, #exp do
+                if res[j] ~= exp[j] then _G.checkError = "Тест " .. i .. " не пройден"; return false end
+            end
+        end
+        return true
+    end,
+}
+
+ns_llua['lua'][51.4] = {
+    type = "commenttest",
+    title = "Тест: функция FilterByPrefix",
+    helpModules = {51.1, 31, 44, 45},
+    preloadVars = {
+        {var = "FilterByPrefix", desc = "FilterByPrefix очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2"},
+    instruction = [=[
+<h>Тест: функция FilterByPrefix</h>
+<t>Создай глобальную функцию <k>FilterByPrefix(words, prefix)</k>.</t>
+<t>Функция должна вернуть массив только тех слов, которые начинаются с <k>prefix</k>.</t>
+<t>Пример: <c>({"sword","shield","spear"}, "sh")</c> -> <c>{"shield"}</c>.</t>
+<w>string.find использовать нельзя — сравнивай префикс через string.sub.</w>
+<w>Ничего выводить не нужно.</w>
+<w>Бонус:</w> если код будет 201 символ или меньше, будет бонусная награда.
+]=],
+    initialCode = [=[
+function FilterByPrefix(words, prefix)
+end
+]=],
+    requireKeywords = {"FilterByPrefix", "function", "return"},
+    forbidKeywords = {"string.find"},
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+
+        if type(_G.FilterByPrefix) ~= "function" then
+            _G.checkError = "FilterByPrefix не является глобальной функцией"
+            return false
+        end
+
+        local function fmt(t)
+            local p = {}
+            for i = 1, #t do
+                p[i] = '"' .. t[i] .. '"'
+            end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
+
+        local function expected(words, prefix)
+            local r = {}
+            for _, w in ipairs(words) do
+                if string.sub(w, 1, #prefix) == prefix then
+                    table.insert(r, w)
+                end
+            end
+            return r
+        end
+
+        local tests = {
+            {words = {"sword", "shield", "spear"}, prefix = "s"},
+            {words = {"sword", "shield", "spear"}, prefix = "sh"},
+        }
+
+        for i, test in ipairs(tests) do
+            local exp = expected(test.words, test.prefix)
+            local ok, res = pcall(_G.FilterByPrefix, test.words, test.prefix)
+
+            _G["test" .. i] = "Получено: "
+                .. (type(res) == "table" and fmt(res) or tostring(res))
+                .. " | Ожидалось: "
+                .. fmt(exp)
+
+            if not ok or type(res) ~= "table" or #res ~= #exp then
+                _G.checkError = "Тест " .. i .. " не пройден"
+                return false
+            end
+
+            for j = 1, #exp do
+                if res[j] ~= exp[j] then
+                    _G.checkError = "Тест " .. i .. " не пройден"
+                    return false
+                end
+            end
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][51.5] = {
+    type = "commenttest",
+    title = "Тест 51-3: функция CountLongWords",
+    helpModules = {51.2, 31, 45},
+    preloadVars = {
+        {var = "CountLongWords", desc = "CountLongWords очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2"},
+    instruction = [=[
+<h>Тест 51-3: функция CountLongWords</h>
+<t>Создай глобальную функцию <k>CountLongWords(words, minLen)</k>.</t>
+<t>Функция должна вернуть количество слов, у которых длина (в символах) больше или равна <k>minLen</k>.</t>
+<t>Длину считай через <k>string.utf8len</k> — она корректна для кириллицы.</t>
+<t>Пример: <c>({"Меч","Щит","Зелье","Лук"}, 3)</c> -> <n>4</n>.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = [=[
+function CountLongWords(words, minLen)
+
+end
+]=],
+    requireKeywords = {"CountLongWords", "function", "for", "ipairs", "string.utf8len", "if", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil; _G.test2 = nil
+        if type(_G.CountLongWords) ~= "function" then
+            _G.checkError = "CountLongWords не является глобальной функцией"; return false
+        end
+        local function expected(words, minLen)
+            local n = 0
+            for _, w in ipairs(words) do
+                if string.utf8len(w) >= minLen then n = n + 1 end
+            end
+            return n
+        end
+        local tests = {
+            {words = {"Меч","Щит","Зелье","Лук"}, minLen = 3, exp = 4},
+            {words = {"Меч","Щит","Зелье","Лук"}, minLen = 4, exp = 1},
+        }
+        for i, test in ipairs(tests) do
+            local ok, res = pcall(_G.CountLongWords, test.words, test.minLen)
+            _G["test" .. i] = "Получено: " .. tostring(res) .. " | Ожидалось: " .. test.exp
+            if not ok or res ~= test.exp then
+                _G.checkError = "Тест " .. i .. " не пройден"; return false
+            end
+        end
+        return true
+    end,
+}
+
+ns_llua['lua'][51.6] = {
+    type = "commenttest",
+    title = "Тест 51-4: функция SplitChars",
+    helpModules = {51.2, 31, 44, 45},
+    preloadVars = {
+        {var = "SplitChars", desc = "SplitChars очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2"},
+    instruction = [=[
+<h>Тест 51-4: функция SplitChars</h>
+<t>Создай глобальную функцию <k>SplitChars(word)</k>.</t>
+<t>Функция должна вернуть массив отдельных символов слова.</t>
+<t>Используй <k>string.utf8len</k> для длины и <k>string.utf8sub(word, i, i)</k> для символа.</t>
+<t>Пример: для <s>"Меч"</s> верни <c>{"М", "е", "ч"}</c>.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = [=[
+function SplitChars(word)
+
+end
+]=],
+    requireKeywords = {"SplitChars", "function", "for", "string.utf8len", "string.utf8sub", "table.insert", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil; _G.test2 = nil
+        if type(_G.SplitChars) ~= "function" then
+            _G.checkError = "SplitChars не является глобальной функцией"; return false
+        end
+        local function fmt(t)
+            local p = {}
+            for i = 1, #t do p[i] = '"' .. t[i] .. '"' end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
+        local function expected(word)
+            local r = {}
+            for i = 1, string.utf8len(word) do
+                table.insert(r, string.utf8sub(word, i, i))
+            end
+            return r
+        end
+        local tests = {{"Меч"}, {"sword"}}
+        for i, test in ipairs(tests) do
+            local exp = expected(test[1])
+            local ok, res = pcall(_G.SplitChars, test[1])
+            _G["test" .. i] = "Вход: \"" .. test[1] .. "\" | Получено: " .. (type(res)=="table" and fmt(res) or tostring(res)) .. " | Ожидалось: " .. fmt(exp)
+            if not ok or type(res) ~= "table" or #res ~= #exp then
+                _G.checkError = "Тест " .. i .. " не пройден"; return false
+            end
+            for j = 1, #exp do
+                if res[j] ~= exp[j] then _G.checkError = "Тест " .. i .. " не пройден"; return false end
+            end
+        end
+        return true
+    end,
+}
+
+ns_llua['lua'][51.7] = {
+    type = "commenttest",
+    title = "Тест 51-5: функция CountChars",
+    helpModules = {51.2, 31, 44, 45},
+    preloadVars = {
+        {var = "CountChars", desc = "CountChars очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2"},
+    instruction = [=[
+<h>Тест 51-5: функция CountChars</h>
+<t>Создай глобальную функцию <k>CountChars(word)</k>.</t>
+<t>Функция должна вернуть хэш-таблицу: символ → сколько раз он встречается.</t>
+<t>Используй <k>string.utf8len</k>, <k>string.utf8sub</k> и накопление в таблице.</t>
+<t>Пример: для <s>"абба"</s> верни <c>{["а"]=2, ["б"]=2}</c>.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = [=[
+function CountChars(word)
+
+end
+]=],
+    requireKeywords = {"CountChars", "function", "for", "string.utf8len", "string.utf8sub", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil; _G.test2 = nil
+        if type(_G.CountChars) ~= "function" then
+            _G.checkError = "CountChars не является глобальной функцией"; return false
+        end
+        local function expected(word)
+            local r = {}
+            for i = 1, string.utf8len(word) do
+                local ch = string.utf8sub(word, i, i)
+                r[ch] = (r[ch] or 0) + 1
+            end
+            return r
+        end
+        local function fmtMap(t)
+            local keys = {}
+            for k in pairs(t) do table.insert(keys, k) end
+            table.sort(keys)
+            local p = {}
+            for _, k in ipairs(keys) do table.insert(p, k .. "=" .. t[k]) end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
+        local function same(a, b)
+            for k, v in pairs(a) do if b[k] ~= v then return false end end
+            for k in pairs(b) do if a[k] == nil then return false end end
+            return true
+        end
+        local tests = {{"абба"}, {"Меч"}}
+        for i, test in ipairs(tests) do
+            local exp = expected(test[1])
+            local ok, res = pcall(_G.CountChars, test[1])
+            _G["test" .. i] = "Вход: \"" .. test[1] .. "\" | Получено: " .. (type(res)=="table" and fmtMap(res) or tostring(res)) .. " | Ожидалось: " .. fmtMap(exp)
+            if not ok or type(res) ~= "table" or not same(res, exp) then
+                _G.checkError = "Тест " .. i .. " не пройден"; return false
+            end
+        end
+        return true
+    end,
+}
+
 ns_llua['lua'][52] = {
     type = "commenttest",
     title = "Итоговый комбо-тест: функция calculateTotalPrice",
@@ -7355,309 +7757,381 @@ end
 }
 
 ns_llua['lua'][77] = {
-type = "info",
-title = "Существование и идентификация юнита",
-helpModules = {71, 65},
-content = [=[
-<h>Существование и идентификация юнита</h>
-<t>Перед тем как использовать данные юнита, полезно проверить, существует ли он.</t>
-<h>UnitExists</h>
-<code>
-/run print(UnitExists("player"))
-/run print(UnitExists("target"))
-</code>
-<t>Если юнит существует, функция вернёт истинное значение. Если нет — <k>nil</k>.</t>
-<h>UnitName</h>
-<code>
-/run print(UnitName("player"))
-</code>
-<t>Если юнита нет, функция вернёт <k>nil</k>.</t>
+    type = "info",
+    title = "UnitGUID: уникальный идентификатор юнита",
+    content = [=[
 <h>UnitGUID</h>
-<t>GUID — это уникальный идентификатор существа.</t>
+<t>GUID — уникальный идентификатор юнита. У каждого существа и игрока он свой.</t>
+
 <code>
 /run print(UnitGUID("player"))
+/run print(UnitGUID("target"))
 </code>
-<h>UnitIsUnit</h>
-<t>Проверяет, указывают ли два UnitID на одного и того же юнита.</t>
-<code>
-/run print(UnitIsUnit("player", "target"))
-</code>
-<t>Если твоя цель — ты сам, результат будет истинным.</t>
-<h>UnitIsPlayer</h>
-<code>
-/run print(UnitIsPlayer("player"))
-/run print(UnitIsPlayer("target"))
-</code>
-<t>Полезно отличать игроков от NPC.</t>
-<h>UnitIsVisible</h>
-<code>
-/run print(UnitIsVisible("target"))
-</code>
-<t>Показывает, виден ли юнит клиенту.</t>
-<h>Безопасный шаблон</h>
-<code>
-/run if UnitExists("target") then local name = UnitName("target"); print("Цель:", name) else print("Нет цели") end
-</code>
+
+<t>Функция возвращает строку вида:</t>
+<s>0x0000000000000001</s>
+
+<t>Если юнита нет, вернёт <k>nil</k>.</t>
+
+<h>Структура GUID</h>
+<t>Это 64-битное число, записанное в шестнадцатеричном виде: префикс <s>0x</s> и 16 цифр.</t>
+<t>Старшие цифры кодируют тип объекта: игрок, существо, питомец или игровой объект.</t>
+<t>У существ внутри также зашит шаблон (entry) — какой именно это NPC, а младшие разряды — уникальный номер конкретного спауна.</t>
+
+<h>Насколько постоянен GUID</h>
+<t>У игроков GUID всегда одинаковый — он привязан к персонажу.</t>
+<t>У боссов и ключевых NPC он тоже не меняется.</t>
+<t>У рядовых мобов и стражников GUID пересоздаётся после рестарта сервера, поэтому становится другим.</t>
+
+<t>Из этого следует практический вывод: по GUID надёжно опознавать игроков и боссов, но нельзя рассчитывать, что «тот же самый» обычный моб после рестарта будет с тем же GUID.</t>
 ]=],
 }
 
 ns_llua['lua'][78] = {
-type = "vartest",
-title = "Тест 77-1: существование и имя игрока",
-helpModules = {77},
-tasks = {
-{
-var = "playerExists",
-desc = 'Создай глобальную переменную playerExists = UnitExists("player")',
-check = function(value)
-return value ~= nil and value ~= false
-end,
-},
-{
-var = "playerName",
-desc = 'Создай глобальную переменную playerName = UnitName("player")',
-check = function(value)
-return type(value) == "string" and value == UnitName("player")
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 77-1: функция GetTargetType",
+    helpModules = {77, 45},
+    preloadVars = {
+        {var = "GetTargetType", desc = "GetTargetType очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "testResult", desc = "testResult очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "testResult"},
+    instruction = [=[
+<h>Тест 77-1: функция GetTargetType</h>
+<t>Создай глобальную функцию <k>GetTargetType()</k>.</t>
+<t>Перед проверкой выдели цель — другого игрока или моба.</t>
+<t>Функция должна вернуть <s>"игрок"</s>, если GUID цели начинается с <s>"0x0000"</s>, и <s>"существо"</s> иначе.</t>
+<t>Используй <k>UnitGUID</k>, <k>string.sub</k> и тернарную конструкцию <k>and or</k>.</t>
+<w>Если цели нет, проверка выдаст предупреждение.</w>
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = "-- Создай глобальную функцию GetTargetType()",
+    requireKeywords = {"GetTargetType", "function", "target", "UnitGUID", "string.sub", "and", "or", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        _G.testResult = nil
+
+        local function fail(msg) _G.checkError = msg return msg end
+
+        if type(_G.GetTargetType) ~= "function" then
+            return fail("GetTargetType не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Выдели игрока или моба и нажми проверку снова.")
+        end
+
+        local okGuid, guid = pcall(UnitGUID, "target")
+        if not okGuid or type(guid) ~= "string" then
+            return fail("Не удалось получить GUID цели.")
+        end
+
+        local expected = string.sub(guid, 1, 6) == "0x0000" and "игрок" or "существо"
+
+        local ok, result = pcall(_G.GetTargetType)
+        _G.testResult = "Получено: " .. tostring(result) .. " | Ожидалось: " .. expected
+
+        if not ok then return fail("Ошибка вызова GetTargetType: " .. tostring(result)) end
+        if result ~= expected then return fail("Результат не совпадает с ожидаемым") end
+        return true
+    end,
 }
 
 ns_llua['lua'][79] = {
-type = "vartest",
-title = "Тест 77-2: игрок и GUID",
-helpModules = {77, 15},
-tasks = {
-{
-var = "playerIsPlayer",
-desc = 'Создай глобальную переменную playerIsPlayer = not not UnitIsPlayer("player")',
-check = function(value)
-return value == true
-end,
-},
-{
-var = "playerGUID",
-desc = 'Создай глобальную переменную playerGUID = UnitGUID("player")',
-check = function(value)
-return type(value) == "string" and value ~= ""
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 77-2: функция BuildGUIDList",
+    helpModules = {77, 31, 44},
+    preloadVars = {
+        {var = "BuildGUIDList", desc = "BuildGUIDList очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 77-2: функция BuildGUIDList</h>
+<t>Создай глобальную функцию <k>BuildGUIDList(units)</k>.</t>
+<t>Аргумент <k>units</k> — таблица со строками UnitID.</t>
+<t>Функция должна вернуть массив GUID только существующих юнитов, в том же порядке.</t>
+<t>Если таблица пустая или аргумент не таблица, верни пустую таблицу.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+    initialCode = "-- Создай глобальную функцию BuildGUIDList(units)",
+    requireKeywords = {"BuildGUIDList", "function", "UnitGUID", "table.insert", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        if type(_G.BuildGUIDList) ~= "function" then
+            _G.checkError = "BuildGUIDList не является глобальной функцией"
+            return false
+        end
+
+        local function fmt(v)
+            if type(v) == "string" then return '"' .. v .. '"' end
+            if type(v) == "table" then
+                local p = {}
+                for i = 1, #v do p[i] = fmt(v[i]) end
+                return "{" .. table.concat(p, ", ") .. "}"
+            end
+            return tostring(v)
+        end
+
+        local function getExpected(units)
+            if type(units) ~= "table" then return {} end
+            local r = {}
+            for _, unit in ipairs(units) do
+                local guid = UnitGUID(unit)
+                if guid then table.insert(r, guid) end
+            end
+            return r
+        end
+
+        local tests = {
+            {input = {"player", "ns_invalid", "player"}},
+            {input = {"ns_invalid"}},
+            {input = {}},
+            {input = "bad"},
+        }
+
+        for i, test in ipairs(tests) do
+            local expected = getExpected(test.input)
+            local ok, result = pcall(_G.BuildGUIDList, test.input)
+            _G["test" .. i] = "Вход: " .. fmt(test.input) .. " | Получено: " .. fmt(result) .. " | Ожидалось: " .. fmt(expected)
+
+            if not ok or type(result) ~= "table" or #result ~= #expected then
+                _G.checkError = "Тест " .. i .. " функции BuildGUIDList не пройден"
+                return false
+            end
+            for j = 1, #expected do
+                if result[j] ~= expected[j] then
+                    _G.checkError = "Тест " .. i .. " функции BuildGUIDList не пройден"
+                    return false
+                end
+            end
+        end
+        return true
+    end,
 }
 
 ns_llua['lua'][80] = {
-type = "commenttest",
-title = "Тест 77-3: функция GetSafeUnitName",
-helpModules = {77, 65},
-preloadVars = {
-{var = "GetSafeUnitName", desc = "GetSafeUnitName очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 77-3: функция GetSafeUnitName</h>
-<t>Создай глобальную функцию <k>GetSafeUnitName(unit)</k>.</t>
-<t>Функция должна вернуть имя юнита через <k>UnitName(unit)</k>.</t>
-<t>Если имени нет, функция должна вернуть строку:</t>
-<s>"Нет юнита"</s>
-<t>Используй <k>or</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 77-3: функция BuildNameToGUIDMap",
+    helpModules = {77, 31, 44},
+    preloadVars = {
+        {var = "BuildNameToGUIDMap", desc = "BuildNameToGUIDMap очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3"},
+    instruction = [=[
+<h>Тест 77-3: функция BuildNameToGUIDMap</h>
+<t>Создай глобальную функцию <k>BuildNameToGUIDMap(units)</k>.</t>
+<t>Аргумент <k>units</k> — таблица со строками UnitID.</t>
+<t>Функция должна вернуть хэш-таблицу, где ключ — имя юнита, значение — его GUID, только для существующих юнитов.</t>
+<t>Если таблица пустая или аргумент не таблица, верни пустую таблицу.</t>
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetSafeUnitName(unit)
-]=],
-requireKeywords = {
-"GetSafeUnitName",
-"function",
-"UnitName",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetSafeUnitName) ~= "function" then
-_G.checkError = "GetSafeUnitName не является глобальной функцией"
-return false
-end
-local ok1, result1 = pcall(_G.GetSafeUnitName, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetSafeUnitName('player'): " .. tostring(result1)
-return false
-end
-if result1 ~= UnitName("player") then
-_G.checkError = "Для player функция должна вернуть имя игрока"
-return false
-end
-local ok2, result2 = pcall(_G.GetSafeUnitName, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetSafeUnitName('ns_invalid_unit'): " .. tostring(result2)
-return false
-end
-if result2 ~= "Нет юнита" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть 'Нет юнита'"
-return false
-end
-return true
-end,
+    initialCode = "-- Создай глобальную функцию BuildNameToGUIDMap(units)",
+    requireKeywords = {"BuildNameToGUIDMap", "function", "UnitName", "UnitGUID", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 3 do _G["test" .. i] = nil end
+
+        if type(_G.BuildNameToGUIDMap) ~= "function" then
+            _G.checkError = "BuildNameToGUIDMap не является глобальной функцией"
+            return false
+        end
+
+        local function getExpected(units)
+            if type(units) ~= "table" then return {} end
+            local r = {}
+            for _, unit in ipairs(units) do
+                local name = UnitName(unit)
+                local guid = UnitGUID(unit)
+                if name and guid then r[name] = guid end
+            end
+            return r
+        end
+
+        local function same(a, b)
+            for k, v in pairs(a) do if b[k] ~= v then return false end end
+            for k in pairs(b) do if a[k] == nil then return false end end
+            return true
+        end
+
+        local function fmtMap(t)
+            local keys = {}
+            for k in pairs(t) do table.insert(keys, k) end
+            table.sort(keys)
+            local p = {}
+            for _, k in ipairs(keys) do table.insert(p, k .. "=" .. tostring(t[k])) end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
+
+        local tests = {
+            {input = {"player", "ns_invalid"}},
+            {input = {}},
+            {input = "bad"},
+        }
+
+        for i, test in ipairs(tests) do
+            local expected = getExpected(test.input)
+            local ok, result = pcall(_G.BuildNameToGUIDMap, test.input)
+            _G["test" .. i] = "Получено: " .. fmtMap(type(result) == "table" and result or {}) .. " | Ожидалось: " .. fmtMap(expected)
+
+            if not ok or type(result) ~= "table" or not same(result, expected) then
+                _G.checkError = "Тест " .. i .. " функции BuildNameToGUIDMap не пройден"
+                return false
+            end
+        end
+        return true
+    end,
 }
 
 ns_llua['lua'][81] = {
-type = "commenttest",
-title = "Тест: функция IsSameUnit",
-helpModules = {77, 45, 21},
-preloadVars = {
-{var = "IsSameUnit", desc = "IsSameUnit очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 77-4: функция IsSameUnit</h>
-<t>Создай глобальную функцию <k>IsSameUnit(unitA, unitB)</k>.</t>
-<t>Функция должна вернуть <k>true</k>, если два UnitID указывают на одного и того же юнита.</t>
-<t>Иначе функция должна вернуть <k>false</k>.</t>
-<t>Используй <k>UnitIsUnit</k>.</t>
-<t>Чтобы результат был именно boolean, используй конструкцию:</t>
-<code>
-return UnitIsUnit(unitA, unitB) and true or false
-</code>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 77-4: функция GetTargetIdentityLine",
+    helpModules = {77, 45, 57},
+    preloadVars = {
+        {var = "GetTargetIdentityLine", desc = "GetTargetIdentityLine очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "testResult", desc = "testResult очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "testResult"},
+    instruction = [=[
+<h>Тест 77-4: функция GetTargetIdentityLine</h>
+<t>Создай глобальную функцию <k>GetTargetIdentityLine()</k>.</t>
+<t>Перед проверкой выдели цель — другого игрока или моба.</t>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>Имя: X, Тип: Y, GUID: Z</s>
+<t>где Y — <s>"игрок"</s>, если GUID начинается с <s>"0x0000"</s>, иначе <s>"существо"</s>.</t>
+<w>Если цели нет, проверка выдаст предупреждение.</w>
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию IsSameUnit(unitA, unitB)
-]=],
-requireKeywords = {
-"IsSameUnit",
-"function",
-"UnitIsUnit",
-"and",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.IsSameUnit) ~= "function" then
-_G.checkError = "IsSameUnit не является глобальной функцией"
-return false
-end
-local tests = {
-{
-args = {"player", "player"},
-expected = true,
-},
-{
-args = {"player", "ns_invalid_unit"},
-expected = false,
-},
-{
-args = {"ns_invalid_unit", "player"},
-expected = false,
-},
-{
-args = {"ns_invalid_unit", "ns_invalid_unit"},
-expected = false,
-},
-}
-for i, test in ipairs(tests) do
-local ok, result = pcall(_G.IsSameUnit, test.args[1], test.args[2])
-if not ok or result ~= test.expected then
-_G.checkError = "Тест " .. i .. " функции IsSameUnit не пройден"
-return false
-end
-end
-return true
-end,
+    initialCode = "-- Создай глобальную функцию GetTargetIdentityLine()",
+    requireKeywords = {"GetTargetIdentityLine", "function", "target", "UnitName", "UnitGUID", "string.sub", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        _G.testResult = nil
+
+        local function fail(msg) _G.checkError = msg return msg end
+
+        if type(_G.GetTargetIdentityLine) ~= "function" then
+            return fail("GetTargetIdentityLine не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Выдели игрока или моба и нажми проверку снова.")
+        end
+
+        local name = UnitName("target")
+        local guid = UnitGUID("target")
+        if not name or not guid then
+            return fail("Не удалось получить данные цели.")
+        end
+
+        local typ = string.sub(guid, 1, 6) == "0x0000" and "игрок" or "существо"
+        local expected = "Имя: " .. name .. ", Тип: " .. typ .. ", GUID: " .. guid
+
+        local ok, result = pcall(_G.GetTargetIdentityLine)
+        _G.testResult = "Получено: " .. tostring(result) .. " | Ожидалось: " .. expected
+
+        if not ok then return fail("Ошибка вызова GetTargetIdentityLine: " .. tostring(result)) end
+
+        local function normalize(s)
+            s = tostring(s):gsub("%s+", " ")
+            return s:match("^%s*(.-)%s*$")
+        end
+        if normalize(result) ~= normalize(expected) then
+            return fail("Строка не совпадает с ожидаемой")
+        end
+        return true
+    end,
 }
 
 ns_llua['lua'][82] = {
-type = "commenttest",
-title = "Тест 77-5: функция GetIdentityReport",
-helpModules = {77, 45, 44},
-preloadVars = {
-{var = "GetIdentityReport", desc = "GetIdentityReport очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 77-5: функция GetIdentityReport</h>
-<t>Создай глобальную функцию <k>GetIdentityReport(unit)</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>exists</c> — <k>true</k>, если юнит существует, иначе <k>false</k>.
-<c>name</c> — имя юнита или <s>"Нет юнита"</s>, если юнита нет.
-<c>isPlayer</c> — <k>true</k>, если юнит является игроком, иначе <k>false</k>.
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitName</c>
-<c>UnitIsPlayer</c>
-<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 77-5: функция CountGUIDTypes",
+    helpModules = {77, 31, 44},
+    preloadVars = {
+        {var = "CountGUIDTypes", desc = "CountGUIDTypes очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 77-5: функция CountGUIDTypes</h>
+<t>Создай глобальную функцию <k>CountGUIDTypes(units)</k>.</t>
+<t>Аргумент <k>units</k> — таблица со строками UnitID.</t>
+<t>Функция должна вернуть хэш-таблицу с двумя ключами:</t>
+<c>["игрок"]</c> — количество существующих юнитов, чей GUID начинается с <s>"0x0000"</s>,
+<c>["существо"]</c> — количество остальных существующих юнитов.
+<t>Если таких юнитов нет, значение равно <n>0</n>.</t>
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetIdentityReport(unit)
-]=],
-requireKeywords = {
-"GetIdentityReport",
-"function",
-"UnitExists",
-"UnitName",
-"UnitIsPlayer",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetIdentityReport) ~= "function" then
-_G.checkError = "GetIdentityReport не является глобальной функцией"
-return false
-end
-local ok1, playerReport = pcall(_G.GetIdentityReport, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetIdentityReport('player'): " .. tostring(playerReport)
-return false
-end
-if type(playerReport) ~= "table" then
-_G.checkError = "GetIdentityReport('player') должна вернуть таблицу"
-return false
-end
-if playerReport.exists ~= true then
-_G.checkError = "Для player поле exists должно быть true"
-return false
-end
-if playerReport.name ~= UnitName("player") then
-_G.checkError = "Для player поле name должно быть именем игрока"
-return false
-end
-if playerReport.isPlayer ~= true then
-_G.checkError = "Для player поле isPlayer должно быть true"
-return false
-end
-local ok2, invalidReport = pcall(_G.GetIdentityReport, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetIdentityReport('ns_invalid_unit'): " .. tostring(invalidReport)
-return false
-end
-if type(invalidReport) ~= "table" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
-return false
-end
-if invalidReport.exists ~= false then
-_G.checkError = "Для несуществующего юнита поле exists должно быть false"
-return false
-end
-if invalidReport.name ~= "Нет юнита" then
-_G.checkError = "Для несуществующего юнита поле name должно быть 'Нет юнита'"
-return false
-end
-if invalidReport.isPlayer ~= false then
-_G.checkError = "Для несуществующего юнита поле isPlayer должно быть false"
-return false
-end
-return true
-end,
+    initialCode = "-- Создай глобальную функцию CountGUIDTypes(units)",
+    requireKeywords = {"CountGUIDTypes", "function", "UnitGUID", "string.sub", "return"},
+    forbidKeywords = {"print"},
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        if type(_G.CountGUIDTypes) ~= "function" then
+            _G.checkError = "CountGUIDTypes не является глобальной функцией"
+            return false
+        end
+
+        local function getExpected(units)
+            local r = {["игрок"] = 0, ["существо"] = 0}
+            if type(units) ~= "table" then return r end
+            for _, unit in ipairs(units) do
+                local guid = UnitGUID(unit)
+                if guid then
+                    local key = string.sub(guid, 1, 6) == "0x0000" and "игрок" or "существо"
+                    r[key] = r[key] + 1
+                end
+            end
+            return r
+        end
+
+        local tests = {
+            {input = {"player", "player", "ns_invalid"}},
+            {input = {"ns_invalid"}},
+            {input = {}},
+            {input = "bad"},
+        }
+
+        for i, test in ipairs(tests) do
+            local expected = getExpected(test.input)
+            local ok, result = pcall(_G.CountGUIDTypes, test.input)
+            _G["test" .. i] = "Получено: игрок=" .. tostring(type(result) == "table" and result["игрок"] or nil)
+                .. ", существо=" .. tostring(type(result) == "table" and result["существо"] or nil)
+                .. " | Ожидалось: игрок=" .. expected["игрок"] .. ", существо=" .. expected["существо"]
+
+            if not ok or type(result) ~= "table"
+                or result["игрок"] ~= expected["игрок"]
+                or result["существо"] ~= expected["существо"] then
+                _G.checkError = "Тест " .. i .. " функции CountGUIDTypes не пройден"
+                return false
+            end
+        end
+        return true
+    end,
 }
 
 ns_llua['lua'][83] = {

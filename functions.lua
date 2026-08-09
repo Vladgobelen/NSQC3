@@ -25021,3 +25021,21 @@ if type(SlashCmdList) == "table" then
         NSPauk_Moth:Print("unknown command:", msg, "type /nsmoth help")
     end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
