@@ -5090,7 +5090,7 @@ end
 
 ns_llua['lua'][51.5] = {
     type = "commenttest",
-    title = "Тест 51-3: функция CountLongWords",
+    title = "Тест: функция CountLongWords",
     helpModules = {51.2, 31, 45},
     preloadVars = {
         {var = "CountLongWords", desc = "CountLongWords очищается перед проверкой"},
@@ -5100,10 +5100,9 @@ ns_llua['lua'][51.5] = {
     },
     reportVars = {"checkError", "test1", "test2"},
     instruction = [=[
-<h>Тест 51-3: функция CountLongWords</h>
+<h>Тест: функция CountLongWords</h>
 <t>Создай глобальную функцию <k>CountLongWords(words, minLen)</k>.</t>
 <t>Функция должна вернуть количество слов, у которых длина (в символах) больше или равна <k>minLen</k>.</t>
-<t>Длину считай через <k>string.utf8len</k> — она корректна для кириллицы.</t>
 <t>Пример: <c>({"Меч","Щит","Зелье","Лук"}, 3)</c> -> <n>4</n>.</t>
 <w>Ничего выводить не нужно.</w>
 ]=],
@@ -5112,8 +5111,8 @@ function CountLongWords(words, minLen)
 
 end
 ]=],
-    requireKeywords = {"CountLongWords", "function", "for", "ipairs", "string.utf8len", "if", "return"},
-    forbidKeywords = {"print"},
+    requireKeywords = {"CountLongWords", "function", "for", "return"},
+    forbidKeywords = {},
     checkCode = function()
         _G.checkError = nil
         _G.test1 = nil; _G.test2 = nil
