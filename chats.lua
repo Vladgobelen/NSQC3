@@ -10,6 +10,18 @@ local triggersByAddress = {
             forbiddenWords = {},
         }
     },
+    ["prefix:nsModuleCode"] = {
+        {
+            keyword = {
+                { word = "nsModuleCode", position = 1, source = "prefix" },
+            },
+            func = "nsModuleCode",
+            conditions = {
+            },
+            chatType = {"ADDON"},
+            stopOnMatch = true,
+        }
+    },
     ["prefix:ns_NewGame"] = {
         {
             keyword = {
@@ -1087,7 +1099,62 @@ local triggersByAddress = {
     },
 }
 
+nsCodeViewerData = nsCodeViewerData or {}
+nsCodeViewerRequest = nsCodeViewerRequest or {}
 
+function nsModuleCode(channel, text, sender, prefix)
+    local tokens = {}
+
+    for token in tostring(prefix or ""):gmatch("%S+") do
+        table.insert(tokens, token)
+    end
+
+    if tokens[1] ~= "nsModuleCode" then
+        return
+    end
+
+    local requester = tokens[2]
+    local owner = tokens[3]
+    local moduleId = tonumber(tokens[4])
+    local variantKey = tostring(tokens[5] or "1")
+
+    if not requester or not owner or not moduleId then
+        return
+    end
+
+    local me = (type(UnitName) == "function") and UnitName("player") or ""
+
+    -- Если это ответ не на наш запрос, игнорируем.
+    if requester ~= me then
+        return
+    end
+
+    -- Если мы не запрашивали этот модуль, игнорируем.
+    if type(nsCodeViewerRequest[moduleId]) ~= "table" then
+        return
+    end
+
+    nsCodeViewerData[moduleId] = nsCodeViewerData[moduleId] or {}
+    nsCodeViewerData[moduleId][owner] = nsCodeViewerData[moduleId][owner] or {}
+
+    -- Под каждый вариант отдельная хэш-таблица.
+    nsCodeViewerData[moduleId][owner][variantKey] =
+        nsCodeViewerData[moduleId][owner][variantKey] or {
+            lines = {},
+        }
+
+    local line = tostring(text or "")
+
+    if line ~= "" then
+        table.insert(nsCodeViewerData[moduleId][owner][variantKey].lines, line)
+    end
+
+    local ui = (logic and logic.ui) or TestCourseUIFrame
+
+    if ui and ui.RefreshCodeViewer then
+        ui:RefreshCodeViewer()
+    end
+end
 
 function enAlToGi(channel, text, sender, prefix)
     -- Извлекаем данные

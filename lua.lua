@@ -23857,14 +23857,32 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
         local editHeight = math.max(60, (block._measure:GetStringHeight() or 0) + 12)
         block._editBox:SetHeight(editHeight)
 
-        innerY = innerY - editHeight - 8
+        innerY = innerY - editHeight - 4
+
+        if block._charCount then
+            block._charCount:ClearAllPoints()
+            block._charCount:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
+            block._charCount:SetWidth(editWidth)
+
+            innerY = innerY - math.max(14, (block._charCount:GetStringHeight() or 14)) - 6
+        else
+            innerY = innerY - 8
+        end
 
         block._button:ClearAllPoints()
         block._button:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
+
+        if block._resultsButton then
+            block._resultsButton:ClearAllPoints()
+            block._resultsButton:SetPoint("LEFT", block._button, "RIGHT", 8, 0)
+            block._resultsButton:SetHeight(block._button:GetHeight() or 22)
+        end
+
         innerY = innerY - (block._button:GetHeight() or 22) - 12
 
         block._previewLabel:ClearAllPoints()
         block._previewLabel:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
+
         innerY = innerY - (block._previewLabel:GetStringHeight() or 12) - 4
 
         block._preview:ClearAllPoints()
@@ -23878,6 +23896,7 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
             block._resultMessage:ClearAllPoints()
             block._resultMessage:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
             block._resultMessage:SetWidth(editWidth)
+
             innerY = innerY - (block._resultMessage:GetStringHeight() or 0) - 10
         else
             block._resultMessage:ClearAllPoints()
@@ -23887,11 +23906,13 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
             if text:GetText() and text:GetText() ~= "" then
                 label:ClearAllPoints()
                 label:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
+
                 innerY = innerY - (label:GetStringHeight() or 12) - 2
 
                 text:ClearAllPoints()
                 text:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
                 text:SetWidth(editWidth)
+
                 innerY = innerY - (text:GetStringHeight() or 0) - 10
             else
                 label:ClearAllPoints()
@@ -23976,6 +23997,44 @@ local function createCodeBlock(parent, raw)
     return block
 end
 
+local MAX_EDITOR_LINE_CHARS = 200
+
+local function CountEditorChars(s)
+    if type(s) ~= "string" or s == "" then
+        return 0
+    end
+
+    local n = 0
+    for i = 1, #s do
+        local b = s:byte(i)
+        if b < 128 or b >= 192 then
+            n = n + 1
+        end
+    end
+
+    return n
+end
+
+local function GetEditorTooLongLine(code)
+    if type(code) ~= "string" or code == "" then
+        return false, 0, 0
+    end
+
+    local normalized = code:gsub("\r\n", "\n"):gsub("\r", "\n")
+    local lineNo = 0
+
+    for line in (normalized .. "\n"):gmatch("(.-)\n") do
+        lineNo = lineNo + 1
+
+        local chars = CountEditorChars(line)
+        if chars > MAX_EDITOR_LINE_CHARS then
+            return true, lineNo, chars
+        end
+    end
+
+    return false, 0, 0
+end
+
 local editorCounter = 0
 
 local function createEditorBlock(parent, data, ui)
@@ -24006,6 +24065,24 @@ local function createEditorBlock(parent, data, ui)
     button:SetSize(130, 22)
     button:SetText(data.buttonText or "Выполнить")
 
+    local resultsButton = CreateFrame("Button", nil, block, "UIPanelButtonTemplate")
+    resultsButton:SetSize(240, 22)
+    resultsButton:SetText("Результаты других игроков")
+
+    if data.resultsEnabled == true then
+        resultsButton:Enable()
+        resultsButton:SetAlpha(1)
+    else
+        resultsButton:Disable()
+        resultsButton:SetAlpha(0.45)
+    end
+
+    resultsButton:SetScript("OnClick", function()
+        if ui and ui.callbacks and ui.callbacks.onShowResults then
+            ui.callbacks.onShowResults(block._name)
+        end
+    end)
+
     local previewLabel = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     previewLabel:SetText("|cFFB3B3B3Подсветка кода:|r")
 
@@ -24015,6 +24092,12 @@ local function createEditorBlock(parent, data, ui)
     preview:SetNonSpaceWrap(true)
     preview:SetSpacing(2)
     preview:SetText(markupCode(data.code or ""))
+
+    local charCount = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    charCount:SetJustifyH("LEFT")
+    charCount:SetJustifyV("MIDDLE")
+    charCount:SetTextColor(0.70, 0.70, 0.80, 1)
+    charCount:SetText("Символов: 0")
 
     local resultMessage = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     resultMessage:SetJustifyH("LEFT")
@@ -24051,6 +24134,28 @@ local function createEditorBlock(parent, data, ui)
     measure:SetNonSpaceWrap(true)
     measure:SetAlpha(0)
 
+    local function updateCharCounter()
+        local text = editBox:GetText() or ""
+        local totalChars = CountEditorChars(text)
+        local tooLong, lineNo, lineChars = GetEditorTooLongLine(text)
+
+        if tooLong then
+            charCount:SetTextColor(1.0, 0.35, 0.35, 1)
+            charCount:SetText(string.format(
+                "Символов: %d | Строка %d: %d/%d (слишком длинная)",
+                totalChars,
+                lineNo,
+                lineChars,
+                MAX_EDITOR_LINE_CHARS
+            ))
+        else
+            charCount:SetTextColor(0.70, 0.70, 0.80, 1)
+            charCount:SetText(string.format("Символов: %d", totalChars))
+        end
+
+        return tooLong
+    end
+
     editBox:SetScript("OnEscapePressed", function(self)
         self:ClearFocus()
     end)
@@ -24068,7 +24173,35 @@ local function createEditorBlock(parent, data, ui)
     end)
 
     editBox:SetScript("OnTextChanged", function(self)
-        preview:SetText(markupCode(self:GetText() or ""))
+        local text = self:GetText() or ""
+
+        if block._settingText then
+            preview:SetText(markupCode(text))
+            updateCharCounter()
+
+            if ui then
+                ui.layoutDirty = true
+            end
+
+            return
+        end
+
+        local tooLong = GetEditorTooLongLine(text)
+
+        if tooLong and block._lastValidText and not block._reverting then
+            block._reverting = true
+            self:SetText(block._lastValidText)
+            self:SetCursorPosition(#(block._lastValidText or ""))
+            block._reverting = false
+            return
+        end
+
+        if not tooLong then
+            block._lastValidText = text
+        end
+
+        preview:SetText(markupCode(text))
+        updateCharCounter()
 
         if ui then
             ui.layoutDirty = true
@@ -24076,23 +24209,67 @@ local function createEditorBlock(parent, data, ui)
     end)
 
     button:SetScript("OnClick", function()
+        local code = editBox:GetText() or ""
+        local tooLong, lineNo, lineChars = GetEditorTooLongLine(code)
+
+        if tooLong then
+            editBox:ClearFocus()
+
+            resultMessage:SetText(
+                "|cFFFF8080"
+                .. escapePipes(string.format(
+                    "Код не принят: строка %d содержит %d символов (максимум %d).",
+                    lineNo,
+                    lineChars,
+                    MAX_EDITOR_LINE_CHARS
+                ))
+                .. "|r"
+            )
+
+            if ui then
+                ui.layoutDirty = true
+            end
+
+            return
+        end
+
         editBox:ClearFocus()
+        resultMessage:SetText("")
+
+        if ui then
+            ui.layoutDirty = true
+        end
 
         if ui and ui.callbacks and ui.callbacks.onExecute then
-            ui.callbacks.onExecute(block._name, editBox:GetText() or "")
+            ui.callbacks.onExecute(block._name, code)
         end
     end)
 
     block._editBox = editBox
     block._button = button
+    block._resultsButton = resultsButton
     block._preview = preview
     block._previewLabel = previewLabel
+    block._charCount = charCount
     block._resultMessage = resultMessage
     block._expectedLabel = expectedLabel
     block._expectedText = expectedText
     block._currentLabel = currentLabel
     block._currentText = currentText
     block._measure = measure
+    block._updateCharCount = updateCharCounter
+    block._settingText = false
+    block._reverting = false
+
+    local initialText = editBox:GetText() or ""
+
+    if not GetEditorTooLongLine(initialText) then
+        block._lastValidText = initialText
+    else
+        block._lastValidText = nil
+    end
+
+    updateCharCounter()
 
     return block
 end
@@ -24671,6 +24848,7 @@ end
 
 function UI:Hide()
     self:HideHelp()
+    self:HideCodeViewer()
     self.frame:Hide()
 end
 
@@ -25464,15 +25642,29 @@ end
 
 function UI:SetEditorText(name, code)
     local editor = self:GetEditor(name)
-
     if not editor or not editor._editBox then
         return
     end
 
     code = code ~= nil and tostring(code) or ""
 
+    local valid = not GetEditorTooLongLine(code)
+
+    editor._settingText = true
     editor._editBox:SetText(code)
+    editor._settingText = false
+
     editor._preview:SetText(markupCode(code))
+
+    if valid then
+        editor._lastValidText = code
+    else
+        editor._lastValidText = nil
+    end
+
+    if editor._updateCharCount then
+        editor._updateCharCount()
+    end
 
     self.layoutDirty = true
 end
@@ -25562,6 +25754,230 @@ function UI:SetEditorResult(name, result)
     end
 
     self.layoutDirty = true
+end
+
+function UI:SetEditorResultsButtonEnabled(name, enabled)
+    local editor = self:GetEditor(name)
+
+    if not editor or not editor._resultsButton then
+        return
+    end
+
+    setButtonEnabled(editor._resultsButton, enabled)
+end
+
+function UI:_CreateCodeViewer()
+    if self.codeViewerFrame then
+        return
+    end
+
+    local f = CreateFrame("Frame", nil, UIParent)
+    f:SetSize(720, 580)
+    f:SetPoint("CENTER", -40, 0)
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:SetClampedToScreen(true)
+    f:SetFrameStrata("DIALOG")
+
+    addBackgroundBorder(f)
+
+    local titleBg = f:CreateTexture(nil, "ARTWORK")
+    titleBg:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    titleBg:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    titleBg:SetHeight(30)
+    titleBg:SetTexture(0.15, 0.15, 0.20, 1)
+
+    local titleSeparator = f:CreateTexture(nil, "ARTWORK")
+    titleSeparator:SetPoint("TOPLEFT", titleBg, "BOTTOMLEFT", 0, 0)
+    titleSeparator:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, 0)
+    titleSeparator:SetHeight(2)
+    titleSeparator:SetTexture(0.30, 0.30, 0.50, 1)
+
+    local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", -5, -5)
+    closeButton:SetScript("OnClick", function()
+        self:HideCodeViewer()
+    end)
+
+    local titleText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    titleText:SetPoint("LEFT", f, "LEFT", 15, 0)
+    titleText:SetPoint("RIGHT", closeButton, "LEFT", -8, 0)
+    titleText:SetPoint("TOP", titleBg, "TOP", 0, -5)
+    titleText:SetText("Результаты других игроков")
+
+    self.codeViewerTitle = titleText
+
+    self.codeViewerScroll, self.codeViewerContent, self.codeViewerBar = createScrollArea(
+        f,
+        680,
+        15,
+        -40,
+        -25,
+        15
+    )
+
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(frame)
+        frame:StartMoving()
+    end)
+    f:SetScript("OnDragStop", function(frame)
+        frame:StopMovingOrSizing()
+    end)
+
+    self.codeViewerFrame = f
+    self.codeViewerBlocks = {}
+
+    if self.frame and self.frame.HookScript then
+        self.frame:HookScript("OnHide", function()
+            self:HideCodeViewer()
+        end)
+    end
+
+    f:Hide()
+end
+
+function UI:HideCodeViewer()
+    if self.codeViewerFrame then
+        self.codeViewerFrame:Hide()
+    end
+end
+
+function UI:ShowCodeViewer(moduleId)
+    self:_CreateCodeViewer()
+
+    self.codeViewerModule = tonumber(moduleId)
+
+    if self.codeViewerTitle then
+        self.codeViewerTitle:SetText(
+            "Результаты других игроков: модуль " .. tostring(moduleId)
+        )
+    end
+
+    self.codeViewerFrame:Show()
+    self:RefreshCodeViewer()
+end
+
+function UI:RefreshCodeViewer()
+    if not self.codeViewerFrame then
+        return
+    end
+
+    if not self.codeViewerFrame:IsShown() then
+        return
+    end
+
+    if not self.codeViewerModule then
+        return
+    end
+
+    self.codeViewerBlocks = self.codeViewerBlocks or {}
+
+    clearBlocks(self.codeViewerBlocks)
+    self.codeViewerBlocks = {}
+
+    local moduleData = nsCodeViewerData and nsCodeViewerData[self.codeViewerModule]
+    local hasContent = false
+
+    if type(moduleData) ~= "table" or next(moduleData) == nil then
+        table.insert(
+            self.codeViewerBlocks,
+            createTextBlock(self.codeViewerContent, "<t>Ожидание ответов от сервера...</t>")
+        )
+    else
+        local owners = {}
+
+        for owner in pairs(moduleData) do
+            table.insert(owners, owner)
+        end
+
+        table.sort(owners, function(a, b)
+            return tostring(a):lower() < tostring(b):lower()
+        end)
+
+        for _, owner in ipairs(owners) do
+            local ownerData = moduleData[owner]
+
+            local variants = {}
+
+            if type(ownerData) == "table" then
+                -- Совместимость со старым форматом, если ownerData = { lines = {...} }.
+                if type(ownerData.lines) == "table" then
+                    variants["1"] = ownerData
+                else
+                    variants = ownerData
+                end
+            end
+
+            local variantKeys = {}
+
+            for k in pairs(variants) do
+                table.insert(variantKeys, k)
+            end
+
+            table.sort(variantKeys, function(a, b)
+                local na = tonumber(a)
+                local nb = tonumber(b)
+
+                if na and nb then
+                    return na < nb
+                end
+
+                return tostring(a) < tostring(b)
+            end)
+
+            if #variantKeys > 0 then
+                hasContent = true
+            end
+
+            for _, variantKey in ipairs(variantKeys) do
+                local entry = variants[variantKey]
+                local lines = entry and entry.lines or {}
+                local code = table.concat(lines, "\n")
+
+                local safeOwner = tostring(owner):gsub("<", "")
+
+                table.insert(
+                    self.codeViewerBlocks,
+                    createTextBlock(
+                        self.codeViewerContent,
+                        "<h>Игрок: " .. safeOwner .. " | Вариант " .. tostring(variantKey) .. "</h>"
+                    )
+                )
+
+                if code == "" then
+                    table.insert(
+                        self.codeViewerBlocks,
+                        createTextBlock(self.codeViewerContent, "<t>Код пуст.</t>")
+                    )
+                else
+                    table.insert(
+                        self.codeViewerBlocks,
+                        createCodeBlock(self.codeViewerContent, code)
+                    )
+                end
+            end
+        end
+
+        if not hasContent then
+            table.insert(
+                self.codeViewerBlocks,
+                createTextBlock(self.codeViewerContent, "<t>Нет данных.</t>")
+            )
+        end
+    end
+
+    layoutBlocks(
+        self.codeViewerBlocks,
+        self.codeViewerContent,
+        self.codeViewerScroll,
+        self.codeViewerBar
+    )
+
+    resetScroll(
+        self.codeViewerScroll,
+        self.codeViewerContent,
+        self.codeViewerBar
+    )
 end
 
 -- ============================================================
@@ -26120,8 +26536,96 @@ function Logic:InstallRunScript()
     end
 end
 
+function Logic:IsCodeLineLengthValid(code)
+    if code == nil then
+        return true
+    end
+
+    local s = tostring(code)
+    s = s:gsub("\r\n", "\n"):gsub("\r", "\n")
+
+    for line in (s .. "\n"):gmatch("(.-)\n") do
+        if CountSolutionChars(line) > 200 then
+            return false
+        end
+    end
+
+    return true
+end
+
+function Logic:SendCodeLines(code)
+    if type(SendAddonMessage) ~= "function" then
+        return false
+    end
+
+    if not self:IsCodeLineLengthValid(code) then
+        return false
+    end
+
+    local s = tostring(code or "")
+    s = s:gsub("\r\n", "\n"):gsub("\r", "\n")
+
+    local prefix = string.format("nsCode %s", tostring(self.current or 0))
+
+    for line in s:gmatch("[^\n]+") do
+        if line:match("^%s*$") == nil then
+            SendAddonMessage(prefix, line, "GUILD")
+        end
+    end
+
+    SendAddonMessage(prefix, "__NS_CODE_END__", "GUILD")
+
+    return true
+end
+
+function Logic:RequestOtherResults(editorName)
+    local m = self.db and self.db[self.current]
+
+    if not m then
+        return
+    end
+
+    local mtype = TrimString(m.type)
+
+    if mtype ~= "commenttest" then
+        return
+    end
+
+    if self.commentTestPassed ~= true then
+        if self.ui and self.ui.SetEditorResultsButtonEnabled then
+            self.ui:SetEditorResultsButtonEnabled(editorName or "commenttest", false)
+        end
+
+        return
+    end
+
+    local moduleId = self.current
+
+    nsCodeViewerData = nsCodeViewerData or {}
+    nsCodeViewerRequest = nsCodeViewerRequest or {}
+
+    -- Очищаем старые данные по этому модулю перед новым запросом.
+    nsCodeViewerData[moduleId] = {}
+    nsCodeViewerRequest[moduleId] = {
+        requester = (type(UnitName) == "function") and UnitName("player") or "",
+        time = (type(GetTime) == "function") and GetTime() or 0,
+    }
+
+    if type(SendAddonMessage) == "function" then
+        SendAddonMessage("nsGetCode", tostring(moduleId), "GUILD")
+    end
+
+    if self.ui and self.ui.ShowCodeViewer then
+        self.ui:ShowCodeViewer(moduleId)
+    end
+end
+
 function Logic:SendWinMessage(code)
     if type(SendAddonMessage) ~= "function" then
+        return
+    end
+
+    if not self:IsCodeLineLengthValid(code) then
         return
     end
 
@@ -26129,6 +26633,16 @@ function Logic:SendWinMessage(code)
     local payload = tostring(self.current or 0) .. ":" .. tostring(chars)
 
     SendAddonMessage("ns_Win", payload, "GUILD")
+
+    self:SendCodeLines(code)
+
+    local m = self.db and self.db[self.current]
+
+    if m and TrimString(m.type) == "commenttest" then
+        if self.ui and self.ui.SetEditorResultsButtonEnabled then
+            self.ui:SetEditorResultsButtonEnabled("commenttest", true)
+        end
+    end
 end
 
 function Logic:CheckPrintTasks()
@@ -26274,12 +26788,12 @@ function Logic:CheckPrintTasks()
         self:SendWinMessage(self.lastExecutedCode)
     end
 end
+
 function Logic:new(ui, modules)
     local self = setmetatable({}, Logic)
 
     self.ui = ui
     self.db = modules or {}
-
     self.order = {}
     self.orderIndex = {}
 
@@ -26322,6 +26836,10 @@ function Logic:new(ui, modules)
 
         onSelectModule = function(index)
             self:ManageCourse(index)
+        end,
+
+        onShowResults = function(editorName)
+            self:RequestOtherResults(editorName)
         end,
 
         isModuleCompleted = function(index)
@@ -26600,6 +27118,7 @@ function Logic:SendModuleToUI()
             name = "commenttest",
             buttonText = "Проверить",
             code = code,
+            resultsEnabled = self.commentTestPassed == true,
         })
 
         data.blocks = blocks
@@ -26609,8 +27128,14 @@ function Logic:SendModuleToUI()
 
     self.ui:SetModuleContent(data)
 
-    if mtype == "commenttest" and self.commentTestPassed then
-        self.ui:SetEditorButtonEnabled("commenttest", false)
+    if mtype == "commenttest" then
+        if self.ui and type(self.ui.SetEditorButtonEnabled) == "function" then
+            self.ui:SetEditorButtonEnabled("commenttest", true)
+        end
+
+        if self.ui and type(self.ui.SetEditorResultsButtonEnabled) == "function" then
+            self.ui:SetEditorResultsButtonEnabled("commenttest", self.commentTestPassed == true)
+        end
     end
 end
 
@@ -26828,28 +27353,29 @@ function Logic:CheckVars()
 end
 
 function Logic:CheckCode(editorName, code)
-    if self.commentTestPassed then
-        return
-    end
-
     local function Trim(s)
         return (tostring(s or ""):match("^%s*(.-)%s*$"))
     end
 
     local function Normalize(s)
         s = tostring(s or ""):gsub("\r\n", "\n")
+
         local lines = {}
+
         for line in s:gmatch("[^\n]+") do
             line = Trim(line)
+
             if line ~= "" then
                 table.insert(lines, line)
             end
         end
+
         return table.concat(lines, "\n")
     end
 
     local m = self.db and self.db[self.current]
     local mtype = Trim(m and m.type)
+
     if not m or mtype ~= "commenttest" then
         return
     end
@@ -26857,9 +27383,55 @@ function Logic:CheckCode(editorName, code)
     editorName = editorName or "commenttest"
     code = code or ""
 
+    local alreadyPassed = self.commentTestPassed == true
+
+    local function RefreshEditorButtons()
+        if self.ui and type(self.ui.SetEditorButtonEnabled) == "function" then
+            self.ui:SetEditorButtonEnabled(editorName, true)
+        end
+
+        if self.ui and type(self.ui.SetEditorResultsButtonEnabled) == "function" then
+            self.ui:SetEditorResultsButtonEnabled(editorName, self.commentTestPassed == true)
+        end
+    end
+
+    local function ApplyFailState()
+        if alreadyPassed then
+            self.commentTestPassed = true
+            self:SaveCommentTest(code, nil)
+
+            if self.ui and self.ui.SetNextEnabled then
+                self.ui:SetNextEnabled(true)
+            end
+        else
+            self.commentTestPassed = false
+            self:SaveCommentTest(code, false)
+
+            if self.ui and self.ui.SetNextEnabled then
+                self.ui:SetNextEnabled(false)
+            end
+        end
+
+        RefreshEditorButtons()
+    end
+
+    if type(self.IsCodeLineLengthValid) == "function" and not self:IsCodeLineLengthValid(code) then
+        ApplyFailState()
+
+        self.ui:SetEditorResult(editorName, {
+            status = "diff",
+            message = "Код не принят: есть строки длиннее 200 символов.",
+            expected = m.expectedCode or m.expectedOutput or "",
+            current = code,
+        })
+
+        return
+    end
+
     if m.preloadVars then
         for _, v in ipairs(m.preloadVars) do
             local var = Trim(v.var)
+
             if var ~= "" then
                 _G[var] = v.value
             end
@@ -26873,16 +27445,17 @@ function Logic:CheckCode(editorName, code)
             m.onlyCodePatterns or m.onlyKeywords,
             m.singleLine
         )
+
         if not keywordOk then
-            self.commentTestPassed = false
-            self:SaveCommentTest(code, false)
-            self.ui:SetNextEnabled(false)
+            ApplyFailState()
+
             self.ui:SetEditorResult(editorName, {
                 status = "diff",
                 message = keywordErr or "Неверный код.",
                 expected = m.expectedCode or m.expectedOutput or "",
                 current = code,
             })
+
             return
         end
     end
@@ -26926,7 +27499,9 @@ function Logic:CheckCode(editorName, code)
 
     local function FormatValue(value, depth)
         depth = depth or 0
+
         local valueType = type(value)
+
         if valueType == "string" then
             return '"' .. value .. '"'
         elseif valueType == "number" then
@@ -26939,32 +27514,44 @@ function Logic:CheckCode(editorName, code)
             if depth >= 1 then
                 return "{...}"
             end
+
             local parts = {}
             local arraySize = #value
+
             if arraySize > 0 then
                 local maxSize = math.min(arraySize, 5)
+
                 for i = 1, maxSize do
                     table.insert(parts, FormatValue(value[i], depth + 1))
                 end
+
                 if arraySize > 5 then
                     table.insert(parts, "...")
                 end
+
                 return "{" .. table.concat(parts, ", ") .. "}"
             end
+
             local count = 0
+
             for k, v in pairs(value) do
                 count = count + 1
+
                 if count > 5 then
                     table.insert(parts, "...")
                     break
                 end
+
                 table.insert(parts, tostring(k) .. "=" .. FormatValue(v, depth + 1))
             end
+
             if count == 0 then
                 return "{}"
             end
+
             return "{" .. table.concat(parts, ", ") .. "}"
         end
+
         return "<" .. valueType .. ">"
     end
 
@@ -26987,15 +27574,20 @@ function Logic:CheckCode(editorName, code)
 
     _G.__ns_trace_loop = function(label, ...)
         iterationCount = iterationCount + 1
+
         local argCount = select("#", ...)
+
         if argCount == 0 then
             AddIterationLine("Итерация " .. iterationCount .. ": " .. tostring(label))
             return
         end
+
         local parts = {}
+
         for i = 1, argCount do
             parts[i] = FormatValue(select(i, ...))
         end
+
         AddIterationLine(
             "Итерация " .. iterationCount .. ": " .. tostring(label) .. " = " .. table.concat(parts, ", ")
         )
@@ -27003,19 +27595,25 @@ function Logic:CheckCode(editorName, code)
 
     _G.__ns_trace_while = function(condText, vars)
         iterationCount = iterationCount + 1
+
         local parts = {}
+
         if type(vars) == "table" then
             local keys = {}
+
             for k in pairs(vars) do
                 table.insert(keys, k)
             end
+
             table.sort(keys)
+
             for _, k in ipairs(keys) do
                 if type(vars[k]) ~= "function" then
                     table.insert(parts, tostring(k) .. " = " .. FormatValue(vars[k]))
                 end
             end
         end
+
         if #parts > 0 then
             AddIterationLine(
                 "Итерация " .. iterationCount .. ": while " .. tostring(condText) .. " | " .. table.concat(parts, ", ")
@@ -27027,21 +27625,27 @@ function Logic:CheckCode(editorName, code)
 
     local function InstrumentCode(source)
         local out = {}
+
         for line in source:gmatch("[^\r\n]+") do
             table.insert(out, line)
+
             local indent = line:match("^%s*") or ""
             local header = Trim(line)
             header = Trim((header:gsub("%-%-.*$", "")))
+
             if header ~= "" then
                 local vars = header:match("^for%s+(.-)%s+in%s+.-%s+do%s*$")
+
                 if vars then
                     local args = vars:gsub("%s+", "")
+
                     table.insert(
                         out,
                         indent .. "    __ns_trace_loop(" .. string.format("%q", args) .. ", " .. args .. ")"
                     )
                 else
                     local numVar = header:match("^for%s+(%w+)%s*=%s*.-do%s*$")
+
                     if numVar then
                         table.insert(
                             out,
@@ -27049,45 +27653,56 @@ function Logic:CheckCode(editorName, code)
                         )
                     else
                         local cond = header:match("^while%s+(.-)%s+do%s*$")
+
                         if cond then
                             local names = {}
                             local seen = {}
+
                             for word in cond:gmatch("[%a_][%w_]*") do
                                 if not keywords[word] and not seen[word] then
                                     seen[word] = true
                                     table.insert(names, word)
                                 end
                             end
+
                             local varParts = {}
+
                             for _, word in ipairs(names) do
                                 table.insert(varParts, word .. " = " .. word)
                             end
+
                             table.insert(
                                 out,
                                 indent .. "    __ns_trace_while("
-                                    .. string.format("%q", cond)
-                                    .. ", {" .. table.concat(varParts, ", ") .. "})"
+                                .. string.format("%q", cond)
+                                .. ", {" .. table.concat(varParts, ", ") .. "})"
                             )
                         end
                     end
                 end
             end
         end
+
         return table.concat(out, "\n")
     end
 
     local function ExecuteSource(source)
         local output = {}
+
         local oldPrint = print
+
         print = function(...)
             local parts = {}
+
             for i = 1, select("#", ...) do
                 parts[i] = tostring(select(i, ...))
             end
+
             table.insert(output, table.concat(parts, " "))
         end
 
         local fn, compileErr
+
         if type(loadstring) == "function" then
             fn, compileErr = loadstring(source)
         else
@@ -27095,6 +27710,7 @@ function Logic:CheckCode(editorName, code)
         end
 
         local ok, runErr = false, nil
+
         if fn then
             ok, runErr = pcall(fn)
         else
@@ -27102,6 +27718,7 @@ function Logic:CheckCode(editorName, code)
         end
 
         print = oldPrint
+
         return ok, runErr, table.concat(output, "\n")
     end
 
@@ -27110,18 +27727,23 @@ function Logic:CheckCode(editorName, code)
 
     local function AddCandidate(name)
         name = Trim(name)
+
         if name == "" then
             return
         end
+
         if candidateSeen[name] then
             return
         end
+
         if keywords[name] then
             return
         end
+
         if not name:match("^[%a_][%w_]*$") then
             return
         end
+
         candidateSeen[name] = true
         table.insert(candidateOrder, name)
     end
@@ -27139,6 +27761,7 @@ function Logic:CheckCode(editorName, code)
     end
 
     local searchText = tostring(m.instruction or "") .. "\n" .. tostring(m.content or "")
+
     for name in searchText:gmatch("<k>([%a_][%w_]*)</k>") do
         AddCandidate(name)
     end
@@ -27152,6 +27775,7 @@ function Logic:CheckCode(editorName, code)
     end
 
     local oldValues = {}
+
     for _, name in ipairs(candidateOrder) do
         oldValues[name] = _G[name]
     end
@@ -27160,24 +27784,29 @@ function Logic:CheckCode(editorName, code)
         if m.preloadVars then
             for _, v in ipairs(m.preloadVars) do
                 local var = Trim(v.var)
+
                 if var ~= "" then
                     _G[var] = v.value
                 end
             end
         end
+
         for _, name in ipairs(candidateOrder) do
             _G[name] = oldValues[name]
         end
     end
 
     local instrumentedCode = InstrumentCode(code)
+
     local ok, runErr, rawOutput = ExecuteSource(instrumentedCode)
 
     if not ok and instrumentedCode ~= code then
         iterationLines = {}
         iterationCount = 0
         traceOverflow = false
+
         ResetInputs()
+
         ok, runErr, rawOutput = ExecuteSource(code)
     end
 
@@ -27187,8 +27816,10 @@ function Logic:CheckCode(editorName, code)
     local problems = {}
 
     local outputOk = true
+
     if m.expectedOutput then
         outputOk = Normalize(rawOutput) == Normalize(m.expectedOutput)
+
         if not outputOk then
             table.insert(problems, "Неверный вывод.")
         end
@@ -27197,25 +27828,34 @@ function Logic:CheckCode(editorName, code)
     local printCount = 0
     local templateOk = true
     local needPrint = tonumber(m.requiredPrintCount)
+
     if needPrint then
         local codeForCheck = code:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''")
         local searchPos = 1
+
         while true do
             local startPos, endPos = codeForCheck:find("print", searchPos, true)
+
             if not startPos then
                 break
             end
+
             local before = startPos > 1 and codeForCheck:sub(startPos - 1, startPos - 1) or ""
             local after = codeForCheck:sub(endPos + 1, endPos + 1) or ""
+
             local beforeIsWord = before ~= "" and before:match("[%w_]") ~= nil
             local afterIsWord = after ~= "" and after:match("[%w_]") ~= nil
+
             if not beforeIsWord and not afterIsWord then
                 printCount = printCount + 1
             end
+
             searchPos = endPos + 1
         end
+
         if printCount ~= needPrint then
             templateOk = false
+
             table.insert(
                 problems,
                 ("В коде должно быть %d слов print. Найдено: %d."):format(needPrint, printCount)
@@ -27225,26 +27865,31 @@ function Logic:CheckCode(editorName, code)
 
     local runtimeOk = true
     local checkDetails = nil
+
     if type(m.checkCode) == "function" then
         if not ok then
             runtimeOk = false
         else
             local success, result = pcall(m.checkCode)
+
             if success and result == true then
                 runtimeOk = true
             else
                 runtimeOk = false
+
                 if type(result) == "string" then
                     checkDetails = result
                 end
             end
         end
+
         if not runtimeOk then
             table.insert(problems, "Проверка результата не пройдена.")
         end
     end
 
     local runOk = true
+
     if not ok and not m.expectedOutput and type(m.checkCode) ~= "function" then
         runOk = false
         table.insert(problems, "Ошибка выполнения кода.")
@@ -27256,6 +27901,7 @@ function Logic:CheckCode(editorName, code)
 
     if #iterationLines > 0 then
         table.insert(reportLines, "Итерации:")
+
         for _, line in ipairs(iterationLines) do
             table.insert(reportLines, "  " .. line)
         end
@@ -27263,20 +27909,25 @@ function Logic:CheckCode(editorName, code)
 
     if rawOutput ~= "" then
         table.insert(reportLines, "Вывод:")
+
         for line in rawOutput:gmatch("[^\n]+") do
             table.insert(reportLines, "  " .. line)
         end
     end
 
     local finalLines = {}
+
     for _, name in ipairs(candidateOrder) do
         local newValue = _G[name]
+
         if type(newValue) ~= "function" and newValue ~= nil then
             table.insert(finalLines, name .. " = " .. FormatValue(newValue))
         end
     end
+
     if #finalLines > 0 then
         table.insert(reportLines, "Итог:")
+
         for _, line in ipairs(finalLines) do
             table.insert(reportLines, "  " .. line)
         end
@@ -27284,6 +27935,7 @@ function Logic:CheckCode(editorName, code)
 
     if checkDetails then
         table.insert(reportLines, "Детали проверки:")
+
         for line in checkDetails:gmatch("[^\n]+") do
             table.insert(reportLines, "  " .. line)
         end
@@ -27294,19 +27946,21 @@ function Logic:CheckCode(editorName, code)
     end
 
     local reportText = table.concat(reportLines, "\n")
+
     local displayCurrent = reportText
 
     if not ok then
         if displayCurrent ~= "" then
             displayCurrent = displayCurrent .. "\n"
         end
+
         displayCurrent = displayCurrent .. "Ошибка: " .. tostring(runErr)
     end
 
-    self.commentTestPassed = passed
-    self:SaveCommentTest(code, passed)
-
     if passed then
+        self.commentTestPassed = true
+        self:SaveCommentTest(code, true)
+
         self.ui:SetEditorResult(editorName, {
             status = "success",
             message = "",
@@ -27314,25 +27968,31 @@ function Logic:CheckCode(editorName, code)
             current = reportText,
             footerSuccess = true,
         })
+
         self.ui:SetNextEnabled(true)
-        self.ui:SetEditorButtonEnabled(editorName, false)
+
+        RefreshEditorButtons()
+
         if PlaySoundFile then
             PlaySoundFile("Interface\\AddOns\\NSQC3\\libs\\fin.ogg")
         end
 
         self:SendWinMessage(code)
     else
+        ApplyFailState()
+
         local message = table.concat(problems, " ")
+
         if message == "" then
             message = "Неверно."
         end
+
         self.ui:SetEditorResult(editorName, {
             status = "diff",
             message = message,
             expected = m.expectedCode or m.expectedOutput or "",
             current = displayCurrent,
         })
-        self.ui:SetNextEnabled(false)
     end
 end
 
