@@ -28245,6 +28245,20 @@ local POSITION_OFFSET = 400
 -- Вспомогательные функции
 -- ========================================================================
 
+local COMBAT_REMINDER_DELAY = 60 * 60 -- после боя не показываем напоминалку 1 час
+
+local function IsPlayerInCombat()
+    if InCombatLockdown and InCombatLockdown() then
+        return true
+    end
+
+    if UnitAffectingCombat and UnitAffectingCombat("player") then
+        return true
+    end
+
+    return false
+end
+
 local function Trim(s)
     return (tostring(s or ""):match("^%s*(.-)%s*$"))
 end
@@ -28432,6 +28446,7 @@ function NSReminder:New()
     self.label = nil
     self.timerFrame = nil
     self.fadeFrame = nil
+    self.eventFrame = nil
 
     self.mode = "wait"
     self.elapsed = 0
@@ -28525,6 +28540,31 @@ function NSReminder:Init()
     self.timerFrame:SetScript("OnUpdate", function(_, elapsed)
         self:OnUpdate(elapsed)
     end)
+
+    self.eventFrame = CreateFrame("Frame")
+    self.eventFrame:Show()
+    self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+
+    self.eventFrame:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_DISABLED" then
+            self:OnEnterCombat()
+        end
+    end)
+end
+
+function NSReminder:HideImmediate()
+    if not self.frame then
+        return
+    end
+
+    if self.fadeFrame then
+        self.fadeFrame:SetScript("OnUpdate", nil)
+        self.fadeFrame:Hide()
+    end
+
+    self.frame:StopMovingOrSizing()
+    self.frame:SetAlpha(0)
+    self.frame:Hide()
 end
 
 function NSReminder:OnUpdate(elapsed)
@@ -28539,6 +28579,12 @@ function NSReminder:OnUpdate(elapsed)
     end
 
     self.elapsed = 0
+
+    if IsPlayerInCombat() then
+        self:HideImmediate()
+        self:ScheduleCombatCooldown()
+        return
+    end
 
     -- Если курс никогда не открывали — не показываем напоминалку.
     if not HasCourseEverOpened() then
@@ -28562,6 +28608,15 @@ function NSReminder:OnUpdate(elapsed)
 end
 
 function NSReminder:ScheduleRandom()
+    if self.mode == "stopped" then
+        return
+    end
+
+    if IsPlayerInCombat() then
+        self:ScheduleCombatCooldown()
+        return
+    end
+
     self.mode = "wait"
     self.elapsed = 0
     self.nextDelay = math.random(MIN_REMINDER_INTERVAL, MAX_REMINDER_INTERVAL)
@@ -28593,13 +28648,23 @@ function NSReminder:Stop()
         self.timerFrame:Hide()
     end
 
-    if self.frame then
-        self.frame:Hide()
+    if self.eventFrame then
+        self.eventFrame:SetScript("OnEvent", nil)
+        self.eventFrame:UnregisterAllEvents()
+        self.eventFrame:Hide()
     end
+
+    self:HideImmediate()
 end
 
 function NSReminder:Show()
     if not self.frame then
+        return
+    end
+
+    if IsPlayerInCombat() then
+        self:HideImmediate()
+        self:ScheduleCombatCooldown()
         return
     end
 
@@ -28656,7 +28721,26 @@ function NSReminder:Hide()
         return
     end
 
+    if IsPlayerInCombat() then
+        self:HideImmediate()
+        return
+    end
+
     self:StartFade(self.frame:GetAlpha(), 0, 0.3)
+end
+
+function NSReminder:ScheduleCombatCooldown()
+    if self.mode == "stopped" then
+        return
+    end
+
+    self.mode = "wait"
+    self.elapsed = 0
+    self.nextDelay = COMBAT_REMINDER_DELAY
+
+    if self.timerFrame then
+        self.timerFrame:Show()
+    end
 end
 
 function NSReminder:OnRightClick()
@@ -28670,6 +28754,39 @@ function NSReminder:OnRightClick()
         -- Тут же перезапускаем напоминалку.
         self:Hide()
         self:Show()
+    end
+end
+
+function NSReminder:OnEnterCombat()
+    if self.mode == "stopped" then
+        return
+    end
+
+    -- Если уже добавлены вспомогательные методы из предыдущего патча — используем их.
+    if type(self.HideImmediate) == "function" and type(self.ScheduleCombatCooldown) == "function" then
+        self:HideImmediate()
+        self:ScheduleCombatCooldown()
+        return
+    end
+
+    -- Запасной вариант, если HideImmediate и ScheduleCombatCooldown не были добавлены.
+    if self.fadeFrame then
+        self.fadeFrame:SetScript("OnUpdate", nil)
+        self.fadeFrame:Hide()
+    end
+
+    if self.frame then
+        self.frame:StopMovingOrSizing()
+        self.frame:SetAlpha(0)
+        self.frame:Hide()
+    end
+
+    self.mode = "wait"
+    self.elapsed = 0
+    self.nextDelay = COMBAT_REMINDER_DELAY or 3600
+
+    if self.timerFrame then
+        self.timerFrame:Show()
     end
 end
 
