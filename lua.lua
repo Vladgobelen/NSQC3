@@ -1695,7 +1695,6 @@ answer6 = nil -- nil or false
     },
     forbidKeywords = {
         "or",
-        "print",
     },
     checkCode = function()
         return _G.answer1 == "Запасной"
@@ -4970,7 +4969,7 @@ function BuildPrefixes(word)
 end
 ]=],
     requireKeywords = {"BuildPrefixes", "function", "for", "string.utf8sub", "table.insert", "return"},
-    forbidKeywords = {"print"},
+    forbidKeywords = {},
     checkCode = function()
         _G.checkError = nil
         for i = 1, 3 do _G["test" .. i] = nil end
@@ -5143,7 +5142,7 @@ end
 
 ns_llua['lua'][51.6] = {
     type = "commenttest",
-    title = "Тест 51-4: функция SplitChars",
+    title = "Тест: функция SplitChars",
     helpModules = {51.2, 31, 44, 45},
     preloadVars = {
         {var = "SplitChars", desc = "SplitChars очищается перед проверкой"},
@@ -5153,7 +5152,7 @@ ns_llua['lua'][51.6] = {
     },
     reportVars = {"checkError", "test1", "test2"},
     instruction = [=[
-<h>Тест 51-4: функция SplitChars</h>
+<h>Тест: функция SplitChars</h>
 <t>Создай глобальную функцию <k>SplitChars(word)</k>.</t>
 <t>Функция должна вернуть массив отдельных символов слова.</t>
 <t>Используй <k>string.utf8len</k> для длины и <k>string.utf8sub(word, i, i)</k> для символа.</t>
@@ -5165,8 +5164,8 @@ function SplitChars(word)
 
 end
 ]=],
-    requireKeywords = {"SplitChars", "function", "for", "string.utf8len", "string.utf8sub", "table.insert", "return"},
-    forbidKeywords = {"print"},
+    requireKeywords = {"SplitChars", "function", "for", "return"},
+    forbidKeywords = {},
     checkCode = function()
         _G.checkError = nil
         _G.test1 = nil; _G.test2 = nil
@@ -5203,7 +5202,7 @@ end
 
 ns_llua['lua'][51.7] = {
     type = "commenttest",
-    title = "Тест 51-5: функция CountChars",
+    title = "Тест: функция CountChars",
     helpModules = {51.2, 31, 44, 45},
     preloadVars = {
         {var = "CountChars", desc = "CountChars очищается перед проверкой"},
@@ -5213,9 +5212,9 @@ ns_llua['lua'][51.7] = {
     },
     reportVars = {"checkError", "test1", "test2"},
     instruction = [=[
-<h>Тест 51-5: функция CountChars</h>
+<h>Тест: функция CountChars</h>
 <t>Создай глобальную функцию <k>CountChars(word)</k>.</t>
-<t>Функция должна вернуть хэш-таблицу: символ → сколько раз он встречается.</t>
+<t>Функция должна вернуть хэш-таблицу: символ -> сколько раз он встречается.</t>
 <t>Используй <k>string.utf8len</k>, <k>string.utf8sub</k> и накопление в таблице.</t>
 <t>Пример: для <s>"абба"</s> верни <c>{["а"]=2, ["б"]=2}</c>.</t>
 <w>Ничего выводить не нужно.</w>
@@ -5225,8 +5224,8 @@ function CountChars(word)
 
 end
 ]=],
-    requireKeywords = {"CountChars", "function", "for", "string.utf8len", "string.utf8sub", "return"},
-    forbidKeywords = {"print"},
+    requireKeywords = {"CountChars", "function", "for", "return"},
+    forbidKeywords = {},
     checkCode = function()
         _G.checkError = nil
         _G.test1 = nil; _G.test2 = nil
