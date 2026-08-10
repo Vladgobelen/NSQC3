@@ -5504,7 +5504,1516 @@ finalCartText = "Зелье, Компас, Меч, Факел"
     end,
 }
 
+-- ============================================================
+-- COURSE DATA: MODULES 52.2-52.9
+-- LOOKUP-TABLES: DATA DRIVEN FUNCTIONS
+-- Без WoW API, только абстрактные учебные примеры
+-- ============================================================
 
+ns_llua['lua'][52.2] = {
+    type = "info",
+    title = "Данные отдельно: lookup-таблицы, наборы и значения",
+    content = [=[
+<h>Данные отдельно: lookup-таблицы</h>
+<t>Lookup-таблица — это обычная таблица, в которой данные хранятся как пары <k>ключ = значение</k>. Вместо того чтобы писать длинную цепочку if/elseif, программа просто достаёт значение по ключу.</t>
+
+<h>Проблема: данные размазаны по логике</h>
+<t>Часто новички пишут так:</t>
+<code>
+function GetFruitName(token)
+    if token == "APPLE" then
+        return "яблоко"
+    elseif token == "BANANA" then
+        return "банан"
+    elseif token == "CHERRY" then
+        return "вишня"
+    elseif token == "MELON" then
+        return "арбуз"
+    end
+end
+</code>
+<t>Работает, но минусы такие:</t>
+<t>- данные и логика смешаны;</t>
+<t>- при добавлении нового значения нужно снова лезть в функцию;</t>
+<t>- легко сделать опечатку в условиях;</t>
+<t>- код становится длиннее и хуже читается.</t>
+
+<h>Решение: вынести данные в таблицу</h>
+<code>
+FRUIT_NAMES = {
+    APPLE = "яблоко",
+    BANANA = "банан",
+    CHERRY = "вишня",
+    MELON = "арбуз",
+}
+
+function GetFruitName(token)
+    -- Сначала проверяем token: если он nil или false, дальше не идём и вернём "неизвестно".
+    -- Если token нормальный, пробуем достать значение из таблицы: FRUIT_NAMES[token].
+    -- Если такого ключа нет, получится nil, и тогда or вернёт "неизвестно".
+    return token and FRUIT_NAMES[token] or "неизвестно"
+end
+</code>
+<t>Теперь функция универсальная и короткая. Она не знает заранее, какие именно значения существуют. Она просто знает, что нужно взять значение из таблицы по ключу.</t>
+
+<h>Как это работает</h>
+<t>Запись <k>FRUIT_NAMES[token]</k> означает:</t>
+<t>- возьми таблицу <k>FRUIT_NAMES</k>;</t>
+<t>- найди в ней ключ <k>token</k>;</t>
+<t>- верни значение по этому ключу.</t>
+<code>
+FRUIT_NAMES = {
+    APPLE = "яблоко",
+}
+
+print(FRUIT_NAMES["APPLE"]) -- яблоко
+print(FRUIT_NAMES["FURY"])  -- nil
+</code>
+
+<h>Таблица-набор: есть или нет</h>
+<t>Если нужно просто проверять, входит ли элемент в набор, таблицу используют как набор. В такой таблице ключ означает сам элемент, а значение просто говорит: «ключ существует».</t>
+<t>Самый понятный маркер для такого набора — <k>true</k>.</t>
+<code>
+MODERATORS = {
+    ["Шеф"] = true,
+    ["Высшая"] = true,
+}
+
+-- Если ключ есть, вернётся true.
+-- Если ключа нет, вернётся nil, а nil считается ложью.
+if MODERATORS["Шеф"] then
+    print("Это модератор")
+end
+</code>
+
+<h>Безопасная проверка с именем</h>
+<t>Если имя может быть <k>nil</k>, сначала нужно проверить его, иначе обращение к таблице по nil-ключу даст ошибку.</t>
+<code>
+local name = "Шеф"
+
+if name and MODERATORS[name] then
+    print("Это модератор")
+end
+</code>
+<t>Или через функцию:</t>
+<code>
+function IsModerator(name)
+    -- Если name равен nil или false, сразу вернём false.
+    -- Если name есть в таблице, MODERATORS[name] вернёт true.
+    -- Если ключа нет, получится nil, и or заменит его на false.
+    return name and MODERATORS[name] or false
+end
+</code>
+
+<h>Почему массив не заменяет такой набор</h>
+<t>Иногда хочется написать так:</t>
+<code>
+BAD_MODERATORS = {
+    "Шеф",
+    "Высшая",
+}
+
+if BAD_MODERATORS["Шеф"] then
+    print("Это модератор")
+end
+</code>
+<w>Так работать не будет.</w>
+<t>Это массив. Его ключи — числа 1, 2 и так далее. Запись <k>BAD_MODERATORS["Шеф"]</k> ищет строковый ключ <s>"Шеф"</s>, а его там нет, поэтому вернётся <k>nil</k>.</t>
+<code>
+print(BAD_MODERATORS["Шеф"]) -- nil
+print(BAD_MODERATORS[1])     -- Шеф
+</code>
+<t>То есть массив хранит значения по номерам. Он не возвращает <k>true</k> автоматически только потому, что элемент где-то есть внутри.</t>
+<t>Если нужно проверить вхождение элемента в массив, придётся либо идти циклом по массиву, либо заранее превратить его в таблицу-набор.</t>
+
+<h>Вариант с разными значениями</h>
+<t>Теперь представим, что таблица хранит не просто признак «есть», а конкретные данные. Например, роли игроков.</t>
+<code>
+USER_ROLES = {
+    ["Шеф"] = "admin",
+    ["Высшая"] = "moderator",
+    ["Гость"] = "viewer",
+}
+</code>
+<t>Здесь значения уже разные и имеют смысл:</t>
+<t>- <s>"admin"</s> — администратор;</t>
+<t>- <s>"moderator"</s> — модератор;</t>
+<t>- <s>"viewer"</s> — обычный зритель.</t>
+
+<h>Почему простого условия уже недостаточно</h>
+<t>Если написать так:</t>
+<code>
+if USER_ROLES["Гость"] then
+    print("У игрока есть роль")
+end
+</code>
+<t>условие сработает, потому что ключ <s>"Гость"</s> есть в таблице, а значение <s>"viewer"</s> в Lua считается истиной.</t>
+<t>Но такая проверка говорит только: «игрок есть в таблице». Она не говорит, что у него нужные права.</t>
+<t>Если нужно проверить конкретную роль, надо сравнивать значение:</t>
+<code>
+if USER_ROLES["Шеф"] == "admin" then
+    print("Это админ")
+end
+</code>
+<t>Если нужно проверить несколько ролей, можно сохранить значение в переменную:</t>
+<code>
+local role = USER_ROLES["Высшая"]
+
+if role == "admin" or role == "moderator" then
+    print("Есть права модератора")
+end
+</code>
+
+<h>Функция для точной проверки значения</h>
+<code>
+function IsAdmin(name)
+    -- Если name равен nil или false, сразу вернём false.
+    -- Иначе достаём роль из таблицы и сравниваем её с нужным значением.
+    return name ~= nil and USER_ROLES[name] == "admin"
+end
+
+function IsModeratorRole(name)
+    -- Достаём роль игрока из таблицы.
+    local role = USER_ROLES[name]
+
+    -- Если роль nil, сравнения просто дадут false.
+    return role == "admin" or role == "moderator"
+end
+</code>
+<t>Здесь уже важно сравнивать именно значение, потому что наличие ключа само по себе ничего не говорит о правах игрока.</t>
+
+<h>Почему в первом случае хватает простого условия</h>
+<t>В первом случае таблица — это набор. Ключ есть — значит «да». Ключа нет — значит «нет».</t>
+<c>ключ найден -> значение истинное -> условие проходит;</c>
+<c>ключ не найден -> nil -> условие не проходит.</c>
+<t>Поэтому достаточно короткой проверки:</t>
+<code>
+if MODERATORS[name] then
+    print("Входит в набор")
+end
+</code>
+
+<h>Почему во втором случае нужно уточнять</h>
+<t>Во втором случае таблица — это словарь данных. Разные значения означают разные состояния или права. Само наличие ключа уже не означает нужное право.</t>
+<t>Поэтому нужно проверять не просто «ключ есть», а «ключ есть и значение именно такое, какое нужно».</t>
+<code>
+if USER_ROLES[name] == "admin" then
+    print("Это админ")
+end
+</code>
+
+<h>Итоговая шпаргалка</h>
+<c>Таблица-набор: ключ есть = да, ключа нет = нет.</c>
+<c>Для набора удобно использовать значение true.</c>
+<c>В наборе обычно достаточно: if set[name] then.</c>
+<c>Если key может быть nil, безопаснее: if name and set[name] then.</c>
+<c>Массив не проверяет наличие элемента по значению через arr[value].</c>
+<c>Таблица-словарь: значения имеют смысл.</c>
+<c>В словаре нужно сравнивать значение: if map[name] == expected then.</c>
+]=],
+}
+
+ns_llua['lua'][52.3] = {
+    type = "commenttest",
+    title = "Практика: карта значений",
+    helpModules = {52.2, 44, 45, 21.1},
+    preloadVars = {
+        {var = "colorNames", desc = "colorNames очищается перед проверкой"},
+        {var = "GetColorName", desc = "GetColorName очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+        {var = "test7", desc = "test7 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+        "test7",
+    },
+    instruction = [=[
+<h>Практика: карта значений</h>
+<t>Создай глобальную таблицу <k>colorNames</k> с такими парами:</t>
+<code>
+RED - красный
+GREEN - зелёный
+BLUE - синий
+YELLOW - жёлтый
+</code>
+<t>Создай глобальную функцию <k>GetColorName(token)</k>.</t>
+<t>Функция должна возвращать значение из <k>colorNames</k> по ключу <k>token</k>.</t>
+<t>Если token равен nil или такого ключа нет, функция должна вернуть <s>"неизвестно"</s>.</t>
+<t>Смысл возврата такой:</t>
+<c>Если token существует и есть в таблице, вернём colorNames[token].</c>
+<c>Если token ложный или ключ не найден, вернём "неизвестно".</c>
+]=],
+    initialCode = [=[
+colorNames = {
+
+}
+
+function GetColorName(token)
+    
+end
+]=],
+    requireKeywords = {
+        "colorNames",
+        "GetColorName",
+        "function",
+        "return",
+        "RED",
+        "GREEN",
+        "BLUE",
+        "YELLOW",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 7 do
+            _G["test" .. i] = nil
+        end
+
+        local function fmt(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        if type(_G.colorNames) ~= "table" then
+            _G.checkError = "colorNames должна быть глобальной таблицей"
+            return _G.checkError
+        end
+
+        local expectedMap = {
+            RED = "красный",
+            GREEN = "зелёный",
+            BLUE = "синий",
+            YELLOW = "жёлтый",
+        }
+
+        for key, expected in pairs(expectedMap) do
+            if _G.colorNames[key] ~= expected then
+                _G.checkError = "В colorNames неправильное значение для ключа " .. tostring(key)
+                return _G.checkError
+            end
+        end
+
+        if type(_G.GetColorName) ~= "function" then
+            _G.checkError = "GetColorName должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local tests = {
+            {arg = "RED", expected = "красный"},
+            {arg = "GREEN", expected = "зелёный"},
+            {arg = "BLUE", expected = "синий"},
+            {arg = "YELLOW", expected = "жёлтый"},
+            {arg = "UNKNOWN", expected = "неизвестно"},
+            {arg = "", expected = "неизвестно"},
+            {arg = nil, expected = "неизвестно"},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.GetColorName, test.arg)
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            local line = string.format(
+                "Вход: %s | Получено: %s | Ожидалось: %s",
+                fmt(test.arg),
+                resultText,
+                fmt(test.expected)
+            )
+
+            _G["test" .. i] = line
+
+            if not ok or result ~= test.expected then
+                table.insert(details, line)
+            end
+        end
+
+        if #details > 0 then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][52.4] = {
+    type = "commenttest",
+    title = "Практика: таблица-множество модераторов",
+    helpModules = {52.2, 44, 45, 15},
+    preloadVars = {
+        {var = "moderators", desc = "moderators очищается перед проверкой"},
+        {var = "IsModerator", desc = "IsModerator очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+    },
+    instruction = [=[
+<h>Практика: таблица-множество модераторов</h>
+<t>Создай глобальную таблицу <k>moderators</k>.</t>
+<t>Ключи — имена модераторов, значения — <k>true</k>:</t>
+<code>
+Артас
+Джайна
+Тралл
+</code>
+<t>Создай глобальную функцию <k>IsModerator(name)</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если name есть в таблице <k>moderators</k>, и <k>false</k> во всех остальных случаях.</t>
+<t>Если name равен nil, функция должна вернуть <k>false</k>, а не ошибку.</t>
+]=],
+    initialCode = [=[
+moderators = {
+
+}
+
+function IsModerator(name)
+
+end
+]=],
+    requireKeywords = {
+        "moderators",
+        "IsModerator",
+        "function",
+        "return",
+        "true",
+        "Артас",
+        "Джайна",
+        "Тралл",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 6 do
+            _G["test" .. i] = nil
+        end
+
+        local function fmt(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        if type(_G.moderators) ~= "table" then
+            _G.checkError = "moderators должна быть глобальной таблицей"
+            return _G.checkError
+        end
+
+        local names = {"Артас", "Джайна", "Тралл"}
+
+        for _, name in ipairs(names) do
+            if _G.moderators[name] ~= true then
+                _G.checkError = "В moderators должен быть ключ " .. name .. " со значением true"
+                return _G.checkError
+            end
+        end
+
+        if type(_G.IsModerator) ~= "function" then
+            _G.checkError = "IsModerator должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local tests = {
+            {arg = "Артас", expected = true},
+            {arg = "Джайна", expected = true},
+            {arg = "Тралл", expected = true},
+            {arg = "Иллидан", expected = false},
+            {arg = "", expected = false},
+            {arg = nil, expected = false},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.IsModerator, test.arg)
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            local line = string.format(
+                "Вход: %s | Получено: %s | Ожидалось: %s",
+                fmt(test.arg),
+                resultText,
+                fmt(test.expected)
+            )
+
+            _G["test" .. i] = line
+
+            if not ok or result ~= test.expected then
+                table.insert(details, line)
+            end
+        end
+
+        if #details > 0 then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][52.5] = {
+    type = "commenttest",
+    title = "Практика: универсальная проверка вхождения",
+    helpModules = {52.2, 52.4, 44, 45},
+    preloadVars = {
+        {var = "blockedPlayers", desc = "blockedPlayers очищается перед проверкой"},
+        {var = "trustedPlayers", desc = "trustedPlayers очищается перед проверкой"},
+        {var = "IsInSet", desc = "IsInSet очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+    },
+    instruction = [=[
+<h>Практика: универсальная проверка вхождения</h>
+<t>В этом задании мы делаем проверку на разрешённых и заблокированных пользователей.</t>
+
+<t>Создай глобальную таблицу <k>blockedPlayers</k>.</t>
+<t>Это чёрный список: добавь в него заблокированных игроков <s>"Гулдан"</s> и <s>"КелТузад"</s>. В качестве значения используй <k>true</k>.</t>
+
+<t>Создай глобальную таблицу <k>trustedPlayers</k>.</t>
+<t>Это белый список: добавь в него разрешённых игроков <s>"Артас"</s> и <s>"Джайна"</s>. В качестве значения используй <k>true</k>.</t>
+
+<t>Создай глобальную функцию <k>IsInSet(set, name)</k>.</t>
+<t>Функция должна быть универсальной: она принимает любую таблицу-множество и имя, а затем проверяет, входит ли это имя в таблицу.</t>
+<t>Такую функцию можно использовать и для списка заблокированных, и для списка разрешённых пользователей.</t>
+
+<t>Если set не является таблицей или name равен nil, функция должна вернуть <k>false</k>.</t>
+<t>Иначе функция должна вернуть <k>true</k> только если <k>set[name] == true</k>.</t>
+]=],
+    initialCode = [=[
+blockedPlayers = {
+
+}
+
+trustedPlayers = {
+
+}
+
+function IsInSet(set, name)
+
+end
+]=],
+    requireKeywords = {
+        "blockedPlayers",
+        "trustedPlayers",
+        "IsInSet",
+        "function",
+        "return",
+        "true",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 6 do
+            _G["test" .. i] = nil
+        end
+
+        local function fmt(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        if type(_G.blockedPlayers) ~= "table" then
+            _G.checkError = "blockedPlayers должна быть глобальной таблицей"
+            return _G.checkError
+        end
+
+        if type(_G.trustedPlayers) ~= "table" then
+            _G.checkError = "trustedPlayers должна быть глобальной таблицей"
+            return _G.checkError
+        end
+
+        local blockedNames = {"Гулдан", "КелТузад"}
+
+        for _, name in ipairs(blockedNames) do
+            if _G.blockedPlayers[name] ~= true then
+                _G.checkError = "В blockedPlayers должен быть ключ " .. name .. " со значением true"
+                return _G.checkError
+            end
+        end
+
+        local trustedNames = {"Артас", "Джайна"}
+
+        for _, name in ipairs(trustedNames) do
+            if _G.trustedPlayers[name] ~= true then
+                _G.checkError = "В trustedPlayers должен быть ключ " .. name .. " со значением true"
+                return _G.checkError
+            end
+        end
+
+        if type(_G.IsInSet) ~= "function" then
+            _G.checkError = "IsInSet должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local tests = {
+            {set = _G.blockedPlayers, setName = "blockedPlayers", name = "Гулдан", expected = true},
+            {set = _G.blockedPlayers, setName = "blockedPlayers", name = "Артас", expected = false},
+            {set = _G.trustedPlayers, setName = "trustedPlayers", name = "Артас", expected = true},
+            {set = _G.trustedPlayers, setName = "trustedPlayers", name = "Гулдан", expected = false},
+            {set = nil, setName = "nil", name = "Артас", expected = false},
+            {set = _G.blockedPlayers, setName = "blockedPlayers", name = nil, expected = false},
+        }
+
+        local allOk = true
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.IsInSet, test.set, test.name)
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            local line = string.format(
+                "Вход: %s, %s | Получено: %s | Ожидалось: %s",
+                test.setName,
+                fmt(test.name),
+                resultText,
+                fmt(test.expected)
+            )
+
+            _G["test" .. i] = line
+
+            if not ok or result ~= test.expected then
+                allOk = false
+                table.insert(details, line)
+            end
+        end
+
+        if not allOk then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][52.6] = {
+    type = "commenttest",
+    title = "Практика: lookup с числовыми ключами ",
+    helpModules = {52.2, 44, 45, 10},
+    preloadVars = {
+        {var = "discountByRank", desc = "discountByRank очищается перед проверкой"},
+        {var = "GetDiscount", desc = "GetDiscount очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+        {var = "test7", desc = "test7 очищается перед проверкой"},
+        {var = "test8", desc = "test8 очищается перед проверкой"},
+        {var = "test9", desc = "test9 очищается перед проверкой"},
+        {var = "test10", desc = "test10 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+        "test7",
+        "test8",
+        "test9",
+        "test10",
+    },
+    instruction = [=[
+<h>Практика: lookup с числовыми ключами</h>
+<t>Это пример таблицы, где по номеру ранга хранится размер скидки.</t>
+
+<h>Шаг 1: таблица скидок</h>
+<t>Создай глобальную таблицу <k>discountByRank</k> со значениями:</t>
+<code>
+0
+5
+10
+15
+</code>
+<t>То есть:</t>
+<c>ранг 1 -> скидка 0</c>
+<c>ранг 2 -> скидка 5</c>
+<c>ранг 3 -> скидка 10</c>
+<c>ранг 4 -> скидка 15</c>
+
+<h>Шаг 2: функция GetDiscount(rank)</h>
+<t>Создай глобальную функцию <k>GetDiscount(rank)</k>. Она должна вернуть размер скидки для ранга <k>rank</k>.</t>
+
+<h>Что должна делать функция</h>
+<c>1. Достань значение из discountByRank по значению rank.</c>
+<c>2. Если что то пошло не так — верни 0.</c>
+
+<h>Зачем это нужно</h>
+<t>Данные о скидках лежат в таблице отдельно. Функция не хранит кучу условий внутри себя, а просто достаёт нужное значение по ключу.</t>
+
+]=],
+    initialCode = [=[
+discountByRank = {
+
+}
+
+function GetDiscount(rank)
+
+end
+]=],
+    requireKeywords = {
+        "discountByRank",
+        "GetDiscount",
+        "function",
+        "return",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 10 do
+            _G["test" .. i] = nil
+        end
+
+        local function fmt(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        if type(_G.discountByRank) ~= "table" then
+            _G.checkError = "discountByRank должна быть глобальной таблицей"
+            return _G.checkError
+        end
+
+        local expectedMap = {
+            [1] = 0,
+            [2] = 5,
+            [3] = 10,
+            [4] = 15,
+        }
+
+        for rank, expected in pairs(expectedMap) do
+            if _G.discountByRank[rank] ~= expected then
+                _G.checkError = "В discountByRank неправильное значение для ранга " .. tostring(rank)
+                return _G.checkError
+            end
+        end
+
+        if type(_G.GetDiscount) ~= "function" then
+            _G.checkError = "GetDiscount должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local tests = {
+            {arg = 1, expected = 0},
+            {arg = 2, expected = 5},
+            {arg = 3, expected = 10},
+            {arg = 4, expected = 15},
+            {arg = "2", expected = 5},
+            {arg = "3", expected = 10},
+            {arg = 5, expected = 0},
+            {arg = "5", expected = 0},
+            {arg = "bad", expected = 0},
+            {arg = nil, expected = 0},
+        }
+
+        local allOk = true
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.GetDiscount, test.arg)
+
+            local resultText
+            if ok then
+                resultText = fmt(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            local line = string.format(
+                "Вход: %s | Получено: %s | Ожидалось: %s",
+                fmt(test.arg),
+                resultText,
+                fmt(test.expected)
+            )
+
+            _G["test" .. i] = line
+
+            if not ok or result ~= test.expected then
+                allOk = false
+                table.insert(details, line)
+            end
+        end
+
+        if not allOk then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][52.7] = {
+    type = "commenttest",
+    title = "Практика: замена элементов списка через таблицу",
+    helpModules = {52.2, 31, 29.1, 45},
+    preloadVars = {
+        {var = "TranslateList", desc = "TranslateList очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+    },
+    instruction = [=[
+<h>Практика: замена элементов списка через таблицу</h>
+<t>Создай глобальную функцию <k>TranslateList(list, map, default)</k>.</t>
+
+<t>Функция получает три аргумента:</t>
+<c>list — массив ключей;</c>
+<c>map — таблица соответствий ключ -> значение;</c>
+<c>default — запасное значение.</c>
+
+<t>Что должна сделать функция:</t>
+<c>1. Пройти по всем элементам list.</c>
+<c>2. Использовать каждый элемент list как ключ для map.</c>
+<c>3. Если по этому ключу в map есть значение, положить его в результат.</c>
+<c>4. Если значения нет, положить default.</c>
+<c>5. Вернуть новый массив-результат.</c>
+
+<w>Важно:</w>
+<t>Ключом является сам элемент из list, а не его номер.</t>
+
+<t>Дополнительные условия:</t>
+<c>Если list не является таблицей, верни пустую таблицу.</c>
+<c>Если map не является таблицей, считай, что значений нет, и подставляй default.</c>
+<c>Исходный list менять нельзя.</c>
+
+<w>Бонус:</w> если в решении будет 200 символов или меньше, будет бонусная награда.
+]=],
+    initialCode = [=[
+function TranslateList(list, map, default)
+
+end
+]=],
+    requireKeywords = {
+        "TranslateList",
+        "function",
+        "return",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 5 do
+            _G["test" .. i] = nil
+        end
+
+        if type(_G.TranslateList) ~= "function" then
+            _G.checkError = "TranslateList должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local function sameArrays(a, b)
+            if type(a) ~= "table" or type(b) ~= "table" then
+                return false
+            end
+
+            if #a ~= #b then
+                return false
+            end
+
+            for i = 1, #a do
+                if a[i] ~= b[i] then
+                    return false
+                end
+            end
+
+            return true
+        end
+
+        local function fmtScalar(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        local function fmtArray(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+
+            local parts = {}
+
+            for i = 1, #t do
+                parts[i] = fmtScalar(t[i])
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local function fmtMap(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+
+            local keys = {}
+
+            for k in pairs(t) do
+                table.insert(keys, k)
+            end
+
+            table.sort(keys, function(a, b)
+                return tostring(a) < tostring(b)
+            end)
+
+            local parts = {}
+
+            for _, k in ipairs(keys) do
+                table.insert(parts, tostring(k) .. "=" .. fmtScalar(t[k]))
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local tests = {
+            {
+                name = "обычная замена",
+                list = {"APPLE", "BANANA", "UNKNOWN"},
+                map = {APPLE = "яблоко", BANANA = "банан"},
+                default = "?",
+                expected = {"яблоко", "банан", "?"},
+            },
+            {
+                name = "пустой список",
+                list = {},
+                map = {A = 1},
+                default = "?",
+                expected = {},
+            },
+            {
+                name = "list не таблица",
+                list = nil,
+                map = {A = 1},
+                default = "?",
+                expected = {},
+            },
+            {
+                name = "map не таблица",
+                list = {"A", "B"},
+                map = nil,
+                default = "d",
+                expected = {"d", "d"},
+            },
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.TranslateList, test.list, test.map, test.default)
+
+            local resultText
+            if ok then
+                resultText = fmtArray(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            local line = string.format(
+                "%s | Вход: list=%s, map=%s, default=%s | Получено: %s | Ожидалось: %s",
+                test.name,
+                fmtArray(test.list),
+                fmtMap(test.map),
+                fmtScalar(test.default),
+                resultText,
+                fmtArray(test.expected)
+            )
+
+            _G["test" .. i] = line
+
+            if not ok or not sameArrays(result, test.expected) then
+                table.insert(details, line)
+            end
+        end
+
+        local original = {"APPLE"}
+        local map = {APPLE = "яблоко"}
+        local ok, result = pcall(_G.TranslateList, original, map, "?")
+
+        if ok then
+            _G.test5 = 'Проверка исходного list | Вход: list={"APPLE"} | Получено: '
+                .. fmtArray(original)
+                .. ' | Ожидалось: {"APPLE"}'
+
+            if #original ~= 1 or original[1] ~= "APPLE" then
+                table.insert(details, "Исходный список list был изменён")
+            end
+        else
+            _G.test5 = "Проверка исходного list | Ошибка: " .. tostring(result)
+            table.insert(details, "Ошибка при проверке изменения исходного списка: " .. tostring(result))
+        end
+
+        if #details > 0 then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][52.8] = {
+    type = "commenttest",
+    title = "Практика: фильтрация списка через таблицу-множество",
+    helpModules = {52.2, 52.4, 31, 29.1, 45},
+    preloadVars = {
+        {var = "FilterAllowed", desc = "FilterAllowed очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+    },
+    instruction = [=[
+<h>Практика: фильтрация списка через таблицу-множество</h>
+<t>Создай глобальную функцию <k>FilterAllowed(items, allowedSet)</k>.</t>
+
+<t>Функция получает два аргумента:</t>
+<c>items — массив элементов;</c>
+<c>allowedSet — таблица-множество, где разрешённые элементы имеют значение true.</c>
+
+<t>Что должна сделать функция:</t>
+<c>1. Пройти по всем элементам items.</c>
+<c>2. Проверить, разрешён ли каждый элемент в allowedSet.</c>
+<c>3. Собрать новый массив только из разрешённых элементов.</c>
+<c>4. Вернуть новый массив-результат.</c>
+
+<t>Дополнительные условия:</t>
+<c>Если items не является таблицей, верни пустую таблицу.</c>
+<c>Если allowedSet не является таблицей, верни пустую таблицу.</c>
+<c>Исходный items менять нельзя.</c>
+]=],
+    initialCode = [=[
+function FilterAllowed(items, allowedSet)
+
+end
+]=],
+    requireKeywords = {
+        "FilterAllowed",
+        "function",
+        "return",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 5 do
+            _G["test" .. i] = nil
+        end
+
+        if type(_G.FilterAllowed) ~= "function" then
+            _G.checkError = "FilterAllowed должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local function sameArrays(a, b)
+            if type(a) ~= "table" or type(b) ~= "table" then
+                return false
+            end
+
+            if #a ~= #b then
+                return false
+            end
+
+            for i = 1, #a do
+                if a[i] ~= b[i] then
+                    return false
+                end
+            end
+
+            return true
+        end
+
+        local function fmtScalar(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        local function fmtArray(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+
+            local parts = {}
+
+            for i = 1, #t do
+                parts[i] = fmtScalar(t[i])
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local function fmtMap(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+
+            local keys = {}
+
+            for k in pairs(t) do
+                table.insert(keys, k)
+            end
+
+            table.sort(keys, function(a, b)
+                return tostring(a) < tostring(b)
+            end)
+
+            local parts = {}
+
+            for _, k in ipairs(keys) do
+                table.insert(parts, tostring(k) .. "=" .. fmtScalar(t[k]))
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local tests = {
+            {
+                name = "обычная фильтрация",
+                items = {"яблоко", "банан", "вишня"},
+                allowedSet = {["яблоко"] = true, ["вишня"] = true},
+                expected = {"яблоко", "вишня"},
+            },
+            {
+                name = "пустой items",
+                items = {},
+                allowedSet = {["яблоко"] = true},
+                expected = {},
+            },
+            {
+                name = "items не таблица",
+                items = nil,
+                allowedSet = {["яблоко"] = true},
+                expected = {},
+            },
+            {
+                name = "allowedSet не таблица",
+                items = {"яблоко"},
+                allowedSet = nil,
+                expected = {},
+            },
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.FilterAllowed, test.items, test.allowedSet)
+
+            local resultText
+            if ok then
+                resultText = fmtArray(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
+            end
+
+            local line = string.format(
+                "%s | Вход: items=%s, allowedSet=%s | Получено: %s | Ожидалось: %s",
+                test.name,
+                fmtArray(test.items),
+                fmtMap(test.allowedSet),
+                resultText,
+                fmtArray(test.expected)
+            )
+
+            _G["test" .. i] = line
+
+            if not ok or not sameArrays(result, test.expected) then
+                table.insert(details, line)
+            end
+        end
+
+        local original = {"яблоко"}
+        local allowedSet = {["яблоко"] = true}
+        local ok, result = pcall(_G.FilterAllowed, original, allowedSet)
+
+        if ok then
+            _G.test5 = 'Проверка исходного items | Вход: items={"яблоко"} | Получено: '
+                .. fmtArray(original)
+                .. ' | Ожидалось: {"яблоко"}'
+
+            if #original ~= 1 or original[1] ~= "яблоко" then
+                table.insert(details, "Исходный список items был изменён")
+            end
+        else
+            _G.test5 = "Проверка исходного items | Ошибка: " .. tostring(result)
+            table.insert(details, "Ошибка при проверке изменения исходного списка: " .. tostring(result))
+        end
+
+        if #details > 0 then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
+
+ns_llua['lua'][52.9] = {
+    type = "commenttest",
+    title = "Итоговый комбо-тест: lookup-таблицы и отчёт",
+    helpModules = {52.2, 31, 31.2, 7, 44, 45},
+    preloadVars = {
+        {var = "BuildTeamReport", desc = "BuildTeamReport очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+        {var = "test7", desc = "test7 очищается перед проверкой"},
+        {var = "test8", desc = "test8 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+        "test7",
+        "test8",
+    },
+    instruction = [=[
+<h>Итоговый комбо-тест: lookup-таблицы и отчёт</h>
+<t>Создай глобальную функцию <k>BuildTeamReport(players, playerTeams, teamNames, banned)</k>.</t>
+
+<t>Функция получает четыре аргумента:</t>
+<c>players — массив имён игроков;</c>
+<c>playerTeams — таблица: имя игрока -> код команды;</c>
+<c>teamNames — таблица: код команды -> текст команды;</c>
+<c>banned — таблица-множество: имя игрока -> true.</c>
+
+<t>Что должна сделать функция:</t>
+<c>1. Пройти по всем игрокам из players.</c>
+<c>2. Пропустить игроков, которые есть в banned.</c>
+<c>3. Для остальных найти код команды в playerTeams.</c>
+<c>4. По коду команды найти текст команды в teamNames.</c>
+<c>5. Если команду или текст команды найти не удалось, использовать "Неизвестно".</c>
+<c>6. Собрать отчёт по разрешённым игрокам.</c>
+
+<t>Формат отчёта:</t>
+<c>Для каждого разрешённого игрока: имя: команда.</c>
+<c>Части отчёта разделяются "; ".</c>
+
+<t>Функция должна вернуть два значения:</t>
+<c>1. количество разрешённых игроков;</c>
+<c>2. строку отчёта.</c>
+
+<t>Если разрешённых игроков нет, строка отчёта должна быть пустой.</t>
+
+<t>Дополнительные условия:</t>
+<c>Если players не является таблицей, верни 0 и пустую строку.</c>
+<c>Если playerTeams, teamNames или banned не являются таблицами, считай их пустыми таблицами.</c>
+<c>Входные таблицы менять нельзя.</c>
+]=],
+    initialCode = [=[
+function BuildTeamReport(players, playerTeams, teamNames, banned)
+    
+end
+]=],
+    requireKeywords = {
+        "BuildTeamReport",
+        "function",
+        "return",
+    },
+    checkCode = function()
+        local details = {}
+
+        _G.checkError = nil
+
+        for i = 1, 8 do
+            _G["test" .. i] = nil
+        end
+
+        if type(_G.BuildTeamReport) ~= "function" then
+            _G.checkError = "BuildTeamReport должна быть глобальной функцией"
+            return _G.checkError
+        end
+
+        local function fmtScalar(value)
+            if type(value) == "string" then
+                return '"' .. value .. '"'
+            end
+
+            return tostring(value)
+        end
+
+        local function fmtArray(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+
+            local parts = {}
+
+            for i = 1, #t do
+                parts[i] = fmtScalar(t[i])
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local function fmtMap(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+
+            local keys = {}
+
+            for k in pairs(t) do
+                table.insert(keys, k)
+            end
+
+            table.sort(keys, function(a, b)
+                return tostring(a) < tostring(b)
+            end)
+
+            local parts = {}
+
+            for _, k in ipairs(keys) do
+                table.insert(parts, tostring(k) .. "=" .. fmtScalar(t[k]))
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+
+        local testIndex = 0
+
+        local function addTest(name, players, playerTeams, teamNames, banned, expectedCount, expectedReport)
+            testIndex = testIndex + 1
+
+            local ok, count, report = pcall(_G.BuildTeamReport, players, playerTeams, teamNames, banned)
+
+            local countText
+            local reportText
+
+            if ok then
+                countText = fmtScalar(count)
+                reportText = fmtScalar(report)
+            else
+                countText = "ошибка: " .. tostring(count)
+                reportText = "nil"
+            end
+
+            local line = string.format(
+                "%s | Вход: players=%s, playerTeams=%s, teamNames=%s, banned=%s | Получено: count=%s, report=%s | Ожидалось: count=%s, report=%s",
+                name,
+                fmtArray(players),
+                fmtMap(playerTeams),
+                fmtMap(teamNames),
+                fmtMap(banned),
+                countText,
+                reportText,
+                fmtScalar(expectedCount),
+                fmtScalar(expectedReport)
+            )
+
+            _G["test" .. testIndex] = line
+
+            if not ok or count ~= expectedCount or report ~= expectedReport then
+                table.insert(details, line)
+            end
+        end
+
+        addTest(
+            "обычный отчёт",
+            {"Артас", "Джайна", "Гулдан"},
+            {["Артас"] = "RED", ["Джайна"] = "BLUE"},
+            {RED = "Красные", BLUE = "Синие"},
+            {["Гулдан"] = true},
+            2,
+            "Артас: Красные; Джайна: Синие"
+        )
+
+        addTest(
+            "команда не найдена",
+            {"Тралл"},
+            {},
+            {},
+            {},
+            1,
+            "Тралл: Неизвестно"
+        )
+
+        addTest(
+            "все забанены",
+            {"Гулдан"},
+            {["Гулдан"] = "RED"},
+            {RED = "Красные"},
+            {["Гулдан"] = true},
+            0,
+            ""
+        )
+
+        addTest(
+            "players не таблица",
+            nil,
+            {},
+            {},
+            {},
+            0,
+            ""
+        )
+
+        addTest(
+            "banned nil",
+            {"Артас"},
+            {["Артас"] = "RED"},
+            {RED = "Красные"},
+            nil,
+            1,
+            "Артас: Красные"
+        )
+
+        addTest(
+            "playerTeams nil",
+            {"Артас"},
+            nil,
+            {RED = "Красные"},
+            nil,
+            1,
+            "Артас: Неизвестно"
+        )
+
+        addTest(
+            "teamNames nil",
+            {"Артас"},
+            {["Артас"] = "RED"},
+            nil,
+            nil,
+            1,
+            "Артас: Неизвестно"
+        )
+
+        local players = {"Артас"}
+        local playerTeams = {["Артас"] = "RED"}
+        local teamNames = {RED = "Красные"}
+        local expectedPlayersText = '{"Артас"}'
+
+        testIndex = testIndex + 1
+
+        local ok, err = pcall(_G.BuildTeamReport, players, playerTeams, teamNames, nil)
+
+        if ok then
+            _G.test8 = "Проверка исходного players | Вход: players="
+                .. expectedPlayersText
+                .. " | Получено: "
+                .. fmtArray(players)
+                .. " | Ожидалось: "
+                .. expectedPlayersText
+
+            if #players ~= 1 or players[1] ~= "Артас" then
+                table.insert(details, "Исходный список players был изменён")
+            end
+        else
+            _G.test8 = "Проверка исходного players | Ошибка: " .. tostring(err)
+            table.insert(details, "Ошибка при проверке изменения исходного списка players")
+        end
+
+        if #details > 0 then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
+}
 
 
 
@@ -8122,153 +9631,12 @@ end
     end,
 }
 
-ns_llua['lua'][80.1] = {
-    type = "commenttest",
-    title = "Тест 77-3: функция BuildNameToGUIDMap",
-    helpModules = {77, 31, 44},
-    preloadVars = {
-        {var = "BuildNameToGUIDMap", desc = "BuildNameToGUIDMap очищается перед проверкой"},
-        {var = "checkError", desc = "checkError очищается перед проверкой"},
-        {var = "test1", desc = "test1 очищается перед проверкой"},
-        {var = "test2", desc = "test2 очищается перед проверкой"},
-        {var = "test3", desc = "test3 очищается перед проверкой"},
-    },
-    reportVars = {"checkError", "test1", "test2", "test3"},
-    instruction = [=[
-<h>Тест 77-3: функция BuildNameToGUIDMap</h>
-<t>Создай глобальную функцию <k>BuildNameToGUIDMap(units)</k>.</t>
-<t>Аргумент <k>units</k> — таблица со строками UnitID.</t>
-<t>Функция должна вернуть хэш-таблицу, где ключ — имя юнита, значение — его GUID, только для существующих юнитов.</t>
-<t>Если таблица пустая или аргумент не таблица, верни пустую таблицу.</t>
-<w>Ничего выводить не нужно.</w>
-]=],
-    initialCode = "-- Создай глобальную функцию BuildNameToGUIDMap(units)",
-    requireKeywords = {"BuildNameToGUIDMap", "function", "UnitName", "UnitGUID", "return"},
-    forbidKeywords = {"print"},
-    checkCode = function()
-        _G.checkError = nil
-        for i = 1, 3 do _G["test" .. i] = nil end
-
-        if type(_G.BuildNameToGUIDMap) ~= "function" then
-            _G.checkError = "BuildNameToGUIDMap не является глобальной функцией"
-            return false
-        end
-
-        local function getExpected(units)
-            if type(units) ~= "table" then return {} end
-            local r = {}
-            for _, unit in ipairs(units) do
-                local name = UnitName(unit)
-                local guid = UnitGUID(unit)
-                if name and guid then r[name] = guid end
-            end
-            return r
-        end
-
-        local function same(a, b)
-            for k, v in pairs(a) do if b[k] ~= v then return false end end
-            for k in pairs(b) do if a[k] == nil then return false end end
-            return true
-        end
-
-        local function fmtMap(t)
-            local keys = {}
-            for k in pairs(t) do table.insert(keys, k) end
-            table.sort(keys)
-            local p = {}
-            for _, k in ipairs(keys) do table.insert(p, k .. "=" .. tostring(t[k])) end
-            return "{" .. table.concat(p, ", ") .. "}"
-        end
-
-        local tests = {
-            {input = {"player", "ns_invalid"}},
-            {input = {}},
-            {input = "bad"},
-        }
-
-        for i, test in ipairs(tests) do
-            local expected = getExpected(test.input)
-            local ok, result = pcall(_G.BuildNameToGUIDMap, test.input)
-            _G["test" .. i] = "Получено: " .. fmtMap(type(result) == "table" and result or {}) .. " | Ожидалось: " .. fmtMap(expected)
-
-            if not ok or type(result) ~= "table" or not same(result, expected) then
-                _G.checkError = "Тест " .. i .. " функции BuildNameToGUIDMap не пройден"
-                return false
-            end
-        end
-        return true
-    end,
-}
-
 ns_llua['lua'][81] = {
     type = "commenttest",
-    title = "Тест 77-4: функция GetTargetIdentityLine",
-    helpModules = {77, 45, 57},
+    title = "Тест: функция BuildGUIDReport",
+    helpModules = {77, 31, 44, 7},
     preloadVars = {
-        {var = "GetTargetIdentityLine", desc = "GetTargetIdentityLine очищается перед проверкой"},
-        {var = "checkError", desc = "checkError очищается перед проверкой"},
-        {var = "testResult", desc = "testResult очищается перед проверкой"},
-    },
-    reportVars = {"checkError", "testResult"},
-    instruction = [=[
-<h>Тест 77-4: функция GetTargetIdentityLine</h>
-<t>Создай глобальную функцию <k>GetTargetIdentityLine()</k>.</t>
-<t>Перед проверкой выдели цель — другого игрока или моба.</t>
-<t>Функция должна вернуть одну строку в формате:</t>
-<s>Имя: X, Тип: Y, GUID: Z</s>
-<t>где Y — <s>"игрок"</s>, если GUID начинается с <s>"0x0000"</s>, иначе <s>"существо"</s>.</t>
-<w>Если цели нет, проверка выдаст предупреждение.</w>
-<w>Ничего выводить не нужно.</w>
-]=],
-    initialCode = "-- Создай глобальную функцию GetTargetIdentityLine()",
-    requireKeywords = {"GetTargetIdentityLine", "function", "target", "UnitName", "UnitGUID", "string.sub", "return"},
-    forbidKeywords = {"print"},
-    checkCode = function()
-        _G.checkError = nil
-        _G.testResult = nil
-
-        local function fail(msg) _G.checkError = msg return msg end
-
-        if type(_G.GetTargetIdentityLine) ~= "function" then
-            return fail("GetTargetIdentityLine не является глобальной функцией")
-        end
-
-        local okExists, exists = pcall(UnitExists, "target")
-        if not okExists or not exists then
-            return fail("Нет цели. Выдели игрока или моба и нажми проверку снова.")
-        end
-
-        local name = UnitName("target")
-        local guid = UnitGUID("target")
-        if not name or not guid then
-            return fail("Не удалось получить данные цели.")
-        end
-
-        local typ = string.sub(guid, 1, 6) == "0x0000" and "игрок" or "существо"
-        local expected = "Имя: " .. name .. ", Тип: " .. typ .. ", GUID: " .. guid
-
-        local ok, result = pcall(_G.GetTargetIdentityLine)
-        _G.testResult = "Получено: " .. tostring(result) .. " | Ожидалось: " .. expected
-
-        if not ok then return fail("Ошибка вызова GetTargetIdentityLine: " .. tostring(result)) end
-
-        local function normalize(s)
-            s = tostring(s):gsub("%s+", " ")
-            return s:match("^%s*(.-)%s*$")
-        end
-        if normalize(result) ~= normalize(expected) then
-            return fail("Строка не совпадает с ожидаемой")
-        end
-        return true
-    end,
-}
-
-ns_llua['lua'][82] = {
-    type = "commenttest",
-    title = "Тест 77-5: функция CountGUIDTypes",
-    helpModules = {77, 31, 44},
-    preloadVars = {
-        {var = "CountGUIDTypes", desc = "CountGUIDTypes очищается перед проверкой"},
+        {var = "BuildGUIDReport", desc = "BuildGUIDReport очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
         {var = "test1", desc = "test1 очищается перед проверкой"},
         {var = "test2", desc = "test2 очищается перед проверкой"},
@@ -8277,346 +9645,535 @@ ns_llua['lua'][82] = {
     },
     reportVars = {"checkError", "test1", "test2", "test3", "test4"},
     instruction = [=[
-<h>Тест 77-5: функция CountGUIDTypes</h>
-<t>Создай глобальную функцию <k>CountGUIDTypes(units)</k>.</t>
-<t>Аргумент <k>units</k> — таблица со строками UnitID.</t>
-<t>Функция должна вернуть хэш-таблицу с двумя ключами:</t>
-<c>["игрок"]</c> — количество существующих юнитов, чей GUID начинается с <s>"0x0000"</s>,
-<c>["существо"]</c> — количество остальных существующих юнитов.
-<t>Если таких юнитов нет, значение равно <n>0</n>.</t>
+<h>Тест функция BuildGUIDReport</h>
+<t>Создай глобальную функцию <k>BuildGUIDReport(units)</k>.</t>
+<t>Аргумент <k>units</k> — хэш-таблица: ключ — имя юнита, значение — его GUID.</t>
+<t>Функция должна вернуть одну строку с записью по каждому юниту.</t>
+<t>Формат записи: <s>"имя: игрок"</s> или <s>"имя: моб"</s>.</t>
+<t>Записи соединяются через запятую и пробел. Порядок записей может быть любым.</t>
+<t>Если аргумент не таблица или таблица пустая, верни пустую строку.</t>
+<t>Пример:</t>
+<code>
+local map = {
+    ["Шеф"] = "0x0000000000184817",
+    ["Тралл"] = "0xF1300013550015F4",
+}
+BuildGUIDReport(map) -- "Шеф: игрок, Тралл: моб" (порядок может быть любым)
+</code>
 <w>Ничего выводить не нужно.</w>
+<h>Бонус за компактность</h>
+<t>Если код будет 260 символов или меньше — получишь бонусную награду.</t>
 ]=],
-    initialCode = "-- Создай глобальную функцию CountGUIDTypes(units)",
-    requireKeywords = {"CountGUIDTypes", "function", "UnitGUID", "string.sub", "return"},
-    forbidKeywords = {"print"},
+    initialCode = [=[
+function BuildGUIDReport(units)
+
+end
+]=],
+    requireKeywords = {
+        "BuildGUIDReport",
+        "function",
+        "pairs",
+        "and",
+        "or",
+        "return",
+        "0x0000",
+    },
+    forbidKeywords = {
+        "print",
+    },
     checkCode = function()
         _G.checkError = nil
-        for i = 1, 4 do _G["test" .. i] = nil end
-
-        if type(_G.CountGUIDTypes) ~= "function" then
-            _G.checkError = "CountGUIDTypes не является глобальной функцией"
-            return false
+        for i = 1, 4 do
+            _G["test" .. i] = nil
         end
 
-        local function getExpected(units)
-            local r = {["игрок"] = 0, ["существо"] = 0}
-            if type(units) ~= "table" then return r end
-            for _, unit in ipairs(units) do
-                local guid = UnitGUID(unit)
-                if guid then
-                    local key = string.sub(guid, 1, 6) == "0x0000" and "игрок" or "существо"
-                    r[key] = r[key] + 1
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.BuildGUIDReport) ~= "function" then
+            return fail("BuildGUIDReport не является глобальной функцией")
+        end
+
+        local realList = {
+            ["Шеф"] = "0x0000000000184817",
+            ["Воинствующая"] = "0x000000000021361F",
+            ["Тренировочный манекен PvP"] = "0xF13000EA650012DE",
+            ["Гипотеза"] = "0x00000000004755A5",
+            ["Кернаг"] = "0x00000000001E196C",
+            ["Импресарио"] = "0xF13002E668001395",
+            ["Высшая"] = "0x00000000001E409C",
+            ["Оргримарский рубака"] = "0xF130000CE0000D4B",
+            ["Тралл"] = "0xF1300013550015F4",
+            ["Кровопалый кнутохвост"] = "0xF130000C320031EF",
+        }
+
+        local function getExpected(map)
+            local set = {}
+            local count = 0
+            if type(map) ~= "table" then
+                return set, count
+            end
+            for name, guid in pairs(map) do
+                if type(name) == "string" and type(guid) == "string" then
+                    local kind = string.sub(guid, 1, 6) == "0x0000" and "игрок" or "моб"
+                    set[name .. ": " .. kind] = true
+                    count = count + 1
                 end
             end
-            return r
+            return set, count
+        end
+
+        local function parseResult(s)
+            local set = {}
+            local count = 0
+            for part in s:gmatch("[^,]+") do
+                local entry = part:match("^%s*(.-)%s*$")
+                if entry ~= "" then
+                    set[entry] = true
+                    count = count + 1
+                end
+            end
+            return set, count
+        end
+
+        local function fmtSet(set)
+            local keys = {}
+            for k in pairs(set) do
+                table.insert(keys, k)
+            end
+            table.sort(keys)
+            return table.concat(keys, ", ")
         end
 
         local tests = {
-            {input = {"player", "player", "ns_invalid"}},
-            {input = {"ns_invalid"}},
+            {input = realList},
+            {input = {["Шеф"] = "0x0000000000184817", ["Тралл"] = "0xF1300013550015F4"}},
             {input = {}},
             {input = "bad"},
         }
 
         for i, test in ipairs(tests) do
-            local expected = getExpected(test.input)
-            local ok, result = pcall(_G.CountGUIDTypes, test.input)
-            _G["test" .. i] = "Получено: игрок=" .. tostring(type(result) == "table" and result["игрок"] or nil)
-                .. ", существо=" .. tostring(type(result) == "table" and result["существо"] or nil)
-                .. " | Ожидалось: игрок=" .. expected["игрок"] .. ", существо=" .. expected["существо"]
+            local expSet, expCount = getExpected(test.input)
+            local ok, result = pcall(_G.BuildGUIDReport, test.input)
 
-            if not ok or type(result) ~= "table"
-                or result["игрок"] ~= expected["игрок"]
-                or result["существо"] ~= expected["существо"] then
-                _G.checkError = "Тест " .. i .. " функции CountGUIDTypes не пройден"
-                return false
+            _G["test" .. i] = "Получено: " .. tostring(result)
+                .. " | Ожидалось (в любом порядке): " .. fmtSet(expSet)
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова функции")
+            end
+
+            if type(result) ~= "string" then
+                return fail("Тест " .. i .. ": функция должна вернуть строку")
+            end
+
+            local resSet, resCount = parseResult(result)
+
+            if resCount ~= expCount then
+                return fail("Тест " .. i .. " не пройден")
+            end
+
+            for k in pairs(expSet) do
+                if not resSet[k] then
+                    return fail("Тест " .. i .. " не пройден")
+                end
             end
         end
+
         return true
     end,
 }
 
+ns_llua['lua'][82] = {
+    type = "info",
+    title = "Структура GUID: entry моба и Wowhead",
+    helpModules = {77, 10},
+    content = [=[
+<h>Что внутри GUID</h>
+<t>GUID в WoW 3.3.5 — это 64-битное число в шестнадцатеричном виде. Префикс <s>0x</s> и 16 цифр:</t>
+<s>0xF1300013550015F4</s>
+
+<t>Разобьём строку на части по смыслу:</t>
+
+<t><k>0x</k> — префикс, обозначающий шестнадцатеричное число. Есть у всех GUID.</t>
+<t><k>F130</k> (4 символа) — тип объекта. Определяет, что это: игрок, существо, питомец или игровой объект.</t>
+<t><k>00</k> (2 символа) — регион или инстанс. Техническая информация о мире, где находится юнит.</t>
+<t><k>1355</k> (4 символа) — entry. ID шаблона NPC. У всех спаунов одного моба эта часть одинаковая.</t>
+<t><k>0015F4</k> (6 символов) — номер спауна. Уникальный идентификатор конкретного экземпляра.</t>
+
+<t>Самое полезное поле — <k>entry</k> (символы 9–12). Это ID шаблона NPC, одинаковый у всех спаунов одного и того же моба.</t>
+
+<h>Пример: Тралл</h>
+<t>У Тралла GUID: <s>0xF1300013550015F4</s>. Символы 9–12: <s>1355</s>.</t>
+<t>Это шестнадцатеричное число. Чтобы превратить его в привычное десятичное, используем <k>tonumber</k> со вторым аргументом — основанием системы счисления:</t>
+
+<code>
+print(tonumber("1355", 16)) -- 4949
+</code>
+
+<t>Получилось <n>4949</n>. Это и есть ID Тралла как NPC.</t>
+
+<h>Ссылка на Wowhead</h>
+<t>Зная entry, можно сразу открыть страницу моба:</t>
+<s>https://www.wowhead.com/classic/ru/npc=4949</s>
+
+<t>Для любого моба склейка одна и та же:</t>
+<code>
+local guid = UnitGUID("target")
+local entry = tonumber(string.sub(guid, 9, 12), 16)
+local url = "https://www.wowhead.com/classic/ru/npc=" .. entry
+print(url)
+</code>
+
+<h>Проверка на других мобах</h>
+<t>Оргриммарский рубака: GUID <s>0xF130000CE0000D4B</s>, entry <s>00CE</s>:</t>
+<code>
+print(tonumber("00CE", 16)) -- 206
+-- https://www.wowhead.com/classic/ru/npc=206
+</code>
+
+<t>Кровопалый кнутохвост: GUID <s>0xF130000C320031EF</s>, entry <s>00C3</s>:</t>
+<code>
+print(tonumber("00C3", 16)) -- 195
+-- https://www.wowhead.com/classic/ru/npc=195
+</code>
+
+<h>Важно про игроков</h>
+<t>У игроков GUID начинается с <s>0x0000</s> — это совсем другая структура, и entry у них нет. Вытаскивать символы 9–12 имеет смысл только когда ты уже убедился, что это не игрок:</t>
+
+<code>
+local guid = UnitGUID("target")
+if string.sub(guid, 1, 6) == "0x0000" then
+    print("Это игрок, entry тут нет")
+else
+    local entry = tonumber(string.sub(guid, 9, 12), 16)
+    print("NPC entry:", entry)
+end
+</code>
+
+<h>Почему одинаковые мобы дают разные GUID</h>
+<t>Два спауна одного и того же Оргриммарского рубаки будут иметь одинаковый entry (<n>206</n>), но разный номер спауна в последних символах. Поэтому сравнивать GUID целиком нельзя — сравнивай только entry.</t>
+
+<h>Короткое правило</h>
+<c>entry = tonumber(guid:sub(9, 12), 16)</c>
+<c>url = "https://www.wowhead.com/classic/ru/npc=" .. entry</c>
+]=],
+}
+
 ns_llua['lua'][83] = {
 type = "info",
-title = "Здоровье и ресурсы юнита",
-helpModules = {65, 71, 77},
+title = "Ресурсы юнита: мана, ярость, энергия",
+helpModules = {65, 71, 7},
 content = [=[
-<h>Здоровье и ресурсы юнита</h>
-<t>Основные функции для здоровья:</t>
-<c>UnitHealth(unit)</c> — текущее здоровье.
-<c>UnitHealthMax(unit)</c> — максимальное здоровье.
-<code>
-/run print(UnitHealth("player"), UnitHealthMax("player"))
-</code>
-<h>Процент здоровья</h>
-<code>
-/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(math.floor(hp / hpMax * 100)) else print(0) end
-</code>
-<w>Важно:</w> всегда проверяй <k>hpMax > 0</k>, иначе можно получить деление на ноль.
-<h>Красивый вывод через string.format</h>
-<code>
-/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(string.format("HP: %d/%d (%d%%)", hp, hpMax, math.floor(hp / hpMax * 100))) end
-</code>
-<t>Здесь <k>%%</k> внутри <k>string.format</k> выводит обычный знак процента.</t>
-<h>Ресурсы: мана, ярость, энергия</h>
-<t>В WoW 3.3.5 часто используются функции:</t>
+<h>Ресурсы юнита</h>
+<t>Здоровье и безопасные шаблоны мы разобрали в модуле 65. Здесь — то, что есть у юнита кроме здоровья: мана, ярость, энергия, руническая сила.</t>
+<t>Ресурс читается той же парой функций, что и здоровье:</t>
 <c>UnitMana(unit)</c> — текущий ресурс.
 <c>UnitManaMax(unit)</c> — максимальный ресурс.
 <code>
+-- UnitMana("player") — текущий ресурс персонажа (мана, ярость или энергия)
+-- UnitManaMax("player") — потолок этого ресурса
+-- print выведет оба значения через табуляцию, например: 12500 15000
 /run print(UnitMana("player"), UnitManaMax("player"))
 </code>
-<t>Для разных классов ресурс может быть разным: мана, ярость, энергия, руническая сила. Функция <k>UnitMana</k> обычно возвращает текущее значение основного ресурса.</t>
-<h>Тип ресурса</h>
+<t>Функция возвращает основной ресурс класса: у мага — ману, у воина — ярость, у разбойника — энергию.</t>
+<t>Если ресурса у класса нет (у воина нет маны), <k>UnitManaMax</k> вернёт <n>0</n>. Поэтому правило из модуля 65 то же: перед делением проверяй знаменатель.</t>
+<h>Тип ресурса: UnitPowerType</h>
 <code>
+-- UnitPowerType возвращает СРАЗУ два значения:
+-- 1-е — числовой код типа ресурса (0 — мана, 1 — ярость, 3 — энергия и т.д.)
+-- 2-е — строковый токен ("MANA", "RAGE", "ENERGY" и т.д.)
+-- print выведет оба: например 0 MANA
 /run print(UnitPowerType("player"))
 </code>
-<t>Функция может вернуть числовой код и строковый токен типа ресурса.</t>
-<h>Безопасный шаблон</h>
+<t>Функция возвращает два значения: числовой код и строковый токен.</t>
+<t>Для логики удобнее токен: <s>"MANA"</s>, <s>"RAGE"</s>, <s>"ENERGY"</s>, <s>"RUNIC_POWER"</s>.</t>
 <code>
-function GetSafeUnitHealthPercent(unit)
+-- Первый результат (числовой код) нам не нужен,
+-- поэтому вместо переменной стоит _ — это общепринятая "дырка" для ненужного значения
+-- Второй результат (токен) сохраняем в token и выводим
+/run local _, token = UnitPowerType("player"); print(token)
+</code>
+<h>Знак процента в string.format</h>
+<t>Чтобы вывести сам знак процента, в шаблоне пишут <k>%%</k> — два процента схлопываются в один при выводе.</t>
+<code>
+-- hp — текущее здоровье; or 0 подстраховка: если API вернул nil, возьмём 0
+-- hpMax — максимальное здоровье; та же страховка от nil
+-- if hpMax > 0 — защита от деления на ноль: делим только при положительном знаменателе
+-- внутри string.format: %d — место под целое число, %% — один % в выводе
+-- math.floor(hp / hpMax * 100) — процент здоровья, округлённый вниз
+/run local hp = UnitHealth("player") or 0; local hpMax = UnitHealthMax("player") or 0; if hpMax > 0 then print(string.format("HP: %d/%d (%d%%)", hp, hpMax, math.floor(hp / hpMax * 100))) end
+</code>
+<h>Безопасный отчёт по ресурсу</h>
+<t>Безопасный шаблон из модуля 65 работает и для ресурсов. Та же идея для маны, сразу с красивой строкой:</t>
+<code>
+function GetManaReport(unit)
+    -- Если юнита не существует (нет цели, опечатка в unitID),
+    -- дальше считать нечего: выходим из функции досрочно с текстом
     if not UnitExists(unit) then
-        return 0
+        return "Нет юнита"
     end
-    local hp = UnitHealth(unit) or 0
-    local hpMax = UnitHealthMax(unit) or 0
-    if hpMax <= 0 then
-        return 0
+    -- Текущий ресурс юнита; or 0 — если API вернул nil, подставляем 0
+    local mana = UnitMana(unit) or 0
+    -- Максимальный ресурс; та же страховка от nil
+    local manaMax = UnitManaMax(unit) or 0
+    -- Если максимум равен 0 (у воина нет маны), делить нельзя:
+    -- выходим досрочно с текстом вместо числа
+    if manaMax <= 0 then
+        return "Нет ресурса"
     end
-    return math.floor(hp / hpMax * 100)
+    -- Собираем строку вида "12500/15000 (83%)":
+    -- первый %d — текущий ресурс, второй %d — максимум,
+    -- %d%% — процент и знак процента (%% даёт один % в выводе),
+    -- math.floor(mana / manaMax * 100) — процент ресурса, округлённый вниз
+    return string.format("%d/%d (%d%%)", mana, manaMax, math.floor(mana / manaMax * 100))
 end
 </code>
+<t>Это заготовка для будущих тестов: безопасные проверки из 65 плюс <k>%%</k> из этого модуля.</t>
 ]=],
 }
 
 ns_llua['lua'][84] = {
-type = "vartest",
-title = "Тест 83-1: здоровье игрока",
-helpModules = {83, 65},
-tasks = {
-{
-var = "myHealth",
-desc = 'Создай глобальную переменную myHealth = UnitHealth("player") or 0',
-check = function(value)
-return type(value) == "number" and value >= 0
+type = "commenttest",
+title = "Тест 83-1: функция GetResourceLine",
+helpModules = {83, 65, 7},
+preloadVars = {
+{var = "GetResourceLine", desc = "GetResourceLine очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "test1", desc = "test1 очищается перед проверкой"},
+},
+reportVars = {"checkError", "test1"},
+instruction = [=[
+<h>Тест 83-1: функция GetResourceLine</h>
+<t>Создай глобальную функцию <k>GetResourceLine(unit)</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита: игрока или моба.</t>
+<t>Проверка вызовет функцию с аргументом <k>"target"</k> и сравнит результат с данными твоей текущей цели.</t>
+<t>Если юнит существует и у него есть ресурс, верни строку в формате:</t>
+<s>"MANA: 12500/15000 (83%)"</s>
+<t>Первое слово — тип ресурса юнита: второй результат <k>UnitPowerType(unit)</k> через <k>select(2, ...)</k>.</t>
+<t>Если юнита нет или максимальный ресурс равен 0, верни строку <s>"Нет ресурса"</s>.</t>
+<t>Используй <k>UnitMana</k>, <k>UnitManaMax</k>, <k>math.floor</k> и <k>string.format</k>; знак процента в шаблоне пишется как <k>%%</k>.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+initialCode = [=[
+function GetResourceLine(unit)
+
+end
+]=],
+requireKeywords = {
+"GetResourceLine",
+"UnitPowerType(unit)",
+"function",
+"UnitMana(unit)",
+"UnitManaMax(unit)",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+_G.test1 = nil
+
+local function fail(msg)
+_G.checkError = msg
+return msg
+end
+
+if type(_G.GetResourceLine) ~= "function" then
+return fail("GetResourceLine не является глобальной функцией")
+end
+
+local okExists, exists = pcall(UnitExists, "target")
+if not okExists or not exists then
+return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
+end
+
+local function liveValues(unit)
+if not UnitExists(unit) then
+return nil
+end
+local max = UnitManaMax(unit) or 0
+if max <= 0 then
+return nil
+end
+return UnitMana(unit) or 0, max
+end
+
+local function expectedLine(unit)
+local cur, max = liveValues(unit)
+if cur == nil then
+return "Нет ресурса"
+end
+local _, token = UnitPowerType(unit)
+return string.format("%s: %d/%d (%d%%)", tostring(token), cur, max, math.floor(cur / max * 100))
+end
+
+local function parseLine(line)
+if type(line) ~= "string" then
+return nil
+end
+-- Убираем скобки из строки, чтобы не экранировать их в паттерне
+local flat = line:gsub("[()]", "")
+local token, cur, max, pct = flat:match("^([^:]+): (%d+)/(%d+) (%d+)%%$")
+if not token then
+return nil
+end
+return token, tonumber(cur), tonumber(max), tonumber(pct)
+end
+
+local function checkUnit(unit, i)
+local ok, result = pcall(_G.GetResourceLine, unit)
+
+-- Заполняем отчёт ДО проверок, чтобы он был виден и при успехе
+_G["test" .. i] = "Получено: " .. tostring(result) .. " | Ожидалось: " .. expectedLine(unit)
+
+if not ok then
+return fail("Ошибка вызова GetResourceLine('" .. unit .. "'): " .. tostring(result))
+end
+local cur, max = liveValues(unit)
+if cur == nil then
+if result ~= "Нет ресурса" then
+return fail("Для '" .. unit .. "' ожидалось 'Нет ресурса'")
+end
+return true
+end
+local token, rCur, rMax, rPct = parseLine(result)
+if not token then
+return fail("Строка для '" .. unit .. "' не похожа на 'ТИП: X/Y (P%)'")
+end
+local _, expToken = UnitPowerType(unit)
+if token ~= expToken then
+return fail("В строке для '" .. unit .. "' должен быть тип ресурса '" .. tostring(expToken) .. "'")
+end
+local tol = math.max(5, math.floor(max * 0.05))
+if rMax ~= max then
+return fail("Максимум ресурса для '" .. unit .. "' не совпадает")
+end
+if math.abs(rCur - cur) > tol then
+return fail("Текущий ресурс для '" .. unit .. "' не совпадает")
+end
+if rPct ~= math.floor(rCur / rMax * 100) then
+return fail("Процент для '" .. unit .. "' не совпадает с дробью X/Y")
+end
+return true
+end
+
+for i, unit in ipairs({"target"}) do
+local err = checkUnit(unit, i)
+if err ~= true then
+return err
+end
+end
+
+return true
 end,
-},
-{
-var = "myHealthMax",
-desc = 'Создай глобальную переменную myHealthMax = UnitHealthMax("player") or 0',
-check = function(value)
-return type(value) == "number" and value >= 0
-end,
-},
-{
-var = "healthIsSane",
-desc = 'Создай глобальную переменную healthIsSane = (UnitHealth("player") or 0) <= (UnitHealthMax("player") or 0)',
-check = function(value)
-return value == true
-end,
-},
-},
 }
 
 ns_llua['lua'][85] = {
-type = "vartest",
-title = "Тест 83-2: процент здоровья игрока",
-helpModules = {83, 65, 10},
-tasks = {
-{
-var = "myHealthPercent",
-desc = 'Создай глобальную переменную myHealthPercent с процентом здоровья игрока от 0 до 100',
-check = function(value)
-return type(value) == "number" and value >= 0 and value <= 100
+type = "commenttest",
+title = "Тест 83-2: функция GetResourceName",
+helpModules = {83, 45},
+preloadVars = {
+{var = "GetResourceName", desc = "GetResourceName очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 83-2: функция GetResourceName</h>
+<t>Создай глобальную функцию <k>GetResourceName(unit)</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита: игрока или моба.</t>
+<t>Функция должна узнать, какой у юнита ресурс, и вернуть его название по-русски. Тип ресурса приходит строкой на английском:</t>
+<t>- <s>"MANA"</s> — вернуть <s>"мана"</s>;</t>
+<t>- <s>"RAGE"</s> — вернуть <s>"ярость"</s>;</t>
+<t>- <s>"ENERGY"</s> — вернуть <s>"энергия"</s>;</t>
+<t>- <s>"RUNIC_POWER"</s> — вернуть <s>"руническая сила"</s>;</t>
+]=],
+initialCode = [=[
+function GetResourceName(unit)
+
+end
+]=],
+requireKeywords = {
+"function",
+"UnitPowerType",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+
+local function fail(msg)
+_G.checkError = msg
+return msg
+end
+
+if type(_G.GetResourceName) ~= "function" then
+return fail("GetResourceName не является глобальной функцией")
+end
+
+local okExists, exists = pcall(UnitExists, "target")
+if not okExists or not exists then
+return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
+end
+
+local function rusToken(token)
+if token == "MANA" then
+return "мана"
+elseif token == "RAGE" then
+return "ярость"
+elseif token == "ENERGY" then
+return "энергия"
+elseif token == "RUNIC_POWER" then
+return "руническая сила"
+end
+return "другое"
+end
+
+local function expected(unit)
+local _, token = UnitPowerType(unit)
+return rusToken(token)
+end
+
+for _, unit in ipairs({"player", "target"}) do
+local ok, result = pcall(_G.GetResourceName, unit)
+if not ok then
+return fail("Ошибка вызова GetResourceName('" .. unit .. "'): " .. tostring(result))
+end
+if result ~= expected(unit) then
+return fail("Для '" .. unit .. "' ожидалось '" .. expected(unit) .. "', получено '" .. tostring(result) .. "'")
+end
+end
+
+return true
 end,
-},
-},
 }
 
 ns_llua['lua'][86] = {
 type = "commenttest",
-title = "Тест 83-3: функция GetHealthPercent",
-helpModules = {83, 65, 45},
+title = "Тест 83-3: функция CompareResourcePercent",
+helpModules = {83, 65, 21.2, 45},
 preloadVars = {
-{var = "GetHealthPercent", desc = "GetHealthPercent очищается перед проверкой"},
+{var = "CompareResourcePercent", desc = "CompareResourcePercent очищается перед проверкой"},
 {var = "checkError", desc = "checkError очищается перед проверкой"},
 },
-reportVars = {
-"checkError",
-},
+reportVars = {"checkError"},
 instruction = [=[
-<h>Тест 83-3: функция GetHealthPercent</h>
-<t>Создай глобальную функцию <k>GetHealthPercent(unit)</k>.</t>
-<t>Функция должна вернуть процент здоровья юнита от 0 до 100.</t>
-<t>Если юнита нет, функция должна вернуть <n>0</n>.</t>
-<t>Если максимальное здоровье меньше или равно нуля, функция должна вернуть <n>0</n>.</t>
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitHealth</c>
-<c>UnitHealthMax</c>
-<c>math.floor</c>
-<t>Ничего выводить не нужно.</t>
+<h>Тест 83-3: функция CompareResourcePercent</h>
+<t>Создай глобальную функцию <k>CompareResourcePercent(unitA, unitB)</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита: игрока или моба.</t>
+<t>Функция должна посчитать процент ресурса каждого юнита (от 0 до 100, без ресурса или без юнита — 0) и сравнить их.</t>
+<t>Вернуть нужно одну строку:</t>
+<t>- <s>"A"</s> — если процент первого юнита больше;</t>
+<t>- <s>"B"</s> — если процент второго юнита больше;</t>
+<t>- <s>"same"</s> — если проценты равны.</t>
+<t>Используй <k>UnitExists</k>, <k>UnitMana</k>, <k>UnitManaMax</k> и сравнения. Деление защищай от нуля.</t>
+<w>Ничего выводить не нужно.</w>
 ]=],
 initialCode = [=[
--- Создай глобальную функцию GetHealthPercent(unit)
+function CompareResourcePercent(unitA, unitB)
+end
 ]=],
 requireKeywords = {
-"GetHealthPercent",
-"function",
-"UnitExists",
-"UnitHealth",
-"UnitHealthMax",
-"math.floor",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetHealthPercent) ~= "function" then
-_G.checkError = "GetHealthPercent не является глобальной функцией"
-return false
-end
-local ok, percent = pcall(_G.GetHealthPercent, "player")
-if not ok then
-_G.checkError = "Ошибка вызова GetHealthPercent('player'): " .. tostring(percent)
-return false
-end
-if type(percent) ~= "number" then
-_G.checkError = "GetHealthPercent должна вернуть число"
-return false
-end
-if percent < 0 or percent > 100 then
-_G.checkError = "Процент здоровья должен быть от 0 до 100"
-return false
-end
-local hp = UnitHealth("player") or 0
-local hpMax = UnitHealthMax("player") or 0
-local expected = 0
-if hpMax > 0 then
-expected = math.floor(hp / hpMax * 100)
-end
-if math.abs(percent - expected) > 5 then
-_G.checkError = "Процент здоровья не совпадает с текущим здоровьем игрока"
-return false
-end
-local ok2, invalidPercent = pcall(_G.GetHealthPercent, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetHealthPercent('ns_invalid_unit'): " .. tostring(invalidPercent)
-return false
-end
-if invalidPercent ~= 0 then
-_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
-return false
-end
-return true
-end,
-}
-
-ns_llua['lua'][87] = {
-type = "commenttest",
-title = "Тест 83-4: функция GetHealthText",
-helpModules = {83, 65, 7},
-preloadVars = {
-{var = "GetHealthText", desc = "GetHealthText очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 83-4: функция GetHealthText</h>
-<t>Создай глобальную функцию <k>GetHealthText(unit)</k>.</t>
-<t>Если юнита нет, функция должна вернуть строку:</t>
-<s>"0/0"</s>
-<t>Если юнит существует, функция должна вернуть строку вида:</t>
-<s>"текущее/максимальное"</s>
-<t>Например:</t>
-<s>"8500/10000"</s>
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitHealth</c>
-<c>UnitHealthMax</c>
-<c>or 0</c>
-<c>конкатенацию</c>
-<t>Ничего выводить не нужно.</t>
-]=],
-initialCode = [=[
--- Создай глобальную функцию GetHealthText(unit)
-]=],
-requireKeywords = {
-"GetHealthText",
-"function",
-"UnitExists",
-"UnitHealth",
-"UnitHealthMax",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetHealthText) ~= "function" then
-_G.checkError = "GetHealthText не является глобальной функцией"
-return false
-end
-local ok1, playerText = pcall(_G.GetHealthText, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetHealthText('player'): " .. tostring(playerText)
-return false
-end
-if type(playerText) ~= "string" or playerText == "" then
-_G.checkError = "GetHealthText('player') должна вернуть строку"
-return false
-end
-local hpText, maxText = playerText:match("^(%d+)/(%d+)$")
-if not hpText or not maxText then
-_G.checkError = "Строка для player должна иметь формат число/число"
-return false
-end
-local hp = tonumber(hpText)
-local hpMax = tonumber(maxText)
-if not hp or not hpMax or hp < 0 or hpMax < 0 then
-_G.checkError = "Значения здоровья должны быть числами больше или равными нулю"
-return false
-end
-local ok2, invalidText = pcall(_G.GetHealthText, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetHealthText('ns_invalid_unit'): " .. tostring(invalidText)
-return false
-end
-if invalidText ~= "0/0" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть '0/0'"
-return false
-end
-return true
-end,
-}
-
-ns_llua['lua'][88] = {
-type = "commenttest",
-title = "Тест 83-5: функция GetPlayerResource",
-helpModules = {83, 45},
-preloadVars = {
-{var = "GetPlayerResource", desc = "GetPlayerResource очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 83-5: функция GetPlayerResource</h>
-<t>Создай глобальную функцию <k>GetPlayerResource()</k>.</t>
-<t>Функция должна вернуть два значения:</t>
-<c>1</c> — текущий ресурс игрока.
-<c>2</c> — максимальный ресурс игрока.
-<t>Используй:</t>
-<c>UnitMana("player")</c>
-<c>UnitManaMax("player")</c>
-<c>or 0</c>
-<t>Если ресурс недоступен, оба значения должны быть числами больше или равными нулю.</t>
-<t>Ничего выводить не нужно.</t>
-]=],
-initialCode = [=[
--- Создай глобальную функцию GetPlayerResource()
-]=],
-requireKeywords = {
-"GetPlayerResource",
+"CompareResourcePercent",
 "function",
 "UnitMana",
 "UnitManaMax",
@@ -8624,23 +10181,300 @@ requireKeywords = {
 },
 checkCode = function()
 _G.checkError = nil
-if type(_G.GetPlayerResource) ~= "function" then
-_G.checkError = "GetPlayerResource не является глобальной функцией"
-return false
+
+local function fail(msg)
+_G.checkError = msg
+return msg
 end
-local ok, current, max = pcall(_G.GetPlayerResource)
+
+if type(_G.CompareResourcePercent) ~= "function" then
+return fail("CompareResourcePercent не является глобальной функцией")
+end
+
+local okExists, exists = pcall(UnitExists, "target")
+if not okExists or not exists then
+return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
+end
+
+local function livePercent(unit)
+if not UnitExists(unit) then
+return 0
+end
+local cur = UnitMana(unit) or 0
+local max = UnitManaMax(unit) or 0
+if max <= 0 then
+return 0
+end
+return cur / max * 100
+end
+
+local tests = {
+{"player", "target"},
+{"target", "player"},
+{"ns_invalid", "player"},
+{"player", "player"},
+}
+
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.CompareResourcePercent, test[1], test[2])
 if not ok then
-_G.checkError = "Ошибка вызова GetPlayerResource: " .. tostring(current)
-return false
+return fail("Ошибка вызова в тесте " .. i .. ": " .. tostring(result))
 end
-if type(current) ~= "number" or type(max) ~= "number" then
-_G.checkError = "Функция должна вернуть два числа"
-return false
+if result ~= "A" and result ~= "B" and result ~= "same" then
+return fail("Тест " .. i .. ": функция должна вернуть 'A', 'B' или 'same'")
 end
-if current < 0 or max < 0 then
-_G.checkError = "Значения ресурса не должны быть отрицательными"
-return false
+local pa = livePercent(test[1])
+local pb = livePercent(test[2])
+if math.abs(pa - pb) < 0.5 then
+-- проценты почти равны, любой валидный ответ принимаем
+else
+local exp = pa > pb and "A" or "B"
+if result ~= exp then
+return fail("Тест " .. i .. ": ожидалось '" .. exp .. "'")
 end
+end
+end
+
+return true
+end,
+}
+
+ns_llua['lua'][87] = {
+type = "commenttest",
+title = "Тест 83-4: функция BuildResourceMap",
+helpModules = {83, 65, 31, 44, 45},
+preloadVars = {
+{var = "BuildResourceMap", desc = "BuildResourceMap очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+{var = "test1", desc = "test1 очищается перед проверкой"},
+{var = "test2", desc = "test2 очищается перед проверкой"},
+{var = "test3", desc = "test3 очищается перед проверкой"},
+{var = "test4", desc = "test4 очищается перед проверкой"},
+},
+reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+instruction = [=[
+<h>Тест 83-4: функция BuildResourceMap</h>
+<t>Создай глобальную функцию <k>BuildResourceMap(units)</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита: игрока или моба.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна вернуть хэш-таблицу: ключ — UnitID, значение — процент ресурса этого юнита (целое число от 0 до 100 через <k>math.floor</k>).</t>
+<t>Если юнита нет или у него нет ресурса, значение для него — <n>0</n>.</t>
+<t>Если аргумент не таблица, верни пустую таблицу.</t>
+<t>Используй цикл, <k>UnitMana</k>, <k>UnitManaMax</k>, <k>math.floor</k> и накопление в таблицу.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+initialCode = [=[
+function BuildResourceMap(units)
+end
+]=],
+requireKeywords = {
+"BuildResourceMap",
+"function",
+"for",
+"UnitMana",
+"UnitManaMax",
+"math.floor",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+for i = 1, 4 do
+_G["test" .. i] = nil
+end
+
+local function fail(msg)
+_G.checkError = msg
+return msg
+end
+
+if type(_G.BuildResourceMap) ~= "function" then
+return fail("BuildResourceMap не является глобальной функцией")
+end
+
+local okExists, exists = pcall(UnitExists, "target")
+if not okExists or not exists then
+return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
+end
+
+local function livePercent(unit)
+if not UnitExists(unit) then
+return 0
+end
+local cur = UnitMana(unit) or 0
+local max = UnitManaMax(unit) or 0
+if max <= 0 then
+return 0
+end
+return math.floor(cur / max * 100)
+end
+
+local function fmtMap(t)
+local keys = {}
+for k in pairs(t) do
+table.insert(keys, tostring(k))
+end
+table.sort(keys)
+local p = {}
+for _, k in ipairs(keys) do
+table.insert(p, k .. "=" .. tostring(t[k]))
+end
+return "{" .. table.concat(p, ", ") .. "}"
+end
+
+local tests = {
+{input = {"player", "target", "ns_invalid"}},
+{input = {"player", "player"}},
+{input = {}},
+{input = "bad"},
+}
+
+for i, test in ipairs(tests) do
+local ok, result = pcall(_G.BuildResourceMap, test.input)
+
+local expParts = {}
+if type(test.input) == "table" then
+for _, unit in ipairs(test.input) do
+expParts[unit] = livePercent(unit)
+end
+end
+_G["test" .. i] = "Получено: " .. (type(result) == "table" and fmtMap(result) or tostring(result)) .. " | Ожидалось: " .. fmtMap(expParts)
+
+if not ok then
+return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+end
+if type(result) ~= "table" then
+return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+end
+
+local expCount = 0
+for _ in pairs(expParts) do
+expCount = expCount + 1
+end
+local resCount = 0
+for _ in pairs(result) do
+resCount = resCount + 1
+end
+if resCount ~= expCount then
+return fail("Тест " .. i .. " не пройден")
+end
+
+for unit, exp in pairs(expParts) do
+local got = result[unit]
+if type(got) ~= "number" or math.abs(got - exp) > 5 then
+return fail("Тест " .. i .. " не пройден")
+end
+end
+end
+
+return true
+end,
+}
+
+ns_llua['lua'][88] = {
+type = "commenttest",
+title = "Тест 83-5: функция GetTargetSummary",
+helpModules = {83, 65, 77, 7, 45},
+preloadVars = {
+{var = "GetTargetSummary", desc = "GetTargetSummary очищается перед проверкой"},
+{var = "checkError", desc = "checkError очищается перед проверкой"},
+},
+reportVars = {"checkError"},
+instruction = [=[
+<h>Тест 83-5: функция GetTargetSummary</h>
+<t>Создай глобальную функцию <k>GetTargetSummary()</k>.</t>
+<w>Перед проверкой обязательно возьми в цель моба или NPC. Цель не должна быть игроком.</w>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>"Имя: Тралл, Тип: моб, HP: 100%, Ресурс: 0%"</s>
+<t>где:</t>
+<t>- имя — через <k>UnitName("target")</k>;</t>
+<t>- тип — <s>"игрок"</s>, если GUID начинается с <s>"0x0000"</s>, иначе <s>"моб"</s>;</t>
+<t>- HP — процент здоровья через <k>UnitHealth</k> / <k>UnitHealthMax</k>;</t>
+<t>- Ресурс — процент ресурса через <k>UnitMana</k> / <k>UnitManaMax</k> (нет ресурса — 0).</t>
+<t>Если цели нет, верни строку <s>"Нет цели"</s>.</t>
+<t>Собери строку через <k>string.format</k>, знак процента в шаблоне — <k>%%</k>. Все деления защищай от нуля.</t>
+<w>Ничего выводить не нужно.</w>
+]=],
+initialCode = [=[
+function GetTargetSummary()
+end
+]=],
+requireKeywords = {
+"GetTargetSummary",
+"function",
+"UnitName",
+"UnitGUID",
+"string.sub",
+"UnitHealth",
+"UnitHealthMax",
+"UnitMana",
+"UnitManaMax",
+"string.format",
+"0x0000",
+"return",
+},
+checkCode = function()
+_G.checkError = nil
+
+local function fail(msg)
+_G.checkError = msg
+return msg
+end
+
+if type(_G.GetTargetSummary) ~= "function" then
+return fail("GetTargetSummary не является глобальной функцией")
+end
+
+local okExists, exists = pcall(UnitExists, "target")
+if not okExists or not exists then
+return fail("Нет цели. Возьми в цель моба или NPC и нажми проверку снова.")
+end
+
+local okGuid, guid = pcall(UnitGUID, "target")
+if not okGuid or type(guid) ~= "string" then
+return fail("Не удалось получить GUID цели.")
+end
+
+if string.sub(guid, 1, 6) == "0x0000" then
+return fail("Цель не должна быть игроком. Возьми в цель моба или NPC.")
+end
+
+local ok, result = pcall(_G.GetTargetSummary)
+if not ok then
+return fail("Ошибка вызова GetTargetSummary: " .. tostring(result))
+end
+if type(result) ~= "string" then
+return fail("GetTargetSummary должна вернуть строку")
+end
+
+local name, typ, hp, res = result:match("^Имя: (.-), Тип: (.-), HP: (%d+)%%, Ресурс: (%d+)%%$")
+if not name then
+return fail("Строка не похожа на 'Имя: X, Тип: Y, HP: N%, Ресурс: M%'")
+end
+
+if name ~= UnitName("target") then
+return fail("Имя цели не совпадает")
+end
+if typ ~= "моб" then
+return fail("Тип цели должен быть 'моб'")
+end
+
+local function livePercent(cur, max)
+if max <= 0 then
+return 0
+end
+return math.floor(cur / max * 100)
+end
+
+local hpExp = livePercent(UnitHealth("target") or 0, UnitHealthMax("target") or 0)
+local resExp = livePercent(UnitMana("target") or 0, UnitManaMax("target") or 0)
+
+if math.abs(tonumber(hp) - hpExp) > 5 then
+return fail("Процент HP не совпадает")
+end
+if math.abs(tonumber(res) - resExp) > 5 then
+return fail("Процент ресурса не совпадает")
+end
+
 return true
 end,
 }
