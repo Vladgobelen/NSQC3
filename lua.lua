@@ -26373,7 +26373,6 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
             block._charCount:ClearAllPoints()
             block._charCount:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
             block._charCount:SetWidth(editWidth)
-
             innerY = innerY - math.max(14, (block._charCount:GetStringHeight() or 14)) - 6
         else
             innerY = innerY - 8
@@ -26386,6 +26385,12 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
             block._resultsButton:ClearAllPoints()
             block._resultsButton:SetPoint("LEFT", block._button, "RIGHT", 8, 0)
             block._resultsButton:SetHeight(block._button:GetHeight() or 22)
+        end
+
+        if block._skipButton then
+            block._skipButton:ClearAllPoints()
+            block._skipButton:SetPoint("LEFT", block._resultsButton, "RIGHT", 8, 0)
+            block._skipButton:SetHeight(block._button:GetHeight() or 22)
         end
 
         innerY = innerY - (block._button:GetHeight() or 22) - 12
@@ -26406,7 +26411,6 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
             block._resultMessage:ClearAllPoints()
             block._resultMessage:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
             block._resultMessage:SetWidth(editWidth)
-
             innerY = innerY - (block._resultMessage:GetStringHeight() or 0) - 10
         else
             block._resultMessage:ClearAllPoints()
@@ -26416,7 +26420,6 @@ local function layoutBlocks(blocks, parent, scrollFrame, bar)
             if text:GetText() and text:GetText() ~= "" then
                 label:ClearAllPoints()
                 label:SetPoint("TOPLEFT", block, "TOPLEFT", 10, innerY)
-
                 innerY = innerY - (label:GetStringHeight() or 12) - 2
 
                 text:ClearAllPoints()
@@ -26593,6 +26596,60 @@ local function createEditorBlock(parent, data, ui)
         end
     end)
 
+    local skipButton = CreateFrame("Button", nil, block, "UIPanelButtonTemplate")
+    skipButton:SetSize(160, 22)
+    skipButton:SetText(data.skipped == true and "Отменить пропуск" or "Пропустить")
+
+    block._skipped = data.skipped == true
+
+    local skipAllowed = data.skipEnabled ~= false
+    local hasSkipCallback = ui and ui.callbacks and type(ui.callbacks.onToggleSkip) == "function"
+
+    if skipAllowed and hasSkipCallback then
+        skipButton:Enable()
+        skipButton:SetAlpha(1)
+    else
+        skipButton:Disable()
+        skipButton:SetAlpha(0.45)
+    end
+
+    skipButton:SetScript("OnClick", function()
+        if ui and ui.callbacks and type(ui.callbacks.onToggleSkip) == "function" then
+            ui.callbacks.onToggleSkip(block._name)
+        end
+    end)
+
+    skipButton:SetScript("OnEnter", function(self)
+        if not GameTooltip then
+            return
+        end
+
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("Пропуск модуля", 1, 1, 1, true)
+
+        if block._skipped then
+            GameTooltip:AddLine("Модуль помечен как пропущенный.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine("ЛКМ — отменить пропуск.", 0.6, 0.6, 0.6, true)
+        else
+            local skippedCount = 0
+            if ui and ui.GetSkippedCount then
+                skippedCount = ui:GetSkippedCount()
+            end
+
+            GameTooltip:AddLine(string.format("Использовано пропусков: %d/5", skippedCount), 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine("ЛКМ — пометить модуль как пропущенный.", 0.6, 0.6, 0.6, true)
+        end
+
+        GameTooltip:Show()
+    end)
+
+    skipButton:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+
     local previewLabel = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     previewLabel:SetText("|cFFB3B3B3Подсветка кода:|r")
 
@@ -26758,6 +26815,7 @@ local function createEditorBlock(parent, data, ui)
     block._editBox = editBox
     block._button = button
     block._resultsButton = resultsButton
+    block._skipButton = skipButton
     block._preview = preview
     block._previewLabel = previewLabel
     block._charCount = charCount
@@ -26880,6 +26938,109 @@ function UI:new(parent)
     self:_CreateMain()
 
     return self
+end
+
+function UI:IsModuleSkipped(index)
+    return self:_IsModuleSkipped(index)
+end
+
+function UI:_IsModuleSkippedByTaskDetails(index)
+    local details = self:_GetTaskDetails(index)
+    return details.skipped == true
+end
+
+function UI:_IsModuleSkipped(index)
+    index = tonumber(index)
+
+    if not index then
+        return false
+    end
+
+    local state = self.moduleStates and self.moduleStates[index]
+
+    if type(state) == "table" and state.skipped then
+        return true
+    end
+
+    return self:_IsModuleSkippedByTaskDetails(index)
+end
+
+function UI:_IsModuleDoneOrSkipped(index)
+    return self:_IsModuleDone(index) or self:_IsModuleSkipped(index)
+end
+
+function UI:GetSkippedCount()
+    local count = 0
+    local indices = self:_GetSortedModuleIndices()
+
+    for _, idx in ipairs(indices) do
+        if self:_IsModuleSkipped(idx) and not self:_IsModuleDone(idx) then
+            count = count + 1
+        end
+    end
+
+    return count
+end
+
+function UI:CanSkipModule(index)
+    index = tonumber(index)
+
+    if not index then
+        return false
+    end
+
+    if self:_IsModuleSkipped(index) then
+        return true
+    end
+
+    if self:_IsModuleDone(index) then
+        return false
+    end
+
+    return self:GetSkippedCount() < 5
+end
+
+function UI:SetModuleSkipped(index, skipped)
+    index = tonumber(index)
+
+    if not index then
+        return
+    end
+
+    skipped = skipped and true or false
+
+    self.moduleStates = self.moduleStates or {}
+    self.moduleStates[index] = self.moduleStates[index] or {}
+    self.moduleStates[index].skipped = skipped
+
+    nsDbc = nsDbc or {}
+    nsDbc.luaTest = nsDbc.luaTest or {}
+    nsDbc.luaTest.taskDetails = nsDbc.luaTest.taskDetails or {}
+    nsDbc.luaTest.taskDetails[index] = nsDbc.luaTest.taskDetails[index] or {}
+    nsDbc.luaTest.taskDetails[index].skipped = skipped
+
+    self:RefreshSidePanel()
+    self:SaveState()
+end
+
+function UI:SetEditorSkipButtonState(name, skipped, enabled)
+    local editor = self:GetEditor(name)
+
+    if not editor or not editor._skipButton then
+        return
+    end
+
+    editor._skipped = skipped and true or false
+
+    if editor._skipButton.SetText then
+        editor._skipButton:SetText(editor._skipped and "Отменить пропуск" or "Пропустить")
+    end
+
+    if enabled == nil then
+        enabled = true
+    end
+
+    setButtonEnabled(editor._skipButton, enabled and true or false)
 end
 
 function UI:SaveState()
@@ -27727,7 +27888,7 @@ function UI:_GetFirstIncompleteModuleIndex(indices)
     indices = indices or self:_GetSortedModuleIndices()
 
     for _, idx in ipairs(indices) do
-        if not self:_IsModuleDone(idx) then
+        if not self:_IsModuleDoneOrSkipped(idx) then
             return idx
         end
     end
@@ -27767,24 +27928,24 @@ function UI:CanSelectModule(index, indices, firstIncomplete)
     -- Запасной вариант, если вдруг позиция не найдена.
     if not currentPos or not targetPos then
         if index < current then
-            if self:_IsModuleDone(index) then
+            if self:_IsModuleDoneOrSkipped(index) then
                 return true
             end
 
             return index == firstIncomplete
         end
 
-        if not self:_IsModuleDone(current) then
+        if not self:_IsModuleDoneOrSkipped(current) then
             return false
         end
 
-        return self:_IsModuleDone(index)
+        return self:_IsModuleDoneOrSkipped(index)
     end
 
     -- Переход назад.
     if targetPos < currentPos then
-        -- Зелёные модули назад доступны.
-        if self:_IsModuleDone(index) then
+        -- Пройденные и пропущенные модули назад доступны.
+        if self:_IsModuleDoneOrSkipped(index) then
             return true
         end
 
@@ -27793,14 +27954,14 @@ function UI:CanSelectModule(index, indices, firstIncomplete)
     end
 
     -- Переход вперёд.
-    -- Нельзя идти вперёд, если текущий модуль ещё не пройден.
-    if not self:_IsModuleDone(current) then
+    -- Нельзя идти вперёд, если текущий модуль ещё не пройден и не пропущен.
+    if not self:_IsModuleDoneOrSkipped(current) then
         return false
     end
 
-    -- Нельзя перепрыгивать через непройденные модули.
+    -- Нельзя перепрыгивать через непройденные и непропущенные модули.
     for pos = currentPos + 1, targetPos do
-        if not self:_IsModuleDone(indices[pos]) then
+        if not self:_IsModuleDoneOrSkipped(indices[pos]) then
             return false
         end
     end
@@ -27835,6 +27996,7 @@ function UI:RefreshSidePanel()
         local m = db[idx] or {}
         local isInfo = self:_IsModuleInfo(m)
         local done = self:_IsModuleDone(idx)
+        local skipped = self:_IsModuleSkipped(idx)
         local allowed = self:CanSelectModule(idx, indices, firstIncomplete)
 
         local button = CreateFrame("Button", nil, self.sideContent)
@@ -27879,12 +28041,15 @@ function UI:RefreshSidePanel()
         title = (title:gsub("\r", " "))
 
         local prefix = (currentIndex == idx and "> " or "")
+
         local textColor
 
-        if not allowed then
-            textColor = "|cFF555555"
-        elseif done then
+        if done then
             textColor = "|cFF00FF00"
+        elseif skipped then
+            textColor = "|cFFFFD700"
+        elseif not allowed then
+            textColor = "|cFF555555"
         else
             textColor = "|cFF999999"
         end
@@ -27894,12 +28059,15 @@ function UI:RefreshSidePanel()
         local statusText
         local statusR, statusG, statusB
 
-        if not allowed then
-            statusText = "Недоступен"
-            statusR, statusG, statusB = 0.80, 0.35, 0.35
-        elseif done then
+        if done then
             statusText = "Пройден"
             statusR, statusG, statusB = 0.2, 1.0, 0.2
+        elseif skipped then
+            statusText = "Пропущен"
+            statusR, statusG, statusB = 1.0, 0.85, 0.0
+        elseif not allowed then
+            statusText = "Недоступен"
+            statusR, statusG, statusB = 0.80, 0.35, 0.35
         elseif isInfo then
             statusText = "Не прочитан"
             statusR, statusG, statusB = 0.7, 0.7, 0.7
@@ -27909,10 +28077,18 @@ function UI:RefreshSidePanel()
         end
 
         button:SetScript("OnEnter", function()
+            if not GameTooltip then
+                return
+            end
+
             GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
             GameTooltip:ClearLines()
             GameTooltip:AddLine(escapePipes(title), 1, 1, 1, true)
             GameTooltip:AddLine(statusText, statusR, statusG, statusB, true)
+
+            if skipped then
+                GameTooltip:AddLine("Модуль помечен как пропущенный.", 0.80, 0.70, 0.20, true)
+            end
 
             if allowed then
                 GameTooltip:AddLine("ЛКМ — открыть", 0.6, 0.6, 0.6, true)
@@ -27924,7 +28100,9 @@ function UI:RefreshSidePanel()
         end)
 
         button:SetScript("OnLeave", function()
-            GameTooltip:Hide()
+            if GameTooltip then
+                GameTooltip:Hide()
+            end
         end)
 
         button:SetScript("OnClick", function()
@@ -28788,6 +28966,130 @@ function Logic:BuildOrder()
     end
 end
 
+function Logic:IsModuleSkipped(moduleId)
+    local id = tonumber(moduleId)
+
+    if not id then
+        return false
+    end
+
+    if self.ui and type(self.ui.IsModuleSkipped) == "function" then
+        return self.ui:IsModuleSkipped(id)
+    end
+
+    self:EnsureSaved()
+
+    local details = nsDbc.luaTest.taskDetails[id]
+
+    if details == nil then
+        details = nsDbc.luaTest.taskDetails[tostring(id)]
+    end
+
+    return type(details) == "table" and details.skipped == true
+end
+
+function Logic:GetSkippedCount()
+    if self.ui and type(self.ui.GetSkippedCount) == "function" then
+        return self.ui:GetSkippedCount()
+    end
+
+    if not self.order or #self.order == 0 then
+        self:BuildOrder()
+    end
+
+    local count = 0
+
+    for _, id in ipairs(self.order or {}) do
+        if self:IsModuleSkipped(id) and not self:IsModuleCompleted(id) then
+            count = count + 1
+        end
+    end
+
+    return count
+end
+
+function Logic:CanSkipModule(moduleId)
+    local id = tonumber(moduleId)
+
+    if not id then
+        return false
+    end
+
+    if self:IsModuleSkipped(id) then
+        return true
+    end
+
+    if self:IsModuleCompleted(id) then
+        return false
+    end
+
+    return self:GetSkippedCount() < 5
+end
+
+function Logic:ToggleModuleSkip(editorName)
+    local id = tonumber(self.current)
+
+    if not id then
+        return
+    end
+
+    editorName = editorName or "commenttest"
+
+    local wasSkipped = self:IsModuleSkipped(id)
+    local newSkipped = not wasSkipped
+
+    if newSkipped and not self:CanSkipModule(id) then
+        local message
+
+        if self:IsModuleCompleted(id) then
+            message = "Пропуск недоступен: модуль уже пройден."
+        else
+            message = "Нельзя пропустить: уже пропущено 5 модулей."
+        end
+
+        if self.ui and type(self.ui.SetEditorResult) == "function" then
+            self.ui:SetEditorResult(editorName, {
+                status = "error",
+                message = message,
+            })
+        end
+
+        return
+    end
+
+    if self.ui and type(self.ui.SetModuleSkipped) == "function" then
+        self.ui:SetModuleSkipped(id, newSkipped)
+    else
+        self:EnsureSaved()
+
+        nsDbc.luaTest.taskDetails[id] = nsDbc.luaTest.taskDetails[id] or {}
+        nsDbc.luaTest.taskDetails[id].skipped = newSkipped
+    end
+
+    if self.ui and type(self.ui.RefreshSidePanel) == "function" then
+        self.ui:RefreshSidePanel()
+    end
+
+    if self.ui and type(self.ui.SetEditorSkipButtonState) == "function" then
+        local enabled = newSkipped or not self:IsModuleCompleted(id)
+        self.ui:SetEditorSkipButtonState(editorName, newSkipped, enabled)
+    end
+
+    if self.ui and type(self.ui.SetNextEnabled) == "function" then
+        local m = self.db and self.db[id] or {}
+        local mtype = TrimString(m.type)
+        local nextEnabled = true
+
+        if mtype == "commenttest" then
+            nextEnabled = (self.commentTestPassed == true) or newSkipped
+        elseif mtype == "vartest" or mtype == "customtest" or mtype == "printtest" then
+            nextEnabled = newSkipped or self.allDone == true
+        end
+
+        self.ui:SetNextEnabled(nextEnabled)
+    end
+end
+
 function Logic:FindModuleIndex(moduleId)
     local id = tonumber(moduleId)
 
@@ -28813,9 +29115,11 @@ function Logic:SaveModuleProgress()
     self:EnsureSaved()
 
     local n = self.current
+
     nsDbc.luaTest.taskDetails[n] = nsDbc.luaTest.taskDetails[n] or {}
 
     local done = {}
+
     if self.done then
         for i, v in pairs(self.done) do
             done[i] = v
@@ -28824,6 +29128,14 @@ function Logic:SaveModuleProgress()
 
     nsDbc.luaTest.taskDetails[n].done = done
     nsDbc.luaTest.taskDetails[n].formatDone = self.formatDone == true
+
+    if self.allDone == true and nsDbc.luaTest.taskDetails[n].skipped == true then
+        nsDbc.luaTest.taskDetails[n].skipped = false
+
+        if self.ui and type(self.ui.SetModuleSkipped) == "function" then
+            self.ui:SetModuleSkipped(n, false)
+        end
+    end
 end
 
 function Logic:IsInfoModule(moduleOrType)
@@ -28958,13 +29270,33 @@ function Logic:SaveCommentTest(code, passed)
     self:EnsureSaved()
 
     local n = self.current
-    nsDbc.luaTest.taskDetails[n] = nsDbc.luaTest.taskDetails[n] or {}
 
+    nsDbc.luaTest.taskDetails[n] = nsDbc.luaTest.taskDetails[n] or {}
     nsDbc.luaTest.taskDetails[n].currentCode = code
 
     if passed ~= nil then
         nsDbc.luaTest.taskDetails[n].commentTestPassed = passed == true
         nsDbc.luaTest.taskDetails[n].completed = passed == true
+    end
+
+    local passedNow = self.commentTestPassed == true
+
+    if passed ~= nil then
+        passedNow = passed == true
+    end
+
+    if passedNow then
+        if nsDbc.luaTest.taskDetails[n].skipped == true then
+            nsDbc.luaTest.taskDetails[n].skipped = false
+
+            if self.ui and type(self.ui.SetModuleSkipped) == "function" then
+                self.ui:SetModuleSkipped(n, false)
+            end
+        end
+
+        if self.ui and type(self.ui.SetEditorSkipButtonState) == "function" then
+            self.ui:SetEditorSkipButtonState("commenttest", false, false)
+        end
     end
 
     if self.ui and self.ui.RefreshSidePanel then
@@ -29352,6 +29684,10 @@ function Logic:new(ui, modules)
             self:RequestOtherResults(editorName)
         end,
 
+        onToggleSkip = function(editorName)
+            self:ToggleModuleSkip(editorName)
+        end,
+
         isModuleCompleted = function(index)
             return self:IsModuleCompleted(index)
         end,
@@ -29510,10 +29846,13 @@ function Logic:SendModuleToUI()
         return
     end
 
+    self:EnsureSaved()
+
     self.done = self.done or {}
     self.formatDone = self.formatDone or false
 
     local mtype = TrimString(m.type)
+    local skipped = self:IsModuleSkipped(n)
 
     local practice = mtype == "vartest"
         or mtype == "printtest"
@@ -29584,10 +29923,14 @@ function Logic:SendModuleToUI()
         if mtype == "vartest" and m.formatTask then
             nextEnabled = nextEnabled and self.formatDone == true
         end
+
+        if skipped then
+            nextEnabled = true
+        end
     end
 
     if mtype == "commenttest" then
-        nextEnabled = self.commentTestPassed == true
+        nextEnabled = (self.commentTestPassed == true) or skipped
     end
 
     local currentIndex = self.currentIndex or 1
@@ -29608,8 +29951,6 @@ function Logic:SendModuleToUI()
     }
 
     if mtype == "commenttest" then
-        self:EnsureSaved()
-
         local saved = nsDbc.luaTest.taskDetails[n]
         local code = (saved and saved.currentCode) or m.initialCode or ""
 
@@ -29629,6 +29970,8 @@ function Logic:SendModuleToUI()
             buttonText = "Проверить",
             code = code,
             resultsEnabled = self.commentTestPassed == true,
+            skipped = skipped,
+            skipEnabled = skipped or not self:IsModuleCompleted(n),
         })
 
         data.blocks = blocks
@@ -29644,7 +29987,18 @@ function Logic:SendModuleToUI()
         end
 
         if self.ui and type(self.ui.SetEditorResultsButtonEnabled) == "function" then
-            self.ui:SetEditorResultsButtonEnabled("commenttest", self.commentTestPassed == true)
+            self.ui:SetEditorResultsButtonEnabled(
+                "commenttest",
+                self.commentTestPassed == true
+            )
+        end
+
+        if self.ui and type(self.ui.SetEditorSkipButtonState) == "function" then
+            self.ui:SetEditorSkipButtonState(
+                "commenttest",
+                skipped,
+                skipped or not self:IsModuleCompleted(n)
+            )
         end
     end
 end
