@@ -10148,95 +10148,239 @@ end,
 }
 
 ns_llua['lua'][86] = {
-type = "commenttest",
-title = "Тест 83-3: функция CompareResourcePercent",
-helpModules = {83, 65, 21.2, 45},
-preloadVars = {
-{var = "CompareResourcePercent", desc = "CompareResourcePercent очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {"checkError"},
-instruction = [=[
+    type = "commenttest",
+    title = "Тест 83-3: функция CompareResourcePercent",
+    helpModules = {83, 65, 21.2, 45},
+    preloadVars = {
+        {var = "CompareResourcePercent", desc = "CompareResourcePercent очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+        {var = "test6", desc = "test6 очищается перед проверкой"},
+        {var = "test7", desc = "test7 очищается перед проверкой"},
+    },
+    reportVars = {
+        "checkError",
+        "test1",
+        "test2",
+        "test3",
+        "test4",
+        "test5",
+        "test6",
+        "test7",
+    },
+    instruction = [=[
 <h>Тест 83-3: функция CompareResourcePercent</h>
 <t>Создай глобальную функцию <k>CompareResourcePercent(unitA, unitB)</k>.</t>
-<t>Перед проверкой возьми в цель любого юнита: игрока или моба.</t>
-<t>Функция должна посчитать процент ресурса каждого юнита (от 0 до 100, без ресурса или без юнита — 0) и сравнить их.</t>
-<t>Вернуть нужно одну строку:</t>
-<t>- <s>"A"</s> — если процент первого юнита больше;</t>
-<t>- <s>"B"</s> — если процент второго юнита больше;</t>
-<t>- <s>"same"</s> — если проценты равны.</t>
-<t>Используй <k>UnitExists</k>, <k>UnitMana</k>, <k>UnitManaMax</k> и сравнения. Деление защищай от нуля.</t>
-<w>Ничего выводить не нужно.</w>
+
+<t>Функция получает два идентификатора юнита, например:</t>
+<c>player</c>
+<c>target</c>
+<c>focus</c>
+<c>pet</c>
+
+<t>Для каждого юнита нужно посчитать процент ресурса:</t>
+<c>UnitMana(unit) / UnitManaMax(unit) * 100</c>
+
+<t>Если юнит не существует, процент считается равным 0.</t>
+<t>Если максимальный ресурс равен 0 или меньше, процент тоже считается равным 0.</t>
+
+<t>Функция должна вернуть одну строку:</t>
+<c>"A" — если процент первого юнита больше;</c>
+<c>"B" — если процент второго юнита больше;</c>
+<c>"same" — если проценты равны.</c>
+
+<t>Во время проверки система подставит свои тестовые значения для <k>UnitExists</k>, <k>UnitMana</k> и <k>UnitManaMax</k>.</t>
+<t>Поэтому брать цель или искать конкретного юнита не нужно.</t>
+
 ]=],
-initialCode = [=[
+    initialCode = [=[
 function CompareResourcePercent(unitA, unitB)
+
 end
 ]=],
-requireKeywords = {
-"CompareResourcePercent",
-"function",
-"UnitMana",
-"UnitManaMax",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
+    requireKeywords = {
+        "CompareResourcePercent",
+        "function",
+        "UnitExists",
+        "UnitMana",
+        "UnitManaMax",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
 
-local function fail(msg)
-_G.checkError = msg
-return msg
-end
+        for i = 1, 7 do
+            _G["test" .. i] = nil
+        end
 
-if type(_G.CompareResourcePercent) ~= "function" then
-return fail("CompareResourcePercent не является глобальной функцией")
-end
+        if type(_G.CompareResourcePercent) ~= "function" then
+            _G.checkError = "CompareResourcePercent не является глобальной функцией"
+            return _G.checkError
+        end
 
-local okExists, exists = pcall(UnitExists, "target")
-if not okExists or not exists then
-return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
-end
+        local oldExists = _G.UnitExists
+        local oldMana = _G.UnitMana
+        local oldManaMax = _G.UnitManaMax
 
-local function livePercent(unit)
-if not UnitExists(unit) then
-return 0
-end
-local cur = UnitMana(unit) or 0
-local max = UnitManaMax(unit) or 0
-if max <= 0 then
-return 0
-end
-return cur / max * 100
-end
+        local mock = {
+            player = {
+                exists = true,
+                cur = 50,
+                max = 100,
+            },
+            target = {
+                exists = true,
+                cur = 25,
+                max = 100,
+            },
+            boss = {
+                exists = true,
+                cur = 80,
+                max = 200,
+            },
+            empty = {
+                exists = true,
+                cur = 0,
+                max = 0,
+            },
+            missing = {
+                exists = false,
+                cur = 0,
+                max = 0,
+            },
+        }
 
-local tests = {
-{"player", "target"},
-{"target", "player"},
-{"ns_invalid", "player"},
-{"player", "player"},
-}
+        local function mockPercent(unit)
+            local data = mock[unit]
 
-for i, test in ipairs(tests) do
-local ok, result = pcall(_G.CompareResourcePercent, test[1], test[2])
-if not ok then
-return fail("Ошибка вызова в тесте " .. i .. ": " .. tostring(result))
-end
-if result ~= "A" and result ~= "B" and result ~= "same" then
-return fail("Тест " .. i .. ": функция должна вернуть 'A', 'B' или 'same'")
-end
-local pa = livePercent(test[1])
-local pb = livePercent(test[2])
-if math.abs(pa - pb) < 0.5 then
--- проценты почти равны, любой валидный ответ принимаем
-else
-local exp = pa > pb and "A" or "B"
-if result ~= exp then
-return fail("Тест " .. i .. ": ожидалось '" .. exp .. "'")
-end
-end
-end
+            if type(data) ~= "table" or data.exists ~= true then
+                return 0
+            end
 
-return true
-end,
+            local max = data.max or 0
+
+            if max <= 0 then
+                return 0
+            end
+
+            return (data.cur or 0) / max * 100
+        end
+
+        local function fmtPct(value)
+            return string.format("%.1f%%", value)
+        end
+
+        local tests = {
+            {"player", "target"},
+            {"target", "player"},
+            {"boss", "player"},
+            {"player", "boss"},
+            {"empty", "player"},
+            {"missing", "player"},
+            {"player", "player"},
+        }
+
+        local details = {}
+        local allOk = true
+
+        local function applyMocks()
+            _G.UnitExists = function(unit)
+                local data = mock[unit]
+                return type(data) == "table" and data.exists == true
+            end
+
+            _G.UnitMana = function(unit)
+                local data = mock[unit]
+
+                if type(data) ~= "table" then
+                    return 0
+                end
+
+                return data.cur or 0
+            end
+
+            _G.UnitManaMax = function(unit)
+                local data = mock[unit]
+
+                if type(data) ~= "table" then
+                    return 0
+                end
+
+                return data.max or 0
+            end
+        end
+
+        local function restoreMocks()
+            _G.UnitExists = oldExists
+            _G.UnitMana = oldMana
+            _G.UnitManaMax = oldManaMax
+        end
+
+        local okRun, runErr = pcall(function()
+            applyMocks()
+
+            for i, test in ipairs(tests) do
+                local unitA = test[1]
+                local unitB = test[2]
+
+                local percentA = mockPercent(unitA)
+                local percentB = mockPercent(unitB)
+
+                local expected
+
+                if math.abs(percentA - percentB) < 0.001 then
+                    expected = "same"
+                elseif percentA > percentB then
+                    expected = "A"
+                else
+                    expected = "B"
+                end
+
+                local ok, result = pcall(_G.CompareResourcePercent, unitA, unitB)
+
+                local resultText
+
+                if ok then
+                    resultText = tostring(result)
+                else
+                    resultText = "ошибка: " .. tostring(result)
+                end
+
+                _G["test" .. i] = string.format(
+                    "%s vs %s | A=%s, B=%s | Получено: %s | Ожидалось: %s",
+                    unitA,
+                    unitB,
+                    fmtPct(percentA),
+                    fmtPct(percentB),
+                    resultText,
+                    expected
+                )
+
+                if not ok or result ~= expected then
+                    allOk = false
+                    table.insert(details, _G["test" .. i])
+                end
+            end
+        end)
+
+        restoreMocks()
+
+        if not okRun then
+            _G.checkError = "Ошибка проверки: " .. tostring(runErr)
+            return _G.checkError
+        end
+
+        if not allOk then
+            _G.checkError = "Проверка результата не пройдена"
+            return table.concat(details, "\n")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][87] = {

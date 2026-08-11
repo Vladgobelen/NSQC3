@@ -12315,7 +12315,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
     -----------------------------------------------------------------------
     if S.nspSectorRecheckRunning then
         local now = GetTime()
-
         if type(S.nspSectorRecheckLockAt) ~= "number"
             or (now - S.nspSectorRecheckLockAt) > 3 then
             S.nspSectorRecheckRunning = false
@@ -12345,6 +12344,12 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
     local eps = spacing * 0.5
 
+    local maxDeg = tonumber(C.CROSS_MAX_SECTOR_ANGLE) or 160
+    if type(maxDeg) ~= "number" or maxDeg ~= maxDeg or maxDeg <= 0 then
+        maxDeg = 160
+    end
+    local maxRad = maxDeg * math.pi / 180
+
     local function isDrawn(owner)
         return owner
             and owner.alive
@@ -12367,7 +12372,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
         if not p then
             return { x = 0, y = 0 }
         end
-
         return {
             x = p.x or 0,
             y = p.y or 0,
@@ -12381,7 +12385,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
         local p0 = thread.p0
         local p2 = thread.p2
-
         local p1 = thread.p1 or {
             x = (p0.x + p2.x) / 2,
             y = (p0.y + p2.y) / 2,
@@ -12448,12 +12451,10 @@ function NSPauk:NP_RecheckWebSectors(inst)
         )
 
         local task = self:AddThreadTask(tasks, seg, drawThread)
-
         added = added + (#tasks - before)
 
         if task then
             scheduled[seg] = true
-
             return {
                 x = drawThread.p2.x,
                 y = drawThread.p2.y,
@@ -12493,6 +12494,52 @@ function NSPauk:NP_RecheckWebSectors(inst)
             ok = false
         end
 
+        -------------------------------------------------------------------
+        -- Новое: не даём старому recheck лезть в запрещённые сектора.
+        --
+        -- Если план явно разрешил сектор (например, принудительно),
+        -- оставляем его. Если план явно запретил — пропускаем.
+        -- Если плана нет, проверяем текущий угол.
+        -------------------------------------------------------------------
+        if ok then
+            local planAllowed = nil
+            if type(inst.sectorAllowed) == "table" and pair.original then
+                planAllowed = inst.sectorAllowed[pair.a]
+            end
+
+            local forbidden = false
+
+            if planAllowed == false then
+                forbidden = true
+            elseif planAllowed ~= true then
+                local useMin = (pairsCount == 2)
+                local angle = self:NP_GetPairAngleAtHub(inst, connA, connB, useMin)
+                if angle > maxRad then
+                    forbidden = true
+                end
+            end
+
+            if forbidden then
+                -----------------------------------------------------------
+                -- Заодно убираем недописанные recheck-сегменты, которые
+                -- старый код успел создать в запрещённом секторе.
+                -----------------------------------------------------------
+                for _, seg in ipairs(inst.crossSegs or {}) do
+                    if seg.alive
+                        and seg.isRecheck
+                        and not self:NP_IsWebOwnerDrawn(seg) then
+                        local direct = seg.connA == connA and seg.connB == connB
+                        local reverse = seg.connA == connB and seg.connB == connA
+                        if direct or reverse then
+                            self:KillSeg(seg)
+                        end
+                    end
+                end
+
+                ok = false
+            end
+        end
+
         if ok then
             if connA.thread and (not connA.arcLength or connA.arcLength <= 0) then
                 local samples, total = self:BuildArcSamples(connA.thread)
@@ -12513,12 +12560,10 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 -- Собираем уже существующие живые сегменты этой пары.
                 -----------------------------------------------------------
                 local pairSegs = {}
-
                 for _, seg in ipairs(inst.crossSegs or {}) do
                     if seg.alive then
                         local direct = seg.connA == connA and seg.connB == connB
                         local reverse = seg.connA == connB and seg.connB == connA
-
                         if direct or reverse then
                             pairSegs[#pairSegs + 1] = seg
                         end
@@ -12554,7 +12599,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                             segArc = seg.recheckArcLen
                         else
                             local p = nil
-
                             if seg.connA == connA then
                                 p = seg.thread.p0
                             elseif seg.connB == connA then
@@ -12567,7 +12611,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                                     p.x,
                                     p.y
                                 )
-
                                 if type(t) == "number" and t == t then
                                     segArc = t * (connA.arcLength or 0)
                                 end
@@ -12578,7 +12621,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                             and segArc == segArc
                             and segArc > 0 then
                             local diff = math.abs(segArc - arcLen)
-
                             if diff < bestDiff then
                                 bestDiff = diff
                                 best = seg
@@ -12598,7 +12640,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                     end
 
                     local seg = findSegForArc(arcLen)
-
                     if seg then
                         if not isDrawn(seg) and not scheduled[seg] then
                             local newCursor = addSegTasks(seg)
@@ -12606,7 +12647,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                                 cursor = newCursor
                             end
                         end
-
                         return
                     end
 
@@ -12626,7 +12666,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                         if newSeg then
                             newSeg.isRecheck = true
                             newSeg.recheckArcLen = arcLen
-
                             pairSegs[#pairSegs + 1] = newSeg
 
                             local newCursor = addSegTasks(newSeg)
@@ -12641,7 +12680,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 -- Обязательные ряды через spacing.
                 -----------------------------------------------------------
                 local arcLen = spacing
-
                 while arcLen <= pairMin + eps do
                     ensureArc(arcLen)
                     arcLen = arcLen + spacing
@@ -12671,7 +12709,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
     -----------------------------------------------------------------------
     -- Минимальная служебная информация о последнем пересмотре.
-    -- Это не отладочный спам, а внутреннее состояние.
     -----------------------------------------------------------------------
     inst.lastSectorRecheck = {
         at = GetTime(),
@@ -16730,9 +16767,345 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
         return 0
     end
 
+    local function cp(p)
+        if type(p) ~= "table" then
+            return {
+                x = S.lastSpiderX or 0,
+                y = S.lastSpiderY or 0,
+            }
+        end
+
+        return {
+            x = tonumber(p.x) or 0,
+            y = tonumber(p.y) or 0,
+        }
+    end
+
+    if type(from) ~= "table" then
+        from = {
+            x = S.lastSpiderX or 0,
+            y = S.lastSpiderY or 0,
+        }
+    end
+
+    from = cp(from)
+
+    local target = cp(to or task.p2 or from)
+
     local variant = (tonumber(task.nspLoopVariant) or 0) + 1
 
-    -- Текущий drag лучше перезапустить, но сама задача не пропускается.
+    local pos = S.taskIdx
+    if type(pos) ~= "number" or pos < 1 or pos > #S.tasks + 1 then
+        pos = #S.tasks + 1
+    end
+
+    local insertPos = pos
+
+    local function insert(t)
+        if t then
+            table.insert(S.tasks, insertPos, t)
+            insertPos = insertPos + 1
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Если варианты маршрутизации уже исчерпаны, больше не идём напрямую.
+    --
+    -- Аварийная логика:
+    -- 1) прыгаем к нижнему краю экрана;
+    -- 2) ползём по нижнему краю к ближайшей боковой стороне;
+    -- 3) поднимаемся по боковому краю до верха экрана;
+    -- 4) ползём по верхнему краю до точки над целью;
+    -- 5) падаем сверху на цель.
+    ---------------------------------------------------------------------------
+    if variant >= 8 then
+        local sw, sh = self:GetScreenSize()
+
+        if type(sw) ~= "number" or sw <= 0 then
+            sw = 1
+        end
+
+        if type(sh) ~= "number" or sh <= 0 then
+            sh = 1
+        end
+
+        local gap = self:NP_GetGap()
+
+        local function clampX(x)
+            x = tonumber(x) or 0
+
+            if x < 0 then
+                return 0
+            end
+
+            if x > sw then
+                return sw
+            end
+
+            return x
+        end
+
+        local function clampY(y)
+            y = tonumber(y) or 0
+
+            if y < 0 then
+                return 0
+            end
+
+            if y > sh then
+                return sh
+            end
+
+            return y
+        end
+
+        local function edgePoint(x, y, side)
+            return {
+                x = clampX(x),
+                y = clampY(y),
+                kind = "edge",
+                edgeSide = side,
+            }
+        end
+
+        local function dist2(a, b)
+            if type(a) ~= "table" or type(b) ~= "table" then
+                return 0
+            end
+
+            local dx = (tonumber(a.x) or 0) - (tonumber(b.x) or 0)
+            local dy = (tonumber(a.y) or 0) - (tonumber(b.y) or 0)
+
+            return dx * dx + dy * dy
+        end
+
+        local function makeCrawl(a, b, duringDrag, markEnd)
+            local ct = self:NP_MakeCrawlTask(a, b, task)
+
+            if duringDrag then
+                ct.nspDuringDrag = true
+            end
+
+            if markEnd then
+                ct.nspDragEnd = true
+            end
+
+            return ct
+        end
+
+        local function makeFall(a, b, duringDrag, markEnd)
+            local f = self:NP_MakeFallTask(a, b)
+
+            if duringDrag then
+                f.nspDuringDrag = true
+            end
+
+            if markEnd then
+                f.nspDragEnd = true
+            end
+
+            return f
+        end
+
+        -----------------------------------------------------------------------
+        -- Строит аварийный маршрут через периметр экрана:
+        -- startPt -> низ -> боковая сторона -> верх -> точка над destPt -> destPt.
+        -----------------------------------------------------------------------
+        local function insertEdgeRoute(startPt, destPt, duringDrag, markEnd)
+            local cur = cp(startPt)
+            local dest = cp(destPt)
+
+            cur.x = clampX(cur.x)
+            cur.y = clampY(cur.y)
+
+            dest.x = clampX(dest.x)
+            dest.y = clampY(dest.y)
+
+            -------------------------------------------------------------------
+            -- Если уже на месте, при необходимости просто ставим завершающую
+            -- задачу, чтобы drag мог корректно завершиться.
+            -------------------------------------------------------------------
+            if dist2(cur, dest) <= 1 then
+                if markEnd then
+                    insert(makeCrawl(cur, dest, duringDrag, true))
+                end
+                return
+            end
+
+            -------------------------------------------------------------------
+            -- 1. Прыжок/падение к нижнему краю экрана.
+            -------------------------------------------------------------------
+            if cur.y > gap then
+                insert(makeFall(
+                    cur,
+                    {
+                        x = cur.x,
+                        y = 0,
+                    },
+                    duringDrag,
+                    false
+                ))
+            end
+
+            cur = {
+                x = clampX(cur.x),
+                y = 0,
+            }
+
+            -------------------------------------------------------------------
+            -- 2. Выбираем боковую сторону, через которую дешевле добраться
+            -- до верхнего края.
+            -------------------------------------------------------------------
+            local leftCost = cur.x + dest.x
+            local rightCost = (sw - cur.x) + (sw - dest.x)
+
+            local sideX
+            local sideName
+
+            if leftCost <= rightCost then
+                sideX = 0
+                sideName = "left"
+            else
+                sideX = sw
+                sideName = "right"
+            end
+
+            -------------------------------------------------------------------
+            -- 3. Ползём по нижнему краю к выбранной боковой стороне.
+            -------------------------------------------------------------------
+            local bottomStart = edgePoint(cur.x, 0, "bottom")
+            local bottomSide = edgePoint(sideX, 0, "bottom")
+
+            if dist2(bottomStart, bottomSide) > 1 then
+                insert(makeCrawl(
+                    bottomStart,
+                    bottomSide,
+                    duringDrag,
+                    false
+                ))
+            end
+
+            -------------------------------------------------------------------
+            -- 4. Поднимаемся по боковому краю до верхнего края экрана.
+            -------------------------------------------------------------------
+            local sideTop = edgePoint(sideX, sh, sideName)
+
+            if dist2(bottomSide, sideTop) > 1 then
+                insert(makeCrawl(
+                    bottomSide,
+                    sideTop,
+                    duringDrag,
+                    false
+                ))
+            end
+
+            -------------------------------------------------------------------
+            -- 5. Ползём по верхнему краю до точки над целью.
+            -------------------------------------------------------------------
+            local topOverTarget = edgePoint(dest.x, sh, "top")
+
+            if dist2(sideTop, topOverTarget) > 1 then
+                insert(makeCrawl(
+                    sideTop,
+                    topOverTarget,
+                    duringDrag,
+                    false
+                ))
+            end
+
+            -------------------------------------------------------------------
+            -- 6. Прыгаем/падаем сверху на цель.
+            -------------------------------------------------------------------
+            if math.abs(topOverTarget.x - dest.x) > 1
+                or math.abs(topOverTarget.y - dest.y) > 1 then
+                insert(makeFall(
+                    topOverTarget,
+                    dest,
+                    duringDrag,
+                    markEnd
+                ))
+            elseif markEnd then
+                insert(makeCrawl(
+                    topOverTarget,
+                    dest,
+                    duringDrag,
+                    true
+                ))
+            end
+        end
+
+        -----------------------------------------------------------------------
+        -- Определяем, нужно ли не просто дойти до точки, а ещё и
+        -- дотащить/завершить нить.
+        -----------------------------------------------------------------------
+        local activeDrag = (S.nspDrag ~= nil)
+            and (task.owner == nil or S.nspDrag.owner == task.owner)
+
+        local canStartDrag = task.nspDrag == true
+            and type(task.finalThread) == "table"
+            and type(task.finalThread.p2) == "table"
+
+        local hasFinalDragTarget = (task.nspDrag or task.nspContinueDrag)
+            and type(task.finalThread) == "table"
+            and type(task.finalThread.p2) == "table"
+
+        local wantsDragFinish = dragMode
+            or task.nspDrag
+            or task.nspContinueDrag
+            or task.nspDragEnd
+
+        if canStartDrag and not activeDrag then
+            -------------------------------------------------------------------
+            -- Drag ещё не начат.
+            --
+            -- Сначала аварийно добираемся до anchor через периметр,
+            -- затем стартуем drag, затем так же аварийно идём к конечной
+            -- точке нити и завершаем drag.
+            -------------------------------------------------------------------
+            local anchor = cp(task.finalThread.p0 or target)
+            local finalTarget = cp(task.finalThread.p2)
+
+            insertEdgeRoute(from, anchor, false, false)
+            insert(self:NP_MakeStartDragTask(task, anchor))
+            insertEdgeRoute(anchor, finalTarget, true, true)
+
+        elseif activeDrag or dragMode then
+            -------------------------------------------------------------------
+            -- Drag уже активен или задача должна тащить нить.
+            --
+            -- Идём аварийным маршрутом к конечной точке и, если нужно,
+            -- завершаем drag.
+            -------------------------------------------------------------------
+            local finalTarget = target
+
+            if hasFinalDragTarget then
+                finalTarget = cp(task.finalThread.p2)
+            end
+
+            insertEdgeRoute(
+                from,
+                finalTarget,
+                activeDrag,
+                activeDrag and wantsDragFinish
+            )
+
+        else
+            -------------------------------------------------------------------
+            -- Обычный маршрут без перетаскивания нити.
+            -------------------------------------------------------------------
+            insertEdgeRoute(from, target, false, false)
+        end
+
+        S.taskIdx = pos
+        S.currentTask = nil
+        S.phase = "task"
+
+        return 0
+    end
+
+    ---------------------------------------------------------------------------
+    -- Обычная обработка ранних повторов маршрута.
+    ---------------------------------------------------------------------------
     if dragMode or S.nspDrag then
         self:NP_ClearGlobalDrag(true)
     end
@@ -16763,7 +17136,7 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
 
     copy.nspLoopDetourPoint = self:NP_ChooseLoopDetourPoint(
         from,
-        to or task.p2,
+        target,
         variant
     )
 
@@ -16776,11 +17149,6 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
     -- Совсем аварийный режим: разрешаем анти-телепорт bypass.
     if variant >= 7 then
         copy.nspAllowTeleport = true
-    end
-
-    local pos = S.taskIdx
-    if type(pos) ~= "number" or pos < 1 or pos > #S.tasks + 1 then
-        pos = #S.tasks + 1
     end
 
     table.insert(S.tasks, pos, copy)
@@ -20944,42 +21312,56 @@ function NSPauk:NP_GetWebCompletionStats(inst)
     end
 
     local N = inst.conns and #inst.conns or 0
+
     if N >= 2 and inst.crossRowsList then
         local indices = self:NP_GetSectorIndices(inst)
+
         local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
         if spacing < 0.5 then
             spacing = 0.5
         end
+
         local eps = math.max(0.5, spacing * 0.5)
+        local sectorAllowed = inst.sectorAllowed
 
         for rowIdx, row in ipairs(inst.crossRowsList) do
             if type(row) == "table" then
                 local arcLen = self:NP_GetRowArcLen(inst, rowIdx, row)
 
                 for _, idx in ipairs(indices) do
-                    local connA = inst.conns[idx]
-                    local connB = inst.conns[(idx % N) + 1]
-                    if connA and connB then
-                        local pairMin = math.min(
-                            connA.arcLength or 0,
-                            connB.arcLength or 0
-                        )
+                    local allowed = true
+                    if type(sectorAllowed) == "table" and sectorAllowed[idx] == false then
+                        allowed = false
+                    end
 
-                        if arcLen <= pairMin + eps then
-                            local seg = row[idx]
-                            if seg then
-                                stats.crossPlanned = stats.crossPlanned + 1
-                                if seg.alive then
-                                    if self:NP_IsWebOwnerDrawn(seg) then
-                                        stats.crossDrawn = stats.crossDrawn + 1
+                    if allowed then
+                        local connA = inst.conns[idx]
+                        local connB = inst.conns[(idx % N) + 1]
+
+                        if connA and connB then
+                            local pairMin = math.min(
+                                connA.arcLength or 0,
+                                connB.arcLength or 0
+                            )
+
+                            if arcLen <= pairMin + eps then
+                                local seg = row[idx]
+
+                                if seg then
+                                    stats.crossPlanned = stats.crossPlanned + 1
+
+                                    if seg.alive then
+                                        if self:NP_IsWebOwnerDrawn(seg) then
+                                            stats.crossDrawn = stats.crossDrawn + 1
+                                        else
+                                            stats.crossPending = stats.crossPending + 1
+                                        end
                                     else
-                                        stats.crossPending = stats.crossPending + 1
+                                        stats.crossDead = stats.crossDead + 1
                                     end
                                 else
-                                    stats.crossDead = stats.crossDead + 1
+                                    stats.crossMissing = stats.crossMissing + 1
                                 end
-                            else
-                                stats.crossMissing = stats.crossMissing + 1
                             end
                         end
                     end
@@ -21033,7 +21415,11 @@ function NSPauk:NP_GetSectorDebugInfo(inst, idx, sectorAllowed, sectorAngleDeg, 
     end
 
     local angle = sectorAngleDeg and sectorAngleDeg[idx] or 0
-    local allowed = sectorAllowed and sectorAllowed[idx] or false
+
+    local allowed = true
+    if type(sectorAllowed) == "table" then
+        allowed = sectorAllowed[idx] == true
+    end
 
     info.angle = angle
     info.allowed = allowed
@@ -21048,6 +21434,7 @@ function NSPauk:NP_GetSectorDebugInfo(inst, idx, sectorAllowed, sectorAngleDeg, 
     if spacing < 0.5 then
         spacing = 0.5
     end
+
     local eps = math.max(0.5, spacing * 0.5)
 
     if not connA.alive then
@@ -21102,23 +21489,28 @@ function NSPauk:NP_GetSectorDebugInfo(inst, idx, sectorAllowed, sectorAngleDeg, 
         for rowIdx, row in ipairs(inst.crossRowsList) do
             if type(row) == "table" then
                 local arcLen = self:NP_GetRowArcLen(inst, rowIdx, row)
+                local inRange = arcLen <= pairMin + eps
 
-                if arcLen <= pairMin + eps then
+                if inRange and allowed then
                     info.expectedRows = info.expectedRows + 1
-                    local seg = row[idx]
+                end
 
-                    if seg then
-                        info.planned = info.planned + 1
-                        if seg.alive then
-                            if self:NP_IsWebOwnerDrawn(seg) then
-                                info.drawn = info.drawn + 1
-                            else
-                                info.pending = info.pending + 1
-                            end
+                local seg = row[idx]
+
+                if seg then
+                    info.planned = info.planned + 1
+
+                    if seg.alive then
+                        if self:NP_IsWebOwnerDrawn(seg) then
+                            info.drawn = info.drawn + 1
                         else
-                            info.dead = info.dead + 1
+                            info.pending = info.pending + 1
                         end
                     else
+                        info.dead = info.dead + 1
+                    end
+                else
+                    if inRange and allowed then
                         info.missing = info.missing + 1
                     end
                 end
@@ -21128,23 +21520,25 @@ function NSPauk:NP_GetSectorDebugInfo(inst, idx, sectorAllowed, sectorAngleDeg, 
         table.insert(info.reasons, "нет плана рядов")
     end
 
-    if info.expectedRows == 0 and pairMin >= spacing then
-        table.insert(info.reasons, "нет подходящих рядов")
-    end
+    if allowed then
+        if info.expectedRows == 0 and pairMin >= spacing then
+            table.insert(info.reasons, "нет подходящих рядов")
+        end
 
-    if info.expectedRows > 0 and info.planned == 0 then
-        table.insert(info.reasons, "нет запланированных сегментов")
-    end
+        if info.expectedRows > 0 and info.planned == 0 then
+            table.insert(info.reasons, "нет запланированных сегментов")
+        end
 
-    if info.planned > 0 and info.drawn == 0 and info.pending == 0 then
-        table.insert(info.reasons, "все запланированные сегменты мертвы")
-    end
+        if info.planned > 0 and info.drawn == 0 and info.pending == 0 then
+            table.insert(info.reasons, "все запланированные сегменты мертвы")
+        end
 
-    if info.missing > 0 then
-        table.insert(info.reasons, string.format(
-            "пропущено %d сегментов",
-            info.missing
-        ))
+        if info.missing > 0 then
+            table.insert(info.reasons, string.format(
+                "пропущено %d сегментов",
+                info.missing
+            ))
+        end
     end
 
     info.reason = table.concat(info.reasons, "; ")
