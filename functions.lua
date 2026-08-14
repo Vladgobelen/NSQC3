@@ -12517,6 +12517,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
     if S.phase ~= "task" and S.phase ~= "instanceComplete" then
         return 0
     end
+
     if S.nspSectorRecheckRunning then
         local now = GetTime()
         if type(S.nspSectorRecheckLockAt) ~= "number"
@@ -12528,11 +12529,13 @@ function NSPauk:NP_RecheckWebSectors(inst)
     end
     S.nspSectorRecheckRunning = true
     S.nspSectorRecheckLockAt = GetTime()
+
     local N = inst.conns and #inst.conns or 0
     if N < 2 then
         S.nspSectorRecheckRunning = false
         return 0
     end
+
     local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
     if spacing < 0.5 then
         spacing = 0.5
@@ -12542,25 +12545,33 @@ function NSPauk:NP_RecheckWebSectors(inst)
         minCross = 4
     end
     local eps = spacing * 0.5
+
+    ---------------------------------------------------------------
+    -- ИСПРАВЛЕНО: лимит угла для проверки секторов.
+    ---------------------------------------------------------------
     local maxDeg = tonumber(C.CROSS_MAX_SECTOR_ANGLE) or 160
     if type(maxDeg) ~= "number" or maxDeg ~= maxDeg or maxDeg <= 0 then
         maxDeg = 160
     end
     local maxRad = maxDeg * math.pi / 180
+
     local function isDrawn(owner)
         return owner
             and owner.alive
             and owner.textures
             and #owner.textures > 0
     end
+
     local scheduled = self:NP_CollectScheduledOwners()
     if type(scheduled) ~= "table" then
         scheduled = {}
     end
+
     local tasks = {}
     local added = 0
     local cursor = self:NP_GetSpiderPointIfShown()
         or { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
+
     local function copyPt(p)
         if not p then
             return { x = 0, y = 0 }
@@ -12570,6 +12581,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
             y = p.y or 0,
         }
     end
+
     local function orientThread(thread)
         if not thread or not thread.p0 or not thread.p2 then
             return nil
@@ -12605,6 +12617,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
         end
         return normal
     end
+
     local function addSegTasks(seg)
         if not seg
             or not seg.alive
@@ -12640,18 +12653,22 @@ function NSPauk:NP_RecheckWebSectors(inst)
         end
         return nil
     end
+
     local alivePairs = self:NP_GetAliveSectorPairs(inst)
     if type(alivePairs) ~= "table" then
         alivePairs = {}
     end
     local pairsCount = #alivePairs
+
     for _, pair in ipairs(alivePairs) do
         local connA = inst.conns[pair.a]
         local connB = inst.conns[pair.b]
+
         local ok = connA
             and connB
             and connA.alive
             and connB.alive
+
         if ok then
             if connA.target and not self:ValidateAnchorRect(connA.target.rect) then
                 ok = false
@@ -12660,9 +12677,11 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 ok = false
             end
         end
+
         if ok and ((not isDrawn(connA)) or (not isDrawn(connB))) then
             ok = false
         end
+
         if ok then
             if not self:NP_AreThreadsAdjacent(inst, pair.a, pair.b) then
                 ok = false
@@ -12673,6 +12692,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 end
             end
         end
+
         if ok then
             if connA.thread and (not connA.arcLength or connA.arcLength <= 0) then
                 local samples, total = self:BuildArcSamples(connA.thread)
@@ -12684,7 +12704,9 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 connB.arcSamples = samples
                 connB.arcLength = total
             end
+
             local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
+
             if pairMin >= minCross then
                 local pairSegs = {}
                 for _, seg in ipairs(inst.crossSegs or {}) do
@@ -12696,6 +12718,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
                         end
                     end
                 end
+
                 for _, seg in ipairs(pairSegs) do
                     if not isDrawn(seg) and not scheduled[seg] then
                         local newCursor = addSegTasks(seg)
@@ -12704,6 +12727,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
                         end
                     end
                 end
+
                 local function findSegForArc(arcLen)
                     local best = nil
                     local bestDiff = spacing * 0.75
@@ -12747,6 +12771,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
                     end
                     return best
                 end
+
                 local function ensureArc(arcLen)
                     if arcLen < minCross or arcLen > pairMin + eps then
                         return
@@ -12783,6 +12808,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
                         end
                     end
                 end
+
                 local arcLen = spacing
                 while arcLen <= pairMin + eps do
                     ensureArc(arcLen)
@@ -12792,6 +12818,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
             end
         end
     end
+
     if added > 0 then
         for _, task in ipairs(tasks) do
             S.tasks[#S.tasks + 1] = task
@@ -12804,12 +12831,14 @@ function NSPauk:NP_RecheckWebSectors(inst)
             self:AdvanceTask()
         end
     end
+
     inst.lastSectorRecheck = {
         at = GetTime(),
         crossCount = inst.builtCrossCount or 0,
         pairs = pairsCount,
         added = added,
     }
+
     S.nspSectorRecheckRunning = false
     return added
 end
@@ -15142,23 +15171,27 @@ function NSPauk:KillSeg(seg)
     if not seg or not seg.alive then
         return
     end
-
     seg.alive = false
-
     if #seg.textures > 0 then
         self:StartLocalFade(seg.textures, self.C.TEAR_FADE_DURATION)
         seg.textures = {}
     end
-
     local ref = seg.thread and seg.thread.ownerRef
     local inst = ref and ref.inst
-
     if inst and inst.interSegs then
         for _, inter in ipairs(inst.interSegs) do
-            if inter.alive and (inter.parentSegA == seg or inter.parentSegB == seg) then
+            if inter.alive
+                and (inter.parentSegA == seg or inter.parentSegB == seg) then
                 self:KillSeg(inter)
             end
         end
+    end
+
+    if inst
+        and not inst.torn
+        and not inst.isCocoon
+        and not inst.isMoth then
+        self:NP_RequestSectorRecheck(inst)
     end
 end
 
@@ -15455,25 +15488,23 @@ function NSPauk:KillConnection(inst, conn)
     if not conn or not conn.alive then
         return
     end
-
     conn.alive = false
-
     if #conn.textures > 0 then
         self:StartLocalFade(conn.textures, self.C.TEAR_FADE_DURATION)
         conn.textures = {}
     end
-
     if inst then
         for _, seg in ipairs(inst.crossSegs) do
             if seg.alive and (seg.connA == conn or seg.connB == conn) then
                 self:KillSeg(seg)
             end
         end
-
         self:CheckInstanceDead(inst)
-
         if not inst.torn then
+
+            self:NP_HealHoleAroundConn(inst, conn)
             self:NP_RecheckWebSectors(inst)
+            self:NP_RecheckWebSectorsByTriangles(inst)
         end
     end
 end
@@ -20699,7 +20730,252 @@ function NSPauk:ReturnToLimitHome()
     self:AdvanceTask()
 end
 
-function NSPauk:NP_DebugSectors()
+function NSPauk:NP_ClearSectorsDebug()
+    local S = self.S
+    local dbg = S.nspSectorsDebug
+    if not dbg then
+        return
+    end
+    if dbg.textures and #dbg.textures > 0 then
+        self:RecycleTextures(dbg.textures)
+    end
+    if dbg.fonts then
+        for _, fs in ipairs(dbg.fonts) do
+            if fs and fs.Hide then
+                fs:Hide()
+            end
+        end
+    end
+    S.nspSectorsDebug = nil
+end
+
+function NSPauk:NP_DrawSectorsDebug()
+    local S = self.S
+    local C = self.C
+    local inst = S.currentInstance
+
+    self:NP_ClearSectorsDebug()
+
+    if not inst then
+        self:Echo("Нет текущей паутины для визуализации.")
+        return
+    end
+
+    local N = inst.conns and #inst.conns or 0
+    if N < 2 then
+        self:Echo("Меньше 2 нитей, нечего визуализировать.")
+        return
+    end
+
+    local dbg = {
+        textures = {},
+        fonts = {},
+    }
+    S.nspSectorsDebug = dbg
+
+    local frame = S.activeFrame or UIParent
+    local palette = self.PreviewColors
+
+    local function dot(x, y, color, alpha, size)
+        local tex
+        if #S.webPool > 0 then
+            tex = table.remove(S.webPool)
+            if tex then
+                tex._nspInPool = false
+            end
+        end
+        if not tex then
+            tex = frame:CreateTexture(nil, "OVERLAY")
+        end
+        if not tex then
+            return
+        end
+        tex:SetTexture(C.TEX_WEB)
+        tex:SetDrawLayer("OVERLAY")
+        tex:SetVertexColor(color.r, color.g, color.b, 1)
+        tex:SetAlpha(alpha or 0.9)
+        tex:SetWidth(size or 3)
+        tex:SetHeight(size or 3)
+        tex:ClearAllPoints()
+        tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+        tex:Show()
+        dbg.textures[#dbg.textures + 1] = tex
+    end
+
+    local function drawLine(x1, y1, x2, y2, color, alpha, step)
+        step = step or 4
+        local dx = x2 - x1
+        local dy = y2 - y1
+        local len = math.sqrt(dx * dx + dy * dy)
+        if len < 1 then
+            return
+        end
+        local n = math.max(2, math.floor(len / step) + 1)
+        for i = 0, n do
+            local t = i / n
+            dot(x1 + dx * t, y1 + dy * t, color, alpha, step * 0.8)
+        end
+    end
+
+    local function drawBezier(p0, p1, p2, color, alpha, step)
+        if not p0 or not p2 then
+            return
+        end
+        if not p1 then
+            p1 = {
+                x = (p0.x + p2.x) / 2,
+                y = (p0.y + p2.y) / 2,
+            }
+        end
+        step = step or 3
+        local dx = p2.x - p0.x
+        local dy = p2.y - p0.y
+        local chord = math.sqrt(dx * dx + dy * dy)
+        local n = math.max(2, math.floor(chord / step) + 1)
+        for i = 0, n do
+            local t = i / n
+            local m = 1 - t
+            local x = m * m * p0.x + 2 * m * t * p1.x + t * t * p2.x
+            local y = m * m * p0.y + 2 * m * t * p1.y + t * t * p2.y
+            dot(x, y, color, alpha, step * 0.9)
+        end
+    end
+
+    local function label(x, y, text, color, fontSize)
+        local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        if not fs then
+            return
+        end
+        fs:SetText(text)
+        fs:SetTextColor(color.r, color.g, color.b, 1)
+        if fontSize then
+            local fontName = fs:GetFont()
+            if fontName then
+                fs:SetFont(fontName, fontSize)
+            end
+        end
+        fs:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+        dbg.fonts[#dbg.fonts + 1] = fs
+    end
+
+    local function fillTriangle(ax, ay, bx, by, cx, cy, color, alpha, step)
+        step = step or 14
+        local minX = math.min(ax, bx, cx)
+        local maxX = math.max(ax, bx, cx)
+        local minY = math.min(ay, by, cy)
+        local maxY = math.max(ay, by, cy)
+        local y = minY
+        while y <= maxY do
+            local x = minX
+            while x <= maxX do
+                if self:NP_PointInTriangle(x, y, ax, ay, bx, by, cx, cy) then
+                    dot(x, y, color, alpha, step * 0.6)
+                end
+                x = x + step
+            end
+            y = y + step
+        end
+    end
+
+    local hubX = (inst.hub.rect and inst.hub.rect.cx) or 0
+    local hubY = (inst.hub.rect and inst.hub.rect.cy) or 0
+
+    local computedAllowed, sectorAngleDeg = self:ComputeCrossSectors(inst)
+    local allowed = inst.sectorAllowed or computedAllowed
+
+    ---------------------------------------------------------------
+    -- 1. Треугольники секторов
+    ---------------------------------------------------------------
+    for i = 1, N do
+        local j = (i % N) + 1
+        local connA = inst.conns[i]
+        local connB = inst.conns[j]
+        if connA and connB and connA.thread and connB.thread then
+            local ax, ay = self:BzThread(connA.thread, 1)
+            local bx, by = self:BzThread(connB.thread, 1)
+            local colA = palette[((i - 1) % #palette) + 1]
+            local colB = palette[((j - 1) % #palette) + 1]
+            local blendCol = {
+                r = (colA.r + colB.r) / 2,
+                g = (colA.g + colB.g) / 2,
+                b = (colA.b + colB.b) / 2,
+            }
+
+            local isAllowed = allowed and allowed[i]
+            local angle = sectorAngleDeg and sectorAngleDeg[i] or 0
+
+            if isAllowed then
+                fillTriangle(hubX, hubY, ax, ay, bx, by, blendCol, 0.12, 14)
+                drawLine(hubX, hubY, ax, ay, colA, 0.5, 5)
+                drawLine(hubX, hubY, bx, by, colB, 0.5, 5)
+                drawLine(ax, ay, bx, by, blendCol, 0.7, 5)
+            else
+                drawLine(ax, ay, bx, by, { r = 1, g = 0.15, b = 0.15 }, 0.9, 5)
+            end
+
+            local cx = (hubX + ax + bx) / 3
+            local cy = (hubY + ay + by) / 3
+            local secText = string.format("%d-%d\n%.0f", i, j, angle)
+            if not isAllowed then
+                secText = secText .. "\nЗАПРЕТ"
+            end
+            label(cx, cy, secText, blendCol, 11)
+        end
+    end
+
+    ---------------------------------------------------------------
+    -- 2. Основные нити с номерами
+    ---------------------------------------------------------------
+    for i, conn in ipairs(inst.conns) do
+        local col = palette[((i - 1) % #palette) + 1]
+        if conn.alive and conn.thread then
+            drawBezier(
+                conn.thread.p0,
+                conn.thread.p1,
+                conn.thread.p2,
+                col,
+                0.9,
+                3
+            )
+            local ex, ey = self:BzThread(conn.thread, 1)
+            label(ex + 12, ey + 12, tostring(i), col, 16)
+        else
+            if conn.thread then
+                drawBezier(
+                    conn.thread.p0,
+                    conn.thread.p1,
+                    conn.thread.p2,
+                    { r = 0.4, g = 0.1, b = 0.1 },
+                    0.5,
+                    5
+                )
+            end
+        end
+    end
+
+    ---------------------------------------------------------------
+    -- 3. Маркер хаба
+    ---------------------------------------------------------------
+    for i = 0, 11 do
+        local ang = (i / 12) * 2 * math.pi
+        dot(
+            hubX + math.cos(ang) * 8,
+            hubY + math.sin(ang) * 8,
+            { r = 1, g = 1, b = 1 },
+            0.9,
+            3
+        )
+    end
+    label(hubX, hubY - 14, "ХАБ", { r = 1, g = 1, b = 1 }, 10)
+
+    self:Echo(string.format(
+        "Визуализация: %d текстур, %d подписей. Очистка: /nspsectors clear",
+        #dbg.textures,
+        #dbg.fonts
+    ))
+end
+
+function NSPauk:NP_DebugSectors(noVisual)
     local S = self.S
     local C = self.C
     local inst = S.currentInstance
@@ -20722,143 +20998,6 @@ function NSPauk:NP_DebugSectors()
         tostring(S.phase)
     ))
 
-    -------------------------------------------------------------------
-    -- Паук: позиция и опора под ним.
-    -------------------------------------------------------------------
-    local spiderX = S.lastSpiderX or 0
-    local spiderY = S.lastSpiderY or 0
-    local sup = self:NP_FindSupportAt(spiderX, spiderY)
-    self:Echo(string.format(
-        "Паук: %.1f, %.1f | опора: %s | nearSupport=%s",
-        spiderX,
-        spiderY,
-        self:NP_SupportDescription(sup),
-        tostring(self:NP_NearSupportWithin(spiderX, spiderY, self:NP_GetGap() * 1.5))
-    ))
-
-    -------------------------------------------------------------------
-    -- Текущая задача.
-    -------------------------------------------------------------------
-    local curTask = S.currentTask
-    if curTask then
-        local kind = "обычная"
-        if curTask.nspPlan then
-            kind = "plan"
-        elseif curTask.nspCrawl then
-            kind = "crawl"
-        elseif curTask.nspFall then
-            kind = "fall"
-        elseif curTask.nspTempThread then
-            kind = "tempdrop"
-        elseif curTask.kind then
-            kind = tostring(curTask.kind)
-        end
-        local flags = {}
-        if curTask.nspDuringDrag then flags[#flags + 1] = "drag" end
-        if curTask.nspDragEnd then flags[#flags + 1] = "dragEnd" end
-        if curTask.nspNoSupportCheck then flags[#flags + 1] = "noSup" end
-        if curTask.nspAlongWeb then flags[#flags + 1] = "alongWeb" end
-        if curTask.nspContinueDrag then flags[#flags + 1] = "contDrag" end
-        self:Echo(string.format(
-            "Задача: %s, t=%.2f/%.2f, флаги=[%s]",
-            kind,
-            S.moveT or 0,
-            S.moveDur or 0,
-            table.concat(flags, ",")
-        ))
-        if curTask.p0 and curTask.p2 then
-            self:Echo(string.format(
-                "  от %.1f,%.1f к %.1f,%.1f",
-                curTask.p0.x or 0,
-                curTask.p0.y or 0,
-                curTask.p2.x or 0,
-                curTask.p2.y or 0
-            ))
-        end
-        if curTask.owner then
-            local ownerType = "?"
-            if curTask.owner.connA or curTask.owner.connB then
-                ownerType = "seg"
-                if curTask.owner.isHeal then ownerType = "heal" end
-                if curTask.owner.isInterCross then ownerType = "inter" end
-                if curTask.owner.isTriSector then ownerType = "tri" end
-                if curTask.owner.isRecheck then ownerType = "recheck" end
-            elseif curTask.owner.target then
-                ownerType = "conn"
-            end
-            self:Echo(string.format(
-                "  owner=%s, alive=%s, drawn=%s",
-                ownerType,
-                tostring(curTask.owner.alive),
-                tostring(self:NP_IsWebOwnerDrawn(curTask.owner))
-            ))
-        end
-    else
-        self:Echo("Задача: нет")
-    end
-
-    -------------------------------------------------------------------
-    -- Последний маршрут.
-    -------------------------------------------------------------------
-    if S.nspLastRoute then
-        local r = S.nspLastRoute
-        self:Echo(string.format(
-            "Маршрут: от %s к %s, точек %d, длина %.0f, тип %s",
-            tostring(r.fromName or "?"),
-            tostring(r.toName or "?"),
-            r.count or 0,
-            r.length or 0,
-            tostring(r.kind or "?")
-        ))
-    else
-        self:Echo("Маршрут: нет")
-    end
-
-    -------------------------------------------------------------------
-    -- Активный drag.
-    -------------------------------------------------------------------
-    if S.nspDrag and S.nspDrag.anchor then
-        self:Echo(string.format(
-            "Тянем нить от %.1f,%.1f, owner alive=%s",
-            S.nspDrag.anchor.x or 0,
-            S.nspDrag.anchor.y or 0,
-            tostring(S.nspDrag.owner and S.nspDrag.owner.alive)
-        ))
-    else
-        self:Echo("Drag: нет")
-    end
-
-    -------------------------------------------------------------------
-    -- Очередь задач и пересмотры.
-    -------------------------------------------------------------------
-    self:Echo(string.format(
-        "Очередь: задач=%d, taskIdx=%d, completeTimer=%.2f",
-        type(S.tasks) == "table" and #S.tasks or 0,
-        S.taskIdx or 0,
-        S.completeTimer or 0
-    ))
-    self:Echo(string.format(
-        "builtCrossCount=%s, finalRecheckDone=%s",
-        tostring(inst.builtCrossCount or 0),
-        tostring(inst._nspFinalRecheckDone)
-    ))
-    if inst.lastSectorRecheck then
-        local r = inst.lastSectorRecheck
-        self:Echo(string.format(
-            "Последний recheck: %.1f сек назад, пар=%d, добавлено=%d",
-            GetTime() - (r.at or 0),
-            r.pairs or 0,
-            r.added or 0
-        ))
-    end
-    if type(S.nspRouteHistory) == "table" and #S.nspRouteHistory > 0 then
-        self:Echo(string.format(
-            "История маршрутов: %d записей, контекст=%s",
-            #S.nspRouteHistory,
-            tostring(S.nspRouteContext or "?")
-        ))
-    end
-
     if N == 0 then
         self:Echo("В текущей паутине нет нитей.")
         return
@@ -20867,6 +21006,7 @@ function NSPauk:NP_DebugSectors()
     local maxSectorAngle = tonumber(C.CROSS_MAX_SECTOR_ANGLE) or 160
     local crossSpacing = tonumber(C.CROSS_ROW_SPACING) or 0
     local minCrossLen = tonumber(C.MIN_CROSS_LEN) or 0
+
     self:Echo(string.format(
         "CROSS_MAX_SECTOR_ANGLE=%.1f, CROSS_ROW_SPACING=%.1f, MIN_CROSS_LEN=%.1f",
         maxSectorAngle,
@@ -20905,6 +21045,7 @@ function NSPauk:NP_DebugSectors()
     end
 
     local indices = self:NP_GetSectorIndices(inst)
+
     for _, i in ipairs(indices) do
         local j = (i % N) + 1
         local info = self:NP_GetSectorDebugInfo(
@@ -20947,48 +21088,19 @@ function NSPauk:NP_DebugSectors()
         stats.crossSegAlive
     ))
 
-    local scheduled = self:NP_CollectScheduledOwners()
+    local scheduled = self:NP_CollectScheduledOwners(inst)
     local schedCount = 0
-    local drawnSched = 0
-    local byType = { conn = 0, seg = 0, heal = 0, inter = 0, tri = 0, recheck = 0, other = 0 }
-    for owner in pairs(scheduled) do
+    for _ in pairs(scheduled) do
         schedCount = schedCount + 1
-        if self:NP_IsWebOwnerDrawn(owner) then
-            drawnSched = drawnSched + 1
-        end
-        if owner.connA or owner.connB then
-            if owner.isHeal then
-                byType.heal = byType.heal + 1
-            elseif owner.isInterCross then
-                byType.inter = byType.inter + 1
-            elseif owner.isTriSector then
-                byType.tri = byType.tri + 1
-            elseif owner.isRecheck then
-                byType.recheck = byType.recheck + 1
-            else
-                byType.seg = byType.seg + 1
-            end
-        elseif owner.target then
-            byType.conn = byType.conn + 1
-        else
-            byType.other = byType.other + 1
-        end
     end
-    self:Echo(string.format(
-        "Запланировано владельцев в очереди: %d (нарисовано %d)",
-        schedCount,
-        drawnSched
-    ))
-    self:Echo(string.format(
-        "  по типам: conn=%d, seg=%d, heal=%d, inter=%d, tri=%d, recheck=%d, other=%d",
-        byType.conn,
-        byType.seg,
-        byType.heal,
-        byType.inter,
-        byType.tri,
-        byType.recheck,
-        byType.other
-    ))
+    self:Echo("Запланировано владельцев в очереди: " .. tostring(schedCount))
+
+    ---------------------------------------------------------------
+    -- Визуальная диагностика
+    ---------------------------------------------------------------
+    if not noVisual then
+        self:NP_DrawSectorsDebug()
+    end
 end
 
 function NSPauk:Echo(message)
@@ -22321,38 +22433,41 @@ end
 
 if type(SlashCmdList) == "table" then
     local cmdName = "NSPAUKSECTORS"
-
     if not SlashCmdList[cmdName] then
         SlashCmdList[cmdName] = function(msg)
             if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
                 NSPauk:Echo("Паук выключен. Для включения используй /paukblock.")
                 return
             end
-
             msg = type(msg) == "string" and msg or ""
             msg = msg:gsub("^%s+", "")
             msg = msg:gsub("%s+$", "")
 
-            local cmd, arg = msg:match("^(%S+)%s+(%S+)$")
+            if msg == "clear" then
+                NSPauk:NP_ClearSectorsDebug()
+                NSPauk:Echo("Визуализация секторов очищена.")
+                return
+            end
 
+            if msg == "text" then
+                NSPauk:NP_DebugSectors(true)
+                return
+            end
+
+            local cmd, arg = msg:match("^(%S+)%s+(%S+)$")
             if cmd == "angle" and tonumber(arg) then
                 local value = tonumber(arg)
-
                 if value < 0 then
                     value = 0
                 end
-
                 if value > 360 then
                     value = 360
                 end
-
                 NSPauk.C.CROSS_MAX_SECTOR_ANGLE = value
-
                 if type(NSPauk.DB) == "table"
                     and type(NSPauk.DB.constants) == "table" then
                     NSPauk.DB.constants.CROSS_MAX_SECTOR_ANGLE = value
                 end
-
                 NSPauk:Echo(string.format(
                     "CROSS_MAX_SECTOR_ANGLE=%.1f. Для применения создай новую паутину.",
                     value
@@ -22360,10 +22475,9 @@ if type(SlashCmdList) == "table" then
             elseif cmd == "angle" then
                 NSPauk:Echo("Использование: /nspsectors angle 160")
             else
-                NSPauk:NP_DebugSectors()
+                NSPauk:NP_DebugSectors(false)
             end
         end
-
         if _G then
             _G["SLASH_" .. cmdName .. "1"] = "/nspsectors"
             _G["SLASH_" .. cmdName .. "2"] = "/pauksectors"
