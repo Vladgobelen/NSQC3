@@ -8976,7 +8976,6 @@ end
 function NSPauk:NP_FindFallTarget(x, y)
     local S = self.S
     local gap = self:NP_GetGap()
-
     local bestY = -math.huge
     local best = {
         x = x,
@@ -8984,9 +8983,7 @@ function NSPauk:NP_FindFallTarget(x, y)
         kind = "edge",
         name = "низ экрана",
     }
-
     local rects = self:NP_EnsureFrameCache()
-
     for _, r in ipairs(rects) do
         if x >= r.left - 2 and x <= r.right + 2 then
             local top = r.top
@@ -9002,10 +8999,8 @@ function NSPauk:NP_FindFallTarget(x, y)
             end
         end
     end
-
     local checked = 0
     local xTol = math.max(4, gap * 0.6)
-
     for _, inst in ipairs(S.instances) do
         if inst.conns then
             for _, conn in ipairs(inst.conns) do
@@ -9013,15 +9008,18 @@ function NSPauk:NP_FindFallTarget(x, y)
                     and conn.thread
                     and conn.textures
                     and #conn.textures > 0 then
-
                     checked = checked + 1
                     local samples = self:NP_EnsureThreadSamples(conn.thread)
                     if samples then
-                        for _, p in ipairs(samples) do
+                        ---------------------------------------------------
+                        -- ИСПРАВЛЕНО: каждый 4-й сэмпл вместо всех.
+                        -- 24 сэмпла → 6 проверок на нить.
+                        ---------------------------------------------------
+                        for si = 1, #samples, 4 do
+                            local p = samples[si]
                             if math.abs(p.x - x) <= xTol
                                 and p.y <= y + 1
                                 and p.y > bestY then
-
                                 bestY = p.y
                                 best = {
                                     x = x,
@@ -9035,22 +9033,20 @@ function NSPauk:NP_FindFallTarget(x, y)
                 end
             end
         end
-
         if inst.crossSegs then
             for _, seg in ipairs(inst.crossSegs) do
                 if seg.alive
                     and seg.thread
                     and seg.textures
                     and #seg.textures > 0 then
-
                     checked = checked + 1
                     local samples = self:NP_EnsureThreadSamples(seg.thread)
                     if samples then
-                        for _, p in ipairs(samples) do
+                        for si = 1, #samples, 4 do
+                            local p = samples[si]
                             if math.abs(p.x - x) <= xTol
                                 and p.y <= y + 1
                                 and p.y > bestY then
-
                                 bestY = p.y
                                 best = {
                                     x = x,
@@ -9064,16 +9060,13 @@ function NSPauk:NP_FindFallTarget(x, y)
                 end
             end
         end
-
         if checked >= 80 then
             break
         end
     end
-
     if best.y < 0 then
         best.y = 0
     end
-
     return best
 end
 
@@ -9426,16 +9419,11 @@ function NSPauk:NP_BuildRoute(from, to)
         edges[#nodes] = {}
         return #nodes
     end
-    -------------------------------------------------------------------
-    -- ИСПРАВЛЕНО: веса.
-    -- Паутина и хаб — самые дешёвые, чтобы паук полз по паутине
-    -- через хаб, а не уходил на фреймы и края экрана.
-    -------------------------------------------------------------------
-    local EDGE_PENALTY = 3.00
-    local WEB_BONUS    = 0.20
-    local FRAME_BONUS  = 1.20
-    local GAP_PENALTY  = 1.50
-    local HUB_BONUS    = 0.20
+    local EDGE_PENALTY = 2.00
+    local WEB_BONUS    = 0.30
+    local FRAME_BONUS  = 0.70
+    local GAP_PENALTY  = 1.00
+    local HUB_BONUS    = 2.50
     local function addEdge(a, b, w, kind)
         if a and b and a ~= b then
             if not w or w < 0 then
@@ -9457,7 +9445,12 @@ function NSPauk:NP_BuildRoute(from, to)
         end
     end
     local function addEdgeNode(x, y, side)
-        addNode({ x = x, y = y, kind = "edge", edgeSide = side })
+        addNode({
+            x = x,
+            y = y,
+            kind = "edge",
+            edgeSide = side,
+        })
     end
     addEdgeNode(0, 0, "bottom")
     addEdgeNode(sw * 0.5, 0, "bottom")
@@ -9477,19 +9470,39 @@ function NSPauk:NP_BuildRoute(from, to)
             return
         end
         if n.x <= gap then
-            local eid = addNode({ x = 0, y = n.y, kind = "edge", edgeSide = "left" })
+            local eid = addNode({
+                x = 0,
+                y = n.y,
+                kind = "edge",
+                edgeSide = "left",
+            })
             addEdge(id, eid, math.abs(n.x), "edge")
         end
         if n.x >= sw - gap then
-            local eid = addNode({ x = sw, y = n.y, kind = "edge", edgeSide = "right" })
+            local eid = addNode({
+                x = sw,
+                y = n.y,
+                kind = "edge",
+                edgeSide = "right",
+            })
             addEdge(id, eid, math.abs(sw - n.x), "edge")
         end
         if n.y <= gap then
-            local eid = addNode({ x = n.x, y = 0, kind = "edge", edgeSide = "bottom" })
+            local eid = addNode({
+                x = n.x,
+                y = 0,
+                kind = "edge",
+                edgeSide = "bottom",
+            })
             addEdge(id, eid, math.abs(n.y), "edge")
         end
         if n.y >= sh - gap then
-            local eid = addNode({ x = n.x, y = sh, kind = "edge", edgeSide = "top" })
+            local eid = addNode({
+                x = n.x,
+                y = sh,
+                kind = "edge",
+                edgeSide = "top",
+            })
             addEdge(id, eid, math.abs(sh - n.y), "edge")
         end
     end
@@ -9509,8 +9522,12 @@ function NSPauk:NP_BuildRoute(from, to)
         local ids = {}
         for _, p in ipairs(pts) do
             local id = addNode({
-                x = p.x, y = p.y, kind = "frame",
-                frameId = fi, name = rect.name, frame = rect.frame,
+                x = p.x,
+                y = p.y,
+                kind = "frame",
+                frameId = fi,
+                name = rect.name,
+                frame = rect.frame,
             })
             ids[#ids + 1] = id
         end
@@ -9533,7 +9550,11 @@ function NSPauk:NP_BuildRoute(from, to)
         local prevId = nil
         for _, p in ipairs(info.samples) do
             local id = addNode({
-                x = p.x, y = p.y, kind = "web", webId = wi, thread = info.thread,
+                x = p.x,
+                y = p.y,
+                kind = "web",
+                webId = wi,
+                thread = info.thread,
             })
             ids[#ids + 1] = id
             if prevId then
@@ -9573,19 +9594,35 @@ function NSPauk:NP_BuildRoute(from, to)
     end
     for _, inst in ipairs(S.instances) do
         if not inst.torn
-            and inst.hub and inst.hub.frame and inst.hub.rect
-            and inst.conns and #inst.conns > 0 then
+            and inst.hub
+            and inst.hub.frame
+            and inst.hub.rect
+            and inst.conns
+            and #inst.conns > 0 then
             local hubX = inst.hub.rect.cx
             local hubY = inst.hub.rect.cy
             if type(hubX) == "number" and type(hubY) == "number" then
-                local hubId = addNode({ x = hubX, y = hubY, kind = "hub", hubInstance = inst.id })
+                local hubId = addNode({
+                    x = hubX,
+                    y = hubY,
+                    kind = "hub",
+                    hubInstance = inst.id,
+                })
                 for _, conn in ipairs(inst.conns) do
-                    if conn.alive and conn.thread and conn.thread.p0
-                        and conn.textures and #conn.textures > 0 then
+                    if conn.alive
+                        and conn.thread
+                        and conn.thread.p0
+                        and conn.textures
+                        and #conn.textures > 0 then
                         local ids = threadNodeIdByThread[conn.thread]
                         local samples = threadSamplesByThread[conn.thread]
                         if ids and samples then
-                            local nodeId = nearestNodeIdTo(ids, samples, conn.thread.p0.x, conn.thread.p0.y)
+                            local nodeId = nearestNodeIdTo(
+                                ids,
+                                samples,
+                                conn.thread.p0.x,
+                                conn.thread.p0.y
+                            )
                             if nodeId then
                                 local n = nodes[nodeId]
                                 local dx = hubX - n.x
@@ -9602,36 +9639,85 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
     end
-    local supportCount = #nodes
-    for i = 1, supportCount do
+
+    -------------------------------------------------------------------
+    -- ИСПРАВЛЕНО: gap-соединения через пространственную сетку.
+    --
+    -- Было: перебор всех пар узлов O(N²).
+    -- При 1500 узлов это ~1.1 млн проверок расстояния.
+    --
+    -- Стало: сетка с ячейкой gap. Для каждого узла проверяются
+    -- только узлы в 9 соседних ячейках. O(N × k), где k ≈ 5-20.
+    -------------------------------------------------------------------
+    local cellSize = gap
+    if cellSize < 1 then
+        cellSize = 1
+    end
+    local grid = {}
+    for i = 1, #nodes do
         local ni = nodes[i]
         if ni.kind == "frame" or ni.kind == "web" or ni.kind == "hub" then
-            for j = i + 1, supportCount do
-                local nj = nodes[j]
-                if nj.kind == "frame" or nj.kind == "web" or nj.kind == "hub" then
-                    local same = false
-                    if ni.kind == "frame" and nj.kind == "frame" and ni.frameId == nj.frameId then
-                        same = true
-                    end
-                    if ni.kind == "web" and nj.kind == "web" and ni.webId == nj.webId then
-                        same = true
-                    end
-                    if ni.kind == "hub" and nj.kind == "hub" and ni.hubInstance == nj.hubInstance then
-                        same = true
-                    end
-                    if not same then
-                        local dx = ni.x - nj.x
-                        local dy = ni.y - nj.y
-                        local d2 = dx * dx + dy * dy
-                        if d2 <= gap * gap then
-                            addEdge(i, j, math.sqrt(d2), "gap")
+            local cx = math.floor(ni.x / cellSize)
+            local cy = math.floor(ni.y / cellSize)
+            local key = (cx + 5000) * 10000 + (cy + 5000)
+            if not grid[key] then
+                grid[key] = {}
+            end
+            grid[key][#grid[key] + 1] = i
+        end
+    end
+
+    for i = 1, #nodes do
+        local ni = nodes[i]
+        if ni.kind == "frame" or ni.kind == "web" or ni.kind == "hub" then
+            local cx = math.floor(ni.x / cellSize)
+            local cy = math.floor(ni.y / cellSize)
+            for dx = -1, 1 do
+                for dy = -1, 1 do
+                    local key = (cx + dx + 5000) * 10000 + (cy + dy + 5000)
+                    local cell = grid[key]
+                    if cell then
+                        for _, j in ipairs(cell) do
+                            if j > i then
+                                local nj = nodes[j]
+                                local same = false
+                                if ni.kind == "frame"
+                                    and nj.kind == "frame"
+                                    and ni.frameId == nj.frameId then
+                                    same = true
+                                end
+                                if ni.kind == "web"
+                                    and nj.kind == "web"
+                                    and ni.webId == nj.webId then
+                                    same = true
+                                end
+                                if ni.kind == "hub"
+                                    and nj.kind == "hub"
+                                    and ni.hubInstance == nj.hubInstance then
+                                    same = true
+                                end
+                                if not same then
+                                    local ddx = ni.x - nj.x
+                                    local ddy = ni.y - nj.y
+                                    local d2 = ddx * ddx + ddy * ddy
+                                    if d2 <= gap * gap then
+                                        addEdge(i, j, math.sqrt(d2), "gap")
+                                    end
+                                end
+                            end
                         end
                     end
                 end
             end
         end
     end
-    local sides = { bottom = {}, top = {}, left = {}, right = {} }
+
+    local sides = {
+        bottom = {},
+        top = {},
+        left = {},
+        right = {},
+    }
     for i, n in ipairs(nodes) do
         if n.kind == "edge" and n.edgeSide and sides[n.edgeSide] then
             table.insert(sides[n.edgeSide], i)
@@ -9677,15 +9763,28 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
     end
-    local startIdx = addNode({ x = from.x, y = from.y, kind = "start" })
-    local targetIdx = addNode({ x = to.x, y = to.y, kind = "target" })
+    local startIdx = addNode({
+        x = from.x,
+        y = from.y,
+        kind = "start",
+    })
+    local targetIdx = addNode({
+        x = to.x,
+        y = to.y,
+        kind = "target",
+    })
     local topX = to.x
     if topX < 0 then
         topX = 0
     elseif topX > sw then
         topX = sw
     end
-    local topIdx = addNode({ x = topX, y = sh, kind = "edge", edgeSide = "top" })
+    local topIdx = addNode({
+        x = topX,
+        y = sh,
+        kind = "edge",
+        edgeSide = "top",
+    })
     for i, n in ipairs(nodes) do
         if i ~= topIdx and n.kind == "edge" and n.edgeSide == "top" then
             addEdge(topIdx, i, math.abs(n.x - topX), "edge")
@@ -9737,7 +9836,10 @@ function NSPauk:NP_BuildRoute(from, to)
         end
         local webPickGap = gap * 1.5
         for _, info in ipairs(threads) do
-            if info.nodeIds and info.thread and info.samples and #info.samples > 0 then
+            if info.nodeIds
+                and info.thread
+                and info.samples
+                and #info.samples > 0 then
                 local attached = false
                 local _, curveDist = self:NP_NearestThreadT(info.thread, point.x, point.y)
                 if curveDist <= webPickGap then
@@ -9783,7 +9885,12 @@ function NSPauk:NP_BuildRoute(from, to)
             end
         end
         local function connectEdgeProj(side, px, py, weight)
-            local eid = addNode({ x = px, y = py, kind = "edge", edgeSide = side })
+            local eid = addNode({
+                x = px,
+                y = py,
+                kind = "edge",
+                edgeSide = side,
+            })
             addEdge(idx, eid, weight, "edge")
             for i, n in ipairs(nodes) do
                 if i ~= eid and n.kind == "edge" and n.edgeSide == side then
@@ -9810,34 +9917,53 @@ function NSPauk:NP_BuildRoute(from, to)
             connectEdgeProj("top", point.x, sh, sh - point.y)
         end
     end
+
+
+
     connectPoint(startIdx, from)
     connectPoint(targetIdx, to)
-    -------------------------------------------------------------------
-    -- ИСПРАВЛЕНО: A* вместо Dijkstra.
-    -- heuristicScale = минимальный множитель веса, чтобы эвристика
-    -- оставалась допустимой и A* был оптимален.
-    -------------------------------------------------------------------
+
     local heuristicScale = math.min(
-        EDGE_PENALTY, WEB_BONUS, FRAME_BONUS, GAP_PENALTY, HUB_BONUS
+        EDGE_PENALTY,
+        WEB_BONUS,
+        FRAME_BONUS,
+        GAP_PENALTY,
+        HUB_BONUS
     )
     local directDist, directPrev = self:NP_AStar(
-        startIdx, targetIdx, nodes, edges, heuristicScale
+        startIdx,
+        targetIdx,
+        nodes,
+        edges,
+        heuristicScale
     )
     local directPath = nil
     local directLen = nil
-    if directDist and directDist[targetIdx] and directDist[targetIdx] < math.huge then
+    if directDist
+        and directDist[targetIdx]
+        and directDist[targetIdx] < math.huge then
         directLen = directDist[targetIdx]
         directPath = self:NP_ReconstructPath(directPrev, startIdx, targetIdx, nodes)
     end
     local topDist, topPrev = self:NP_AStar(
-        startIdx, topIdx, nodes, edges, heuristicScale
+        startIdx,
+        topIdx,
+        nodes,
+        edges,
+        heuristicScale
     )
     local topPath = nil
     local topLen = nil
-    if topDist and topDist[topIdx] and topDist[topIdx] < math.huge then
+    if topDist
+        and topDist[topIdx]
+        and topDist[topIdx] < math.huge then
         topLen = topDist[topIdx]
         topPath = self:NP_ReconstructPath(topPrev, startIdx, topIdx, nodes)
     end
+
+
+
+
     local fallbackLength = nil
     if topLen and topPath then
         fallbackLength = topLen + math.abs(sh - to.y)
@@ -9853,17 +9979,28 @@ function NSPauk:NP_BuildRoute(from, to)
     end
     local route = nil
     if directPath and fallbackLength and directLen <= fallbackLength then
-        route = { points = directPath, length = actualLen(directPath), kind = "direct" }
+        route = {
+            points = directPath,
+            length = actualLen(directPath),
+            kind = "direct",
+        }
     elseif topPath then
         route = {
             points = topPath,
             length = actualLen(topPath) + math.abs(sh - to.y),
             kind = "drop",
             dropToTarget = true,
-            dropFrom = { x = topX, y = sh },
+            dropFrom = {
+                x = topX,
+                y = sh,
+            },
         }
     elseif directPath then
-        route = { points = directPath, length = actualLen(directPath), kind = "direct" }
+        route = {
+            points = directPath,
+            length = actualLen(directPath),
+            kind = "direct",
+        }
     end
     if route then
         local fromSup = self:NP_FindSupportAt(from.x, from.y)
@@ -12518,11 +12655,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
             ok = false
         end
 
-        ---------------------------------------------------------------
-        -- ИСПРАВЛЕНО: пропускаем запрещённые сектора.
-        -- Раньше recheck лез в сектор с углом > лимита и создавал там
-        -- фантомные перемычки, которые паук пытался рисовать вечно.
-        ---------------------------------------------------------------
         if ok then
             local forbidden = false
             if type(inst.sectorAllowed) == "table" and pair.original then
@@ -12745,25 +12877,43 @@ end
 
 function NSPauk:NP_CollectWebPointClouds(inst)
     local entries = {}
-
     if not inst then
         return entries
+    end
+
+    local aliveCount = 0
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.alive
+            and conn.thread
+            and conn.textures
+            and #conn.textures > 0 then
+            aliveCount = aliveCount + 1
+        end
+    end
+    for _, seg in ipairs(inst.crossSegs or {}) do
+        if seg.alive
+            and seg.thread
+            and seg.textures
+            and #seg.textures > 0 then
+            aliveCount = aliveCount + 1
+        end
+    end
+
+    local cacheKey = (inst.builtCrossCount or 0) * 1000 + aliveCount
+    if inst._nspPointCloudCache
+        and inst._nspPointCloudKey == cacheKey then
+        return inst._nspPointCloudCache
     end
 
     local mainSamples = 28
     local crossSamples = 18
 
-    -----------------------------------------------------------------------
-    -- Только текущая паутина.
-    -- Чужие паутины пока не считаются помехами.
-    -----------------------------------------------------------------------
     for _, conn in ipairs(inst.conns or {}) do
         if conn.alive
             and conn.thread
             and conn.textures
             and #conn.textures > 0 then
             local pts = self:NP_GetThreadTriSamples(conn.thread, mainSamples)
-
             for _, p in ipairs(pts) do
                 entries[#entries + 1] = {
                     x = p.x,
@@ -12780,7 +12930,6 @@ function NSPauk:NP_CollectWebPointClouds(inst)
             and seg.textures
             and #seg.textures > 0 then
             local pts = self:NP_GetThreadTriSamples(seg.thread, crossSamples)
-
             for _, p in ipairs(pts) do
                 entries[#entries + 1] = {
                     x = p.x,
@@ -12791,6 +12940,8 @@ function NSPauk:NP_CollectWebPointClouds(inst)
         end
     end
 
+    inst._nspPointCloudCache = entries
+    inst._nspPointCloudKey = cacheKey
     return entries
 end
 
