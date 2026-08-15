@@ -9865,24 +9865,25 @@ function NSPauk:NP_MakeTempDropTask(from, to)
     return self:NP_MakeFallTask(from, to)
 end
 
-function NSPauk:NP_MakeStartDragTask(plan, anchor)
-    local finalThread = plan.finalThread
+function NSPauk:NP_MakeStartDragTask(task, anchor)
+    local finalThread = task.finalThread
 
     if not finalThread then
         finalThread = {
             p0 = copyPoint(anchor),
-            p1 = copyPoint(plan.p1),
-            p2 = copyPoint(plan.p2),
+            p1 = copyPoint(task.p1),
+            p2 = copyPoint(task.p2),
         }
     end
 
-    return {
+    local t = {
         kind = "travel",
         nspStartDragTask = true,
         nspDuringDrag = true,
         nspNoInsert = true,
-        nspNoSupportCheck = true,
+
         drop = false,
+
         p0 = {
             x = anchor.x or 0,
             y = anchor.y or 0,
@@ -9895,12 +9896,27 @@ function NSPauk:NP_MakeStartDragTask(plan, anchor)
             x = anchor.x or 0,
             y = anchor.y or 0,
         },
-        owner = plan.owner,
-        conn = plan.conn,
+
+        owner = task.owner,
+        conn = task.conn,
         finalThread = finalThread,
-        isCross = plan.isCross,
-        isMain = plan.isMain,
+        isCross = task.isCross,
+        isMain = task.isMain,
     }
+
+    local supA = self:NP_FindSupportAt(t.p0.x, t.p0.y)
+    if supA then
+        t.nspSupportA = supA
+    end
+
+    if finalThread and finalThread.p2 then
+        local supB = self:NP_FindSupportAt(finalThread.p2.x, finalThread.p2.y)
+        if supB then
+            t.nspSupportB = supB
+        end
+    end
+
+    return t
 end
 
 function NSPauk:NP_InvalidateRouteCaches(thread, owner)
@@ -9960,8 +9976,6 @@ function NSPauk:NP_DropPermanentThread(owner, thread)
 
     local density = self:NP_GetWebDensityOffset()
 
-    -- В обычном режиме сохраняем сплошную нить с шагом не больше 2.5 px.
-    -- В режиме экономии FPS разрешаем более редкие точки.
     local maxSpacing = math.max(2.5, 1 + density)
 
     if maxSpacing > 4 then
@@ -9994,13 +10008,6 @@ function NSPauk:NP_DropPermanentThread(owner, thread)
         count = minCount
     end
 
-    -----------------------------------------------------------------------
-    -- Аварийный потолок.
-    --
-    -- Для обычных экранных нитей его хватает с запасом.
-    -- Если нить вдруг очень длинная, он не даст одному вызову
-    -- создать бесконечно много текстур за один кадр.
-    -----------------------------------------------------------------------
     local hard = math.max(5000, minCount)
 
     if hard > 12000 then
@@ -10024,12 +10031,6 @@ function NSPauk:NP_DropPermanentThread(owner, thread)
 
     self:NP_InvalidateRouteCaches(thread, owner)
 end
-
----------------------------------------------------------------------------
--- Жёстко убивает владельца нити, если он остался без видимых текстур.
--- Для основной нити убивает conn и все crossSegs, которые от неё зависят.
--- Для cross/inter сегмента убивает сам сегмент и его inter-детей.
----------------------------------------------------------------------------
 
 function NSPauk:NP_KillOwnerHard(owner)
     if not owner then
@@ -10088,8 +10089,6 @@ function NSPauk:NP_ClearGlobalDrag(fade)
 
     S.nspDrag = nil
 
-    -- Если постоянных текстур так и не появилось, значит нить не была
-    -- завершена. Убиваем её, чтобы перемычки не строились по пустоте.
     if owner and (not owner.textures or #owner.textures == 0) then
         self:NP_KillOwnerHard(owner)
     end
@@ -10146,14 +10145,6 @@ function NSPauk:NP_FinishGlobalDrag(task)
 
     self:NP_InvalidateRouteCaches(thread, owner)
 
-    -----------------------------------------------------------------------
-    -- Счётчик построенных перемычек текущей паутины.
-    --
-    -- Каждая завершённая перемычка увеличивает builtCrossCount.
-    -- Каждые 10 перемычек запускаем треугольную проверку секторов,
-    -- но дополнительно ограничиваем частоту, чтобы не делать это
-    -- несколько раз в секунду.
-    -----------------------------------------------------------------------
     if owner
         and not owner._nspCrossCounted
         and (owner.connA or owner.connB or owner.isHeal or owner.isInterCross) then
@@ -10183,9 +10174,6 @@ function NSPauk:NP_FinishGlobalDrag(task)
     end
 end
 
----------------------------------------------------------------------------
--- Virtual web anchors
----------------------------------------------------------------------------
 function NSPauk:NP_IsWebAnchorAlive(rect)
     local inst = rect and rect.webInst
 
@@ -15062,6 +15050,7 @@ end
 
 function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
     local S = self.S
+
     self:NP_ResetRouteHistory()
 
     if not task then
@@ -15071,6 +15060,7 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
     if dragMode or S.nspDrag then
         self:NP_ClearGlobalDrag(true)
     end
+
     if task.nspDragTextures then
         self:RecycleTextures(task.nspDragTextures)
         task.nspDragTextures = nil
@@ -15089,10 +15079,13 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
     if type(from) ~= "table" then
         from = { x = S.lastSpiderX or 0, y = S.lastSpiderY or 0 }
     end
+
     local target = to
+
     if not target and task.p2 then
         target = cp(task.p2)
     end
+
     if not target then
         target = cp(from)
     end
@@ -15107,6 +15100,8 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
     --   1) падаем на нижний край;
     --   2) ползём по краю до x цели;
     --   3) поднимаемся к цели.
+    --
+    -- Но подниматься можно только туда, где реально есть опора.
     ---------------------------------------------------------------
     local bottomY = gap * 0.25
     if bottomY < 1 then
@@ -15119,9 +15114,11 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
         x = from.x,
         y = bottomY,
     })
+
     if dragMode then
         dropTask.nspDuringDrag = true
     end
+
     table.insert(S.tasks, insertIdx, dropTask)
     insertIdx = insertIdx + 1
 
@@ -15131,30 +15128,79 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
             { x = target.x, y = bottomY },
             task
         )
+
         crawlTask.nspNoSupportCheck = true
         crawlTask.nspSupportA = { kind = "edge", edgeSide = "bottom" }
         crawlTask.nspSupportB = { kind = "edge", edgeSide = "bottom" }
+
         if dragMode then
             crawlTask.nspDuringDrag = true
         end
+
         table.insert(S.tasks, insertIdx, crawlTask)
         insertIdx = insertIdx + 1
     end
 
+    -------------------------------------------------------------------
+    -- ИСПРАВЛЕНО: нельзя делать loop-breaker подъём в точку,
+    -- где нет опоры.
+    --
+    -- Раньше climbTask всегда получал nspNoSupportCheck = true,
+    -- из-за чего паук мог ползти из нижнего края прямо в воздух.
+    -------------------------------------------------------------------
+    local climbTo = cp(target)
+
+    local climbSupported = self:NP_NearSupportWithin(
+        climbTo.x,
+        climbTo.y,
+        gap * 1.5
+    )
+
+    if not climbSupported then
+        local land = self:NP_FindFallTarget(climbTo.x, climbTo.y)
+
+        if land
+            and type(land.x) == "number"
+            and land.x == land.x
+            and type(land.y) == "number"
+            and land.y == land.y then
+            climbTo = { x = land.x, y = land.y }
+
+            climbSupported = self:NP_NearSupportWithin(
+                climbTo.x,
+                climbTo.y,
+                gap * 1.5
+            )
+        end
+    end
+
+    -- Если так и не нашли опору, не лезем вверх.
+    -- Остаёмся на нижнем крае экрана.
+    if not climbSupported then
+        climbTo = {
+            x = climbTo.x,
+            y = bottomY,
+        }
+    end
+
     local climbTask = self:NP_MakeCrawlTask(
-        { x = target.x, y = bottomY },
-        target,
+        { x = climbTo.x, y = bottomY },
+        climbTo,
         task
     )
-    climbTask.nspNoSupportCheck = true
+
+    climbTask.nspNoSupportCheck = false
     climbTask.nspAllowTeleport = true
     climbTask.nspLoopBreaker = true
+
     if dragMode then
         climbTask.nspDuringDrag = true
     end
+
     if task.nspDragEnd then
         climbTask.nspDragEnd = true
     end
+
     table.insert(S.tasks, insertIdx, climbTask)
     insertIdx = insertIdx + 1
 
@@ -15163,6 +15209,60 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
     S.phase = "task"
 
     return 0
+end
+
+function NSPauk:NP_LocalAngleAtHub(inst, conn)
+    if not inst or not conn or not conn.thread then
+        return 0
+    end
+
+    local hubX = (inst.hub.rect and inst.hub.rect.cx) or 0
+    local hubY = (inst.hub.rect and inst.hub.rect.cy) or 0
+
+    if not conn.arcLength or conn.arcLength <= 0 then
+        local samples, total = self:BuildArcSamples(conn.thread)
+        conn.arcSamples = samples
+        conn.arcLength = total
+    end
+
+    local total = conn.arcLength or 0
+    local angle = nil
+
+    if total > 1 then
+        local dist = 100
+
+        if dist > total * 0.5 then
+            dist = total * 0.5
+        end
+
+        local t = self:ThreadTAtLength(conn, dist)
+
+        if t then
+            local x, y = self:BzThread(conn.thread, t)
+            local dx = x - hubX
+            local dy = y - hubY
+
+            if dx * dx + dy * dy > 0.01 then
+                angle = math.atan2(dy, dx)
+            end
+        end
+    end
+
+    if not angle then
+        angle = conn.thread.angle or 0
+    end
+
+    local twoPi = math.pi * 2
+
+    while angle < 0 do
+        angle = angle + twoPi
+    end
+
+    while angle >= twoPi do
+        angle = angle - twoPi
+    end
+
+    return angle
 end
 
 function NSPauk:NP_ExecutePlan(task)
@@ -23796,21 +23896,3 @@ if type(SlashCmdList) == "table" then
         NSPauk_Moth:Print("unknown command:", msg, "type /nsmoth help")
     end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
