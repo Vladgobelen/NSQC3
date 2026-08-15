@@ -18255,12 +18255,521 @@ end
 function NSPauk:NP_ApplyCombatHiddenVisuals()
     local S = self.S
 
-    if S.spider and S.spider:IsShown() then
+    -------------------------------------------------------------------
+    -- Главный контейнер паутины.
+    -- Не прячем его через Hide(), иначе остановится OnUpdate-таймер.
+    -- Вместо этого делаем его полностью прозрачным.
+    -------------------------------------------------------------------
+    if self.F_HIGH and self.F_HIGH.SetAlpha then
+        self.F_HIGH:SetAlpha(0)
+    end
+
+    -------------------------------------------------------------------
+    -- Контейнеры паука и клика.
+    -------------------------------------------------------------------
+    if self.F_SPIDER and self.F_SPIDER.Hide then
+        self.F_SPIDER:Hide()
+    end
+
+    if self.F_CLICK and self.F_CLICK.Hide then
+        self.F_CLICK:Hide()
+    end
+
+    -------------------------------------------------------------------
+    -- Сам паук и кнопка обработки кликов.
+    -------------------------------------------------------------------
+    if S.spider and S.spider.Hide then
         S.spider:Hide()
     end
 
-    if S.clickBtn and S.clickBtn:IsShown() then
+    if S.clickBtn and S.clickBtn.Hide then
         S.clickBtn:Hide()
+    end
+
+    -------------------------------------------------------------------
+    -- Служебные окна.
+    -------------------------------------------------------------------
+    if self.killConfirmFrame and self.killConfirmFrame.Hide then
+        self.killConfirmFrame:Hide()
+    end
+
+    if self.levelUpFrame and self.levelUpFrame.Hide then
+        self.levelUpFrame:Hide()
+    end
+
+    -------------------------------------------------------------------
+    -- UI-restore мерцания UIParent.
+    -------------------------------------------------------------------
+    if S.uiFlickerFrame and S.uiFlickerFrame.Hide then
+        S.uiFlickerFrame:Hide()
+    end
+
+    -------------------------------------------------------------------
+    -- Preview и отладка секторов.
+    -------------------------------------------------------------------
+    if S.nspPreviewTextures then
+        for _, tex in ipairs(S.nspPreviewTextures) do
+            if tex and tex.Hide then
+                tex:Hide()
+            end
+        end
+    end
+
+    if S.nspSectorsDebug then
+        if S.nspSectorsDebug.textures then
+            for _, tex in ipairs(S.nspSectorsDebug.textures) do
+                if tex and tex.Hide then
+                    tex:Hide()
+                end
+            end
+        end
+
+        if S.nspSectorsDebug.fonts then
+            for _, fs in ipairs(S.nspSectorsDebug.fonts) do
+                if fs and fs.Hide then
+                    fs:Hide()
+                end
+            end
+        end
+    end
+end
+
+function NSPauk:NP_SaveCombatHideState()
+    local S = self.S
+
+    -------------------------------------------------------------------
+    -- Если состояние уже сохранено, не пересохраняем его.
+    -- Это важно при повторном входе в бой во время того же скрытия.
+    -------------------------------------------------------------------
+    if type(S.nspCombatHideState) == "table" then
+        return
+    end
+
+    local function shown(obj)
+        if obj and obj.IsShown then
+            return obj:IsShown() and true or false
+        end
+        return false
+    end
+
+    local state = {}
+
+    -------------------------------------------------------------------
+    -- Основная фаза и очередь задач.
+    -------------------------------------------------------------------
+    state.phase = S.phase
+    state.currentInstance = S.currentInstance
+    state.tasks = S.tasks
+    state.taskIdx = S.taskIdx
+    state.currentTask = S.currentTask
+
+    -------------------------------------------------------------------
+    -- Таймеры движения и служебные таймеры.
+    -------------------------------------------------------------------
+    state.moveDur = S.moveDur
+    state.moveT = S.moveT
+    state.lastTaskT = S.lastTaskT
+
+    state.initTimer = S.initTimer
+    state.completeTimer = S.completeTimer
+    state.stillTimer = S.stillTimer
+    state.speedTimer = S.speedTimer
+    state.monitorTimer = S.monitorTimer
+    state.mouseTimer = S.mouseTimer
+    state.mouseIdle = S.mouseIdle
+    state.disableTimer = S.disableTimer
+    state.mothCheckTimer = S.mothCheckTimer
+
+    state.mouseOnThread = S.mouseOnThread
+
+    -------------------------------------------------------------------
+    -- Последняя позиция паука.
+    -------------------------------------------------------------------
+    state.lastSpiderX = S.lastSpiderX
+    state.lastSpiderY = S.lastSpiderY
+
+    -------------------------------------------------------------------
+    -- Активные специальные режимы.
+    -------------------------------------------------------------------
+    state.cocoon = S.cocoon
+    state.moth = S.moth
+    state.nspDrag = S.nspDrag
+    state.nspTempOwners = S.nspTempOwners
+
+    -------------------------------------------------------------------
+    -- Отложенные секторные проверки и resume.
+    -------------------------------------------------------------------
+    state.nspQueueResumePending = S.nspQueueResumePending
+    state.nspQueueResumeInst = S.nspQueueResumeInst
+    state.nspQueueResumePriority = S.nspQueueResumePriority
+    state.nspSectorRecheckPending = S.nspSectorRecheckPending
+    state.nspSectorRecheckInst = S.nspSectorRecheckInst
+
+    -------------------------------------------------------------------
+    -- Лимиты.
+    -------------------------------------------------------------------
+    state.limitReached = S.limitReached
+    state.limitReturnPending = S.limitReturnPending
+    state.limitCocoonPending = S.limitCocoonPending
+    state.limitWaitTimer = S.limitWaitTimer
+    state.limitHomePoint = S.limitHomePoint
+
+    -------------------------------------------------------------------
+    -- UI-restore и адаптация.
+    -------------------------------------------------------------------
+    state.uiFlicker = S.uiFlicker
+    state.uiParentBaseAlpha = S.uiParentBaseAlpha
+    state.adaptive = S.adaptive
+    state.nspDragFps = S.nspDragFps
+    state.nspDragVisualAt = S.nspDragVisualAt
+    state.nspTempVisualAt = S.nspTempVisualAt
+
+    -------------------------------------------------------------------
+    -- Видимость визуальных объектов.
+    -------------------------------------------------------------------
+    state.spiderShown = shown(S.spider)
+    state.clickShown = shown(S.clickBtn)
+    state.fSpiderShown = shown(self.F_SPIDER)
+    state.fClickShown = shown(self.F_CLICK)
+    state.levelUpShown = shown(self.levelUpFrame)
+    state.killConfirmShown = shown(self.killConfirmFrame)
+
+    if self.F_HIGH and self.F_HIGH.GetAlpha then
+        state.highAlpha = self.F_HIGH:GetAlpha()
+
+        if type(state.highAlpha) ~= "number" or state.highAlpha ~= state.highAlpha then
+            state.highAlpha = 1
+        end
+    else
+        state.highAlpha = 1
+    end
+
+    S.nspCombatHideState = state
+end
+
+function NSPauk:NP_RestoreCombatHideState()
+    local S = self.S
+
+    local state = S.nspCombatHideState
+    S.nspCombatHideState = nil
+
+    -------------------------------------------------------------------
+    -- Если состояния нет, возвращаемся в безопасный режим наблюдения.
+    -------------------------------------------------------------------
+    if type(state) ~= "table" then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+        return
+    end
+
+    -------------------------------------------------------------------
+    -- Фаза и очередь задач.
+    -------------------------------------------------------------------
+    S.phase = state.phase or "watch"
+
+    if S.phase == "combatHide" then
+        S.phase = "watch"
+    end
+
+    S.currentInstance = state.currentInstance
+    S.tasks = state.tasks or {}
+    S.taskIdx = state.taskIdx or 1
+    S.currentTask = state.currentTask
+
+    if type(S.tasks) ~= "table" then
+        S.tasks = {}
+    end
+
+    -------------------------------------------------------------------
+    -- Таймеры движения и служебные таймеры.
+    -------------------------------------------------------------------
+    S.moveDur = state.moveDur or 1
+    S.moveT = state.moveT or 0
+    S.lastTaskT = state.lastTaskT or 0
+
+    S.initTimer = state.initTimer or 0
+    S.completeTimer = state.completeTimer or 0
+    S.stillTimer = state.stillTimer or 0
+    S.speedTimer = state.speedTimer or 0
+    S.monitorTimer = state.monitorTimer or 0
+    S.mouseTimer = state.mouseTimer or 0
+    S.mouseIdle = state.mouseIdle or 0
+    S.disableTimer = state.disableTimer or 0
+    S.mothCheckTimer = state.mothCheckTimer or 0
+
+    S.mouseOnThread = state.mouseOnThread
+
+    -------------------------------------------------------------------
+    -- Позиция паука.
+    -------------------------------------------------------------------
+    S.lastSpiderX = state.lastSpiderX or 0
+    S.lastSpiderY = state.lastSpiderY or 0
+
+    -------------------------------------------------------------------
+    -- Специальные режимы.
+    -------------------------------------------------------------------
+    S.cocoon = state.cocoon
+    S.moth = state.moth
+    S.nspDrag = state.nspDrag
+    S.nspTempOwners = state.nspTempOwners or {}
+
+    -------------------------------------------------------------------
+    -- Отложенные проверки.
+    -------------------------------------------------------------------
+    S.nspQueueResumePending = state.nspQueueResumePending
+    S.nspQueueResumeInst = state.nspQueueResumeInst
+    S.nspQueueResumePriority = state.nspQueueResumePriority
+    S.nspSectorRecheckPending = state.nspSectorRecheckPending
+    S.nspSectorRecheckInst = state.nspSectorRecheckInst
+
+    -------------------------------------------------------------------
+    -- Лимиты.
+    -------------------------------------------------------------------
+    S.limitReached = state.limitReached
+    S.limitReturnPending = state.limitReturnPending
+    S.limitCocoonPending = state.limitCocoonPending
+    S.limitWaitTimer = state.limitWaitTimer or 0
+    S.limitHomePoint = state.limitHomePoint
+
+    -------------------------------------------------------------------
+    -- UI-restore и адаптация.
+    -------------------------------------------------------------------
+    S.uiFlicker = state.uiFlicker
+    S.uiParentBaseAlpha = state.uiParentBaseAlpha
+    S.adaptive = state.adaptive
+    S.nspDragFps = state.nspDragFps
+    S.nspDragVisualAt = state.nspDragVisualAt
+    S.nspTempVisualAt = state.nspTempVisualAt
+
+    -------------------------------------------------------------------
+    -- Сброс кэшей маршрутизации и поддержки.
+    -- За 10 минут UI мог измениться.
+    -------------------------------------------------------------------
+    self:NP_ResetRouteHistory()
+
+    S.nspFrameCache = nil
+    S.nspSupportCache = nil
+    S.nspNearCache = nil
+    S.nspFreshSupportCache = nil
+    S.nspAnchorRectCache = nil
+
+    -------------------------------------------------------------------
+    -- Восстановление визуальных объектов.
+    -------------------------------------------------------------------
+    if state.spiderShown and not S.spider then
+        self:MkSpider()
+    end
+
+    if state.clickShown and not S.clickBtn then
+        self:MkClickBtn()
+    end
+
+    if self.F_HIGH and self.F_HIGH.SetAlpha then
+        self.F_HIGH:SetAlpha(state.highAlpha or 1)
+    end
+
+    local function restoreFrame(obj, shouldBeShown)
+        if obj and obj.Show and obj.Hide then
+            if shouldBeShown then
+                obj:Show()
+            else
+                obj:Hide()
+            end
+        end
+    end
+
+    restoreFrame(self.F_SPIDER, state.fSpiderShown)
+    restoreFrame(self.F_CLICK, state.fClickShown)
+    restoreFrame(S.spider, state.spiderShown)
+    restoreFrame(S.clickBtn, state.clickShown)
+    restoreFrame(self.levelUpFrame, state.levelUpShown)
+    restoreFrame(self.killConfirmFrame, state.killConfirmShown)
+
+    -------------------------------------------------------------------
+    -- Preview и отладка секторов.
+    -------------------------------------------------------------------
+    if S.nspPreviewTextures then
+        for _, tex in ipairs(S.nspPreviewTextures) do
+            if tex and tex.Show then
+                tex:Show()
+            end
+        end
+    end
+
+    if S.nspSectorsDebug then
+        if S.nspSectorsDebug.textures then
+            for _, tex in ipairs(S.nspSectorsDebug.textures) do
+                if tex and tex.Show then
+                    tex:Show()
+                end
+            end
+        end
+
+        if S.nspSectorsDebug.fonts then
+            for _, fs in ipairs(S.nspSectorsDebug.fonts) do
+                if fs and fs.Show then
+                    fs:Show()
+                end
+            end
+        end
+    end
+
+    -------------------------------------------------------------------
+    -- Возвращаем паука на сохранённую позицию.
+    -------------------------------------------------------------------
+    self:PutSpider(S.lastSpiderX, S.lastSpiderY)
+
+    -------------------------------------------------------------------
+    -- Если был paused UI-restore, продолжаем его.
+    -------------------------------------------------------------------
+    if S.uiFlicker then
+        self:NP_ResumeUIParentRestore()
+    end
+
+    -------------------------------------------------------------------
+    -- За время боевого скрытия якоря могли уехать.
+    -- Проверяем и рвём только то, что реально сломалось.
+    -------------------------------------------------------------------
+    self:CheckInstancesMovement()
+
+    -------------------------------------------------------------------
+    -- Чистка некорректных состояний после проверки движения.
+    -------------------------------------------------------------------
+    if S.phase == "uiRestore" and not S.uiFlicker then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+    end
+
+    if S.phase == "dissolve" and not S.cocoon then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+    end
+
+    if S.phase == "mothEat" and (not S.moth or not S.moth.active) then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+    end
+
+    if S.phase == "limitWait" and not S.limitReached then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+    end
+
+    if (S.phase == "task" or S.phase == "instanceComplete") and not S.currentInstance then
+        S.tasks = {}
+        S.taskIdx = 1
+        S.currentTask = nil
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+    end
+end
+
+function NSPauk:NP_PauseUIParentRestore()
+    local S = self.S
+
+    if not S.uiFlicker then
+        return
+    end
+
+    -------------------------------------------------------------------
+    -- Запоминаем момент паузы, чтобы после боя продолжить
+    -- с того же места, а не сбрасывать эффект.
+    -------------------------------------------------------------------
+    if type(S.uiFlickerPausedAt) ~= "number" then
+        S.uiFlickerPausedAt = GetTime()
+    end
+
+    -------------------------------------------------------------------
+    -- Останавливаем тикер.
+    -------------------------------------------------------------------
+    if S.uiFlickerTicker then
+        S.uiFlickerTicker:Cancel()
+        S.uiFlickerTicker = nil
+    end
+
+    -------------------------------------------------------------------
+    -- Останавливаем OnUpdate-драйвер.
+    -------------------------------------------------------------------
+    if S.uiFlickerFrame then
+        S.uiFlickerFrame:SetScript("OnUpdate", nil)
+        S.uiFlickerFrame:Hide()
+    end
+end
+
+function NSPauk:NP_ResumeUIParentRestore()
+    local S = self.S
+
+    if not S.uiFlicker then
+        return
+    end
+
+    -------------------------------------------------------------------
+    -- Компенсируем время, проведённое в боевом скрытии.
+    -------------------------------------------------------------------
+    if type(S.uiFlickerPausedAt) == "number" then
+        local paused = GetTime() - S.uiFlickerPausedAt
+
+        if paused > 0 then
+            S.uiFlicker.startTime = (S.uiFlicker.startTime or GetTime()) + paused
+        end
+
+        S.uiFlickerPausedAt = nil
+    end
+
+    -------------------------------------------------------------------
+    -- Возобновляем OnUpdate-драйвер.
+    -------------------------------------------------------------------
+    local f = S.uiFlickerFrame
+
+    if f then
+        f:SetScript("OnUpdate", function()
+            self:UpdateUIParentRestore()
+        end)
+
+        f:Show()
+    end
+
+    -------------------------------------------------------------------
+    -- Возобновляем страховочный тикер.
+    -------------------------------------------------------------------
+    if type(C_Timer) == "table"
+        and type(C_Timer.NewTicker) == "function"
+        and not S.uiFlickerTicker then
+        S.uiFlickerTicker = C_Timer.NewTicker(0.1, function()
+            if S.uiFlicker then
+                self:UpdateUIParentRestore()
+            end
+        end)
+    end
+end
+
+function NSPauk:NP_LeaveCombatHide()
+    local S = self.S
+
+    if type(S) ~= "table" then
+        return
+    end
+
+    S.inCombat = false
+
+    if S.combatHide then
+        local duration = 600
+
+        if type(self.NP_CombatHideDuration) == "function" then
+            duration = tonumber(self:NP_CombatHideDuration()) or 600
+        end
+
+        if type(duration) ~= "number" or duration ~= duration or duration < 0 then
+            duration = 600
+        end
+
+        S.combatHideUntil = GetTime() + duration
     end
 end
 
@@ -18269,38 +18778,65 @@ function NSPauk:NP_EnterCombatHide()
 
     S.inCombat = true
 
+    -------------------------------------------------------------------
+    -- Если уже находимся в боевом скрытии и снова вошли в бой,
+    -- сбрасываем таймер 10-минутного выхода.
+    -------------------------------------------------------------------
     if S.combatHide then
+        S.combatHideUntil = 0
         return
     end
 
     S.combatHide = true
     S.combatHideUntil = 0
 
-    if type(self.AbortMothHunt) == "function" and S.moth and S.moth.active then
-        self:AbortMothHunt(true, true, true)
-    end
+    -------------------------------------------------------------------
+    -- Сохраняем состояние, чтобы после таймаута вернуть всё как было.
+    -------------------------------------------------------------------
+    self:NP_SaveCombatHideState()
 
-    if type(self.AbortCocoon) == "function" and S.cocoon then
-        self:AbortCocoon()
-    end
-
-    if type(self.NP_ClearGlobalDrag) == "function" then
-        self:NP_ClearGlobalDrag(true)
-    end
+    -------------------------------------------------------------------
+    -- Если сейчас идёт восстановление UIParent после хардкор-кокона,
+    -- ставим его на паузу.
+    -------------------------------------------------------------------
+    self:NP_PauseUIParentRestore()
 
     S.phase = "combatHide"
 
     self:NP_ApplyCombatHiddenVisuals()
 end
 
-function NSPauk:NP_LeaveCombatHide()
+function NSPauk:NP_EnterCombatHide()
     local S = self.S
 
-    S.inCombat = false
+    S.inCombat = true
 
+    -------------------------------------------------------------------
+    -- Если уже находимся в боевом скрытии и снова вошли в бой,
+    -- сбрасываем таймер 10-минутного выхода.
+    -------------------------------------------------------------------
     if S.combatHide then
-        S.combatHideUntil = GetTime() + self:NP_CombatHideDuration()
+        S.combatHideUntil = 0
+        return
     end
+
+    S.combatHide = true
+    S.combatHideUntil = 0
+
+    -------------------------------------------------------------------
+    -- Сохраняем состояние, чтобы после таймаута вернуть всё как было.
+    -------------------------------------------------------------------
+    self:NP_SaveCombatHideState()
+
+    -------------------------------------------------------------------
+    -- Если сейчас идёт восстановление UIParent после хардкор-кокона,
+    -- ставим его на паузу.
+    -------------------------------------------------------------------
+    self:NP_PauseUIParentRestore()
+
+    S.phase = "combatHide"
+
+    self:NP_ApplyCombatHiddenVisuals()
 end
 
 function NSPauk:NP_ExitCombatHide()
@@ -18308,28 +18844,9 @@ function NSPauk:NP_ExitCombatHide()
 
     S.combatHide = false
     S.combatHideUntil = 0
+    S.inCombat = false
 
-    S.currentTask = nil
-    S.tasks = {}
-    S.taskIdx = 1
-    S.currentInstance = nil
-    S.completeTimer = 0
-    S.stillTimer = 0
-    S.speedTimer = 0
-
-    S.limitReached = false
-    S.limitReturnPending = false
-    S.limitCocoonPending = false
-    S.limitWaitTimer = 0
-    S.limitHomePoint = nil
-
-    if type(self.CheckInstancesMovement) == "function" then
-        self:CheckInstancesMovement()
-    end
-
-    S.phase = "watch"
-
-    self:NP_ApplyCombatHiddenVisuals()
+    self:NP_RestoreCombatHideState()
 end
 
 function NSPauk:NP_UpdateCombatHide(dt)
@@ -18339,25 +18856,26 @@ function NSPauk:NP_UpdateCombatHide(dt)
         return
     end
 
-    dt = tonumber(dt) or 0
-
-    self:NP_ApplyCombatHiddenVisuals()
-
-    if type(self.UpdateFades) == "function" then
-        self:UpdateFades(dt)
+    -------------------------------------------------------------------
+    -- Пока бой не закончился, ничего не восстанавливаем.
+    -------------------------------------------------------------------
+    if S.inCombat then
+        return
     end
 
-    if not S.inCombat then
-        local now = GetTime()
+    local now = GetTime()
 
-        if (S.combatHideUntil or 0) > 0 and now >= S.combatHideUntil then
-            self:NP_ExitCombatHide()
-        end
+    if (S.combatHideUntil or 0) > 0 and now >= S.combatHideUntil then
+        self:NP_ExitCombatHide()
     end
 end
 
 function NSPauk:NP_CombatHidePreUpdate(dt)
     local S = self.S
+
+    if type(S) ~= "table" then
+        return false
+    end
 
     local inCombat = false
 
@@ -18368,19 +18886,23 @@ function NSPauk:NP_CombatHidePreUpdate(dt)
     if inCombat then
         S.inCombat = true
 
-        if not S.combatHide then
+        if type(self.NP_EnterCombatHide) == "function" then
             self:NP_EnterCombatHide()
         end
     else
         if S.inCombat then
-            self:NP_LeaveCombatHide()
+            if type(self.NP_LeaveCombatHide) == "function" then
+                self:NP_LeaveCombatHide()
+            end
         end
 
         S.inCombat = false
     end
 
     if S.combatHide then
-        self:NP_UpdateCombatHide(dt)
+        if type(self.NP_UpdateCombatHide) == "function" then
+            self:NP_UpdateCombatHide(dt)
+        end
 
         return true
     end
@@ -19949,6 +20471,14 @@ function NSPauk:OnUpdateGuarded(dt)
     end
 
     if self:IsPersistentlyDisabled() then
+        return
+    end
+
+    -------------------------------------------------------------------
+    -- Во время боевого скрытия работает только один таймер:
+    -- контроль боя и 10-минутный таймаут после выхода из боя.
+    -------------------------------------------------------------------
+    if self:NP_CombatHidePreUpdate(dt) then
         return
     end
 
