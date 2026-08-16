@@ -6128,9 +6128,84 @@ function NSPauk:ResetSessionRecord()
     self.S.session = {
         bestPoints = 0,
         bestExpAwarded = 0,
+        pendingAddPoints = 0,
         pendingBestPoints = nil,
+
         sessionReportScheduled = false,
+
+        flushTimer = 0,
+        flushDelay = 3.0,
+        lastQueueAt = nil,
     }
+end
+
+function NSPauk:UpdateSessionRecordFlush(dt)
+    local S = self.S
+
+    if type(S.session) ~= "table" then
+        return
+    end
+
+    local session = S.session
+
+    if not session.sessionReportScheduled then
+        return
+    end
+
+    local pending = tonumber(session.pendingAddPoints) or 0
+
+    if pending <= 0 then
+        session.sessionReportScheduled = false
+        session.flushTimer = nil
+        return
+    end
+
+    dt = tonumber(dt) or 0
+
+    if dt < 0 then
+        dt = 0
+    elseif dt > 0.25 then
+        dt = 0.25
+    end
+
+    local now = GetTime()
+
+    if type(session.lastQueueAt) ~= "number"
+        or session.lastQueueAt ~= session.lastQueueAt then
+        session.lastQueueAt = now
+    end
+
+    local moving = false
+
+    if type(self.IsMoving) == "function" then
+        moving = self:IsMoving()
+    end
+
+    local activePhase =
+        S.phase == "task"
+        or S.phase == "instanceComplete"
+        or S.phase == "dissolve"
+        or S.phase == "mothEat"
+        or S.phase == "limitWait"
+        or S.phase == "uiRestore"
+
+    local maxPending = 1800
+
+    if (moving or activePhase) and maxPending > 0 then
+        if (now - session.lastQueueAt) < maxPending then
+            session.flushTimer = session.flushDelay or 3.0
+            return
+        end
+    elseif moving or activePhase then
+        session.flushTimer = session.flushDelay or 3.0
+        return
+    end
+
+    session.flushTimer = (tonumber(session.flushTimer) or 0) - dt
+
+    if session.flushTimer <= 0 then
+        self:FlushSessionRecordQueue()
+    end
 end
 
 function NSPauk:QueueSessionRecord(count)
@@ -6139,79 +6214,87 @@ function NSPauk:QueueSessionRecord(count)
     end
 
     count = math.floor(count + 0.5)
+
     if count <= 0 then
         return
     end
 
     local S = self.S
+
     if type(S.session) ~= "table" then
         self:ResetSessionRecord()
     end
 
     local session = S.session
 
-    local currentBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
-    local pendingBest = math.floor((tonumber(session.pendingBestPoints) or 0) + 0.5)
+    session.pendingAddPoints = math.floor(
+        (tonumber(session.pendingAddPoints) or 0) + count + 0.5
+    )
 
-    if count <= currentBest and count <= pendingBest then
-        return
-    end
-
-    if count > pendingBest then
-        session.pendingBestPoints = count
-    end
-
-    if session.sessionReportScheduled then
+    if session.pendingAddPoints <= 0 then
         return
     end
 
     session.sessionReportScheduled = true
 
-    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
-        C_Timer.After(0.25, function()
-            self:FlushSessionRecordQueue()
-        end)
-    else
-        self:FlushSessionRecordQueue()
+    local delay = 3.0
+
+    if type(session.flushDelay) == "number"
+        and session.flushDelay == session.flushDelay
+        and session.flushDelay > 0 then
+        delay = session.flushDelay
     end
+
+    session.flushDelay = delay
+    session.flushTimer = delay
+    session.lastQueueAt = GetTime()
 end
 
 function NSPauk:FlushSessionRecordQueue()
     local S = self.S
+
     if type(S.session) ~= "table" then
         self:ResetSessionRecord()
     end
 
     local session = S.session
+
     session.sessionReportScheduled = false
 
-    local count = math.floor((tonumber(session.pendingBestPoints) or 0) + 0.5)
-    session.pendingBestPoints = nil
+    local add = math.floor((tonumber(session.pendingAddPoints) or 0) + 0.5)
 
-    if count <= 0 then
+    session.pendingAddPoints = 0
+    session.flushTimer = nil
+    session.lastQueueAt = nil
+
+    if add <= 0 then
         return
     end
 
     local oldBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
-    if count <= oldBest then
+    local newBest = oldBest + add
+
+    if newBest <= oldBest then
         return
     end
 
     local oldExp = self:CalcWebExperience(oldBest)
-    local newExp = self:CalcWebExperience(count)
+    local newExp = self:CalcWebExperience(newBest)
 
     local expGain = math.floor((newExp - oldExp) + 0.5)
+
     if expGain <= 0 then
         expGain = 1
     end
 
-    session.bestPoints = count
+    session.bestPoints = newBest
     session.bestExpAwarded = (session.bestExpAwarded or 0) + expGain
 
     local level
     local left
 
     local _, newLevel, newLeft = self:AddExperience(expGain)
+
     level = newLevel
     left = newLeft
 
@@ -6223,11 +6306,13 @@ function NSPauk:FlushSessionRecordQueue()
         local db = self:EnsureDB()
 
         local perLevel = tonumber(self.C.POINTS_PER_LEVEL) or 60000
+
         if perLevel <= 0 then
             perLevel = 60000
         end
 
         local total = db.progress.totalPoints or 0
+
         left = perLevel - (total % perLevel)
 
         if left == perLevel then
@@ -6238,28 +6323,32 @@ function NSPauk:FlushSessionRecordQueue()
     local C = self.C or {}
 
     local perLevel = tonumber(C.POINTS_PER_LEVEL) or 60000
+
     if perLevel <= 0 then
         perLevel = 60000
     end
 
     local full = C.SESSION_FULL_POINTS
+
     if type(full) ~= "number" or full ~= full or full <= 0 then
         full = perLevel
     end
 
     local levelPct = 0
+
     if perLevel > 0 then
         levelPct = expGain / perLevel * 100
     end
 
     local countPct = 0
+
     if full > 0 then
-        countPct = count / full * 100
+        countPct = newBest / full * 100
     end
 
     self:SendOfficer(string.format(
         "Рекорд сессии: %d (%.1f%% от %d), прошлый %d. Опыт +%d (%.2f%% уровня). Уровень %d, до уровня %d",
-        count,
+        newBest,
         countPct,
         full,
         oldBest,
@@ -6268,7 +6357,10 @@ function NSPauk:FlushSessionRecordQueue()
         level,
         left
     ))
-    SendAddonMessage("nsCountP", count, "GUILD")
+
+    if SendAddonMessage then
+        SendAddonMessage("nsCountP", newBest, "GUILD")
+    end
 end
 
 function NSPauk:ResetProgress()
@@ -11685,11 +11777,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
         minCross = 4
     end
 
-    local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
-    if maxRows < 0 then
-        maxRows = 1600
-    end
-
     local sectors = self:NP_GetValidTriangleSectors(inst)
     inst.webSectors = sectors
 
@@ -11771,6 +11858,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
             and connB.alive
             and isDrawn(connA)
             and isDrawn(connB) then
+
             if connA.thread
                 and (not connA.arcLength or connA.arcLength <= 0) then
                 local samples, total = self:BuildArcSamples(connA.thread)
@@ -11785,13 +11873,10 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 connB.arcLength = total
             end
 
-            local pairMin = math.min(
-                connA.arcLength or 0,
-                connB.arcLength or 0
-            )
-
             local function ensureArc(arcLen)
-                if arcLen < minCross or arcLen > pairMin + 0.001 then
+                if type(arcLen) ~= "number"
+                    or arcLen ~= arcLen
+                    or arcLen < minCross then
                     return
                 end
 
@@ -11807,23 +11892,26 @@ function NSPauk:NP_RecheckWebSectors(inst)
                     local targetA = math.min(arcLen, connA.arcLength or 0)
                     local targetB = math.min(arcLen, connB.arcLength or 0)
 
-                    local tA = self:ThreadTAtLength(connA, targetA)
-                    local tB = self:ThreadTAtLength(connB, targetB)
+                    if targetA > 0 and targetB > 0 then
+                        local tA = self:ThreadTAtLength(connA, targetA)
+                        local tB = self:ThreadTAtLength(connB, targetB)
 
-                    if tA and tB then
-                        seg = self:CreateCrossSegArc(
-                            inst,
-                            connA,
-                            connB,
-                            tA,
-                            tB,
-                            minCross
-                        )
+                        if tA and tB then
+                            seg = self:CreateCrossSegArc(
+                                inst,
+                                connA,
+                                connB,
+                                tA,
+                                tB,
+                                minCross
+                            )
 
-                        if seg then
-                            seg.planSectorKey = sector.key
-                            seg.planArcLen = math.min(targetA, targetB)
-                            seg.isRecheck = true
+                            if seg then
+                                seg.planSectorKey = sector.key
+
+                                seg.planArcLen = arcLen
+                                seg.isRecheck = true
+                            end
                         end
                     end
                 end
@@ -11837,22 +11925,10 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 end
             end
 
-            local rows = 0
-            local arcLen = spacing
+            local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
 
-            while arcLen <= pairMin and rows < maxRows do
-                ensureArc(arcLen)
-                arcLen = arcLen + spacing
-                rows = rows + 1
-            end
-
-            if rows < maxRows then
-                local lastArc = math.floor(pairMin / spacing) * spacing
-
-                if pairMin >= minCross
-                    and (pairMin - lastArc) > math.max(1, spacing * 0.25) then
-                    ensureArc(pairMin)
-                end
+            for _, rowArc in ipairs(rowArcs) do
+                ensureArc(rowArc)
             end
         end
     end
@@ -12305,19 +12381,9 @@ function NSPauk:NP_BuildTriangleSectorTasks(inst, tasks, cursorPoint)
         return cursorPoint
     end
 
-    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
-    if spacing < 0.5 then
-        spacing = 0.5
-    end
-
     local minCross = tonumber(C.MIN_CROSS_LEN) or 4
     if minCross < 0 then
         minCross = 4
-    end
-
-    local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
-    if maxRows < 0 then
-        maxRows = 1600
     end
 
     local sectors = self:NP_GetValidTriangleSectors(inst)
@@ -12333,18 +12399,20 @@ function NSPauk:NP_BuildTriangleSectorTasks(inst, tasks, cursorPoint)
             and connB
             and connA.alive
             and connB.alive then
-            local pairMin = math.min(
-                connA.arcLength or 0,
-                connB.arcLength or 0
-            )
 
             local function addRow(arcLen)
-                if arcLen < minCross or arcLen > pairMin + 0.001 then
+                if type(arcLen) ~= "number"
+                    or arcLen ~= arcLen
+                    or arcLen < minCross then
                     return
                 end
 
                 local targetA = math.min(arcLen, connA.arcLength or 0)
                 local targetB = math.min(arcLen, connB.arcLength or 0)
+
+                if targetA <= 0 or targetB <= 0 then
+                    return
+                end
 
                 local tA = self:ThreadTAtLength(connA, targetA)
                 local tB = self:ThreadTAtLength(connB, targetB)
@@ -12361,7 +12429,8 @@ function NSPauk:NP_BuildTriangleSectorTasks(inst, tasks, cursorPoint)
 
                     if seg then
                         seg.planSectorKey = sector.key
-                        seg.planArcLen = math.min(targetA, targetB)
+
+                        seg.planArcLen = arcLen
 
                         local drawThread =
                             self:NP_OrientThreadForCursor(seg.thread, cursor)
@@ -12389,22 +12458,10 @@ function NSPauk:NP_BuildTriangleSectorTasks(inst, tasks, cursorPoint)
                 end
             end
 
-            local rows = 0
-            local arcLen = spacing
+            local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
 
-            while arcLen <= pairMin and rows < maxRows do
+            for _, arcLen in ipairs(rowArcs) do
                 addRow(arcLen)
-                arcLen = arcLen + spacing
-                rows = rows + 1
-            end
-
-            if rows < maxRows then
-                local lastArc = math.floor(pairMin / spacing) * spacing
-
-                if pairMin >= minCross
-                    and (pairMin - lastArc) > math.max(1, spacing * 0.25) then
-                    addRow(pairMin)
-                end
             end
         end
     end
@@ -17150,16 +17207,10 @@ function NSPauk:NP_HasRequiredWebPending(inst)
     end
 
     local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
+
     if spacing < 0.5 then
         spacing = 0.5
     end
-
-    local minCross = tonumber(self.C.MIN_CROSS_LEN) or 4
-    if minCross < 0 then
-        minCross = 4
-    end
-
-    local eps = spacing * 0.5
 
     for _, sector in ipairs(sectors) do
         local connA = inst.conns and inst.conns[sector.a]
@@ -17170,19 +17221,30 @@ function NSPauk:NP_HasRequiredWebPending(inst)
             and connA.alive
             and connB.alive then
 
-            local pairMin = math.min(
-                connA.arcLength or 0,
-                connB.arcLength or 0
-            )
+            if connA.thread
+                and (not connA.arcLength or connA.arcLength <= 0) then
+                local samples, total = self:BuildArcSamples(connA.thread)
+                connA.arcSamples = samples
+                connA.arcLength = total
+            end
 
-            if pairMin >= minCross then
+            if connB.thread
+                and (not connB.arcLength or connB.arcLength <= 0) then
+                local samples, total = self:BuildArcSamples(connB.thread)
+                connB.arcSamples = samples
+                connB.arcLength = total
+            end
 
+            local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
+
+            if #rowArcs > 0 then
                 local pairSegs = {}
 
                 for _, seg in ipairs(inst.crossSegs or {}) do
                     if seg.alive then
                         local direct = seg.connA == connA
                             and seg.connB == connB
+
                         local reverse = seg.connA == connB
                             and seg.connB == connA
 
@@ -17194,7 +17256,7 @@ function NSPauk:NP_HasRequiredWebPending(inst)
 
                 local function findSegForArc(arcLen)
                     local best = nil
-                    local bestDiff = spacing * 0.75
+                    local bestDiff = spacing * 0.6
 
                     for _, seg in ipairs(pairSegs) do
                         local segArc = nil
@@ -17224,9 +17286,7 @@ function NSPauk:NP_HasRequiredWebPending(inst)
                     return best
                 end
 
-                local arcLen = spacing
-
-                while arcLen <= pairMin + eps do
+                for _, arcLen in ipairs(rowArcs) do
                     local seg = findSegForArc(arcLen)
 
                     if not seg then
@@ -17236,18 +17296,6 @@ function NSPauk:NP_HasRequiredWebPending(inst)
                     if not self:NP_IsWebOwnerDrawn(seg) then
                         return true
                     end
-
-                    arcLen = arcLen + spacing
-                end
-
-                local finalSeg = findSegForArc(pairMin)
-
-                if not finalSeg then
-                    return true
-                end
-
-                if not self:NP_IsWebOwnerDrawn(finalSeg) then
-                    return true
                 end
             end
         end
@@ -17255,6 +17303,7 @@ function NSPauk:NP_HasRequiredWebPending(inst)
 
     return false
 end
+
 function NSPauk:NP_RequestQueueResume(inst, priorityOwner)
     local S = self.S
 
@@ -20433,6 +20482,76 @@ function NSPauk:Echo(message)
     end
 end
 
+function NSPauk:NP_GetSectorRowArcs(connA, connB)
+    local C = self.C or {}
+
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+    if spacing < 0.5 then
+        spacing = 0.5
+    end
+
+    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+    if minCross < 0 then
+        minCross = 4
+    end
+
+    local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
+    if maxRows < 0 then
+        maxRows = 1600
+    end
+
+    local lenA = tonumber(connA and connA.arcLength) or 0
+    local lenB = tonumber(connB and connB.arcLength) or 0
+
+    if lenA < 0 then
+        lenA = 0
+    end
+
+    if lenB < 0 then
+        lenB = 0
+    end
+
+    local maxLen = math.max(lenA, lenB)
+    local out = {}
+
+    if maxLen < minCross then
+        return out
+    end
+
+    local rows = 0
+    local arcLen = spacing
+
+    while arcLen <= maxLen and rows < maxRows do
+        out[#out + 1] = arcLen
+        arcLen = arcLen + spacing
+        rows = rows + 1
+    end
+
+    if maxLen >= minCross then
+        local last = out[#out]
+
+        if not last then
+            if rows < maxRows then
+                out[#out + 1] = maxLen
+            end
+        else
+            local tail = maxLen - last
+
+            if tail > 0.001 then
+                local snapTol = spacing * 0.6
+
+                if tail <= snapTol then
+                    out[#out] = maxLen
+                elseif rows < maxRows then
+                    out[#out + 1] = maxLen
+                end
+            end
+        end
+    end
+
+    return out
+end
+
 function NSPauk:IsPersistentlyDisabled()
     if type(nsDbc) ~= "table" then
         return false
@@ -20474,13 +20593,13 @@ function NSPauk:OnUpdateGuarded(dt)
         return
     end
 
-    -------------------------------------------------------------------
-    -- Во время боевого скрытия работает только один таймер:
-    -- контроль боя и 10-минутный таймаут после выхода из боя.
-    -------------------------------------------------------------------
-    if self:NP_CombatHidePreUpdate(dt) then
-        return
+    if type(self.NP_CombatHidePreUpdate) == "function" then
+        if self:NP_CombatHidePreUpdate(dt) then
+            return
+        end
     end
+
+    self:UpdateSessionRecordFlush(dt)
 
     self:NP_UpdateAdaptive(dt)
     self:OnUpdate(dt)
