@@ -6128,15 +6128,11 @@ function NSPauk:ResetSessionRecord()
     self.S.session = {
         bestPoints = 0,
         bestExpAwarded = 0,
-        pendingAddPoints = 0,
         pendingBestPoints = nil,
-
         sessionReportScheduled = false,
-
-        flushTimer = 0,
-        flushDelay = 3.0,
-        lastQueueAt = nil,
     }
+
+    self.S.sessionBurstPoints = 0
 end
 
 function NSPauk:UpdateSessionRecordFlush(dt)
@@ -6209,157 +6205,19 @@ function NSPauk:UpdateSessionRecordFlush(dt)
 end
 
 function NSPauk:QueueSessionRecord(count)
-    if type(count) ~= "number" or count ~= count or count <= 0 then
-        return
-    end
 
-    count = math.floor(count + 0.5)
-
-    if count <= 0 then
-        return
-    end
-
-    local S = self.S
-
-    if type(S.session) ~= "table" then
-        self:ResetSessionRecord()
-    end
-
-    local session = S.session
-
-    session.pendingAddPoints = math.floor(
-        (tonumber(session.pendingAddPoints) or 0) + count + 0.5
-    )
-
-    if session.pendingAddPoints <= 0 then
-        return
-    end
-
-    session.sessionReportScheduled = true
-
-    local delay = 3.0
-
-    if type(session.flushDelay) == "number"
-        and session.flushDelay == session.flushDelay
-        and session.flushDelay > 0 then
-        delay = session.flushDelay
-    end
-
-    session.flushDelay = delay
-    session.flushTimer = delay
-    session.lastQueueAt = GetTime()
 end
 
 function NSPauk:FlushSessionRecordQueue()
     local S = self.S
 
-    if type(S.session) ~= "table" then
-        self:ResetSessionRecord()
-    end
-
-    local session = S.session
-
-    session.sessionReportScheduled = false
-
-    local add = math.floor((tonumber(session.pendingAddPoints) or 0) + 0.5)
-
-    session.pendingAddPoints = 0
-    session.flushTimer = nil
-    session.lastQueueAt = nil
-
-    if add <= 0 then
+    if type(S) ~= "table" then
         return
     end
 
-    local oldBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
-    local newBest = oldBest + add
-
-    if newBest <= oldBest then
-        return
-    end
-
-    local oldExp = self:CalcWebExperience(oldBest)
-    local newExp = self:CalcWebExperience(newBest)
-
-    local expGain = math.floor((newExp - oldExp) + 0.5)
-
-    if expGain <= 0 then
-        expGain = 1
-    end
-
-    session.bestPoints = newBest
-    session.bestExpAwarded = (session.bestExpAwarded or 0) + expGain
-
-    local level
-    local left
-
-    local _, newLevel, newLeft = self:AddExperience(expGain)
-
-    level = newLevel
-    left = newLeft
-
-    if type(level) ~= "number" or level ~= level or level <= 0 then
-        level = self:GetSpiderLevel()
-    end
-
-    if type(left) ~= "number" or left ~= left then
-        local db = self:EnsureDB()
-
-        local perLevel = tonumber(self.C.POINTS_PER_LEVEL) or 60000
-
-        if perLevel <= 0 then
-            perLevel = 60000
-        end
-
-        local total = db.progress.totalPoints or 0
-
-        left = perLevel - (total % perLevel)
-
-        if left == perLevel then
-            left = 0
-        end
-    end
-
-    local C = self.C or {}
-
-    local perLevel = tonumber(C.POINTS_PER_LEVEL) or 60000
-
-    if perLevel <= 0 then
-        perLevel = 60000
-    end
-
-    local full = C.SESSION_FULL_POINTS
-
-    if type(full) ~= "number" or full ~= full or full <= 0 then
-        full = perLevel
-    end
-
-    local levelPct = 0
-
-    if perLevel > 0 then
-        levelPct = expGain / perLevel * 100
-    end
-
-    local countPct = 0
-
-    if full > 0 then
-        countPct = newBest / full * 100
-    end
-
-    self:SendOfficer(string.format(
-        "Рекорд сессии: %d (%.1f%% от %d), прошлый %d. Опыт +%d (%.2f%% уровня). Уровень %d, до уровня %d",
-        newBest,
-        countPct,
-        full,
-        oldBest,
-        expGain,
-        levelPct,
-        level,
-        left
-    ))
-
-    if SendAddonMessage then
-        SendAddonMessage("nsCountP", newBest, "GUILD")
+    if type(S.session) == "table" then
+        S.session.sessionReportScheduled = false
+        S.session.pendingBestPoints = nil
     end
 end
 
@@ -6533,7 +6391,7 @@ function NSPauk:CalcWebExperience(count)
 end
 
 function NSPauk:SettleWebPoints(count)
-    self:QueueSessionRecord(count)
+
 end
 
 function NSPauk:RecordWebLength(count)
@@ -14439,6 +14297,7 @@ end
 function NSPauk:DropWebForTask(task, x, y)
     local S = self.S
     local C = self.C
+
     local owner = task.owner
 
     if not owner or not owner.alive then
@@ -14491,17 +14350,25 @@ function NSPauk:DropWebForTask(task, x, y)
 
     if inst then
         inst.drawnPoints = (inst.drawnPoints or 0) + 1
+
+        ---------------------------------------------------------------
+        -- BURSE-УЧЁТ:
+        --
+        -- Каждая поставленная точка обычной паутины копится
+        -- в S.sessionBurstPoints.
+        --
+        -- Коконные и мотыльковые паутины сюда не попадают.
+        ---------------------------------------------------------------
+        if not inst.isCocoon and not inst.isMoth then
+            S.sessionBurstPoints = (tonumber(S.sessionBurstPoints) or 0) + 1
+        end
     end
 
     S.webPoints = S.webPoints + 1
 
-    -----------------------------------------------------------------------
+    -------------------------------------------------------------------
     -- Счётчик построенных перемычек текущей паутины.
-    --
-    -- Каждая завершённая перемычка увеличивает builtCrossCount.
-    -- Каждые 10 перемычек请求уем отложенный пересмотр секторов,
-    -- чтобы не запускать тяжёлую проверку прямо во время дропа точек.
-    -----------------------------------------------------------------------
+    -------------------------------------------------------------------
     if #owner.textures == 1 and not owner._nspCrossCounted then
         if owner.connA
             or owner.connB
@@ -15919,6 +15786,147 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
     return true
 end
 
+function NSPauk:NP_ResetSessionBurst()
+    local S = self.S
+
+    if type(S) ~= "table" then
+        return
+    end
+
+    S.sessionBurstPoints = 0
+end
+
+function NSPauk:NP_FlushSessionBurst()
+    local S = self.S
+
+    if type(S) ~= "table" then
+        return
+    end
+
+    if not self.initialized or S.runtimeOff or S.phase == "off" then
+        return
+    end
+
+    if S.combatHide then
+        return
+    end
+
+    -------------------------------------------------------------------
+    -- Сколько точек сплетено с предыдущего перебега.
+    -------------------------------------------------------------------
+    local count = math.floor((tonumber(S.sessionBurstPoints) or 0) + 0.5)
+
+    -------------------------------------------------------------------
+    -- Сбрасываем burst сразу, чтобы одна и та же паутина
+    -- не учитывалась повторно.
+    -------------------------------------------------------------------
+    S.sessionBurstPoints = 0
+
+    if count <= 0 then
+        return
+    end
+
+    if type(S.session) ~= "table" then
+        self:ResetSessionRecord()
+    end
+
+    local session = S.session
+
+    local oldBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
+
+    -------------------------------------------------------------------
+    -- Если новый всплеск меньше или равен прошлому рекорду,
+    -- ничего не пишем и опыт не даём.
+    -------------------------------------------------------------------
+    if count <= oldBest then
+        return
+    end
+
+    local oldExp = self:CalcWebExperience(oldBest)
+    local newExp = self:CalcWebExperience(count)
+
+    local expGain = math.floor((newExp - oldExp) + 0.5)
+
+    if expGain <= 0 then
+        expGain = 1
+    end
+
+    session.bestPoints = count
+    session.bestExpAwarded = (session.bestExpAwarded or 0) + expGain
+
+    local level
+    local left
+
+    local _, newLevel, newLeft = self:AddExperience(expGain)
+
+    level = newLevel
+    left = newLeft
+
+    if type(level) ~= "number" or level ~= level or level <= 0 then
+        level = self:GetSpiderLevel()
+    end
+
+    if type(left) ~= "number" or left ~= left then
+        local db = self:EnsureDB()
+
+        local perLevel = tonumber(self.C.POINTS_PER_LEVEL) or 60000
+
+        if perLevel <= 0 then
+            perLevel = 60000
+        end
+
+        local total = db.progress.totalPoints or 0
+
+        left = perLevel - (total % perLevel)
+
+        if left == perLevel then
+            left = 0
+        end
+    end
+
+    local C = self.C or {}
+
+    local perLevel = tonumber(C.POINTS_PER_LEVEL) or 60000
+
+    if perLevel <= 0 then
+        perLevel = 60000
+    end
+
+    local full = C.SESSION_FULL_POINTS
+
+    if type(full) ~= "number" or full ~= full or full <= 0 then
+        full = perLevel
+    end
+
+    local levelPct = 0
+
+    if perLevel > 0 then
+        levelPct = expGain / perLevel * 100
+    end
+
+    local countPct = 0
+
+    if full > 0 then
+        countPct = count / full * 100
+    end
+
+    self:SendOfficer(string.format(
+        "Рекорд сессии: %d (%.1f%% от %d), прошлый %d. Опыт +%d (%.2f%% уровня). Уровень %d, до уровня %d",
+        count,
+        countPct,
+        full,
+        oldBest,
+        expGain,
+        levelPct,
+        level,
+        left
+    ))
+
+    if SendAddonMessage then
+        SendAddonMessage("nsCountP", count, "GUILD")
+    end
+end
+
 function NSPauk:AdvanceTask()
     local S = self.S
     local old = S.currentTask
@@ -16118,9 +16126,7 @@ function NSPauk:AdvanceTask()
                     S.lastSpiderX or 0,
                     S.lastSpiderY or 0
                 ) then
-                -------------------------------------------------------
-                -- ИСПРАВЛЕНО: запасная проверка перед падением.
-                -------------------------------------------------------
+
                 if self:NP_NearSupportWithin(
                     S.lastSpiderX or 0,
                     S.lastSpiderY or 0,
@@ -16168,10 +16174,6 @@ function NSPauk:AdvanceTask()
     S.phase = "instanceComplete"
     S.completeTimer = 0
 end
-
----------------------------------------------------------------------------
--- StartTask: anti-teleport version + EMPTY_SPEED_MULT
----------------------------------------------------------------------------
 
 function NSPauk:StartTask(task)
     local S = self.S
@@ -16507,9 +16509,25 @@ function NSPauk:AddInstance(inst)
     local S = self.S
     local C = self.C
 
+    for _, old in ipairs(S.instances) do
+        if old
+            and old ~= inst
+            and not old.torn
+            and not old.isCocoon
+            and not old.isMoth then
+            self:SettleInstance(old)
+        end
+    end
+
     S.instances[#S.instances + 1] = inst
 
-    if #S.instances > C.MAX_INSTANCES then
+    local maxInstances = tonumber(C.MAX_INSTANCES) or 6
+
+    if maxInstances < 1 then
+        maxInstances = 1
+    end
+
+    if #S.instances > maxInstances then
         local old = table.remove(S.instances, 1)
 
         if S.cocoon and S.cocoon.inst == old then
@@ -16606,6 +16624,9 @@ function NSPauk:StartNewInstance(preferredHub)
 end
 
 function NSPauk:Interrupt()
+
+    self:NP_FlushSessionBurst()
+
     self:ClearAllVisuals()
 
     local S = self.S
