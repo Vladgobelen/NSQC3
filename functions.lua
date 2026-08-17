@@ -15836,23 +15836,44 @@ function NSPauk:NP_FlushSessionBurst()
 
     -------------------------------------------------------------------
     -- Если новый всплеск меньше или равен прошлому рекорду,
-    -- ничего не пишем и опыт не даём.
+    -- ничего не принимаем.
     -------------------------------------------------------------------
     if count <= oldBest then
         return
     end
 
-    local oldExp = self:CalcWebExperience(oldBest)
-    local newExp = self:CalcWebExperience(count)
+    -------------------------------------------------------------------
+    -- ВАЖНО:
+    --
+    -- Новый рекорд засчитывается полностью.
+    --
+    -- Не делаем:
+    --   CalcWebExperience(count) - CalcWebExperience(oldBest)
+    --
+    -- Делаем:
+    --   CalcWebExperience(count)
+    --
+    -- То есть 5000 точек дают опыт как 5000 точек,
+    -- а не как 2000 точек сверху старого рекорда.
+    -------------------------------------------------------------------
+    local expGain = self:CalcWebExperience(count)
 
-    local expGain = math.floor((newExp - oldExp) + 0.5)
+    if type(expGain) ~= "number"
+        or expGain ~= expGain
+        or expGain <= 0 then
+        expGain = 1
+    end
+
+    expGain = math.floor(expGain + 0.5)
 
     if expGain <= 0 then
         expGain = 1
     end
 
     session.bestPoints = count
-    session.bestExpAwarded = (session.bestExpAwarded or 0) + expGain
+    session.bestExpAwarded = math.floor(
+        (tonumber(session.bestExpAwarded) or 0) + expGain + 0.5
+    )
 
     local level
     local left
