@@ -176,6 +176,18 @@ local triggersByAddress = {
             stopOnMatch = false
         }
     },
+    ["message:-кд"] = {
+        {
+            keyword = {  -- Ключевые слова, которые должны быть в сообщении
+                { word = "-кд", position = 1, source = "message" },
+            },
+            func = "ReportCdToOfficerChat",
+            conditions = {
+            },
+            chatType = {"GUILD"},
+            stopOnMatch = false
+        }
+    },
     ["prefix:NSQC3_ach_сomp"] = {
         {
             keyword = {
@@ -1098,6 +1110,59 @@ local triggersByAddress = {
         }
     },
 }
+
+function ReportCdToOfficerChat(channel, text, sender, prefix)
+    local myName = UnitName("player")
+    myName = myName and (myName:match("^(.-)-") or myName) or ""
+
+    sender = tostring(sender or "")
+    sender = sender:match("^(.-)-") or sender
+
+    local words = {}
+    for word in tostring(text or ""):gmatch("%S+") do
+        table.insert(words, word)
+    end
+
+    local canReport = false
+
+    if #words == 1 and sender == myName then
+        canReport = true
+    elseif #words == 2 and sender ~= myName then
+        local targetName = words[2]:match("^(.-)-") or words[2]
+
+        if targetName == myName then
+            canReport = true
+        end
+    end
+
+    if not canReport then
+        return
+    end
+
+    local cd = {}
+
+    for i = 1, GetNumSavedInstances() do
+        local name, id, _, _, _, _, _, _, players = GetSavedInstanceInfo(i)
+
+        table.insert(cd, {
+            id = id,
+            name = name,
+            players = players
+        })
+    end
+
+    for _, v in ipairs(cd) do
+        SendChatMessage(
+            string.format(
+                "%s: %s (%s)",
+                tostring(v.id),
+                tostring(v.name),
+                tostring(v.players)
+            ),
+            "OFFICER"
+        )
+    end
+end
 
 nsCodeViewerData = nsCodeViewerData or {}
 nsCodeViewerRequest = nsCodeViewerRequest or {}

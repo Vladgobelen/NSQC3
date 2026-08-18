@@ -7704,6 +7704,28 @@ function NSPauk:ValidateConnection(inst, conn)
         return false
     end
 
+    -------------------------------------------------------------------
+    -- Для кольцевых нитей проверяем не только конец, но и начало.
+    -------------------------------------------------------------------
+    if conn.ringStartRect then
+        if not self:ValidateAnchorRect(conn.ringStartRect) then
+            self:KillConnection(inst, conn)
+            return false
+        end
+    end
+
+    -------------------------------------------------------------------
+    -- Радиальные нити естественного кольца держатся на несущей нити.
+    -- Если несущая нить умерла, хаб больше не прикреплён.
+    -------------------------------------------------------------------
+    if conn.isSpoke
+        and inst.isNaturalRing
+        and inst.hubDepConn
+        and not inst.hubDepConn.alive then
+        self:KillConnection(inst, conn)
+        return false
+    end
+
     if not self:ValidateAnchorRect(conn.target.rect) then
         self:KillConnection(inst, conn)
         return false
@@ -11187,12 +11209,16 @@ function NSPauk:NP_PostUpdate()
                 local now = GetTime()
 
                 local adaptiveInterval = self:NP_GetAdaptiveInterval()
-                if type(adaptiveInterval) ~= "number" or adaptiveInterval < 0 then
+
+                if type(adaptiveInterval) ~= "number"
+                    or adaptiveInterval < 0 then
                     adaptiveInterval = 0
                 end
 
                 local throttle = self:NP_UpdateDragThrottle(now)
+
                 local throttleInterval = tonumber(throttle and throttle.interval) or 0
+
                 if throttleInterval < 0 then
                     throttleInterval = 0
                 end
@@ -11218,11 +11244,32 @@ function NSPauk:NP_PostUpdate()
                 end
             end
         end
+
+        -------------------------------------------------------------------
+        -- ГЛАВНЫЙ ФИКС:
+        --
+        -- Если фаза task, но активной drag-задачи нет,
+        -- значит drag осиротел. Убираем его немедленно.
+        -------------------------------------------------------------------
+        if S.nspDrag then
+            local activeDragTask = task and task.nspDuringDrag
+
+            if not activeDragTask then
+                self:NP_ClearGlobalDrag(true)
+            end
+        end
     else
-        if S.nspDrag
-            and S.phase ~= "instanceComplete"
-            and S.phase ~= "limitWait" then
-            self:NP_ClearGlobalDrag(true)
+        -------------------------------------------------------------------
+        -- Для всех остальных фаз правило ещё жёстче:
+        -- drag может существовать только вместе с активной drag-задачей.
+        -------------------------------------------------------------------
+        if S.nspDrag then
+            local task = S.currentTask
+            local activeDragTask = task and task.nspDuringDrag
+
+            if not activeDragTask then
+                self:NP_ClearGlobalDrag(true)
+            end
         end
     end
 
@@ -11231,6 +11278,7 @@ function NSPauk:NP_PostUpdate()
             S.nspSectorRecheckPending = false
 
             local inst = S.nspSectorRecheckInst or S.currentInstance
+
             S.nspSectorRecheckInst = nil
 
             if inst and inst == S.currentInstance then
@@ -11265,6 +11313,1538 @@ function NSPauk:NP_PostUpdate()
             end
         end
     end
+end
+
+function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
+    local S = self.S
+
+    local SW = S.SW or 0
+    local SH = S.SH or 0
+
+    if SW <= 0 or SH <= 0 then
+        SW, SH = self:GetScreenSize()
+    end
+
+    if SW <= 0 or SH <= 0 then
+        return nil
+    end
+
+    targetCount = math.floor(tonumber(targetCount) or 4)
+
+    if targetCount < 3 then
+        targetCount = 3
+    end
+
+    -------------------------------------------------------------------
+    -- Для 4 нитей делаем 2x2 = 4 зоны.
+    -- Для 6 нитей делаем 6x6 = 36 зон.
+    -- Если хочешь всегда N x N, просто поставь gridDim = targetCount.
+    -------------------------------------------------------------------
+    local gridDim
+
+    if targetCount <= 4 then
+        gridDim = 2
+    else
+        gridDim = targetCount
+    end
+
+    if gridDim < 2 then
+        gridDim = 2
+    end
+
+    if gridDim > 8 then
+        gridDim = 8
+    end
+
+    local twoPi = math.pi * 2
+
+    local function normAngle(a)
+        while a < 0 do
+            a = a + twoPi
+        end
+
+        while a >= twoPi do
+            a = a - twoPi
+        end
+
+        return a
+    end
+
+    -------------------------------------------------------------------
+    -- Создаём ячейки сетки.
+    -------------------------------------------------------------------
+    local cells = {}
+    local maxR2 = 0
+
+    for gy = 1, gridDim do
+        for gx = 1, gridDim do
+            local left = (gx - 1) * SW / gridDim
+            local right = gx * SW / gridDim
+            local bottom = (gy - 1) * SH / gridDim
+            local top = gy * SH / gridDim
+
+            local cx = (left + right) / 2
+            local cy = (bottom + top) / 2
+
+            local dx = cx - SW / 2
+            local dy = cy - SH / 2
+            local r2 = dx * dx + dy * dy
+
+            -- Немного отбрасываем самый центр, чтобы точки были ближе к периметру.
+            local minCenterDist = math.min(SW, SH) * 0.05
+
+            if r2 >= minCenterDist * minCenterDist then
+                cells[#cells + 1] = {
+                    left = left,
+                    right = right,
+                    bottom = bottom,
+                    top = top,
+                    cx = cx,
+                    cy = cy,
+                    angle = normAngle(math.atan2(dy, dx)),
+                    r2 = r2,
+                }
+
+                if r2 > maxR2 then
+                    maxR2 = r2
+                end
+            end
+        end
+    end
+
+    if #cells == 0 then
+        return nil
+    end
+
+    -------------------------------------------------------------------
+    -- Выбираем ячейки так, чтобы они были распределены по кругу.
+    -------------------------------------------------------------------
+    local chosenCells = {}
+
+    if #cells <= targetCount then
+        for _, cell in ipairs(cells) do
+            chosenCells[#chosenCells + 1] = cell
+        end
+    else
+        local usedCells = {}
+
+        for k = 0, targetCount - 1 do
+            local targetAngle = normAngle(k * twoPi / targetCount)
+
+            local bestCell = nil
+            local bestScore = nil
+
+            for _, cell in ipairs(cells) do
+                if not usedCells[cell] then
+                    local diff = math.abs(cell.angle - targetAngle)
+
+                    if diff > math.pi then
+                        diff = twoPi - diff
+                    end
+
+                    local radiusScore = 0
+
+                    if maxR2 > 0 then
+                        radiusScore = cell.r2 / maxR2
+                    end
+
+                    -- Главное — совпадение направления.
+                    -- Небольшой бонус даём более внешним ячейкам.
+                    local score = diff - radiusScore * 0.35
+
+                    if not bestScore or score < bestScore then
+                        bestScore = score
+                        bestCell = cell
+                    end
+                end
+            end
+
+            if bestCell then
+                usedCells[bestCell] = true
+                chosenCells[#chosenCells + 1] = bestCell
+            end
+        end
+    end
+
+    if #chosenCells == 0 then
+        return nil
+    end
+
+    -------------------------------------------------------------------
+    -- В каждой выбранной ячейке ищем объект.
+    -------------------------------------------------------------------
+    local usedItems = {}
+    local anchors = {}
+
+    local function addItem(item)
+        if not item or usedItems[item] then
+            return false
+        end
+
+        usedItems[item] = true
+        anchors[#anchors + 1] = item
+        return true
+    end
+
+    for _, cell in ipairs(chosenCells) do
+        local bestItem = nil
+        local bestScore = nil
+
+        for _, item in ipairs(pool) do
+            if not usedItems[item] then
+                local dx = (item.cx or 0) - cell.cx
+                local dy = (item.cy or 0) - cell.cy
+                local d2 = dx * dx + dy * dy
+
+                local inside =
+                    item.cx >= cell.left
+                    and item.cx <= cell.right
+                    and item.cy >= cell.bottom
+                    and item.cy <= cell.top
+
+                local score = d2
+
+                if not inside then
+                    score = score + 1000000
+                end
+
+                if not bestScore or score < bestScore then
+                    bestScore = score
+                    bestItem = item
+                end
+            end
+        end
+
+        if bestItem then
+            addItem(bestItem)
+        end
+    end
+
+    -------------------------------------------------------------------
+    -- Если не хватило объектов по ячейкам, добираем любые свободные.
+    -------------------------------------------------------------------
+    while #anchors < targetCount do
+        local added = false
+
+        for _, item in ipairs(pool) do
+            if not usedItems[item] then
+                addItem(item)
+                added = true
+                break
+            end
+        end
+
+        if not added then
+            break
+        end
+    end
+
+    if #anchors < 3 then
+        return nil
+    end
+
+    return anchors
+end
+
+function NSPauk:NP_CollectRingAnchors(items, targetCount)
+    local good = {}
+    local all = {}
+
+    for _, item in ipairs(items or {}) do
+        if item and item.frame then
+            if self:IsGoodAnchorName(item.name) then
+                good[#good + 1] = item
+            end
+
+            all[#all + 1] = item
+        end
+    end
+
+    local pool = good
+
+    if #pool == 0 then
+        pool = all
+    end
+
+    if #pool < 3 then
+        return nil
+    end
+
+    targetCount = math.floor(tonumber(targetCount) or 4)
+
+    if targetCount < 3 then
+        targetCount = 3
+    end
+
+    if targetCount > #pool then
+        targetCount = #pool
+    end
+
+    local bestHull = nil
+
+    -------------------------------------------------------------------
+    -- Несколько попыток подобрать точки так, чтобы все они
+    -- попали на выпуклую оболочку.
+    -------------------------------------------------------------------
+    for attempt = 1, 8 do
+        local picked = self:NP_PickRingAnchorsOnce(pool, targetCount)
+
+        if picked and #picked >= 3 then
+            local points = {}
+
+            for _, item in ipairs(picked) do
+                points[#points + 1] = {
+                    x = item.cx or 0,
+                    y = item.cy or 0,
+                    item = item,
+                }
+            end
+
+            local hull = self:NP_ConvexHull(points)
+
+            if hull and #hull >= 3 then
+                if #hull == targetCount then
+                    local out = {}
+
+                    for _, p in ipairs(hull) do
+                        out[#out + 1] = p.item
+                    end
+
+                    return out
+                end
+
+                if not bestHull or #hull > #bestHull then
+                    bestHull = hull
+                end
+            end
+        end
+    end
+
+    if bestHull then
+        local out = {}
+
+        for _, p in ipairs(bestHull) do
+            out[#out + 1] = p.item
+        end
+
+        return out
+    end
+
+    return nil
+end
+
+function NSPauk:NP_ConvexHull(points)
+    if type(points) ~= "table" or #points < 3 then
+        return {}
+    end
+
+    local pts = {}
+
+    for _, p in ipairs(points) do
+        if type(p.x) == "number"
+            and type(p.y) == "number"
+            and p.x == p.x
+            and p.y == p.y then
+            pts[#pts + 1] = p
+        end
+    end
+
+    if #pts < 3 then
+        return {}
+    end
+
+    table.sort(pts, function(a, b)
+        if a.x == b.x then
+            return a.y < b.y
+        end
+
+        return a.x < b.x
+    end)
+
+    -------------------------------------------------------------------
+    -- Убираем дубликаты.
+    -------------------------------------------------------------------
+    local unique = {}
+
+    for _, p in ipairs(pts) do
+        local last = unique[#unique]
+
+        if not last or last.x ~= p.x or last.y ~= p.y then
+            unique[#unique + 1] = p
+        end
+    end
+
+    if #unique < 3 then
+        return {}
+    end
+
+    local function cross(o, a, b)
+        return (a.x - o.x) * (b.y - o.y)
+             - (a.y - o.y) * (b.x - o.x)
+    end
+
+    local lower = {}
+
+    for _, p in ipairs(unique) do
+        while #lower >= 2
+            and cross(lower[#lower - 1], lower[#lower], p) <= 0 do
+            table.remove(lower)
+        end
+
+        lower[#lower + 1] = p
+    end
+
+    local upper = {}
+
+    for i = #unique, 1, -1 do
+        local p = unique[i]
+
+        while #upper >= 2
+            and cross(upper[#upper - 1], upper[#upper], p) <= 0 do
+            table.remove(upper)
+        end
+
+        upper[#upper + 1] = p
+    end
+
+    table.remove(lower)
+    table.remove(upper)
+
+    for _, p in ipairs(upper) do
+        lower[#lower + 1] = p
+    end
+
+    if #lower < 3 then
+        return {}
+    end
+
+    return lower
+end
+
+function NSPauk:NP_MakeRingThread(p0, p2, center, mode)
+    local function cp(p)
+        if not p then
+            return { x = 0, y = 0 }
+        end
+
+        return {
+            x = p.x or 0,
+            y = p.y or 0,
+        }
+    end
+
+    p0 = cp(p0)
+    p2 = cp(p2)
+
+    local thread = {
+        p0 = p0,
+        p2 = p2,
+    }
+
+    local mx = (p0.x + p2.x) / 2
+    local my = (p0.y + p2.y) / 2
+
+    local dx = p2.x - p0.x
+    local dy = p2.y - p0.y
+
+    local len = math.sqrt(dx * dx + dy * dy)
+
+    if len < 1 then
+        thread.p1 = {
+            x = mx,
+            y = my,
+        }
+
+        return thread
+    end
+
+    local C = self.C or {}
+
+    local minSag
+    local maxSag
+    local jitter
+
+    if mode == "radial" then
+        minSag = tonumber(C.CROSS_SAG_MIN) or 0.05
+        maxSag = tonumber(C.CROSS_SAG_MAX) or 0.13
+        jitter = 0.05
+    else
+        minSag = tonumber(C.MAIN_SAG_MIN) or 0.06
+        maxSag = tonumber(C.MAIN_SAG_MAX) or 0.16
+        jitter = 0.04
+    end
+
+    local ratio = self:RandomFloat(minSag, maxSag)
+
+    if type(ratio) ~= "number" or ratio ~= ratio or ratio <= 0 then
+        ratio = 0.08
+    end
+
+    local sag = len * ratio
+
+    if sag < 1 then
+        sag = 1
+    end
+
+    -------------------------------------------------------------------
+    -- Направление нити.
+    -------------------------------------------------------------------
+    local nx = dx / len
+    local ny = dy / len
+
+    -------------------------------------------------------------------
+    -- Гравитация в экранных координатах WoW.
+    --
+    -- В WoW UI ось Y растёт вверх, поэтому гравитация вниз это:
+    --   x = 0
+    --   y = -1
+    -------------------------------------------------------------------
+    local gx = 0
+    local gy = -1
+
+    -------------------------------------------------------------------
+    -- Берём только ту часть гравитации, которая перпендикулярна нити.
+    --
+    -- Для горизонтальной нити перпендикулярная гравитация максимальна.
+    -- Для вертикальной нити она почти нулевая.
+    -- Для наклонной нити провис получится физически корректным:
+    -- вниз и в сторону "нижней" части линии.
+    -------------------------------------------------------------------
+    local dot = nx * gx + ny * gy
+
+    local px = gx - dot * nx
+    local py = gy - dot * ny
+
+    local plen = math.sqrt(px * px + py * py)
+
+    -------------------------------------------------------------------
+    -- Небольшое внутреннее стягивание кольца можно оставить.
+    --
+    -- Если хочешь чистую гравитацию без стягивания к центру,
+    -- поставь:
+    --   local inwardWeight = 0
+    -------------------------------------------------------------------
+    local inwardX = 0
+    local inwardY = 0
+
+    if center then
+        inwardX = center.x - mx
+        inwardY = center.y - my
+
+        local ilen = math.sqrt(inwardX * inwardX + inwardY * inwardY)
+
+        if ilen > 1 then
+            inwardX = inwardX / ilen
+            inwardY = inwardY / ilen
+        else
+            inwardX = 0
+            inwardY = 0
+        end
+    end
+
+    local gravWeight = 1.0
+    local inwardWeight = 0.12
+
+    if mode == "radial" then
+        inwardWeight = 0.05
+    end
+
+    local dirX
+    local dirY
+
+    if plen > 0.08 then
+        dirX = (px / plen) * gravWeight + inwardX * inwardWeight
+        dirY = (py / plen) * gravWeight + inwardY * inwardWeight
+    else
+        ---------------------------------------------------------------
+        -- Нить почти вертикальная.
+        -- Гравитация почти совпадает с самой нитью, поэтому
+        -- перпендикулярного провиса почти нет.
+        --
+        -- Оставляем только лёгкое внутреннее стягивание, если оно есть.
+        ---------------------------------------------------------------
+        dirX = inwardX * inwardWeight
+        dirY = inwardY * inwardWeight
+    end
+
+    local dlen = math.sqrt(dirX * dirX + dirY * dirY)
+
+    if dlen < 0.01 then
+        ---------------------------------------------------------------
+        -- Аварийный fallback: строго вниз.
+        ---------------------------------------------------------------
+        dirX = 0
+        dirY = -1
+        dlen = 1
+    end
+
+    local jx = (math.random() - 0.5) * len * jitter
+    local jy = (math.random() - 0.5) * len * jitter * 0.35
+
+    local p1x = mx + (dirX / dlen) * sag + jx
+    local p1y = my + (dirY / dlen) * sag + jy
+
+    -------------------------------------------------------------------
+    -- Жёсткая страховка:
+    -- кольцевая нить не должна выгибаться выше своей середины.
+    --
+    -- Это именно тот фикс, который убирает "антигравитацию"
+    -- на нижней линии кольца.
+    -------------------------------------------------------------------
+    if p1y > my then
+        p1y = my - math.max(1, sag * 0.25)
+    end
+
+    thread.p1 = {
+        x = p1x,
+        y = p1y,
+    }
+
+    return thread
+end
+
+function NSPauk:NP_MakeGravityThread(p0, p2, mode, sagMult)
+    local function cp(p)
+        if not p then
+            return { x = 0, y = 0 }
+        end
+
+        return {
+            x = p.x or 0,
+            y = p.y or 0,
+        }
+    end
+
+    p0 = cp(p0)
+    p2 = cp(p2)
+
+    local thread = {
+        p0 = p0,
+        p2 = p2,
+    }
+
+    local mx = (p0.x + p2.x) / 2
+    local my = (p0.y + p2.y) / 2
+
+    local dx = p2.x - p0.x
+    local dy = p2.y - p0.y
+    local len = math.sqrt(dx * dx + dy * dy)
+
+    if len < 1 then
+        thread.p1 = {
+            x = mx,
+            y = my,
+        }
+
+        return thread
+    end
+
+    local C = self.C or {}
+    local D = self.DefaultConstants or {}
+
+    local minSag
+    local maxSag
+    local jitter
+
+    if mode == "main" then
+        minSag = tonumber(C.MAIN_SAG_MIN) or D.MAIN_SAG_MIN or 0.06
+        maxSag = tonumber(C.MAIN_SAG_MAX) or D.MAIN_SAG_MAX or 0.16
+        jitter = 0.06
+    else
+        minSag = tonumber(C.CROSS_SAG_MIN) or D.CROSS_SAG_MIN or 0.05
+        maxSag = tonumber(C.CROSS_SAG_MAX) or D.CROSS_SAG_MAX or 0.13
+        jitter = 0.08
+    end
+
+    if type(sagMult) ~= "number" or sagMult ~= sagMult then
+        sagMult = 1
+    end
+
+    if sagMult <= 0 then
+        thread.p1 = {
+            x = mx,
+            y = my,
+        }
+
+        return thread
+    end
+
+    local ratio = self:RandomFloat(minSag, maxSag) * sagMult
+
+    if type(ratio) ~= "number" or ratio ~= ratio or ratio <= 0 then
+        ratio = 0.08 * sagMult
+    end
+
+    local sag = len * ratio
+
+    if sag < 0.5 then
+        sag = 0.5
+    end
+
+    -------------------------------------------------------------------
+    -- Направление нити.
+    -------------------------------------------------------------------
+    local nx = dx / len
+    local ny = dy / len
+
+    -------------------------------------------------------------------
+    -- Гравитация в координатах WoW UI:
+    --   y растёт вверх,
+    --   поэтому гравитация вниз = (0, -1).
+    --
+    -- Берём только перпендикулярную составляющую гравитации.
+    -- Тогда:
+    --   горизонтальная нить провисает вниз;
+    --   наклонная нить провисает вниз и в сторону нижней части;
+    --   почти вертикальная нить почти не имеет перпендикулярного провиса.
+    -------------------------------------------------------------------
+    local gx = 0
+    local gy = -1
+
+    local dot = nx * gx + ny * gy
+
+    local px = gx - dot * nx
+    local py = gy - dot * ny
+
+    local plen = math.sqrt(px * px + py * py)
+
+    local dirX
+    local dirY
+
+    if plen > 0.08 then
+        dirX = px / plen
+        dirY = py / plen
+    else
+        ---------------------------------------------------------------
+        -- Нить почти вертикальная.
+        -- Настоящая нить при вертикальном натяжении почти не изгибается.
+        -- Добавляем только очень слабый боковой изгиб.
+        ---------------------------------------------------------------
+        dirX = (math.random() - 0.5) * 0.8
+        dirY = 0
+
+        local dl = math.abs(dirX)
+
+        if dl > 0.01 then
+            dirX = dirX / dl
+        else
+            dirX = 0.5
+        end
+
+        sag = sag * 0.35
+    end
+
+    local jitterX = (math.random() - 0.5) * len * jitter * 0.35
+    local jitterY = (math.random() - 0.5) * len * jitter * 0.15
+
+    thread.p1 = {
+        x = mx + dirX * sag + jitterX,
+        y = my + dirY * sag + jitterY,
+    }
+
+    -------------------------------------------------------------------
+    -- Страховка от “антигравитации”.
+    -------------------------------------------------------------------
+    if thread.p1.y > my then
+        thread.p1.y = my - math.max(0.5, sag * 0.25)
+    end
+
+    -------------------------------------------------------------------
+    -- Не даём нити уходить далеко за нижний край экрана.
+    -------------------------------------------------------------------
+    if thread.p1.y < 1 then
+        thread.p1.y = 1
+    end
+
+    return thread
+end
+
+function NSPauk:NP_PointInRingPolygon(x, y, anchors)
+    if type(anchors) ~= "table" or #anchors < 3 then
+        return false
+    end
+
+    local N = #anchors
+    local pos = 0
+    local neg = 0
+
+    for i = 1, N do
+        local a = anchors[i]
+        local b = anchors[(i % N) + 1]
+
+        if not a or not b then
+            return false
+        end
+
+        local ax = a.cx or 0
+        local ay = a.cy or 0
+        local bx = b.cx or 0
+        local by = b.cy or 0
+
+        local cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax)
+
+        if cross > 0.01 then
+            pos = pos + 1
+        elseif cross < -0.01 then
+            neg = neg + 1
+        end
+
+        if pos > 0 and neg > 0 then
+            return false
+        end
+    end
+
+    return true
+end
+
+function NSPauk:NP_ChooseRingDiameter(anchors)
+    local N = anchors and #anchors or 0
+
+    if N < 2 then
+        return 1, 2
+    end
+
+    local bestScore = -math.huge
+    local bestA = 1
+    local bestB = 2
+
+    for i = 1, N do
+        for j = i + 1, N do
+            local a = anchors[i]
+            local b = anchors[j]
+
+            if a and b then
+                local dx = math.abs((a.cx or 0) - (b.cx or 0))
+                local dy = math.abs((a.cy or 0) - (b.cy or 0))
+                local dist = math.sqrt(dx * dx + dy * dy)
+
+                -------------------------------------------------------
+                -- Нам нужна несущая нить, желательно более горизонтальная,
+                -- длинная и соединяющая противоположные стороны кольца.
+                -------------------------------------------------------
+                local score = dx * 2 + dist * 0.35
+
+                if dx >= dy then
+                    score = score + dist * 0.5
+                end
+
+                local idxDist = math.min(j - i, N - (j - i))
+                local ideal = N / 2
+
+                if ideal <= 0 then
+                    ideal = 1
+                end
+
+                local opposite = 1 - math.abs(idxDist - ideal) / ideal
+
+                if opposite < 0 then
+                    opposite = 0
+                end
+
+                score = score + opposite * 120
+
+                if score > bestScore then
+                    bestScore = score
+                    bestA = i
+                    bestB = j
+                end
+            end
+        end
+    end
+
+    return bestA, bestB
+end
+
+function NSPauk:NP_BuildNaturalRingMainTasks(inst, tasks, cursorPoint)
+    if not inst or not tasks then
+        return cursorPoint
+    end
+
+    local cursor = cursorPoint
+
+    -------------------------------------------------------------------
+    -- Порядок важен:
+    --
+    -- 1. Периметр.
+    -- 2. Несущая нить через кольцо.
+    -- 3. Радиальные нити от хаба.
+    --
+    -- Всё это уже лежит в inst.conns в нужном порядке.
+    -------------------------------------------------------------------
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.alive and conn.thread then
+            local drawThread
+
+            if conn.isSpoke then
+                ---------------------------------------------------
+                -- Радиальные нити лучше тянуть от хаба наружу.
+                ---------------------------------------------------
+                drawThread = conn.thread
+            else
+                drawThread =
+                    self:NP_OrientThreadForCursor(conn.thread, cursor)
+                    or conn.thread
+            end
+
+            if cursor then
+                self:AddTravelPointTask(
+                    tasks,
+                    cursor,
+                    drawThread.p0,
+                    conn,
+                    conn
+                )
+            end
+
+            local task = self:AddThreadTask(tasks, conn, drawThread)
+
+            if task then
+                task.isMain = true
+
+                cursor = {
+                    x = drawThread.p2.x,
+                    y = drawThread.p2.y,
+                }
+            end
+        end
+    end
+
+    return cursor
+end
+
+function NSPauk:NP_BuildRingInterior(inst, anchors, center)
+    local C = self.C
+
+    if not inst or not anchors or #anchors < 3 then
+        return
+    end
+
+    local N = #anchors
+
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+
+    if spacing < 6 then
+        spacing = 6
+    end
+
+    local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
+
+    if maxRows < 0 then
+        maxRows = 1600
+    end
+
+    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+
+    if minCross < 1 then
+        minCross = 1
+    end
+
+    local minSeg2 = minCross * minCross
+
+    -------------------------------------------------------------------
+    -- Считаем, сколько колец можно построить внутри.
+    -------------------------------------------------------------------
+    local minRadius = math.huge
+
+    for _, a in ipairs(anchors) do
+        local dx = (a.cx or 0) - center.x
+        local dy = (a.cy or 0) - center.y
+        local r = math.sqrt(dx * dx + dy * dy)
+
+        if r < minRadius then
+            minRadius = r
+        end
+    end
+
+    local rows = math.floor((minRadius - spacing * 0.5) / spacing)
+
+    if rows < 1 then
+        rows = 1
+    end
+
+    -------------------------------------------------------------------
+    -- Жёсткий потолок, чтобы не плодить тысячи сегментов.
+    -------------------------------------------------------------------
+    local hardCap = 32
+
+    if rows > hardCap then
+        rows = hardCap
+    end
+
+    if rows > maxRows then
+        rows = maxRows
+    end
+
+    local original = {}
+
+    for i = 1, N do
+        original[i] = {
+            x = anchors[i].cx or 0,
+            y = anchors[i].cy or 0,
+        }
+    end
+
+    local order = 0
+
+    local function addSeg(p0, p2, depA, depB, key, arcOrder, mode)
+        local dx = (p2.x or 0) - (p0.x or 0)
+        local dy = (p2.y or 0) - (p0.y or 0)
+        local d2 = dx * dx + dy * dy
+
+        if d2 < minSeg2 then
+            return
+        end
+
+        local thread = self:NP_MakeRingThread(p0, p2, center, mode)
+
+        local seg = {
+            connA = depA,
+            connB = depB,
+            thread = thread,
+            textures = {},
+            alive = true,
+            planSectorKey = key,
+            planArcLen = arcOrder,
+            isRingFill = true,
+        }
+
+        thread.ownerRef = {
+            inst = inst,
+            seg = seg,
+        }
+
+        inst.crossSegs[#inst.crossSegs + 1] = seg
+    end
+
+    local prevRing = original
+
+    for r = 1, rows do
+        local f = r / (rows + 1)
+
+        local ring = {}
+
+        for i = 1, N do
+            ring[i] = {
+                x = original[i].x + (center.x - original[i].x) * f,
+                y = original[i].y + (center.y - original[i].y) * f,
+            }
+        end
+
+        ---------------------------------------------------------------
+        -- Радиальные перемычки от предыдущего кольца к новому.
+        ---------------------------------------------------------------
+        for i = 1, N do
+            order = order + 1
+
+            addSeg(
+                prevRing[i],
+                ring[i],
+                inst.conns[i],
+                inst.conns[i],
+                string.format("%03d-rad", r),
+                i,
+                "radial"
+            )
+        end
+
+        ---------------------------------------------------------------
+        -- Само внутреннее кольцо.
+        ---------------------------------------------------------------
+        for i = 1, N do
+            local j = (i % N) + 1
+
+            order = order + 1
+
+            addSeg(
+                ring[i],
+                ring[j],
+                inst.conns[i],
+                inst.conns[j],
+                string.format("%03d-ring", r),
+                i,
+                "ring"
+            )
+        end
+
+        prevRing = ring
+    end
+
+    -------------------------------------------------------------------
+    -- Финальные нити последнего кольца к центру.
+    -------------------------------------------------------------------
+    for i = 1, N do
+        order = order + 1
+
+        addSeg(
+            prevRing[i],
+            {
+                x = center.x,
+                y = center.y,
+            },
+            inst.conns[i],
+            inst.conns[i],
+            string.format("%03d-center", rows + 1),
+            i,
+            "radial"
+        )
+    end
+end
+
+function NSPauk:CreateRingInstance(targetCount, items)
+    local S = self.S
+    local C = self.C
+
+    if type(self.NP_CollectRingAnchors) ~= "function"
+        or type(self.NP_ConvexHull) ~= "function" then
+        return nil
+    end
+
+    targetCount = math.floor(tonumber(targetCount) or 4)
+
+    if targetCount < 3 then
+        targetCount = 3
+    end
+
+    if not items then
+        items = self:CollectVisibleItems()
+    end
+
+    local anchors = self:NP_CollectRingAnchors(items, targetCount)
+
+    if not anchors or #anchors < 3 then
+        return nil
+    end
+
+    -------------------------------------------------------------------
+    -- Фильтруем мёртвые/сдвинутые якоря.
+    -------------------------------------------------------------------
+    for i = #anchors, 1, -1 do
+        if not self:ValidateAnchorRect(anchors[i]) then
+            table.remove(anchors, i)
+        end
+    end
+
+    if #anchors < 3 then
+        return nil
+    end
+
+    -------------------------------------------------------------------
+    -- Строим выпуклую оболочку, чтобы кольцо не самопересекалось.
+    -------------------------------------------------------------------
+    local points = {}
+
+    for _, item in ipairs(anchors) do
+        points[#points + 1] = {
+            x = item.cx or 0,
+            y = item.cy or 0,
+            item = item,
+        }
+    end
+
+    local hull = self:NP_ConvexHull(points)
+
+    if not hull or #hull < 3 then
+        return nil
+    end
+
+    anchors = {}
+
+    for _, p in ipairs(hull) do
+        anchors[#anchors + 1] = p.item
+    end
+
+    local N = #anchors
+
+    if N < 3 then
+        return nil
+    end
+
+    -------------------------------------------------------------------
+    -- Выбираем несущую нить через кольцо.
+    -------------------------------------------------------------------
+    local dA, dB = self:NP_ChooseRingDiameter(anchors)
+
+    local a = anchors[dA]
+    local b = anchors[dB]
+
+    if not a or not b then
+        return nil
+    end
+
+    -------------------------------------------------------------------
+    -- Пытаемся сделать несущую нить с естественным провисом,
+    -- но так, чтобы будущий хаб оставался внутри кольца.
+    -------------------------------------------------------------------
+    local diamThread = nil
+    local hx = nil
+    local hy = nil
+
+    local sagAttempts = { 1.0, 0.65, 0.4, 0.22 }
+
+    for _, mult in ipairs(sagAttempts) do
+        local th = self:NP_MakeGravityThread(
+            { x = a.cx or 0, y = a.cy or 0 },
+            { x = b.cx or 0, y = b.cy or 0 },
+            "main",
+            mult
+        )
+
+        local x, y = self:BzThread(th, 0.5)
+
+        if self:NP_PointInRingPolygon(x, y, anchors) then
+            diamThread = th
+            hx = x
+            hy = y
+            break
+        end
+    end
+
+    -------------------------------------------------------------------
+    -- Если сильный провис выводит хаб из кольца,
+    -- делаем почти прямую несущую нить.
+    -------------------------------------------------------------------
+    if not diamThread then
+        diamThread = self:NP_MakeGravityThread(
+            { x = a.cx or 0, y = a.cy or 0 },
+            { x = b.cx or 0, y = b.cy or 0 },
+            "main",
+            0
+        )
+
+        hx, hy = self:BzThread(diamThread, 0.5)
+    end
+
+    -------------------------------------------------------------------
+    -- Хаб — это точка на уже натянутой несущей нити.
+    -- Он не является фреймом, но физически прикреплён к нити.
+    -------------------------------------------------------------------
+    local hubRect = self:NormalizeFallbackRect({
+        name = "RingHub",
+        left = hx - 16,
+        right = hx + 16,
+        bottom = hy - 16,
+        top = hy + 16,
+    })
+
+    local inst = {
+        id = self.nextInstanceId,
+
+        isRing = true,
+        isNaturalRing = true,
+
+        hub = {
+            frame = nil,
+            name = "RingHub",
+            rect = hubRect,
+        },
+
+        conns = {},
+        crossSegs = {},
+        interSegs = {},
+        crossRowsList = {},
+        webSectors = {},
+        tasks = {},
+        crossRows = 0,
+
+        anchorCandidates = {},
+        drawnPoints = 0,
+        settled = false,
+    }
+
+    self.nextInstanceId = self.nextInstanceId + 1
+
+    inst.anchorCandidates[#inst.anchorCandidates + 1] =
+        self:CopyRect(hubRect)
+
+    -------------------------------------------------------------------
+    -- 1. Внешний периметр кольца.
+    --
+    -- Каждая нить крепится от текущего якоря к следующему.
+    -------------------------------------------------------------------
+    for i = 1, N do
+        local p = anchors[i]
+        local q = anchors[(i % N) + 1]
+
+        local thread = self:NP_MakeGravityThread(
+            { x = p.cx or 0, y = p.cy or 0 },
+            { x = q.cx or 0, y = q.cy or 0 },
+            "main",
+            1.0
+        )
+
+        local angle = math.atan2(
+            (q.cy or 0) - (p.cy or 0),
+            (q.cx or 0) - (p.cx or 0)
+        )
+
+        if angle < 0 then
+            angle = angle + 2 * math.pi
+        end
+
+        thread.angle = angle
+
+        local conn = {
+            id = #inst.conns + 1,
+
+            target = {
+                frame = q.frame,
+                name = q.name,
+                rect = self:CopyRect(q),
+            },
+
+            ringStartRect = self:CopyRect(p),
+
+            thread = thread,
+            angle = angle,
+            textures = {},
+            alive = true,
+
+            -----------------------------------------------------------
+            -- Это каркасная нить, а не радиальная.
+            -- Сектора между такими нитями не строим.
+            -----------------------------------------------------------
+            noSector = true,
+            isRingFrame = true,
+        }
+
+        thread.ownerRef = {
+            inst = inst,
+            conn = conn,
+        }
+
+        inst.conns[#inst.conns + 1] = conn
+
+        inst.anchorCandidates[#inst.anchorCandidates + 1] =
+            self:CopyRect(q)
+    end
+
+    -------------------------------------------------------------------
+    -- 2. Несущая нить через кольцо.
+    --
+    -- Она создаёт точку, к которой потом прикрепится хаб.
+    -------------------------------------------------------------------
+    local diamAngle = math.atan2(
+        (b.cy or 0) - (a.cy or 0),
+        (b.cx or 0) - (a.cx or 0)
+    )
+
+    if diamAngle < 0 then
+        diamAngle = diamAngle + 2 * math.pi
+    end
+
+    diamThread.angle = diamAngle
+
+    local diamConn = {
+        id = #inst.conns + 1,
+
+        target = {
+            frame = b.frame,
+            name = b.name,
+            rect = self:CopyRect(b),
+        },
+
+        ringStartRect = self:CopyRect(a),
+
+        thread = diamThread,
+        angle = diamAngle,
+        textures = {},
+        alive = true,
+
+        noSector = true,
+        isDiameter = true,
+    }
+
+    diamThread.ownerRef = {
+        inst = inst,
+        conn = diamConn,
+    }
+
+    inst.conns[#inst.conns + 1] = diamConn
+
+    -------------------------------------------------------------------
+    -- Хаб зависит от этой несущей нити.
+    -- Если несущая нить умрёт, радиальные нити тоже станут невалидны.
+    -------------------------------------------------------------------
+    inst.hubDepConn = diamConn
+
+    -------------------------------------------------------------------
+    -- 3. Радиальные нити от хаба к периметру.
+    --
+    -- Именно между ними потом будут строиться перемычки.
+    -------------------------------------------------------------------
+    for i = 1, N do
+        local anchor = anchors[i]
+
+        local thread = self:NP_MakeGravityThread(
+            { x = hx, y = hy },
+            { x = anchor.cx or 0, y = anchor.cy or 0 },
+            "cross",
+            0.35
+        )
+
+        local angle = math.atan2(
+            (anchor.cy or 0) - hy,
+            (anchor.cx or 0) - hx
+        )
+
+        if angle < 0 then
+            angle = angle + 2 * math.pi
+        end
+
+        thread.angle = angle
+
+        local conn = {
+            id = #inst.conns + 1,
+
+            target = {
+                frame = anchor.frame,
+                name = anchor.name,
+                rect = self:CopyRect(anchor),
+            },
+
+            ringStartRect = self:CopyRect(hubRect),
+
+            thread = thread,
+            angle = angle,
+            textures = {},
+            alive = true,
+
+            -----------------------------------------------------------
+            -- Это радиальная нить.
+            -- Только радиальные нити участвуют в секторах.
+            -----------------------------------------------------------
+            isSpoke = true,
+        }
+
+        thread.ownerRef = {
+            inst = inst,
+            conn = conn,
+        }
+
+        inst.conns[#inst.conns + 1] = conn
+    end
+
+    self:BuildInstanceTasks(inst)
+
+    return inst
+end
+
+function NSPauk:NP_BuildRingMainTasks(inst, tasks, cursorPoint)
+    if not inst or not inst.conns or #inst.conns == 0 then
+        return cursorPoint
+    end
+
+    local cursor = cursorPoint
+    local N = #inst.conns
+
+    -------------------------------------------------------------------
+    -- Ищем стартовую нить периметра ближе к пауку.
+    -------------------------------------------------------------------
+    local startIdx = 1
+
+    if cursor then
+        local bestDist = nil
+
+        for i, conn in ipairs(inst.conns) do
+            if conn.alive
+                and conn.thread
+                and conn.thread.p0
+                and conn.thread.p2 then
+                local d0x = conn.thread.p0.x - cursor.x
+                local d0y = conn.thread.p0.y - cursor.y
+                local d0 = d0x * d0x + d0y * d0y
+
+                local d2x = conn.thread.p2.x - cursor.x
+                local d2y = conn.thread.p2.y - cursor.y
+                local d2 = d2x * d2x + d2y * d2y
+
+                local d = math.min(d0, d2)
+
+                if not bestDist or d < bestDist then
+                    bestDist = d
+                    startIdx = i
+                end
+            end
+        end
+    end
+
+    -------------------------------------------------------------------
+    -- Обходим кольцо по порядку.
+    -------------------------------------------------------------------
+    for k = 0, N - 1 do
+        local idx = ((startIdx - 1 + k) % N) + 1
+        local conn = inst.conns[idx]
+
+        if conn.alive and conn.thread then
+            local drawThread =
+                self:NP_OrientThreadForCursor(conn.thread, cursor)
+                or conn.thread
+
+            if cursor then
+                self:AddTravelPointTask(
+                    tasks,
+                    cursor,
+                    drawThread.p0,
+                    conn,
+                    conn
+                )
+            end
+
+            local task = self:AddThreadTask(tasks, conn, drawThread)
+
+            if task then
+                task.isMain = true
+
+                cursor = {
+                    x = drawThread.p2.x,
+                    y = drawThread.p2.y,
+                }
+            end
+        end
+    end
+
+    return cursor
+end
+
+function NSPauk:NP_BuildRingWebTasks(inst, tasks, cursorPoint)
+    if not inst or not tasks then
+        return cursorPoint
+    end
+
+    local cursor = cursorPoint
+
+    for _, seg in ipairs(inst.crossSegs or {}) do
+        if seg.alive and not seg.isInterCross then
+            local thread = seg.thread
+
+            if thread and thread.p0 and thread.p2 then
+                local drawThread =
+                    self:NP_OrientThreadForCursor(thread, cursor)
+                    or thread
+
+                if cursor then
+                    self:AddTravelPointTask(
+                        tasks,
+                        cursor,
+                        drawThread.p0,
+                        seg.connA or seg.connB,
+                        seg
+                    )
+                end
+
+                local task = self:AddThreadTask(tasks, seg, drawThread)
+
+                if task then
+                    cursor = {
+                        x = drawThread.p2.x,
+                        y = drawThread.p2.y,
+                    }
+                end
+            end
+        end
+    end
+
+    return cursor
 end
 
 function NSPauk:NP_GetThreadBounds(thread)
@@ -12038,12 +13618,45 @@ function NSPauk:BuildInstanceTasks(inst)
         }
     end
 
+    -------------------------------------------------------------------
+    -- Естественное кольцо.
+    -------------------------------------------------------------------
+    if inst.isNaturalRing then
+        cursorPoint = self:NP_BuildNaturalRingMainTasks(
+            inst,
+            tasks,
+            cursorPoint
+        )
+
+        ---------------------------------------------------------------
+        -- Для секторов нужны arc samples только радиальных нитей.
+        ---------------------------------------------------------------
+        for _, conn in ipairs(inst.conns or {}) do
+            if conn.isSpoke
+                and conn.thread
+                and (not conn.arcLength or conn.arcLength <= 0) then
+                local samples, total = self:BuildArcSamples(conn.thread)
+                conn.arcSamples = samples
+                conn.arcLength = total
+            end
+        end
+
+        self:NP_BuildTriangleSectorTasks(inst, tasks, cursorPoint)
+
+        inst.crossRows = #(inst.crossSegs or {})
+
+        inst.tasks = tasks
+        return
+    end
+
+    -------------------------------------------------------------------
+    -- Обычная паутина.
+    -------------------------------------------------------------------
     cursorPoint = self:AddMainThreadTasks(inst, tasks, cursorPoint)
 
     local N = #inst.conns
 
     if N >= 2 then
-
         for _, conn in ipairs(inst.conns) do
             if conn.thread
                 and (not conn.arcLength or conn.arcLength <= 0) then
@@ -12140,7 +13753,8 @@ function NSPauk:NP_TriangleSectorClear(inst, connA, connB)
         if connC ~= connA
             and connC ~= connB
             and connC.alive
-            and connC.thread then
+            and connC.thread
+            and not connC.noSector then
             local pts = self:SampleThreadPoints(connC.thread, ignoreHub)
 
             for _, p in ipairs(pts) do
@@ -12177,6 +13791,7 @@ function NSPauk:NP_GetValidTriangleSectors(inst)
     end
 
     local minCross = tonumber(self.C.MIN_CROSS_LEN) or 4
+
     if minCross < 0 then
         minCross = 4
     end
@@ -12192,30 +13807,34 @@ function NSPauk:NP_GetValidTriangleSectors(inst)
     end
 
     for i = 1, N do
-        for j = i + 1, N do
-            local connA = inst.conns[i]
-            local connB = inst.conns[j]
+        local connA = inst.conns[i]
 
-            if connA
-                and connB
-                and connA.alive
-                and connB.alive then
-                ensureLen(connA)
-                ensureLen(connB)
+        if connA
+            and connA.alive
+            and not connA.noSector then
+            for j = i + 1, N do
+                local connB = inst.conns[j]
 
-                local pairMin = math.min(
-                    connA.arcLength or 0,
-                    connB.arcLength or 0
-                )
+                if connB
+                    and connB.alive
+                    and not connB.noSector then
+                    ensureLen(connA)
+                    ensureLen(connB)
 
-                if pairMin >= minCross
-                    and self:NP_TriangleSectorClear(inst, connA, connB) then
-                    out[#out + 1] = {
-                        a = i,
-                        b = j,
-                        key = i .. "-" .. j,
-                        pairMin = pairMin,
-                    }
+                    local pairMin = math.min(
+                        connA.arcLength or 0,
+                        connB.arcLength or 0
+                    )
+
+                    if pairMin >= minCross
+                        and self:NP_TriangleSectorClear(inst, connA, connB) then
+                        out[#out + 1] = {
+                            a = i,
+                            b = j,
+                            key = i .. "-" .. j,
+                            pairMin = pairMin,
+                        }
+                    end
                 end
             end
         end
@@ -16591,6 +18210,9 @@ function NSPauk:StartNewInstance(preferredHub)
 
     local items = self:CollectVisibleItems()
 
+    -------------------------------------------------------------------
+    -- Кокон.
+    -------------------------------------------------------------------
     if math.random() < C.COCOON_CHANCE then
         local victim = self:PickCocoonVictim(items)
 
@@ -16600,13 +18222,46 @@ function NSPauk:StartNewInstance(preferredHub)
         end
     end
 
+    local targetCount = self:RandomInt(
+        C.TARGET_COUNT_MIN,
+        C.TARGET_COUNT_MAX
+    )
+
+    -------------------------------------------------------------------
+    -- Третий тип паутины: кольцевая паутина.
+    --
+    -- Шанс 1 из 3.
+    -- Если не удалось построить кольцо, дальше пойдёт обычная паутина.
+    -------------------------------------------------------------------
+    if math.random(1, 3) == 3 then
+        local ringInst = self:CreateRingInstance(targetCount, items)
+
+        if ringInst then
+            self:AddInstance(ringInst)
+
+            S.currentInstance = ringInst
+            S.tasks = ringInst.tasks
+            S.taskIdx = 1
+            S.currentTask = nil
+            S.completeTimer = 0
+
+            self:MkSpider()
+            self:MkClickBtn()
+            self:AdvanceTask()
+
+            return
+        end
+    end
+
+    -------------------------------------------------------------------
+    -- Обычная паутина: центральный или случайный хаб.
+    -------------------------------------------------------------------
     local hub = self:PickWebHub(items)
 
     if hub and hub.frame and not self:ValidateAnchorRect(hub) then
         hub = nil
     end
 
-    local targetCount = self:RandomInt(C.TARGET_COUNT_MIN, C.TARGET_COUNT_MAX)
     local candidates = {}
 
     if hub then
@@ -16641,6 +18296,7 @@ function NSPauk:StartNewInstance(preferredHub)
 
     self:MkSpider()
     self:MkClickBtn()
+
     self:AdvanceTask()
 end
 
@@ -17376,8 +19032,19 @@ function NSPauk:NP_ProcessQueueResume()
         return false
     end
 
+    -------------------------------------------------------------------
+    -- Защита от зависшего флага пересборки.
+    -------------------------------------------------------------------
     if S.nspQueueRebuildRunning then
-        return false
+        local now = GetTime()
+
+        if type(S.nspQueueRebuildLockAt) == "number"
+            and S.nspQueueRebuildLockAt == S.nspQueueRebuildLockAt
+            and (now - S.nspQueueRebuildLockAt) > 3 then
+            S.nspQueueRebuildRunning = false
+        else
+            return false
+        end
     end
 
     if not S.nspQueueResumePending then
@@ -17414,8 +19081,21 @@ function NSPauk:NP_ProcessQueueResume()
         return false
     end
 
+    -------------------------------------------------------------------
+    -- ГЛАВНЫЙ ФИКС:
+    --
+    -- Если drag есть, но текущей активной drag-задачи нет,
+    -- это осиротевший drag. Он не имеет права блокировать
+    -- обязательную достройку паутины.
+    -------------------------------------------------------------------
     if S.nspDrag then
-        return false
+        local activeDragTask = S.currentTask and S.currentTask.nspDuringDrag
+
+        if activeDragTask then
+            return false
+        end
+
+        self:NP_ClearGlobalDrag(true)
     end
 
     S.nspQueueResumePending = false
@@ -17427,6 +19107,7 @@ function NSPauk:NP_ProcessQueueResume()
     end
 
     S.nspQueueRebuildRunning = true
+    S.nspQueueRebuildLockAt = GetTime()
 
     -------------------------------------------------------------------
     -- Сначала даём секторным проверкам создать недостающие сегменты.
@@ -17434,8 +19115,16 @@ function NSPauk:NP_ProcessQueueResume()
     self:NP_RecheckWebSectors(inst)
     self:NP_RecheckWebSectorsByTriangles(inst)
 
+    -------------------------------------------------------------------
+    -- Если после проверок вдруг остался осиротевший drag,
+    -- сразу убираем его.
+    -------------------------------------------------------------------
     if S.nspDrag then
-        self:NP_ClearGlobalDrag(false)
+        local activeDragTask = S.currentTask and S.currentTask.nspDuringDrag
+
+        if not activeDragTask then
+            self:NP_ClearGlobalDrag(false)
+        end
     end
 
     if inst.torn
@@ -17470,18 +19159,17 @@ function NSPauk:NP_ProcessQueueResume()
         S.moveT = 0
         S.lastTaskT = 0
         S.phase = "task"
-
         S.nspQueueRebuildRunning = false
-
         self:AdvanceTask()
         return true
     end
 
     S.nspQueueRebuildRunning = false
+
     return false
 end
 
-function NSPauk:NP_RebuildInstanceTasks(inst)
+function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     local S = self.S
 
     if not inst or inst.torn then
@@ -17544,6 +19232,9 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
             return false
         end
 
+        -------------------------------------------------------------------
+        -- Если владелец был прерван мотыльком, возвращаем его в работу.
+        -------------------------------------------------------------------
         if not owner.alive and owner._nspMothInterrupted then
             owner.alive = true
             owner._nspMothInterrupted = nil
@@ -17595,7 +19286,13 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
 
         local task = self:AddThreadTask(tasks, owner, thread)
 
+        -------------------------------------------------------------------
+        -- Если задачу не удалось создать, владелец считается битым.
+        -- Иначе он может вечно оставаться alive undrawn и блокировать
+        -- завершение паутины.
+        -------------------------------------------------------------------
         if not task then
+            killOwner(owner)
             return false
         end
 
@@ -17613,6 +19310,9 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
         return true
     end
 
+    -------------------------------------------------------------------
+    -- Сначала основные нити.
+    -------------------------------------------------------------------
     for _, conn in ipairs(inst.conns or {}) do
         if conn.alive and not isDrawn(conn) then
             local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
@@ -17636,12 +19336,32 @@ function NSPauk:NP_RebuildInstanceTasks(inst)
         end
     end
 
+    -------------------------------------------------------------------
+    -- Приоритетный владелец, если он был передан.
+    -- Обычно это убитая/прерванная перемычка.
+    -------------------------------------------------------------------
+    if priorityOwner
+        and priorityOwner.alive
+        and not isDrawn(priorityOwner)
+        and not added[priorityOwner]
+        and (priorityOwner.connA or priorityOwner.connB or priorityOwner.isInterCross) then
+        local drawThread =
+            self:NP_OrientThreadForCursor(priorityOwner.thread, cursor)
+            or priorityOwner.thread
+
+        addOwner(priorityOwner, drawThread, false)
+    end
+
+    -------------------------------------------------------------------
+    -- Остальные перемычки.
+    -------------------------------------------------------------------
     local segs = {}
 
     for _, seg in ipairs(inst.crossSegs or {}) do
         if not seg.isInterCross
             and seg.alive
-            and not isDrawn(seg) then
+            and not isDrawn(seg)
+            and seg ~= priorityOwner then
             segs[#segs + 1] = seg
         end
     end
