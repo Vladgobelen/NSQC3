@@ -5528,10 +5528,6 @@ local function copyPoint(p)
     return { x = p.x or 0, y = p.y or 0 }
 end
 
----------------------------------------------------------------------------
--- Moth pounce: резкий прыжок паука к мотыльку, когда осталось близко.
----------------------------------------------------------------------------
-
 function NSPauk:NP_MakeMothPounceTask(from, to)
     local p0 = {
         x = from.x or 0,
@@ -5738,9 +5734,7 @@ NSPauk.DefaultConstants = {
 }
 
 NSPauk.ConstantDescriptions = {
-    -----------------------------------------------------------------------
-    -- Внешний вид
-    -----------------------------------------------------------------------
+
     SPIDER_SIZE = "Размер паука",
     WEB_SIZE = "Размер точек паутины",
     WEB_ALPHA = "Прозрачность паутины",
@@ -5750,9 +5744,6 @@ NSPauk.ConstantDescriptions = {
     CROSS_SAG_MIN = "Мин. провис перемычек",
     CROSS_SAG_MAX = "Макс. провис перемычек",
 
-    -----------------------------------------------------------------------
-    -- Паутина
-    -----------------------------------------------------------------------
     TARGET_COUNT_MIN = "Мин. нитей в паутине",
     TARGET_COUNT_MAX = "Макс. нитей в паутине",
     MAX_INSTANCES = "Макс. одновременных паутин",
@@ -5762,9 +5753,6 @@ NSPauk.ConstantDescriptions = {
     MIN_CROSS_LEN = "Мин. длина перемычки",
     MAX_CROSS_ROWS = "Макс. рядов перемычек",
 
-    -----------------------------------------------------------------------
-    -- Скорость
-    -----------------------------------------------------------------------
     SPIDER_SPEED_MIN = "Мин. скорость паука",
     SPIDER_SPEED_MAX = "Макс. скорость паука",
     FAST_MODE = "Общий множитель скорости",
@@ -5774,9 +5762,6 @@ NSPauk.ConstantDescriptions = {
     EMPTY_SPEED_MULT = "Множитель скорости пустых переходов",
     MOTH_POUNCE_DIST = "Дальность прыжка на мотылька",
 
-    -----------------------------------------------------------------------
-    -- Кокон
-    -----------------------------------------------------------------------
     COCOON_CHANCE = "Шанс кокона вместо обычной паутины",
     DISSOLVE_DURATION_MIN = "Мин. время поедания кокона (сек)",
     DISSOLVE_DURATION_MAX = "Макс. время поедания кокона (сек)",
@@ -5784,9 +5769,6 @@ NSPauk.ConstantDescriptions = {
     COCOON_MIN_AREA = "Мин. площадь жертвы кокона",
     COCOON_MAX_AREA = "Макс. площадь жертвы кокона",
 
-    -----------------------------------------------------------------------
-    -- Прогресс и выживаемость
-    -----------------------------------------------------------------------
     POINTS_PER_LEVEL = "Точек паутины на уровень",
     COCOON_EXP_PERCENT = "Доля уровня за кокон",
     SESSION_FULL_POINTS = "Точек для полного опыта сессии",
@@ -5844,12 +5826,6 @@ NSPauk.S = {
     limitHomePoint = nil,
 }
 
----------------------------------------------------------------------------
--- Профили текстур паука
----------------------------------------------------------------------------
----------------------------------------------------------------------------
--- Профили текстур паука
----------------------------------------------------------------------------
 NSPauk.SpiderTextureProfiles = {
     default = {
         label = "Анимация",
@@ -5930,10 +5906,6 @@ function NSPauk:EnsureDB()
         db.spiderProfile = "default"
     end
 
-    -----------------------------------------------------------------------
-    -- Адаптивный режим хранится отдельно от constants,
-    -- чтобы ResetConstants() не сбрасывал найденный интервал.
-    -----------------------------------------------------------------------
     if type(db.adaptive) ~= "table" then
         db.adaptive = {}
     end
@@ -5993,10 +5965,6 @@ function NSPauk:ApplyRuntimeConstants()
     C.EXCLUDE_FRAMES[C.ADDON .. "_SpiderHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_ClickHigh"] = true
 
-    -------------------------------------------------------------------
-    -- Мотылёк — динамический объект, никогда не цель для паутины.
-    -- Исключаем все возможные варианты имён фреймов мотылька.
-    -------------------------------------------------------------------
     C.EXCLUDE_FRAMES[C.ADDON .. "_MothFrame"] = true
     C.EXCLUDE_FRAMES["NSPauk_MothFrame"] = true
     C.EXCLUDE_FRAMES["NSPauk_Moth"] = true
@@ -6135,92 +6103,6 @@ function NSPauk:ResetSessionRecord()
     self.S.sessionBurstPoints = 0
 end
 
-function NSPauk:UpdateSessionRecordFlush(dt)
-    local S = self.S
-
-    if type(S.session) ~= "table" then
-        return
-    end
-
-    local session = S.session
-
-    if not session.sessionReportScheduled then
-        return
-    end
-
-    local pending = tonumber(session.pendingAddPoints) or 0
-
-    if pending <= 0 then
-        session.sessionReportScheduled = false
-        session.flushTimer = nil
-        return
-    end
-
-    dt = tonumber(dt) or 0
-
-    if dt < 0 then
-        dt = 0
-    elseif dt > 0.25 then
-        dt = 0.25
-    end
-
-    local now = GetTime()
-
-    if type(session.lastQueueAt) ~= "number"
-        or session.lastQueueAt ~= session.lastQueueAt then
-        session.lastQueueAt = now
-    end
-
-    local moving = false
-
-    if type(self.IsMoving) == "function" then
-        moving = self:IsMoving()
-    end
-
-    local activePhase =
-        S.phase == "task"
-        or S.phase == "instanceComplete"
-        or S.phase == "dissolve"
-        or S.phase == "mothEat"
-        or S.phase == "limitWait"
-        or S.phase == "uiRestore"
-
-    local maxPending = 1800
-
-    if (moving or activePhase) and maxPending > 0 then
-        if (now - session.lastQueueAt) < maxPending then
-            session.flushTimer = session.flushDelay or 3.0
-            return
-        end
-    elseif moving or activePhase then
-        session.flushTimer = session.flushDelay or 3.0
-        return
-    end
-
-    session.flushTimer = (tonumber(session.flushTimer) or 0) - dt
-
-    if session.flushTimer <= 0 then
-        self:FlushSessionRecordQueue()
-    end
-end
-
-function NSPauk:QueueSessionRecord(count)
-
-end
-
-function NSPauk:FlushSessionRecordQueue()
-    local S = self.S
-
-    if type(S) ~= "table" then
-        return
-    end
-
-    if type(S.session) == "table" then
-        S.session.sessionReportScheduled = false
-        S.session.pendingBestPoints = nil
-    end
-end
-
 function NSPauk:ResetProgress()
     local db = self:EnsureDB()
     self.DB = db
@@ -6230,12 +6112,6 @@ function NSPauk:ResetProgress()
     self.S.webPoints = 0
 
     self:ResetSessionRecord()
-end
-
-function NSPauk:Print(message)
-    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
-        --DEFAULT_CHAT_FRAME:AddMessage(message)
-    end
 end
 
 function NSPauk:PlayerHasGuild()
@@ -6254,8 +6130,6 @@ function NSPauk:PlayerHasGuild()
 end
 
 function NSPauk:SendOfficer(text)
-    self:Print(text)
-
     if self:PlayerHasGuild() and SendChatMessage then
         if type(pcall) == "function" then
             pcall(SendChatMessage, text, "OFFICER")
@@ -6390,14 +6264,6 @@ function NSPauk:CalcWebExperience(count)
     return expGain, pct, count
 end
 
-function NSPauk:SettleWebPoints(count)
-
-end
-
-function NSPauk:RecordWebLength(count)
-    self:SettleWebPoints(count)
-end
-
 function NSPauk:ShowProgress()
     local S = self.S
     local C = self.C
@@ -6443,19 +6309,10 @@ function NSPauk:ShowProgress()
         currentThreads
     ))
 
-    -----------------------------------------------------------------------
-    -- 3. Изменённые параметры.
-    --
-    -- Сюда попадают только те константы, которые присутствуют
-    -- в окне повышения уровня (имеют описание в ConstantDescriptions).
-    -- Служебные параметры в офицерский чат не выводятся.
-    -----------------------------------------------------------------------
     local descriptions = self.ConstantDescriptions
     local changed = {}
 
     for key, defValue in pairs(self.DefaultConstants) do
-        -- Выживаемость выводим отдельной строкой ниже,
-        -- чтобы не дублировать её в общем списке изменений.
         if key ~= "SURVIVAL_CHANCE" then
             local label = nil
 
@@ -6974,10 +6831,6 @@ function NSPauk:ComputeFrameVisibleInner(frame)
         self:LoadConstants()
     end
 
-    ---------------------------------------------------------------------------
-    -- UIParent обычно исключён из обычных видимых прямоугольников.
-    -- Но для хардкорного кокона мы разрешаем его как отдельную цель.
-    ---------------------------------------------------------------------------
     if frame == UIParent then
         local sw, sh = self:GetScreenSize()
 
@@ -7032,9 +6885,6 @@ function NSPauk:MakeUIParentCocoonItem()
         return inner
     end
 
-    ---------------------------------------------------------------------------
-    -- Запасной вариант, если вдруг MakeInnerRect отказал.
-    ---------------------------------------------------------------------------
     local sw, sh = self:GetScreenSize()
 
     if type(sw) ~= "number" or sw <= 0 then
@@ -7086,19 +6936,11 @@ function NSPauk:CollectCocoonCandidates(items, excludeActive)
         end
     end
 
-    ---------------------------------------------------------------------------
-    -- Тот же принцип, что и для хабов/целей:
-    -- если есть хорошие имена, используем их; иначе все видимые.
-    ---------------------------------------------------------------------------
     local pool = good
     if #pool == 0 then
         pool = all
     end
 
-    ---------------------------------------------------------------------------
-    -- Хардкорно добавляем UIParent.
-    -- Он участвует с тем же весом, что и любой другой кандидат.
-    ---------------------------------------------------------------------------
     local ui = self:MakeUIParentCocoonItem()
 
     if ui then
@@ -7119,28 +6961,6 @@ function NSPauk:CollectCocoonCandidates(items, excludeActive)
     end
 
     return pool
-end
-
-function NSPauk:FrameMoved(storedRect, frame)
-    if not frame then
-        return false
-    end
-
-    if not storedRect then
-        return true
-    end
-
-    local cur = self:ComputeFrameVisibleInner(frame)
-    if not cur then
-        return true
-    end
-
-    local tol = self.C.MOVEMENT_TOLERANCE
-
-    return math.abs(cur.left - storedRect.left) > tol
-        or math.abs(cur.right - storedRect.right) > tol
-        or math.abs(cur.bottom - storedRect.bottom) > tol
-        or math.abs(cur.top - storedRect.top) > tol
 end
 
 function NSPauk:CollectVisibleItems()
@@ -7178,9 +6998,6 @@ function NSPauk:CollectVisibleItems()
         f = EnumerateFrames(f)
     end
 
-    -----------------------------------------------------------------------
-    -- Добавляем уже нарисованные паутины как виртуальные видимые объекты.
-    -----------------------------------------------------------------------
     if #items < C.MAX_VISIBLE_RECTS then
         local webItems = self:NP_CollectWebAnchorItems()
 
@@ -7644,9 +7461,6 @@ function NSPauk:ValidateAnchorRect(rect)
         return false
     end
 
-    -----------------------------------------------------------------------
-    -- Виртуальный объект паутины.
-    -----------------------------------------------------------------------
     if rect.webInst then
         return self:NP_IsWebAnchorAlive(rect)
     end
@@ -7704,9 +7518,6 @@ function NSPauk:ValidateConnection(inst, conn)
         return false
     end
 
-    -------------------------------------------------------------------
-    -- Для кольцевых нитей проверяем не только конец, но и начало.
-    -------------------------------------------------------------------
     if conn.ringStartRect then
         if not self:ValidateAnchorRect(conn.ringStartRect) then
             self:KillConnection(inst, conn)
@@ -7714,14 +7525,23 @@ function NSPauk:ValidateConnection(inst, conn)
         end
     end
 
-    -------------------------------------------------------------------
-    -- Радиальные нити естественного кольца держатся на несущей нити.
-    -- Если несущая нить умерла, хаб больше не прикреплён.
-    -------------------------------------------------------------------
     if conn.isSpoke
         and inst.isNaturalRing
         and inst.hubDepConn
         and not inst.hubDepConn.alive then
+        self:KillConnection(inst, conn)
+        return false
+    end
+
+    if conn.isMidSpoke then
+        if conn.perimeterConn and not conn.perimeterConn.alive then
+            self:KillConnection(inst, conn)
+            return false
+        end
+        return true
+    end
+
+    if conn.isDiameterHalf and conn.hubDepConn and not conn.hubDepConn.alive then
         self:KillConnection(inst, conn)
         return false
     end
@@ -7766,7 +7586,6 @@ function NSPauk:SettleInstance(inst)
         return
     end
 
-    self:SettleWebPoints(count)
 end
 
 function NSPauk:CheckInstanceDead(inst)
@@ -7865,12 +7684,6 @@ function NSPauk:SampleThreadPoints(thread, ignoreHubDist)
         arcLength = total,
     }
 
-    -----------------------------------------------------------------------
-    -- Раньше здесь был фиксированный шаг 6 px.
-    -- Для длинных нитей это даёт сотни точек.
-    --
-    -- Теперь ограничиваем количество точек и делаем шаг адаптивным.
-    -----------------------------------------------------------------------
     local span = total - ignoreHubDist
     local maxPoints = 24
 
@@ -7905,133 +7718,6 @@ function NSPauk:SampleThreadPoints(thread, ignoreHubDist)
     end
 
     return points
-end
-
-function NSPauk:GetThreadCollisionPoints(thread, ignoreHubDist)
-    if not thread then
-        return {}
-    end
-
-    -- Версия 2: кэш сбрасывается при изменении алгоритма сэмплирования.
-    if thread._nspColPts
-        and thread._nspColIgnore == ignoreHubDist
-        and thread._nspColVersion == 2 then
-        return thread._nspColPts
-    end
-
-    local pts = self:SampleThreadPoints(thread, ignoreHubDist)
-
-    thread._nspColPts = pts
-    thread._nspColIgnore = ignoreHubDist
-    thread._nspColVersion = 2
-
-    return pts
-end
-
-function NSPauk:ThreadsTooClose(threadA, threadB, minDist, ignoreHubDist)
-    if not threadA or not threadB then
-        return false
-    end
-
-    if type(minDist) ~= "number" or minDist ~= minDist or minDist <= 0 then
-        return false
-    end
-
-    -----------------------------------------------------------------------
-    -- Быстрая проверка bounding box.
-    -----------------------------------------------------------------------
-    local bA = self:NP_GetThreadBounds(threadA)
-    local bB = self:NP_GetThreadBounds(threadB)
-
-    if not bA or not bB then
-        return false
-    end
-
-    if bA.maxX + minDist < bB.minX
-        or bB.maxX + minDist < bA.minX
-        or bA.maxY + minDist < bB.minY
-        or bB.maxY + minDist < bA.minY then
-        return false
-    end
-
-    local min2 = minDist * minDist
-
-    local function close(ax, ay, bx, by)
-        local dx = (ax or 0) - (bx or 0)
-        local dy = (ay or 0) - (by or 0)
-        return (dx * dx + dy * dy) < min2
-    end
-
-    -----------------------------------------------------------------------
-    -- Быстрые проверки характерных точек.
-    --
-    -- Если ignoreHubDist > 0, старт нити рядом с хабом игнорируем,
-    -- иначе все нити паутины будут считаться пересёкшимиися у хаба.
-    -----------------------------------------------------------------------
-    local ignore = 0
-
-    if type(ignoreHubDist) == "number"
-        and ignoreHubDist == ignoreHubDist
-        and ignoreHubDist > 0 then
-        ignore = ignoreHubDist
-    end
-
-    local quickA = {}
-    local quickB = {}
-
-    if ignore <= 0 then
-        quickA = { threadA.p0, threadA.p1, threadA.p2 }
-        quickB = { threadB.p0, threadB.p1, threadB.p2 }
-    else
-        local lenA = self:ApproxThreadLength(threadA)
-        local lenB = self:ApproxThreadLength(threadB)
-
-        if lenA > ignore then
-            quickA[#quickA + 1] = threadA.p2
-        end
-
-        if lenB > ignore then
-            quickB[#quickB + 1] = threadB.p2
-        end
-
-        if lenA > ignore * 1.5 then
-            quickA[#quickA + 1] = threadA.p1
-        end
-
-        if lenB > ignore * 1.5 then
-            quickB[#quickB + 1] = threadB.p1
-        end
-    end
-
-    for _, a in ipairs(quickA) do
-        if a then
-            for _, b in ipairs(quickB) do
-                if b and close(a.x, a.y, b.x, b.y) then
-                    return true
-                end
-            end
-        end
-    end
-
-    -----------------------------------------------------------------------
-    -- Уменьшенный набор точек кривой.
-    -----------------------------------------------------------------------
-    local ptsA = self:GetThreadCollisionPoints(threadA, ignoreHubDist)
-    local ptsB = self:GetThreadCollisionPoints(threadB, ignoreHubDist)
-
-    if #ptsA == 0 or #ptsB == 0 then
-        return false
-    end
-
-    for _, a in ipairs(ptsA) do
-        for _, b in ipairs(ptsB) do
-            if close(a.x, a.y, b.x, b.y) then
-                return true
-            end
-        end
-    end
-
-    return false
 end
 
 function NSPauk:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
@@ -8079,10 +7765,6 @@ function NSPauk:CreateCrossSegArc(inst, connA, connB, tA, tB, minLen)
 
     return seg
 end
-
----------------------------------------------------------------------------
--- Map/crawl: вспомогательные методы маршрутизации
----------------------------------------------------------------------------
 
 function NSPauk:NP_GetGap()
     local C = self.C or {}
@@ -8196,10 +7878,6 @@ function NSPauk:NP_NearestThreadT(thread, x, y)
     return bestT, math.sqrt(bestD2)
 end
 
----------------------------------------------------------------------------
--- Новые методы: локальная проверка текущей опоры и вертикальное падение
----------------------------------------------------------------------------
-
 function NSPauk:NP_GetThreadOwner(thread)
     local ref = thread and thread.ownerRef
     if not ref then
@@ -8246,15 +7924,10 @@ function NSPauk:NP_ThreadWithinDist(thread, owner, x, y, tol)
         return (dx * dx + dy * dy) <= tol2
     end
 
-    -- Сначала проверяем концы и середину.
     if close(p0.x, p0.y) or close(p2.x, p2.y) or close(p1.x, p1.y) then
         return true
     end
 
-    -----------------------------------------------------------------------
-    -- Раньше здесь было 12 сегментов.
-    -- Для поддержки обычно достаточно 8 сегментов.
-    -----------------------------------------------------------------------
     local prevX, prevY
     local n = 8
 
@@ -8290,10 +7963,6 @@ function NSPauk:NP_IsFrameSupportAlive(frame, x, y, tol)
         return false
     end
 
-    -----------------------------------------------------------------------
-    -- UIParent разрешаем как полную опору только для маршрутов кокона.
-    -- Это не делает его обычным якорем для паутины.
-    -----------------------------------------------------------------------
     if frame == UIParent then
         local sw, sh = self:GetScreenSize()
 
@@ -8465,11 +8134,6 @@ function NSPauk:NP_EnsureFrameCache()
     local S = self.S
     local now = GetTime()
 
-    -----------------------------------------------------------------------
-    -- Раньше TTL был 1.0 сек.
-    -- Для маршрутизации и проверок поддержки 1.5 сек обычно достаточно,
-    -- а EnumerateFrames будет вызываться реже.
-    -----------------------------------------------------------------------
     local ttl = 1.5
 
     if S.nspFrameCache and now - (S.nspFrameCache.t or 0) < ttl then
@@ -8516,11 +8180,6 @@ end
 function NSPauk:NP_GetVisibleFrameRects(a, b, padOverride)
     local all = self:NP_EnsureFrameCache()
 
-    -----------------------------------------------------------------------
-    -- Если текущий кокон сидит на UIParent, добавляем весь экран
-    -- как маршрутный фрейм. Это нужно только для маршрутизации,
-    -- а не для выбора обычных якорей паутины.
-    -----------------------------------------------------------------------
     if self:NP_RouteNeedsUIParent() then
         local hasUIParent = false
 
@@ -8686,11 +8345,7 @@ function NSPauk:NP_GetWebThreads(a, b, padOverride)
     end)
 
     local out = {}
-    ---------------------------------------------------------------
-    -- ИСПРАВЛЕНО: лимит 45 → 80.
-    -- Иначе нужная нить не попадает в граф и паук
-    -- не может по ней ползти.
-    ---------------------------------------------------------------
+
     local limit = 800
     for i = 1, #cand do
         local entry = cand[i]
@@ -8868,10 +8523,7 @@ function NSPauk:NP_FindFallTarget(x, y)
                     checked = checked + 1
                     local samples = self:NP_EnsureThreadSamples(conn.thread)
                     if samples then
-                        ---------------------------------------------------
-                        -- ИСПРАВЛЕНО: каждый 4-й сэмпл вместо всех.
-                        -- 24 сэмпла → 6 проверок на нить.
-                        ---------------------------------------------------
+
                         for si = 1, #samples, 4 do
                             local p = samples[si]
                             if math.abs(p.x - x) <= xTol
@@ -9380,15 +9032,6 @@ function NSPauk:NP_BuildRoute(from, to)
         end
     end
 
-    -------------------------------------------------------------------
-    -- ИСПРАВЛЕНО: gap-соединения через пространственную сетку.
-    --
-    -- Было: перебор всех пар узлов O(N²).
-    -- При 1500 узлов это ~1.1 млн проверок расстояния.
-    --
-    -- Стало: сетка с ячейкой gap. Для каждого узла проверяются
-    -- только узлы в 9 соседних ячейках. O(N × k), где k ≈ 5-20.
-    -------------------------------------------------------------------
     local cellSize = gap
     if cellSize < 1 then
         cellSize = 1
@@ -10191,9 +9834,7 @@ function NSPauk:NP_CollectWebAnchorItems()
             end
 
             if hasDrawn then
-                -----------------------------------------------------------
-                -- Виртуальный хаб старой паутины.
-                -----------------------------------------------------------
+
                 if inst.hub and inst.hub.rect then
                     local r = inst.hub.rect
 
@@ -10220,9 +9861,6 @@ function NSPauk:NP_CollectWebAnchorItems()
                     }
                 end
 
-                -----------------------------------------------------------
-                -- Виртуальные боковые точки на концах живых нитей.
-                -----------------------------------------------------------
                 local count = 0
 
                 for _, conn in ipairs(inst.conns or {}) do
@@ -10296,10 +9934,6 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
     local baseAlpha = tonumber(C.WEB_ALPHA) or 0.55
     local alpha = math.min(0.95, baseAlpha + 0.35)
 
-    -----------------------------------------------------------------------
-    -- Плотность линии регулируется не только FPS-троттлингом,
-    -- но и адаптивным уменьшением точек паутины.
-    -----------------------------------------------------------------------
     local density = self:NP_GetWebDensityOffset()
 
     local step = math.max(1 + density, webSize * 0.65)
@@ -10323,10 +9957,6 @@ function NSPauk:NP_UpdateDragTextures(list, anchor, current, vertical)
 
     local visibleCount = count
 
-    -----------------------------------------------------------------------
-    -- Если раньше было создано больше текстур, чем нужно теперь,
-    -- возвращаем лишний хвост в пул.
-    -----------------------------------------------------------------------
     if #list > visibleCount then
         local surplus = {}
 
@@ -10590,28 +10220,6 @@ function NSPauk:NP_UpdateGlobalDrag()
     )
 end
 
-function NSPauk:NP_UpdateTempDrag(task)
-    local S = self.S
-
-    if not task then
-        return
-    end
-
-    if not task.nspDragTextures then
-        task.nspDragTextures = {}
-    end
-
-    self:NP_UpdateDragTextures(
-        task.nspDragTextures,
-        task.p0,
-        {
-            x = S.lastSpiderX or 0,
-            y = S.lastSpiderY or 0,
-        },
-        true
-    )
-end
-
 function NSPauk:NP_ClearTempOwners()
     local S = self.S
 
@@ -10669,10 +10277,6 @@ function NSPauk:NP_NearSupportWithin(x, y, tol)
         ok = true
     end
 
-    -----------------------------------------------------------------------
-    -- Для кокона на UIParent считаем весь экран допустимой опорой.
-    -- Это нужно только для маршрутизации и проверок поддержки.
-    -----------------------------------------------------------------------
     if not ok and needUI == 1 then
         if x >= -tol
             and x <= sw + tol
@@ -11068,9 +10672,6 @@ function NSPauk:HandleAdaptiveCommand(msg)
     self:Echo("Команды: /nspadapt [status|on|off|reset]")
 end
 
----------------------------------------------------------------------------
--- Поддержка маршрутизации кокона на UIParent
----------------------------------------------------------------------------
 function NSPauk:NP_RouteNeedsUIParent()
     local S = self.S
     if type(S) ~= "table" then
@@ -11096,9 +10697,6 @@ function NSPauk:NP_RouteNeedsUIParent()
     return false
 end
 
----------------------------------------------------------------------------
--- Вход в кокон по общему маршруту
----------------------------------------------------------------------------
 function NSPauk:NP_InsertCocoonEntryApproach(inst)
     if not inst or not inst.isCocoon or inst.isMoth then
         return
@@ -11184,215 +10782,142 @@ function NSPauk:GetWebPointSpacingForTask(task)
 end
 
 function NSPauk:NP_PostUpdate()
-    local S = self.S
+  local S = self.S
 
-    if type(S) ~= "table" then
-        return
+  if type(S) ~= "table" then
+    return
+  end
+
+  if not self.initialized or S.runtimeOff or S.phase == "off" then
+    return
+  end
+
+  if S.combatHide then
+    return
+  end
+
+  if S.phase == "task" then
+    local task = S.currentTask
+
+    if task then
+      local needDrag = S.nspDrag and task.nspDuringDrag
+
+      if needDrag then
+        local now = GetTime()
+        local adaptiveInterval = self:NP_GetAdaptiveInterval()
+
+        if type(adaptiveInterval) ~= "number" or adaptiveInterval < 0 then
+          adaptiveInterval = 0
+        end
+
+        local throttle = self:NP_UpdateDragThrottle(now)
+        local throttleInterval = tonumber(throttle and throttle.interval) or 0
+
+        if throttleInterval < 0 then
+          throttleInterval = 0
+        end
+
+        local interval = math.max(adaptiveInterval, throttleInterval)
+
+        if interval <= 0 or not S.nspDragVisualAt or (now - S.nspDragVisualAt) >= interval then
+          S.nspDragVisualAt = now
+          self:NP_UpdateGlobalDrag()
+        end
+      end
     end
 
-    if not self.initialized or S.runtimeOff or S.phase == "off" then
-        return
+    if S.nspDrag then
+      local activeDragTask = task and task.nspDuringDrag
+
+      if not activeDragTask then
+        self:NP_ClearGlobalDrag(true)
+      end
+    end
+  else
+    if S.nspDrag then
+      local task = S.currentTask
+      local activeDragTask = task and task.nspDuringDrag
+
+      if not activeDragTask then
+        self:NP_ClearGlobalDrag(true)
+      end
+    end
+  end
+
+  if S.phase == "task" or S.phase == "instanceComplete" then
+    if S.nspSectorRecheckPending then
+      S.nspSectorRecheckPending = false
+
+      local inst = S.nspSectorRecheckInst or S.currentInstance
+      S.nspSectorRecheckInst = nil
+
+      if inst and inst == S.currentInstance then
+        self:NP_RecheckWebSectors(inst)
+      end
     end
 
-    if S.combatHide then
-        return
+    if S.nspQueueResumePending then
+      self:NP_ProcessQueueResume()
     end
 
-    if S.phase == "task" then
-        local task = S.currentTask
+    if S.phase == "instanceComplete" and not S.nspQueueResumePending then
+      local inst = S.currentInstance
 
-        if task then
-            local needDrag = S.nspDrag and task.nspDuringDrag
-            local needTemp = task.nspTempThread
-
-            if needDrag or needTemp then
-                local now = GetTime()
-
-                local adaptiveInterval = self:NP_GetAdaptiveInterval()
-
-                if type(adaptiveInterval) ~= "number"
-                    or adaptiveInterval < 0 then
-                    adaptiveInterval = 0
-                end
-
-                local throttle = self:NP_UpdateDragThrottle(now)
-
-                local throttleInterval = tonumber(throttle and throttle.interval) or 0
-
-                if throttleInterval < 0 then
-                    throttleInterval = 0
-                end
-
-                local interval = math.max(adaptiveInterval, throttleInterval)
-
-                if needDrag then
-                    if interval <= 0
-                        or not S.nspDragVisualAt
-                        or (now - S.nspDragVisualAt) >= interval then
-                        S.nspDragVisualAt = now
-                        self:NP_UpdateGlobalDrag()
-                    end
-                end
-
-                if needTemp then
-                    if interval <= 0
-                        or not S.nspTempVisualAt
-                        or (now - S.nspTempVisualAt) >= interval then
-                        S.nspTempVisualAt = now
-                        self:NP_UpdateTempDrag(task)
-                    end
-                end
-            end
+      if inst and not inst.torn and not inst.isCocoon and not inst.isMoth then
+        if self:NP_HasRequiredWebPending(inst) then
+          self:NP_RequestQueueResume(inst, nil)
+          self:NP_ProcessQueueResume()
         end
-
-        -------------------------------------------------------------------
-        -- ГЛАВНЫЙ ФИКС:
-        --
-        -- Если фаза task, но активной drag-задачи нет,
-        -- значит drag осиротел. Убираем его немедленно.
-        -------------------------------------------------------------------
-        if S.nspDrag then
-            local activeDragTask = task and task.nspDuringDrag
-
-            if not activeDragTask then
-                self:NP_ClearGlobalDrag(true)
-            end
-        end
-    else
-        -------------------------------------------------------------------
-        -- Для всех остальных фаз правило ещё жёстче:
-        -- drag может существовать только вместе с активной drag-задачей.
-        -------------------------------------------------------------------
-        if S.nspDrag then
-            local task = S.currentTask
-            local activeDragTask = task and task.nspDuringDrag
-
-            if not activeDragTask then
-                self:NP_ClearGlobalDrag(true)
-            end
-        end
+      end
     end
-
-    if S.phase == "task" or S.phase == "instanceComplete" then
-        if S.nspSectorRecheckPending then
-            S.nspSectorRecheckPending = false
-
-            local inst = S.nspSectorRecheckInst or S.currentInstance
-
-            S.nspSectorRecheckInst = nil
-
-            if inst and inst == S.currentInstance then
-                self:NP_RecheckWebSectors(inst)
-            end
-        end
-
-        -------------------------------------------------------------------
-        -- Обработка отложенного требования "продолжить с первой
-        -- недорисованной".
-        -------------------------------------------------------------------
-        if S.nspQueueResumePending then
-            self:NP_ProcessQueueResume()
-        end
-
-        -------------------------------------------------------------------
-        -- Если очередь закончилась, но паутина реально не достроена,
-        -- не даём ей уйти в новую паутину.
-        -------------------------------------------------------------------
-        if S.phase == "instanceComplete"
-            and not S.nspQueueResumePending then
-            local inst = S.currentInstance
-
-            if inst
-                and not inst.torn
-                and not inst.isCocoon
-                and not inst.isMoth then
-                if self:NP_HasRequiredWebPending(inst) then
-                    self:NP_RequestQueueResume(inst, nil)
-                    self:NP_ProcessQueueResume()
-                end
-            end
-        end
-    end
+  end
 end
 
 function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
     local S = self.S
-
     local SW = S.SW or 0
     local SH = S.SH or 0
-
     if SW <= 0 or SH <= 0 then
         SW, SH = self:GetScreenSize()
     end
-
     if SW <= 0 or SH <= 0 then
         return nil
     end
-
     targetCount = math.floor(tonumber(targetCount) or 4)
-
-    if targetCount < 3 then
-        targetCount = 3
+    if targetCount < 4 then
+        targetCount = 4
     end
-
-    -------------------------------------------------------------------
-    -- Для 4 нитей делаем 2x2 = 4 зоны.
-    -- Для 6 нитей делаем 6x6 = 36 зон.
-    -- Если хочешь всегда N x N, просто поставь gridDim = targetCount.
-    -------------------------------------------------------------------
-    local gridDim
-
-    if targetCount <= 4 then
-        gridDim = 2
-    else
-        gridDim = targetCount
+    local gridDim = targetCount
+    if gridDim < 4 then
+        gridDim = 4
     end
-
-    if gridDim < 2 then
-        gridDim = 2
+    if gridDim > 12 then
+        gridDim = 12
     end
-
-    if gridDim > 8 then
-        gridDim = 8
-    end
-
     local twoPi = math.pi * 2
-
     local function normAngle(a)
         while a < 0 do
             a = a + twoPi
         end
-
         while a >= twoPi do
             a = a - twoPi
         end
-
         return a
     end
-
-    -------------------------------------------------------------------
-    -- Создаём ячейки сетки.
-    -------------------------------------------------------------------
     local cells = {}
     local maxR2 = 0
-
+    local minCenterDist = math.min(SW, SH) * 0.05
     for gy = 1, gridDim do
         for gx = 1, gridDim do
             local left = (gx - 1) * SW / gridDim
             local right = gx * SW / gridDim
             local bottom = (gy - 1) * SH / gridDim
             local top = gy * SH / gridDim
-
             local cx = (left + right) / 2
             local cy = (bottom + top) / 2
-
             local dx = cx - SW / 2
             local dy = cy - SH / 2
             local r2 = dx * dx + dy * dy
-
-            -- Немного отбрасываем самый центр, чтобы точки были ближе к периметру.
-            local minCenterDist = math.min(SW, SH) * 0.05
-
             if r2 >= minCenterDist * minCenterDist then
                 cells[#cells + 1] = {
                     left = left,
@@ -11404,128 +10929,90 @@ function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
                     angle = normAngle(math.atan2(dy, dx)),
                     r2 = r2,
                 }
-
                 if r2 > maxR2 then
                     maxR2 = r2
                 end
             end
         end
     end
-
     if #cells == 0 then
         return nil
     end
-
-    -------------------------------------------------------------------
-    -- Выбираем ячейки так, чтобы они были распределены по кругу.
-    -------------------------------------------------------------------
     local chosenCells = {}
-
     if #cells <= targetCount then
         for _, cell in ipairs(cells) do
             chosenCells[#chosenCells + 1] = cell
         end
     else
         local usedCells = {}
-
         for k = 0, targetCount - 1 do
             local targetAngle = normAngle(k * twoPi / targetCount)
-
             local bestCell = nil
             local bestScore = nil
-
             for _, cell in ipairs(cells) do
                 if not usedCells[cell] then
                     local diff = math.abs(cell.angle - targetAngle)
-
                     if diff > math.pi then
                         diff = twoPi - diff
                     end
-
                     local radiusScore = 0
-
                     if maxR2 > 0 then
                         radiusScore = cell.r2 / maxR2
                     end
-
-                    -- Главное — совпадение направления.
-                    -- Небольшой бонус даём более внешним ячейкам.
                     local score = diff - radiusScore * 0.35
-
                     if not bestScore or score < bestScore then
                         bestScore = score
                         bestCell = cell
                     end
                 end
             end
-
             if bestCell then
                 usedCells[bestCell] = true
                 chosenCells[#chosenCells + 1] = bestCell
             end
         end
     end
-
     if #chosenCells == 0 then
         return nil
     end
-
-    -------------------------------------------------------------------
-    -- В каждой выбранной ячейке ищем объект.
-    -------------------------------------------------------------------
     local usedItems = {}
     local anchors = {}
-
     local function addItem(item)
         if not item or usedItems[item] then
             return false
         end
-
         usedItems[item] = true
         anchors[#anchors + 1] = item
         return true
     end
-
     for _, cell in ipairs(chosenCells) do
         local bestItem = nil
         local bestScore = nil
-
         for _, item in ipairs(pool) do
             if not usedItems[item] then
                 local dx = (item.cx or 0) - cell.cx
                 local dy = (item.cy or 0) - cell.cy
                 local d2 = dx * dx + dy * dy
-
-                local inside =
-                    item.cx >= cell.left
+                local inside = item.cx >= cell.left
                     and item.cx <= cell.right
                     and item.cy >= cell.bottom
                     and item.cy <= cell.top
-
                 local score = d2
-
                 if not inside then
                     score = score + 1000000
                 end
-
                 if not bestScore or score < bestScore then
                     bestScore = score
                     bestItem = item
                 end
             end
         end
-
         if bestItem then
             addItem(bestItem)
         end
     end
-
-    -------------------------------------------------------------------
-    -- Если не хватило объектов по ячейкам, добираем любые свободные.
-    -------------------------------------------------------------------
     while #anchors < targetCount do
         local added = false
-
         for _, item in ipairs(pool) do
             if not usedItems[item] then
                 addItem(item)
@@ -11533,65 +11020,93 @@ function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
                 break
             end
         end
-
         if not added then
             break
         end
     end
-
-    if #anchors < 3 then
+    if #anchors < 4 then
         return nil
     end
-
     return anchors
+end
+
+function NSPauk:NP_MakeHullEven(hull)
+    if type(hull) ~= "table" or #hull < 4 then
+        return nil
+    end
+    if #hull % 2 == 0 then
+        return hull
+    end
+    if #hull < 5 then
+        return nil
+    end
+    local N = #hull
+    local bestIdx = nil
+    local bestScore = math.huge
+    for i = 1, N do
+        local prev = hull[((i - 2 + N) % N) + 1]
+        local cur = hull[i]
+        local nxt = hull[(i % N) + 1]
+        local area = math.abs(
+            (cur.x - prev.x) * (nxt.y - prev.y)
+            - (cur.y - prev.y) * (nxt.x - prev.x)
+        )
+        if area < bestScore then
+            bestScore = area
+            bestIdx = i
+        end
+    end
+    if not bestIdx then
+        return nil
+    end
+    local out = {}
+    for i = 1, N do
+        if i ~= bestIdx then
+            out[#out + 1] = hull[i]
+        end
+    end
+    if #out >= 4 and #out % 2 == 0 then
+        return out
+    end
+    return nil
 end
 
 function NSPauk:NP_CollectRingAnchors(items, targetCount)
     local good = {}
     local all = {}
-
     for _, item in ipairs(items or {}) do
         if item and item.frame then
             if self:IsGoodAnchorName(item.name) then
                 good[#good + 1] = item
             end
-
             all[#all + 1] = item
         end
     end
-
     local pool = good
-
     if #pool == 0 then
         pool = all
     end
-
-    if #pool < 3 then
+    if #pool < 4 then
         return nil
     end
-
     targetCount = math.floor(tonumber(targetCount) or 4)
-
-    if targetCount < 3 then
-        targetCount = 3
+    if targetCount < 4 then
+        targetCount = 4
     end
-
+    if targetCount % 2 ~= 0 then
+        targetCount = targetCount + 1
+    end
     if targetCount > #pool then
-        targetCount = #pool
+        targetCount = #pool - (#pool % 2)
     end
-
+    if targetCount < 4 then
+        return nil
+    end
     local bestHull = nil
-
-    -------------------------------------------------------------------
-    -- Несколько попыток подобрать точки так, чтобы все они
-    -- попали на выпуклую оболочку.
-    -------------------------------------------------------------------
-    for attempt = 1, 8 do
+    for _ = 1, 16 do
         local picked = self:NP_PickRingAnchorsOnce(pool, targetCount)
-
-        if picked and #picked >= 3 then
+        if picked and #picked >= 4 then
             local points = {}
-
             for _, item in ipairs(picked) do
                 points[#points + 1] = {
                     x = item.cx or 0,
@@ -11599,38 +11114,351 @@ function NSPauk:NP_CollectRingAnchors(items, targetCount)
                     item = item,
                 }
             end
-
             local hull = self:NP_ConvexHull(points)
-
-            if hull and #hull >= 3 then
-                if #hull == targetCount then
-                    local out = {}
-
-                    for _, p in ipairs(hull) do
-                        out[#out + 1] = p.item
-                    end
-
-                    return out
+            if hull and #hull >= 4 then
+                if #hull % 2 ~= 0 then
+                    hull = self:NP_MakeHullEven(hull)
                 end
-
-                if not bestHull or #hull > #bestHull then
-                    bestHull = hull
+                if hull and #hull >= 4 and #hull % 2 == 0 then
+                    if #hull == targetCount then
+                        local out = {}
+                        for _, p in ipairs(hull) do
+                            out[#out + 1] = p.item
+                        end
+                        return out
+                    end
+                    if not bestHull or #hull > #bestHull then
+                        bestHull = hull
+                    end
                 end
             end
         end
     end
-
     if bestHull then
         local out = {}
-
         for _, p in ipairs(bestHull) do
             out[#out + 1] = p.item
         end
+        return out
+    end
+    return nil
+end
 
+function NSPauk:NP_MakeRingSagThread(p0, p2, mode, sagMult)
+    local function cp(p)
+        if not p then
+            return { x = 0, y = 0 }
+        end
+        return {
+            x = p.x or 0,
+            y = p.y or 0,
+        }
+    end
+    p0 = cp(p0)
+    p2 = cp(p2)
+    local thread = {
+        p0 = p0,
+        p2 = p2,
+    }
+    local dx = p2.x - p0.x
+    local dy = p2.y - p0.y
+    local len = math.sqrt(dx * dx + dy * dy)
+    local mx = (p0.x + p2.x) / 2
+    local my = (p0.y + p2.y) / 2
+    if len < 1 then
+        thread.p1 = {
+            x = mx,
+            y = my,
+        }
+        return thread
+    end
+    local C = self.C or {}
+    local D = self.DefaultConstants or {}
+    local minSag
+    local maxSag
+    local jitter
+    if mode == "main" then
+        minSag = tonumber(C.MAIN_SAG_MIN) or D.MAIN_SAG_MIN or 0.06
+        maxSag = tonumber(C.MAIN_SAG_MAX) or D.MAIN_SAG_MAX or 0.16
+        jitter = 0.05
+    else
+        minSag = tonumber(C.CROSS_SAG_MIN) or D.CROSS_SAG_MIN or 0.05
+        maxSag = tonumber(C.CROSS_SAG_MAX) or D.CROSS_SAG_MAX or 0.13
+        jitter = 0.06
+    end
+    if type(sagMult) ~= "number" or sagMult ~= sagMult then
+        sagMult = 1
+    end
+    if sagMult <= 0 then
+        thread.p1 = {
+            x = mx,
+            y = my,
+        }
+        return thread
+    end
+    local ratio = self:RandomFloat(minSag, maxSag) * sagMult
+    if type(ratio) ~= "number" or ratio ~= ratio or ratio <= 0 then
+        ratio = 0.08 * sagMult
+    end
+    local sag = len * ratio
+    if type(sag) ~= "number" or sag ~= sag or sag <= 0 then
+        sag = math.max(len * 0.08, 0.5)
+    elseif sag < 0.5 then
+        sag = 0.5
+    end
+    local n1x = -dy / len
+    local n1y = dx / len
+    local n2x = dy / len
+    local n2y = -dx / len
+    local nx, ny
+    if n1y < n2y then
+        nx = n1x
+        ny = n1y
+    else
+        nx = n2x
+        ny = n2y
+    end
+    if ny > -0.08 then
+        local topX
+        local bottomX
+        if p0.y >= p2.y then
+            topX = p0.x
+            bottomX = p2.x
+        else
+            topX = p2.x
+            bottomX = p0.x
+        end
+        if topX > bottomX then
+            nx = 1
+        else
+            nx = -1
+        end
+        ny = 0
+    end
+    local offsetX = nx * sag
+    local offsetY = ny * sag
+    if ny > -0.35 then
+        offsetY = offsetY - sag * 0.45
+    end
+    local jitterX = (math.random() - 0.5) * len * jitter * 0.25
+    local jitterY = (math.random() - 0.5) * len * jitter * 0.10
+    local px = mx + offsetX + jitterX
+    local py = my + offsetY + jitterY
+    local minPy = my - math.max(0.5, sag * 0.20)
+    if py > minPy then
+        py = minPy
+    end
+    if py < 1 then
+        py = 1
+    end
+    thread.p1 = {
+        x = px,
+        y = py,
+    }
+    return thread
+end
+
+function NSPauk:NP_SubBezierThread(thread, u, v, reverse)
+    if not thread or not thread.p0 or not thread.p1 or not thread.p2 then
+        return nil
+    end
+    local p0x = thread.p0.x
+    local p0y = thread.p0.y
+    local p1x = thread.p1.x
+    local p1y = thread.p1.y
+    local p2x = thread.p2.x
+    local p2y = thread.p2.y
+    local function bez(t)
+        local m = 1 - t
+        return m * m * p0x + 2 * m * t * p1x + t * t * p2x,
+            m * m * p0y + 2 * m * t * p1y + t * t * p2y
+    end
+    local x0, y0 = bez(u)
+    local x2, y2 = bez(v)
+    local cx = (1 - u) * (1 - v) * p0x
+        + (u * (1 - v) + v * (1 - u)) * p1x
+        + u * v * p2x
+    local cy = (1 - u) * (1 - v) * p0y
+        + (u * (1 - v) + v * (1 - u)) * p1y
+        + u * v * p2y
+    if reverse then
+        return {
+            p0 = { x = x2, y = y2 },
+            p1 = { x = cx, y = cy },
+            p2 = { x = x0, y = y0 },
+        }
+    end
+    return {
+        p0 = { x = x0, y = y0 },
+        p1 = { x = cx, y = cy },
+        p2 = { x = x2, y = y2 },
+    }
+end
+
+function NSPauk:NP_ChooseOppositeRingPair(anchors)
+    local N = anchors and #anchors or 0
+    if N < 4 then
+        return 1, 2
+    end
+    local half = math.floor(N / 2)
+    local bestI = 1
+    local bestJ = 1 + half
+    if bestJ > N then
+        bestJ = bestJ - N
+    end
+    local bestScore = -math.huge
+    for i = 1, N do
+        local j = i + half
+        if j > N then
+            j = j - N
+        end
+        local a = anchors[i]
+        local b = anchors[j]
+        if a and b then
+            local dx = math.abs((a.cx or 0) - (b.cx or 0))
+            local dy = math.abs((a.cy or 0) - (b.cy or 0))
+            local dist = math.sqrt(dx * dx + dy * dy)
+            local score = dx * 2 + dist * 0.35
+            if dx >= dy then
+                score = score + dist * 0.5
+            end
+            if score > bestScore then
+                bestScore = score
+                bestI = i
+                bestJ = j
+            end
+        end
+    end
+    return bestI, bestJ
+end
+
+function NSPauk:NP_GetRingRowArcs(connA, connB)
+    local C = self.C or {}
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+    if spacing < 0.5 then
+        spacing = 0.5
+    end
+    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+    if minCross < 0 then
+        minCross = 4
+    end
+    local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
+    if maxRows < 0 then
+        maxRows = 1600
+    end
+    local lenA = tonumber(connA and connA.arcLength) or 0
+    local lenB = tonumber(connB and connB.arcLength) or 0
+    if lenA < 0 then
+        lenA = 0
+    end
+    if lenB < 0 then
+        lenB = 0
+    end
+    local maxLen = math.min(lenA, lenB)
+    local out = {}
+    if maxLen < minCross then
+        return out
+    end
+    local rows = 0
+    local arcLen = spacing
+    while arcLen <= maxLen and rows < maxRows do
+        out[#out + 1] = arcLen
+        arcLen = arcLen + spacing
+        rows = rows + 1
+    end
+    local last = out[#out]
+    if not last then
+        if rows < maxRows then
+            out[#out + 1] = maxLen
+        end
+    else
+        local tail = maxLen - last
+        if tail > 0.001 then
+            local snapTol = spacing * 0.6
+            if tail <= snapTol then
+                out[#out] = maxLen
+            elseif rows < maxRows then
+                out[#out + 1] = maxLen
+            end
+        end
+    end
+    return out
+end
+
+function NSPauk:NP_GetRingSectors(inst)
+    local out = {}
+
+    if not inst or not inst.conns then
         return out
     end
 
-    return nil
+    local C = self.C or {}
+    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+    if minCross < 0 then
+        minCross = 4
+    end
+
+    local radial = {}
+
+    for _, conn in ipairs(inst.conns) do
+        if conn.alive and not conn.noSector and conn.thread then
+            if not conn.arcLength or conn.arcLength <= 0 then
+                local samples, total = self:BuildArcSamples(conn.thread)
+                conn.arcSamples = samples
+                conn.arcLength = total
+            end
+
+            if type(conn.arcLength) == "number" and conn.arcLength >= minCross then
+                radial[#radial + 1] = conn
+            end
+        end
+    end
+
+    if #radial < 2 then
+        return out
+    end
+
+    table.sort(radial, function(a, b)
+        local aa = a.angle or 0
+        local bb = b.angle or 0
+        if aa == bb then
+            return (a.id or 0) < (b.id or 0)
+        end
+        return aa < bb
+    end)
+
+    local seen = {}
+    local M = #radial
+
+    for i = 1, M do
+        local connA = radial[i]
+        local connB = radial[(i % M) + 1]
+
+        local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
+
+        if pairMin >= minCross then
+            local idA = connA.id or 0
+            local idB = connB.id or 0
+
+            if idA > idB then
+                idA, idB = idB, idA
+            end
+
+            local key = tostring(idA) .. "-" .. tostring(idB)
+
+            if not seen[key] then
+                seen[key] = true
+                out[#out + 1] = {
+                    a = idA,
+                    b = idB,
+                    key = key,
+                    pairMin = pairMin,
+                }
+            end
+        end
+    end
+
+    return out
 end
 
 function NSPauk:NP_ConvexHull(points)
@@ -11661,9 +11489,6 @@ function NSPauk:NP_ConvexHull(points)
         return a.x < b.x
     end)
 
-    -------------------------------------------------------------------
-    -- Убираем дубликаты.
-    -------------------------------------------------------------------
     local unique = {}
 
     for _, p in ipairs(pts) do
@@ -11719,188 +11544,6 @@ function NSPauk:NP_ConvexHull(points)
     end
 
     return lower
-end
-
-function NSPauk:NP_MakeRingThread(p0, p2, center, mode)
-    local function cp(p)
-        if not p then
-            return { x = 0, y = 0 }
-        end
-
-        return {
-            x = p.x or 0,
-            y = p.y or 0,
-        }
-    end
-
-    p0 = cp(p0)
-    p2 = cp(p2)
-
-    local thread = {
-        p0 = p0,
-        p2 = p2,
-    }
-
-    local mx = (p0.x + p2.x) / 2
-    local my = (p0.y + p2.y) / 2
-
-    local dx = p2.x - p0.x
-    local dy = p2.y - p0.y
-
-    local len = math.sqrt(dx * dx + dy * dy)
-
-    if len < 1 then
-        thread.p1 = {
-            x = mx,
-            y = my,
-        }
-
-        return thread
-    end
-
-    local C = self.C or {}
-
-    local minSag
-    local maxSag
-    local jitter
-
-    if mode == "radial" then
-        minSag = tonumber(C.CROSS_SAG_MIN) or 0.05
-        maxSag = tonumber(C.CROSS_SAG_MAX) or 0.13
-        jitter = 0.05
-    else
-        minSag = tonumber(C.MAIN_SAG_MIN) or 0.06
-        maxSag = tonumber(C.MAIN_SAG_MAX) or 0.16
-        jitter = 0.04
-    end
-
-    local ratio = self:RandomFloat(minSag, maxSag)
-
-    if type(ratio) ~= "number" or ratio ~= ratio or ratio <= 0 then
-        ratio = 0.08
-    end
-
-    local sag = len * ratio
-
-    if sag < 1 then
-        sag = 1
-    end
-
-    -------------------------------------------------------------------
-    -- Направление нити.
-    -------------------------------------------------------------------
-    local nx = dx / len
-    local ny = dy / len
-
-    -------------------------------------------------------------------
-    -- Гравитация в экранных координатах WoW.
-    --
-    -- В WoW UI ось Y растёт вверх, поэтому гравитация вниз это:
-    --   x = 0
-    --   y = -1
-    -------------------------------------------------------------------
-    local gx = 0
-    local gy = -1
-
-    -------------------------------------------------------------------
-    -- Берём только ту часть гравитации, которая перпендикулярна нити.
-    --
-    -- Для горизонтальной нити перпендикулярная гравитация максимальна.
-    -- Для вертикальной нити она почти нулевая.
-    -- Для наклонной нити провис получится физически корректным:
-    -- вниз и в сторону "нижней" части линии.
-    -------------------------------------------------------------------
-    local dot = nx * gx + ny * gy
-
-    local px = gx - dot * nx
-    local py = gy - dot * ny
-
-    local plen = math.sqrt(px * px + py * py)
-
-    -------------------------------------------------------------------
-    -- Небольшое внутреннее стягивание кольца можно оставить.
-    --
-    -- Если хочешь чистую гравитацию без стягивания к центру,
-    -- поставь:
-    --   local inwardWeight = 0
-    -------------------------------------------------------------------
-    local inwardX = 0
-    local inwardY = 0
-
-    if center then
-        inwardX = center.x - mx
-        inwardY = center.y - my
-
-        local ilen = math.sqrt(inwardX * inwardX + inwardY * inwardY)
-
-        if ilen > 1 then
-            inwardX = inwardX / ilen
-            inwardY = inwardY / ilen
-        else
-            inwardX = 0
-            inwardY = 0
-        end
-    end
-
-    local gravWeight = 1.0
-    local inwardWeight = 0.12
-
-    if mode == "radial" then
-        inwardWeight = 0.05
-    end
-
-    local dirX
-    local dirY
-
-    if plen > 0.08 then
-        dirX = (px / plen) * gravWeight + inwardX * inwardWeight
-        dirY = (py / plen) * gravWeight + inwardY * inwardWeight
-    else
-        ---------------------------------------------------------------
-        -- Нить почти вертикальная.
-        -- Гравитация почти совпадает с самой нитью, поэтому
-        -- перпендикулярного провиса почти нет.
-        --
-        -- Оставляем только лёгкое внутреннее стягивание, если оно есть.
-        ---------------------------------------------------------------
-        dirX = inwardX * inwardWeight
-        dirY = inwardY * inwardWeight
-    end
-
-    local dlen = math.sqrt(dirX * dirX + dirY * dirY)
-
-    if dlen < 0.01 then
-        ---------------------------------------------------------------
-        -- Аварийный fallback: строго вниз.
-        ---------------------------------------------------------------
-        dirX = 0
-        dirY = -1
-        dlen = 1
-    end
-
-    local jx = (math.random() - 0.5) * len * jitter
-    local jy = (math.random() - 0.5) * len * jitter * 0.35
-
-    local p1x = mx + (dirX / dlen) * sag + jx
-    local p1y = my + (dirY / dlen) * sag + jy
-
-    -------------------------------------------------------------------
-    -- Жёсткая страховка:
-    -- кольцевая нить не должна выгибаться выше своей середины.
-    --
-    -- Это именно тот фикс, который убирает "антигравитацию"
-    -- на нижней линии кольца.
-    -------------------------------------------------------------------
-    if p1y > my then
-        p1y = my - math.max(1, sag * 0.25)
-    end
-
-    thread.p1 = {
-        x = p1x,
-        y = p1y,
-    }
-
-    return thread
 end
 
 function NSPauk:NP_MakeGravityThread(p0, p2, mode, sagMult)
@@ -11981,23 +11624,9 @@ function NSPauk:NP_MakeGravityThread(p0, p2, mode, sagMult)
         sag = 0.5
     end
 
-    -------------------------------------------------------------------
-    -- Направление нити.
-    -------------------------------------------------------------------
     local nx = dx / len
     local ny = dy / len
 
-    -------------------------------------------------------------------
-    -- Гравитация в координатах WoW UI:
-    --   y растёт вверх,
-    --   поэтому гравитация вниз = (0, -1).
-    --
-    -- Берём только перпендикулярную составляющую гравитации.
-    -- Тогда:
-    --   горизонтальная нить провисает вниз;
-    --   наклонная нить провисает вниз и в сторону нижней части;
-    --   почти вертикальная нить почти не имеет перпендикулярного провиса.
-    -------------------------------------------------------------------
     local gx = 0
     local gy = -1
 
@@ -12015,11 +11644,7 @@ function NSPauk:NP_MakeGravityThread(p0, p2, mode, sagMult)
         dirX = px / plen
         dirY = py / plen
     else
-        ---------------------------------------------------------------
-        -- Нить почти вертикальная.
-        -- Настоящая нить при вертикальном натяжении почти не изгибается.
-        -- Добавляем только очень слабый боковой изгиб.
-        ---------------------------------------------------------------
+
         dirX = (math.random() - 0.5) * 0.8
         dirY = 0
 
@@ -12042,16 +11667,10 @@ function NSPauk:NP_MakeGravityThread(p0, p2, mode, sagMult)
         y = my + dirY * sag + jitterY,
     }
 
-    -------------------------------------------------------------------
-    -- Страховка от “антигравитации”.
-    -------------------------------------------------------------------
     if thread.p1.y > my then
         thread.p1.y = my - math.max(0.5, sag * 0.25)
     end
 
-    -------------------------------------------------------------------
-    -- Не даём нити уходить далеко за нижний край экрана.
-    -------------------------------------------------------------------
     if thread.p1.y < 1 then
         thread.p1.y = 1
     end
@@ -12118,10 +11737,6 @@ function NSPauk:NP_ChooseRingDiameter(anchors)
                 local dy = math.abs((a.cy or 0) - (b.cy or 0))
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                -------------------------------------------------------
-                -- Нам нужна несущая нить, желательно более горизонтальная,
-                -- длинная и соединяющая противоположные стороны кольца.
-                -------------------------------------------------------
                 local score = dx * 2 + dist * 0.35
 
                 if dx >= dy then
@@ -12155,241 +11770,6 @@ function NSPauk:NP_ChooseRingDiameter(anchors)
     return bestA, bestB
 end
 
-function NSPauk:NP_BuildNaturalRingMainTasks(inst, tasks, cursorPoint)
-    if not inst or not tasks then
-        return cursorPoint
-    end
-
-    local cursor = cursorPoint
-
-    -------------------------------------------------------------------
-    -- Порядок важен:
-    --
-    -- 1. Периметр.
-    -- 2. Несущая нить через кольцо.
-    -- 3. Радиальные нити от хаба.
-    --
-    -- Всё это уже лежит в inst.conns в нужном порядке.
-    -------------------------------------------------------------------
-    for _, conn in ipairs(inst.conns or {}) do
-        if conn.alive and conn.thread then
-            local drawThread
-
-            if conn.isSpoke then
-                ---------------------------------------------------
-                -- Радиальные нити лучше тянуть от хаба наружу.
-                ---------------------------------------------------
-                drawThread = conn.thread
-            else
-                drawThread =
-                    self:NP_OrientThreadForCursor(conn.thread, cursor)
-                    or conn.thread
-            end
-
-            if cursor then
-                self:AddTravelPointTask(
-                    tasks,
-                    cursor,
-                    drawThread.p0,
-                    conn,
-                    conn
-                )
-            end
-
-            local task = self:AddThreadTask(tasks, conn, drawThread)
-
-            if task then
-                task.isMain = true
-
-                cursor = {
-                    x = drawThread.p2.x,
-                    y = drawThread.p2.y,
-                }
-            end
-        end
-    end
-
-    return cursor
-end
-
-function NSPauk:NP_BuildRingInterior(inst, anchors, center)
-    local C = self.C
-
-    if not inst or not anchors or #anchors < 3 then
-        return
-    end
-
-    local N = #anchors
-
-    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
-
-    if spacing < 6 then
-        spacing = 6
-    end
-
-    local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
-
-    if maxRows < 0 then
-        maxRows = 1600
-    end
-
-    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
-
-    if minCross < 1 then
-        minCross = 1
-    end
-
-    local minSeg2 = minCross * minCross
-
-    -------------------------------------------------------------------
-    -- Считаем, сколько колец можно построить внутри.
-    -------------------------------------------------------------------
-    local minRadius = math.huge
-
-    for _, a in ipairs(anchors) do
-        local dx = (a.cx or 0) - center.x
-        local dy = (a.cy or 0) - center.y
-        local r = math.sqrt(dx * dx + dy * dy)
-
-        if r < minRadius then
-            minRadius = r
-        end
-    end
-
-    local rows = math.floor((minRadius - spacing * 0.5) / spacing)
-
-    if rows < 1 then
-        rows = 1
-    end
-
-    -------------------------------------------------------------------
-    -- Жёсткий потолок, чтобы не плодить тысячи сегментов.
-    -------------------------------------------------------------------
-    local hardCap = 32
-
-    if rows > hardCap then
-        rows = hardCap
-    end
-
-    if rows > maxRows then
-        rows = maxRows
-    end
-
-    local original = {}
-
-    for i = 1, N do
-        original[i] = {
-            x = anchors[i].cx or 0,
-            y = anchors[i].cy or 0,
-        }
-    end
-
-    local order = 0
-
-    local function addSeg(p0, p2, depA, depB, key, arcOrder, mode)
-        local dx = (p2.x or 0) - (p0.x or 0)
-        local dy = (p2.y or 0) - (p0.y or 0)
-        local d2 = dx * dx + dy * dy
-
-        if d2 < minSeg2 then
-            return
-        end
-
-        local thread = self:NP_MakeRingThread(p0, p2, center, mode)
-
-        local seg = {
-            connA = depA,
-            connB = depB,
-            thread = thread,
-            textures = {},
-            alive = true,
-            planSectorKey = key,
-            planArcLen = arcOrder,
-            isRingFill = true,
-        }
-
-        thread.ownerRef = {
-            inst = inst,
-            seg = seg,
-        }
-
-        inst.crossSegs[#inst.crossSegs + 1] = seg
-    end
-
-    local prevRing = original
-
-    for r = 1, rows do
-        local f = r / (rows + 1)
-
-        local ring = {}
-
-        for i = 1, N do
-            ring[i] = {
-                x = original[i].x + (center.x - original[i].x) * f,
-                y = original[i].y + (center.y - original[i].y) * f,
-            }
-        end
-
-        ---------------------------------------------------------------
-        -- Радиальные перемычки от предыдущего кольца к новому.
-        ---------------------------------------------------------------
-        for i = 1, N do
-            order = order + 1
-
-            addSeg(
-                prevRing[i],
-                ring[i],
-                inst.conns[i],
-                inst.conns[i],
-                string.format("%03d-rad", r),
-                i,
-                "radial"
-            )
-        end
-
-        ---------------------------------------------------------------
-        -- Само внутреннее кольцо.
-        ---------------------------------------------------------------
-        for i = 1, N do
-            local j = (i % N) + 1
-
-            order = order + 1
-
-            addSeg(
-                ring[i],
-                ring[j],
-                inst.conns[i],
-                inst.conns[j],
-                string.format("%03d-ring", r),
-                i,
-                "ring"
-            )
-        end
-
-        prevRing = ring
-    end
-
-    -------------------------------------------------------------------
-    -- Финальные нити последнего кольца к центру.
-    -------------------------------------------------------------------
-    for i = 1, N do
-        order = order + 1
-
-        addSeg(
-            prevRing[i],
-            {
-                x = center.x,
-                y = center.y,
-            },
-            inst.conns[i],
-            inst.conns[i],
-            string.format("%03d-center", rows + 1),
-            i,
-            "radial"
-        )
-    end
-end
-
 function NSPauk:CreateRingInstance(targetCount, items)
     local S = self.S
     local C = self.C
@@ -12400,9 +11780,11 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     targetCount = math.floor(tonumber(targetCount) or 4)
-
-    if targetCount < 3 then
-        targetCount = 3
+    if targetCount < 4 then
+        targetCount = 4
+    end
+    if targetCount % 2 ~= 0 then
+        targetCount = targetCount + 1
     end
 
     if not items then
@@ -12410,29 +11792,30 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     local anchors = self:NP_CollectRingAnchors(items, targetCount)
-
-    if not anchors or #anchors < 3 then
+    if not anchors or #anchors < 4 then
         return nil
     end
 
-    -------------------------------------------------------------------
-    -- Фильтруем мёртвые/сдвинутые якоря.
-    -------------------------------------------------------------------
     for i = #anchors, 1, -1 do
         if not self:ValidateAnchorRect(anchors[i]) then
             table.remove(anchors, i)
         end
     end
 
-    if #anchors < 3 then
+    if #anchors < 4 then
         return nil
     end
 
-    -------------------------------------------------------------------
-    -- Строим выпуклую оболочку, чтобы кольцо не самопересекалось.
-    -------------------------------------------------------------------
-    local points = {}
+    if #anchors % 2 ~= 0 then
+        table.remove(anchors)
+    end
 
+    local N = #anchors
+    if N < 4 then
+        return nil
+    end
+
+    local points = {}
     for _, item in ipairs(anchors) do
         points[#points + 1] = {
             x = item.cx or 0,
@@ -12442,82 +11825,42 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     local hull = self:NP_ConvexHull(points)
+    if not hull or #hull < 4 then
+        return nil
+    end
 
-    if not hull or #hull < 3 then
+    if #hull % 2 ~= 0 then
+        table.remove(hull)
+    end
+
+    if #hull < 4 then
         return nil
     end
 
     anchors = {}
-
     for _, p in ipairs(hull) do
         anchors[#anchors + 1] = p.item
     end
+    N = #anchors
 
-    local N = #anchors
+    local idxA = 1
+    local idxB = 1 + math.floor(N / 2)
 
-    if N < 3 then
-        return nil
-    end
-
-    -------------------------------------------------------------------
-    -- Выбираем несущую нить через кольцо.
-    -------------------------------------------------------------------
-    local dA, dB = self:NP_ChooseRingDiameter(anchors)
-
-    local a = anchors[dA]
-    local b = anchors[dB]
-
+    local a = anchors[idxA]
+    local b = anchors[idxB]
     if not a or not b then
         return nil
     end
 
-    -------------------------------------------------------------------
-    -- Пытаемся сделать несущую нить с естественным провисом,
-    -- но так, чтобы будущий хаб оставался внутри кольца.
-    -------------------------------------------------------------------
-    local diamThread = nil
-    local hx = nil
-    local hy = nil
+    local diamThread = self:NP_MakeGravityThread(
+        { x = a.cx or 0, y = a.cy or 0 },
+        { x = b.cx or 0, y = b.cy or 0 },
+        "main",
+        1.0
+    )
 
-    local sagAttempts = { 1.0, 0.65, 0.4, 0.22 }
+    local hx, hy = self:BzThread(diamThread, 0.5)
 
-    for _, mult in ipairs(sagAttempts) do
-        local th = self:NP_MakeGravityThread(
-            { x = a.cx or 0, y = a.cy or 0 },
-            { x = b.cx or 0, y = b.cy or 0 },
-            "main",
-            mult
-        )
-
-        local x, y = self:BzThread(th, 0.5)
-
-        if self:NP_PointInRingPolygon(x, y, anchors) then
-            diamThread = th
-            hx = x
-            hy = y
-            break
-        end
-    end
-
-    -------------------------------------------------------------------
-    -- Если сильный провис выводит хаб из кольца,
-    -- делаем почти прямую несущую нить.
-    -------------------------------------------------------------------
-    if not diamThread then
-        diamThread = self:NP_MakeGravityThread(
-            { x = a.cx or 0, y = a.cy or 0 },
-            { x = b.cx or 0, y = b.cy or 0 },
-            "main",
-            0
-        )
-
-        hx, hy = self:BzThread(diamThread, 0.5)
-    end
-
-    -------------------------------------------------------------------
-    -- Хаб — это точка на уже натянутой несущей нити.
-    -- Он не является фреймом, но физически прикреплён к нити.
-    -------------------------------------------------------------------
     local hubRect = self:NormalizeFallbackRect({
         name = "RingHub",
         left = hx - 16,
@@ -12528,16 +11871,13 @@ function NSPauk:CreateRingInstance(targetCount, items)
 
     local inst = {
         id = self.nextInstanceId,
-
         isRing = true,
         isNaturalRing = true,
-
         hub = {
             frame = nil,
             name = "RingHub",
             rect = hubRect,
         },
-
         conns = {},
         crossSegs = {},
         interSegs = {},
@@ -12545,7 +11885,6 @@ function NSPauk:CreateRingInstance(targetCount, items)
         webSectors = {},
         tasks = {},
         crossRows = 0,
-
         anchorCandidates = {},
         drawnPoints = 0,
         settled = false,
@@ -12553,14 +11892,10 @@ function NSPauk:CreateRingInstance(targetCount, items)
 
     self.nextInstanceId = self.nextInstanceId + 1
 
-    inst.anchorCandidates[#inst.anchorCandidates + 1] =
-        self:CopyRect(hubRect)
+    inst.anchorCandidates[#inst.anchorCandidates + 1] = self:CopyRect(hubRect)
 
-    -------------------------------------------------------------------
-    -- 1. Внешний периметр кольца.
-    --
-    -- Каждая нить крепится от текущего якоря к следующему.
-    -------------------------------------------------------------------
+    local perimeterConns = {}
+
     for i = 1, N do
         local p = anchors[i]
         local q = anchors[(i % N) + 1]
@@ -12576,33 +11911,23 @@ function NSPauk:CreateRingInstance(targetCount, items)
             (q.cy or 0) - (p.cy or 0),
             (q.cx or 0) - (p.cx or 0)
         )
-
         if angle < 0 then
             angle = angle + 2 * math.pi
         end
-
         thread.angle = angle
 
         local conn = {
             id = #inst.conns + 1,
-
             target = {
                 frame = q.frame,
                 name = q.name,
                 rect = self:CopyRect(q),
             },
-
             ringStartRect = self:CopyRect(p),
-
             thread = thread,
             angle = angle,
             textures = {},
             alive = true,
-
-            -----------------------------------------------------------
-            -- Это каркасная нить, а не радиальная.
-            -- Сектора между такими нитями не строим.
-            -----------------------------------------------------------
             noSector = true,
             isRingFrame = true,
         }
@@ -12613,43 +11938,31 @@ function NSPauk:CreateRingInstance(targetCount, items)
         }
 
         inst.conns[#inst.conns + 1] = conn
-
-        inst.anchorCandidates[#inst.anchorCandidates + 1] =
-            self:CopyRect(q)
+        inst.anchorCandidates[#inst.anchorCandidates + 1] = self:CopyRect(q)
+        perimeterConns[i] = conn
     end
 
-    -------------------------------------------------------------------
-    -- 2. Несущая нить через кольцо.
-    --
-    -- Она создаёт точку, к которой потом прикрепится хаб.
-    -------------------------------------------------------------------
     local diamAngle = math.atan2(
         (b.cy or 0) - (a.cy or 0),
         (b.cx or 0) - (a.cx or 0)
     )
-
     if diamAngle < 0 then
         diamAngle = diamAngle + 2 * math.pi
     end
-
     diamThread.angle = diamAngle
 
     local diamConn = {
         id = #inst.conns + 1,
-
         target = {
             frame = b.frame,
             name = b.name,
             rect = self:CopyRect(b),
         },
-
         ringStartRect = self:CopyRect(a),
-
         thread = diamThread,
         angle = diamAngle,
         textures = {},
         alive = true,
-
         noSector = true,
         isDiameter = true,
     }
@@ -12660,60 +11973,114 @@ function NSPauk:CreateRingInstance(targetCount, items)
     }
 
     inst.conns[#inst.conns + 1] = diamConn
-
-    -------------------------------------------------------------------
-    -- Хаб зависит от этой несущей нити.
-    -- Если несущая нить умрёт, радиальные нити тоже станут невалидны.
-    -------------------------------------------------------------------
     inst.hubDepConn = diamConn
+    inst.diameterConn = diamConn
 
-    -------------------------------------------------------------------
-    -- 3. Радиальные нити от хаба к периметру.
-    --
-    -- Именно между ними потом будут строиться перемычки.
-    -------------------------------------------------------------------
     for i = 1, N do
         local anchor = anchors[i]
+        local isHalf = (i == idxA or i == idxB)
 
-        local thread = self:NP_MakeGravityThread(
-            { x = hx, y = hy },
-            { x = anchor.cx or 0, y = anchor.cy or 0 },
-            "cross",
-            0.35
-        )
+        local thread
+
+        if isHalf then
+            if i == idxA then
+                thread = self:NP_SubBezierThread(diamThread, 0, 0.5, true)
+            else
+                thread = self:NP_SubBezierThread(diamThread, 0.5, 1, false)
+            end
+        end
+
+        if not thread then
+            thread = self:NP_MakeGravityThread(
+                { x = hx, y = hy },
+                { x = anchor.cx or 0, y = anchor.cy or 0 },
+                "cross",
+                0.35
+            )
+        end
 
         local angle = math.atan2(
             (anchor.cy or 0) - hy,
             (anchor.cx or 0) - hx
         )
-
         if angle < 0 then
             angle = angle + 2 * math.pi
         end
-
         thread.angle = angle
 
         local conn = {
             id = #inst.conns + 1,
-
             target = {
                 frame = anchor.frame,
                 name = anchor.name,
                 rect = self:CopyRect(anchor),
             },
-
             ringStartRect = self:CopyRect(hubRect),
-
             thread = thread,
             angle = angle,
             textures = {},
             alive = true,
-
-            -----------------------------------------------------------
-            -- Это радиальная нить.
-            -- Только радиальные нити участвуют в секторах.
-            -----------------------------------------------------------
             isSpoke = true,
+        }
+
+        if isHalf then
+            conn.isDiameterHalf = true
+            conn.hubDepConn = diamConn
+        end
+
+        thread.ownerRef = {
+            inst = inst,
+            conn = conn,
+        }
+
+        inst.conns[#inst.conns + 1] = conn
+    end
+
+    for i = 1, N do
+        local perConn = perimeterConns[i]
+        local pThread = perConn and perConn.thread
+
+        if not pThread then
+            local p = anchors[i]
+            local q = anchors[(i % N) + 1]
+            pThread = self:NP_MakeGravityThread(
+                { x = p.cx or 0, y = p.cy or 0 },
+                { x = q.cx or 0, y = q.cy or 0 },
+                "main",
+                1.0
+            )
+        end
+
+        local midX, midY = self:BzThread(pThread, 0.5)
+
+        local thread = self:NP_MakeGravityThread(
+            { x = hx, y = hy },
+            { x = midX, y = midY },
+            "cross",
+            0.35
+        )
+
+        local angle = math.atan2(midY - hy, midX - hx)
+        if angle < 0 then
+            angle = angle + 2 * math.pi
+        end
+        thread.angle = angle
+
+        local conn = {
+            id = #inst.conns + 1,
+            target = {
+                frame = nil,
+                name = "MidPerimeter",
+                rect = nil,
+            },
+            ringStartRect = self:CopyRect(hubRect),
+            thread = thread,
+            angle = angle,
+            textures = {},
+            alive = true,
+            isSpoke = true,
+            isMidSpoke = true,
+            perimeterConn = perConn,
         }
 
         thread.ownerRef = {
@@ -12729,238 +12096,72 @@ function NSPauk:CreateRingInstance(targetCount, items)
     return inst
 end
 
-function NSPauk:NP_BuildRingMainTasks(inst, tasks, cursorPoint)
-    if not inst or not inst.conns or #inst.conns == 0 then
-        return cursorPoint
-    end
-
-    local cursor = cursorPoint
-    local N = #inst.conns
-
-    -------------------------------------------------------------------
-    -- Ищем стартовую нить периметра ближе к пауку.
-    -------------------------------------------------------------------
-    local startIdx = 1
-
-    if cursor then
-        local bestDist = nil
-
-        for i, conn in ipairs(inst.conns) do
-            if conn.alive
-                and conn.thread
-                and conn.thread.p0
-                and conn.thread.p2 then
-                local d0x = conn.thread.p0.x - cursor.x
-                local d0y = conn.thread.p0.y - cursor.y
-                local d0 = d0x * d0x + d0y * d0y
-
-                local d2x = conn.thread.p2.x - cursor.x
-                local d2y = conn.thread.p2.y - cursor.y
-                local d2 = d2x * d2x + d2y * d2y
-
-                local d = math.min(d0, d2)
-
-                if not bestDist or d < bestDist then
-                    bestDist = d
-                    startIdx = i
-                end
-            end
-        end
-    end
-
-    -------------------------------------------------------------------
-    -- Обходим кольцо по порядку.
-    -------------------------------------------------------------------
-    for k = 0, N - 1 do
-        local idx = ((startIdx - 1 + k) % N) + 1
-        local conn = inst.conns[idx]
-
-        if conn.alive and conn.thread then
-            local drawThread =
-                self:NP_OrientThreadForCursor(conn.thread, cursor)
-                or conn.thread
-
-            if cursor then
-                self:AddTravelPointTask(
-                    tasks,
-                    cursor,
-                    drawThread.p0,
-                    conn,
-                    conn
-                )
-            end
-
-            local task = self:AddThreadTask(tasks, conn, drawThread)
-
-            if task then
-                task.isMain = true
-
-                cursor = {
-                    x = drawThread.p2.x,
-                    y = drawThread.p2.y,
-                }
-            end
-        end
-    end
-
-    return cursor
-end
-
-function NSPauk:NP_BuildRingWebTasks(inst, tasks, cursorPoint)
+function NSPauk:NP_BuildNaturalRingMainTasks(inst, tasks, cursorPoint)
     if not inst or not tasks then
         return cursorPoint
     end
 
     local cursor = cursorPoint
 
-    for _, seg in ipairs(inst.crossSegs or {}) do
-        if seg.alive and not seg.isInterCross then
-            local thread = seg.thread
+    local perimeter = {}
+    local diameter = nil
+    local radial = {}
 
-            if thread and thread.p0 and thread.p2 then
-                local drawThread =
-                    self:NP_OrientThreadForCursor(thread, cursor)
-                    or thread
-
-                if cursor then
-                    self:AddTravelPointTask(
-                        tasks,
-                        cursor,
-                        drawThread.p0,
-                        seg.connA or seg.connB,
-                        seg
-                    )
-                end
-
-                local task = self:AddThreadTask(tasks, seg, drawThread)
-
-                if task then
-                    cursor = {
-                        x = drawThread.p2.x,
-                        y = drawThread.p2.y,
-                    }
-                end
-            end
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.isRingFrame then
+            perimeter[#perimeter + 1] = conn
+        elseif conn.isDiameter then
+            diameter = conn
+        elseif conn.isSpoke and not conn.isDiameterHalf then
+            radial[#radial + 1] = conn
         end
+    end
+
+    table.sort(radial, function(a, b)
+        local aa = a.angle or 0
+        local bb = b.angle or 0
+        if aa == bb then
+            return (a.id or 0) < (b.id or 0)
+        end
+        return aa < bb
+    end)
+
+    local function addMain(conn)
+        local drawThread = self:NP_OrientThreadForCursor(conn.thread, cursor) or conn.thread
+
+        if cursor then
+            self:AddTravelPointTask(
+                tasks,
+                cursor,
+                drawThread.p0,
+                conn,
+                conn
+            )
+        end
+
+        local task = self:AddThreadTask(tasks, conn, drawThread)
+        if task then
+            task.isMain = true
+            cursor = {
+                x = drawThread.p2.x,
+                y = drawThread.p2.y,
+            }
+        end
+    end
+
+    if diameter then
+        addMain(diameter)
+    end
+
+    for _, conn in ipairs(perimeter) do
+        addMain(conn)
+    end
+
+    for _, conn in ipairs(radial) do
+        addMain(conn)
     end
 
     return cursor
-end
-
-function NSPauk:NP_GetThreadBounds(thread)
-    if not thread or not thread.p0 or not thread.p2 then
-        return nil
-    end
-
-    local minX = math.min(thread.p0.x, thread.p2.x)
-    local maxX = math.max(thread.p0.x, thread.p2.x)
-    local minY = math.min(thread.p0.y, thread.p2.y)
-    local maxY = math.max(thread.p0.y, thread.p2.y)
-
-    if thread.p1 then
-        if thread.p1.x < minX then
-            minX = thread.p1.x
-        end
-
-        if thread.p1.x > maxX then
-            maxX = thread.p1.x
-        end
-
-        if thread.p1.y < minY then
-            minY = thread.p1.y
-        end
-
-        if thread.p1.y > maxY then
-            maxY = thread.p1.y
-        end
-    end
-
-    return {
-        minX = minX,
-        maxX = maxX,
-        minY = minY,
-        maxY = maxY,
-    }
-end
-
-function NSPauk:NP_DebugPrint()
-    local S = self.S
-    self:Print("NSPauk debug:")
-    self:Print(string.format(
-        "Фаза: %s, режим: %s",
-        tostring(S.phase),
-        tostring(S.mode)
-    ))
-    self:Print(string.format(
-        "Паук: %.1f, %.1f",
-        S.lastSpiderX or 0,
-        S.lastSpiderY or 0
-    ))
-    local sup = self:NP_FindSupportAt(S.lastSpiderX or 0, S.lastSpiderY or 0)
-    self:Print("Опора: " .. self:NP_SupportDescription(sup))
-    local task = S.currentTask
-    if task then
-        local kind = "обычная"
-        if task.nspPlan then
-            kind = "plan"
-        elseif task.nspTempThread then
-            kind = "tempdrop"
-        elseif task.nspFall then
-            kind = "fall"
-        elseif task.nspCrawl then
-            kind = "crawl"
-        elseif task.kind then
-            kind = tostring(task.kind)
-        end
-        self:Print(string.format(
-            "Задача: %s, drop=%s, drag=%s, end=%s, t=%.2f",
-            kind,
-            tostring(task.drop),
-            tostring(task.nspDuringDrag),
-            tostring(task.nspDragEnd),
-            S.moveT or 0
-        ))
-        if task.p0 and task.p2 then
-            self:Print(string.format(
-                "  от %.1f,%.1f к %.1f,%.1f",
-                task.p0.x or 0,
-                task.p0.y or 0,
-                task.p2.x or 0,
-                task.p2.y or 0
-            ))
-        end
-    else
-        self:Print("Задача: нет")
-    end
-    if S.nspLastRoute then
-        local r = S.nspLastRoute
-        self:Print(string.format(
-            "Маршрут: от %s к %s, милиметров %d, длина %.0f, тип %s",
-            tostring(r.fromName or "?"),
-            tostring(r.toName or "?"),
-            r.count or 0,
-            r.length or 0,
-            tostring(r.kind or "?")
-        ))
-    else
-        self:Print("Маршрут: нет")
-    end
-    if S.nspDrag and S.nspDrag.anchor then
-        self:Print(string.format(
-            "Тянем нить от %.1f,%.1f",
-            S.nspDrag.anchor.x or 0,
-            S.nspDrag.anchor.y or 0
-        ))
-    end
-    if S.nspDragFps then
-        self:Print(string.format(
-            "Троттлинг: fps=%.1f, интервал=%.3f сек",
-            S.nspDragFps.smooth or 0,
-            S.nspDragFps.interval or 0
-        ))
-    else
-        self:Print("Троттлинг: не активен")
-    end
 end
 
 function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
@@ -12980,9 +12181,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
         inst = self:GetOwnerInstance(conn)
     end
 
-    ---------------------------------------------------------------------------
-    -- Для кокона отключаем маршрутизацию полностью.
-    ---------------------------------------------------------------------------
     if inst and inst.isCocoon then
         local task = {
             kind = "travel",
@@ -13002,9 +12200,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
         return task
     end
 
-    ---------------------------------------------------------------------------
-    -- Обычная паутина продолжает использовать маршрутизацию.
-    ---------------------------------------------------------------------------
     local task = {
         kind = "travel",
         conn = conn,
@@ -13022,37 +12217,6 @@ function NSPauk:AddTravelPointTask(tasks, from, to, conn, owner)
     return task
 end
 
-function NSPauk:AddTravelThreadTask(tasks, conn, tA, tB, owner)
-    if not conn or not conn.thread then
-        return nil
-    end
-
-    if math.abs(tB - tA) < 0.005 then
-        return nil
-    end
-
-    local ax, ay = self:BzThread(conn.thread, tA)
-    local bx, by = self:BzThread(conn.thread, tB)
-    local mx, my = self:BzThread(conn.thread, (tA + tB) / 2)
-
-    local task = {
-        kind = "travel",
-        conn = conn,
-        owner = owner,
-        drop = false,
-        p0 = { x = ax, y = ay },
-        p1 = { x = mx, y = my },
-        p2 = { x = bx, y = by },
-        nspCrawl = true,
-        nspAlongWeb = true,
-        nspNoSupportCheck = true,
-    }
-
-    tasks[#tasks + 1] = task
-
-    return task
-end
-
 function NSPauk:AddThreadTask(tasks, owner, thread)
     if not owner or not thread then
         return nil
@@ -13060,9 +12224,6 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
 
     local inst = self:GetOwnerInstance(owner)
 
-    ---------------------------------------------------------------------------
-    -- Для кокона отключаем маршрутизацию и динамическое перетаскивание.
-    ---------------------------------------------------------------------------
     if inst and inst.isCocoon then
         local task = {
             kind = "thread",
@@ -13085,9 +12246,6 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
         return task
     end
 
-    ---------------------------------------------------------------------------
-    -- Обычная паутина продолжает использовать nspPlan / nspDrag.
-    ---------------------------------------------------------------------------
     local task = {
         kind = "thread",
         owner = owner,
@@ -13121,10 +12279,22 @@ function NSPauk:AddThreadTask(tasks, owner, thread)
 end
 
 function NSPauk:NP_IsWebOwnerDrawn(owner)
-    return owner
-        and owner.alive
-        and owner.textures
-        and #owner.textures > 0
+    if not owner or not owner.alive then
+        return false
+    end
+
+    if owner.virtualDrawn then
+        return true
+    end
+
+    if owner.isDiameterHalf and owner.hubDepConn then
+        local dep = owner.hubDepConn
+        return dep.alive
+            and dep.textures ~= nil
+            and #dep.textures > 0
+    end
+
+    return owner.textures ~= nil and #owner.textures > 0
 end
 
 function NSPauk:NP_RequestSectorRecheck(inst)
@@ -13186,7 +12356,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
     if S.nspSectorRecheckRunning then
         local now = GetTime()
-
         if type(S.nspSectorRecheckLockAt) ~= "number"
             or (now - S.nspSectorRecheckLockAt) > 3 then
             S.nspSectorRecheckRunning = false
@@ -13199,7 +12368,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
     S.nspSectorRecheckLockAt = GetTime()
 
     local N = inst.conns and #inst.conns or 0
-
     if N < 2 then
         S.nspSectorRecheckRunning = false
         return 0
@@ -13219,7 +12387,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
     inst.webSectors = sectors
 
     local scheduled = self:NP_CollectScheduledOwners()
-
     if type(scheduled) ~= "table" then
         scheduled = {}
     end
@@ -13234,10 +12401,7 @@ function NSPauk:NP_RecheckWebSectors(inst)
         }
 
     local function isDrawn(owner)
-        return owner
-            and owner.alive
-            and owner.textures
-            and #owner.textures > 0
+        return self:NP_IsWebOwnerDrawn(owner)
     end
 
     local function addSegTasks(seg)
@@ -13249,7 +12413,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
         end
 
         local thread = seg.thread
-
         if not thread or not thread.p0 or not thread.p2 then
             return nil
         end
@@ -13259,7 +12422,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
             or thread
 
         local travelConn = seg.connA or seg.connB
-
         local before = #tasks
 
         self:AddTravelPointTask(
@@ -13276,7 +12438,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
         if task then
             scheduled[seg] = true
-
             return {
                 x = drawThread.p2.x,
                 y = drawThread.p2.y,
@@ -13346,7 +12507,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
                             if seg then
                                 seg.planSectorKey = sector.key
-
                                 seg.planArcLen = arcLen
                                 seg.isRecheck = true
                             end
@@ -13356,7 +12516,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
 
                 if seg then
                     local newCursor = addSegTasks(seg)
-
                     if newCursor then
                         cursor = newCursor
                     end
@@ -13364,7 +12523,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
             end
 
             local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
-
             for _, rowArc in ipairs(rowArcs) do
                 ensureArc(rowArc)
             end
@@ -13397,9 +12555,6 @@ function NSPauk:NP_RecheckWebSectors(inst)
     return added
 end
 
----------------------------------------------------------------------------
--- Triangle sector check
----------------------------------------------------------------------------
 function NSPauk:NP_PointInTriangle(px, py, ax, ay, bx, by, cx, cy)
     local function sign(x1, y1, x2, y2, x3, y3)
         return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
@@ -13599,6 +12754,34 @@ function NSPauk:AddMainThreadTasks(inst, tasks, cursorPoint)
     return cursorPoint
 end
 
+function NSPauk:NP_ChooseEvenRingCount()
+    local C = self.C or {}
+    local min = math.floor(tonumber(C.TARGET_COUNT_MIN) or 3)
+    local max = math.floor(tonumber(C.TARGET_COUNT_MAX) or 6)
+    if min < 4 then
+        min = 4
+    end
+    if max < min then
+        max = min
+    end
+    local minEven = math.ceil(min / 2) * 2
+    local maxEven = math.floor(max / 2) * 2
+    if minEven < 4 then
+        minEven = 4
+    end
+    if maxEven < minEven then
+        maxEven = minEven
+    end
+    local choices = {}
+    for value = minEven, maxEven, 2 do
+        choices[#choices + 1] = value
+    end
+    if #choices == 0 then
+        return 4
+    end
+    return choices[math.random(1, #choices)]
+end
+
 function NSPauk:BuildInstanceTasks(inst)
     local S = self.S
 
@@ -13618,9 +12801,6 @@ function NSPauk:BuildInstanceTasks(inst)
         }
     end
 
-    -------------------------------------------------------------------
-    -- Естественное кольцо.
-    -------------------------------------------------------------------
     if inst.isNaturalRing then
         cursorPoint = self:NP_BuildNaturalRingMainTasks(
             inst,
@@ -13628,9 +12808,7 @@ function NSPauk:BuildInstanceTasks(inst)
             cursorPoint
         )
 
-        ---------------------------------------------------------------
-        -- Для секторов нужны arc samples только радиальных нитей.
-        ---------------------------------------------------------------
+
         for _, conn in ipairs(inst.conns or {}) do
             if conn.isSpoke
                 and conn.thread
@@ -13649,9 +12827,6 @@ function NSPauk:BuildInstanceTasks(inst)
         return
     end
 
-    -------------------------------------------------------------------
-    -- Обычная паутина.
-    -------------------------------------------------------------------
     cursorPoint = self:AddMainThreadTasks(inst, tasks, cursorPoint)
 
     local N = #inst.conns
@@ -13779,23 +12954,21 @@ end
 
 function NSPauk:NP_GetValidTriangleSectors(inst)
     local out = {}
-
     if not inst or not inst.conns then
         return out
     end
-
+    if inst.isNaturalRing then
+        return self:NP_GetRingSectors(inst)
+    end
     local N = #inst.conns
-
     if N < 2 then
         return out
     end
-
-    local minCross = tonumber(self.C.MIN_CROSS_LEN) or 4
-
+    local C = self.C or {}
+    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
     if minCross < 0 then
         minCross = 4
     end
-
     local function ensureLen(conn)
         if conn
             and conn.thread
@@ -13805,27 +12978,22 @@ function NSPauk:NP_GetValidTriangleSectors(inst)
             conn.arcLength = total
         end
     end
-
     for i = 1, N do
         local connA = inst.conns[i]
-
         if connA
             and connA.alive
             and not connA.noSector then
             for j = i + 1, N do
                 local connB = inst.conns[j]
-
                 if connB
                     and connB.alive
                     and not connB.noSector then
                     ensureLen(connA)
                     ensureLen(connB)
-
                     local pairMin = math.min(
                         connA.arcLength or 0,
                         connB.arcLength or 0
                     )
-
                     if pairMin >= minCross
                         and self:NP_TriangleSectorClear(inst, connA, connB) then
                         out[#out + 1] = {
@@ -13839,15 +13007,12 @@ function NSPauk:NP_GetValidTriangleSectors(inst)
             end
         end
     end
-
     table.sort(out, function(x, y)
         if x.a == y.a then
             return x.b < y.b
         end
-
         return x.a < y.a
     end)
-
     return out
 end
 
@@ -14124,17 +13289,6 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
     self:BuildInstanceTasks(inst)
 
     return inst
-end
-
-function NSPauk:NP_CopyPoint(p)
-    if not p then
-        return { x = 0, y = 0 }
-    end
-
-    return {
-        x = p.x or 0,
-        y = p.y or 0,
-    }
 end
 
 function NSPauk:NP_OrientThreadForCursor(thread, cursor)
@@ -14465,9 +13619,7 @@ function NSPauk:BeginDissolve(inst)
 
     local minAlpha
     if isUIParent then
-        -----------------------------------------------------------------------
-        -- Для UIParent не делаем затухание всего интерфейса.
-        -----------------------------------------------------------------------
+
         minAlpha = baseAlpha
     else
         minAlpha = math.min(C.MIN_COCOON_ALPHA, baseAlpha)
@@ -14676,15 +13828,10 @@ function NSPauk:FinishCocoonDigestion()
         self:SettleInstance(c.inst)
     end
 
-    ---------------------------------------------------------------------------
-    -- Что паук съел на самом деле, по-человечески.
-    ---------------------------------------------------------------------------
     local victimDesc = self:DescribeVictim(c.frame, victimName)
 
     if isUIParent then
-        -----------------------------------------------------------------------
-        -- Хардкор: весь интерфейс исчезает.
-        -----------------------------------------------------------------------
+
         if UIParent and UIParent.GetAlpha then
             S.uiParentBaseAlpha = UIParent:GetAlpha() or 1
         end
@@ -14700,10 +13847,6 @@ function NSPauk:FinishCocoonDigestion()
         self:AwardCocoonExperience(victimDesc)
     end
 
-    ---------------------------------------------------------------------------
-    -- UIParent не прячем через SafeHideFrame и не заносим в digestedFrames:
-    -- его возвратом управляет цикл мерцания.
-    ---------------------------------------------------------------------------
     if c.frame and not isUIParent then
         self:SafeHideFrame(c.frame)
         self:AddDigestedFrame(c.frame, c.baseAlpha or 1)
@@ -14726,9 +13869,7 @@ function NSPauk:FinishCocoonDigestion()
     S.completeTimer = 0
 
     if isUIParent then
-        -----------------------------------------------------------------------
-        -- Интерфейс возвращается с мерцанием в течение 10 секунд.
-        -----------------------------------------------------------------------
+
         self:StartUIParentRestore(10)
         return
     end
@@ -14878,20 +14019,11 @@ function NSPauk:UIFlickerAlphaAt(t, baseAlpha)
 
     local progress = t / duration
 
-    ---------------------------------------------------------------------------
-    -- Детерминированный псевдослучай по номеру среза.
-    -- Функция остаётся чистой: одинаковое t всегда даёт одинаковый результат,
-    -- поэтому мерцание не зависит от частоты вызовов.
-    ---------------------------------------------------------------------------
     local function sliceRand(slice, salt)
         local x = math.sin((slice + 1) * 127.1 + (salt or 0) * 311.7) * 43758.5453
         return x - math.floor(x)
     end
 
-    ---------------------------------------------------------------------------
-    -- Фаза 1: полный блэкаут с редкими тусклыми микро-вспышками.
-    -- Монитор ещё «мёртв».
-    ---------------------------------------------------------------------------
     if progress < 0.12 then
         local slice = math.floor(t / 0.05)
 
@@ -14902,11 +14034,6 @@ function NSPauk:UIFlickerAlphaAt(t, baseAlpha)
         return 0
     end
 
-    ---------------------------------------------------------------------------
-    -- Фаза 2: жёсткое мерцание — монитор «ловит» сигнал.
-    -- Очень частые переключения, доля горящих кадров быстро растёт.
-    -- Часть кадров горит вполсилы, как при частичном сигнале.
-    ---------------------------------------------------------------------------
     if progress < 0.45 then
         local localP = (progress - 0.12) / (0.45 - 0.12)
         local slice = math.floor(t / 0.055)
@@ -14925,11 +14052,6 @@ function NSPauk:UIFlickerAlphaAt(t, baseAlpha)
         return 0
     end
 
-    ---------------------------------------------------------------------------
-    -- Фаза 3: картинка «плавает».
-    -- Горящие кадры доминируют, но провалы ещё есть.
-    -- В паузах уже не полная темнота, а тусклый остаточный сигнал.
-    ---------------------------------------------------------------------------
     if progress < 0.75 then
         local localP = (progress - 0.45) / (0.75 - 0.45)
         local slice = math.floor(t / 0.08)
@@ -14945,10 +14067,6 @@ function NSPauk:UIFlickerAlphaAt(t, baseAlpha)
         return offAlpha
     end
 
-    ---------------------------------------------------------------------------
-    -- Фаза 4: почти стабильное изображение с короткими провалами,
-    -- которые постепенно сходят на нет.
-    ---------------------------------------------------------------------------
     if progress < 0.95 then
         local localP = (progress - 0.75) / (0.95 - 0.75)
         local slice = math.floor(t / 0.12)
@@ -14963,9 +14081,6 @@ function NSPauk:UIFlickerAlphaAt(t, baseAlpha)
         return baseAlpha
     end
 
-    ---------------------------------------------------------------------------
-    -- Фаза 5: сигнал полностью стабилизировался.
-    ---------------------------------------------------------------------------
     return baseAlpha
 end
 
@@ -15003,9 +14118,6 @@ function NSPauk:StartUIParentRestore(duration)
         end
     end
 
-    ---------------------------------------------------------------------------
-    -- Гасим предыдущий цикл возврата, если он вдруг ещё идёт.
-    ---------------------------------------------------------------------------
     if S.uiFlickerTicker then
         S.uiFlickerTicker:Cancel()
         S.uiFlickerTicker = nil
@@ -15024,18 +14136,10 @@ function NSPauk:StartUIParentRestore(duration)
 
     S.phase = "uiRestore"
 
-    ---------------------------------------------------------------------------
-    -- Интерфейс исчезает сразу.
-    ---------------------------------------------------------------------------
     if UIParent and UIParent.SetAlpha then
         UIParent:SetAlpha(0)
     end
 
-    ---------------------------------------------------------------------------
-    -- Для эффекта «сбоя монитора» важна высокая частота обновления,
-    -- поэтому основной драйвер — кадр с OnUpdate (каждый кадр рендера).
-    -- Кадр не привязан к UIParent, поэтому переживёт его сокрытие.
-    ---------------------------------------------------------------------------
     local f = S.uiFlickerFrame
     if not f then
         f = CreateFrame("Frame")
@@ -15047,10 +14151,6 @@ function NSPauk:StartUIParentRestore(duration)
     end)
     f:Show()
 
-    ---------------------------------------------------------------------------
-    -- Страховка: если OnUpdate-драйвер по какой-то причине встанет,
-    -- тикер всё равно завершит цикл.
-    ---------------------------------------------------------------------------
     if type(C_Timer) == "table" and type(C_Timer.NewTicker) == "function" then
         S.uiFlickerTicker = C_Timer.NewTicker(0.1, function()
             if S.uiFlicker then
@@ -15069,9 +14169,6 @@ function NSPauk:UpdateUIParentRestore()
         return
     end
 
-    ---------------------------------------------------------------------------
-    -- Если аддон экстренно выключили, сразу возвращаем интерфейс на место.
-    ---------------------------------------------------------------------------
     if not self.initialized
         or S.runtimeOff
         or S.phase == "off"
@@ -15115,9 +14212,6 @@ function NSPauk:FinishUIParentRestore()
 
     self:StopUIParentRestore()
 
-    ---------------------------------------------------------------------------
-    -- Продолжаем обычную жизнь паука.
-    ---------------------------------------------------------------------------
     if S.limitReached or S.limitCocoonPending then
         self:ReturnToLimitHome()
     else
@@ -15314,10 +14408,6 @@ function NSPauk:KillSeg(seg)
         end
     end
 
-    -------------------------------------------------------------------
-    -- Если порвали перемычку текущей обычной паутины,
-    -- requesting resume именно с этой перемычкой как приоритетом.
-    -------------------------------------------------------------------
     if inst
         and not inst.torn
         and not inst.isCocoon
@@ -15375,10 +14465,6 @@ function NSPauk:CheckInstancesMovement()
 
     local killed = false
 
-    -----------------------------------------------------------------------
-    -- Полный скан чужих паутин делаем редко.
-    -- Активную паутину, кокон и мотылька проверяем каждый monitor tick.
-    -----------------------------------------------------------------------
     local fullInterval = 5.0
 
     local doFull = not S.nspNextFullMonitorAt or now >= S.nspNextFullMonitorAt
@@ -15387,13 +14473,6 @@ function NSPauk:CheckInstancesMovement()
         S.nspNextFullMonitorAt = now + fullInterval
     end
 
-    -----------------------------------------------------------------------
-    -- Кэш внутренних прямоугольников на одну проверку.
-    --
-    -- Один и тот же фрейм может быть опорой для десятков нитей кокона.
-    -- Раньше он мог пересчитываться через ComputeFrameVisibleInner
-    -- по числу conn, что было очень дорого.
-    -----------------------------------------------------------------------
     local innerCache = {}
 
     local function getCachedInner(frame)
@@ -15491,12 +14570,6 @@ function NSPauk:CheckInstancesMovement()
             return true
         end
 
-        -------------------------------------------------------------------
-        -- Кокон: все нити прикреплены к одному и тому же объекту.
-        --
-        -- Проверять каждую conn отдельно бессмысленно и дорого.
-        -- Достаточно одной проверки объекта.
-        -------------------------------------------------------------------
         if inst.isCocoon then
             return false
         end
@@ -15517,9 +14590,6 @@ function NSPauk:CheckInstancesMovement()
         return k
     end
 
-    -----------------------------------------------------------------------
-    -- Активные объекты проверяем всегда.
-    -----------------------------------------------------------------------
     if S.currentInstance then
         killed = checkInst(S.currentInstance, true) or killed
     end
@@ -15537,9 +14607,6 @@ function NSPauk:CheckInstancesMovement()
         killed = checkInst(S.moth.inst, true) or killed
     end
 
-    -----------------------------------------------------------------------
-    -- Чужие/старые паутины проверяем только редким полным проходом.
-    -----------------------------------------------------------------------
     if doFull then
         for i = #S.instances, 1, -1 do
             local inst = S.instances[i]
@@ -15970,14 +15037,6 @@ function NSPauk:DropWebForTask(task, x, y)
     if inst then
         inst.drawnPoints = (inst.drawnPoints or 0) + 1
 
-        ---------------------------------------------------------------
-        -- BURSE-УЧЁТ:
-        --
-        -- Каждая поставленная точка обычной паутины копится
-        -- в S.sessionBurstPoints.
-        --
-        -- Коконные и мотыльковые паутины сюда не попадают.
-        ---------------------------------------------------------------
         if not inst.isCocoon and not inst.isMoth then
             S.sessionBurstPoints = (tonumber(S.sessionBurstPoints) or 0) + 1
         end
@@ -15985,9 +15044,6 @@ function NSPauk:DropWebForTask(task, x, y)
 
     S.webPoints = S.webPoints + 1
 
-    -------------------------------------------------------------------
-    -- Счётчик построенных перемычек текущей паутины.
-    -------------------------------------------------------------------
     if #owner.textures == 1 and not owner._nspCrossCounted then
         if owner.connA
             or owner.connB
@@ -16007,42 +15063,6 @@ function NSPauk:DropWebForTask(task, x, y)
             end
         end
     end
-end
-
-function NSPauk:DropAlongLine(task, fx, fy, tx, ty)
-    local S = self.S
-    local C = self.C
-
-    local spacing = C.WEB_POINT_SPACING_MAX
-
-    if spacing <= 0 then
-        spacing = 1
-    end
-
-    local dx = tx - fx
-    local dy = ty - fy
-
-    local len = math.sqrt(dx * dx + dy * dy)
-
-    if len < spacing then
-        return
-    end
-
-    local steps = math.floor(len / spacing)
-
-    if steps > C.MAX_DROPS_PER_FRAME then
-        steps = C.MAX_DROPS_PER_FRAME
-    end
-
-    local ux = dx / len
-    local uy = dy / len
-
-    for i = 1, steps do
-        self:DropWebForTask(task, fx + ux * spacing * i, fy + uy * spacing * i)
-    end
-
-    S.lastDropX = fx + ux * spacing * steps
-    S.lastDropY = fy + uy * spacing * steps
 end
 
 function NSPauk:DropAlongCurve(task, t0, t1)
@@ -16108,12 +15128,6 @@ function NSPauk:DropAlongCurve(task, t0, t1)
     local baseHard = math.max(tonumber(C.MAX_DROPS_PER_FRAME) or 140, 500)
     local hard = baseHard
 
-    -----------------------------------------------------------------------
-    -- Если текущему кадру реально нужно поставить больше точек,
-    -- ставим их все, кроме аварийно огромных значений.
-    --
-    -- Это защищает от пунктира.
-    -----------------------------------------------------------------------
     if planned > hard then
         hard = math.min(planned, 5000)
     end
@@ -16234,172 +15248,172 @@ function NSPauk:IsMoving()
 end
 
 function NSPauk:IsTaskValid(task)
-    if not task then
+  if not task then
+    return false
+  end
+
+  local S = self.S
+
+  if task.nspFall then
+    return true
+  end
+
+  if task.nspPlan then
+    if task.owner and not task.owner.alive then
+      return false
+    end
+
+    if task.conn and not task.conn.alive then
+      return false
+    end
+
+    if task.owner and (task.owner.connA or task.owner.connB) then
+      if task.owner.connA and not task.owner.connA.alive then
         return false
-    end
+      end
 
-    local S = self.S
-
-    if task.nspFall then
-        return true
-    end
-
-    if task.nspTempThread then
-        return task.owner and task.owner.alive
-    end
-
-    if task.nspPlan then
-        if task.owner and not task.owner.alive then
-            return false
-        end
-
-        if task.conn and not task.conn.alive then
-            return false
-        end
-
-        if task.owner and (task.owner.connA or task.owner.connB) then
-            if task.owner.connA and not task.owner.connA.alive then
-                return false
-            end
-            if task.owner.connB and not task.owner.connB.alive then
-                return false
-            end
-        end
-
-        return true
-    end
-
-    if task.nspCrawl then
-        if task.owner and not task.owner.alive then
-            return false
-        end
-
-        if task.conn and not task.conn.alive then
-            return false
-        end
-
-        if task.nspDuringDrag then
-            if not S.nspDrag
-                or not S.nspDrag.owner
-                or not S.nspDrag.owner.alive then
-                return false
-            end
-        end
-    else
-        if task.kind == "thread" then
-            local owner = task.owner
-            if not owner or not owner.alive then
-                return false
-            end
-
-            if task.nspNoSupportCheck then
-                return true
-            end
-
-            local ref = owner.thread and owner.thread.ownerRef
-            local inst = ref and ref.inst
-            if not inst then
-                return false
-            end
-
-            if owner.connA or owner.connB then
-                if owner.connA and not self:ValidateConnection(inst, owner.connA) then
-                    return false
-                end
-                if owner.connB and not self:ValidateConnection(inst, owner.connB) then
-                    return false
-                end
-                if owner.parentSegA and not owner.parentSegA.alive then
-                    return false
-                end
-                if owner.parentSegB and not owner.parentSegB.alive then
-                    return false
-                end
-            elseif owner.target then
-                if not self:ValidateConnection(inst, owner) then
-                    return false
-                end
-            end
-
-            return true
-        end
-
-        if task.kind == "travel" then
-            if task.owner then
-                if not task.owner.alive then
-                    return false
-                end
-
-                if not task.nspNoSupportCheck then
-                    local ref = task.owner.thread and task.owner.thread.ownerRef
-                    local inst = ref and ref.inst
-
-                    if inst then
-                        if task.owner.connA or task.owner.connB then
-                            if task.owner.connA
-                                and not self:ValidateConnection(inst, task.owner.connA) then
-                                return false
-                            end
-                            if task.owner.connB
-                                and not self:ValidateConnection(inst, task.owner.connB) then
-                                return false
-                            end
-                            if task.owner.parentSegA and not task.owner.parentSegA.alive then
-                                return false
-                            end
-                            if task.owner.parentSegB and not task.owner.parentSegB.alive then
-                                return false
-                            end
-                        elseif task.owner.target then
-                            if not self:ValidateConnection(inst, task.owner) then
-                                return false
-                            end
-                        end
-                    end
-                end
-            end
-
-            if task.conn and not task.conn.alive then
-                return false
-            end
-
-            if task.conn and not task.nspNoSupportCheck then
-                local ref = task.conn.thread and task.conn.thread.ownerRef
-                local inst = ref and ref.inst
-                if inst and not self:ValidateConnection(inst, task.conn) then
-                    return false
-                end
-            end
-
-            return true
-        end
-
+      if task.owner.connB and not task.owner.connB.alive then
         return false
-    end
-
-    if task.nspCrawl and not task.nspNoSupportCheck then
-        if S.spider and S.spider:IsShown() then
-            local now = GetTime()
-            local interval = 0.10
-
-            if not task._nspCurSupportAt
-                or (now - task._nspCurSupportAt) >= interval then
-
-                task._nspCurSupportAt = now
-                task._nspCurSupportOK = self:NP_ValidateTaskCurrentSupport(
-                    task,
-                    S.lastSpiderX or 0,
-                    S.lastSpiderY or 0
-                )
-            end
-
-            if task._nspCurSupportOK == false then
-                return false
-            end
-        end
+      end
     end
 
     return true
+  end
+
+  if task.nspCrawl then
+    if task.owner and not task.owner.alive then
+      return false
+    end
+
+    if task.conn and not task.conn.alive then
+      return false
+    end
+
+    if task.nspDuringDrag then
+      if not S.nspDrag or not S.nspDrag.owner or not S.nspDrag.owner.alive then
+        return false
+      end
+    end
+  else
+    if task.kind == "thread" then
+      local owner = task.owner
+
+      if not owner or not owner.alive then
+        return false
+      end
+
+      if task.nspNoSupportCheck then
+        return true
+      end
+
+      local ref = owner.thread and owner.thread.ownerRef
+      local inst = ref and ref.inst
+
+      if not inst then
+        return false
+      end
+
+      if owner.connA or owner.connB then
+        if owner.connA and not self:ValidateConnection(inst, owner.connA) then
+          return false
+        end
+
+        if owner.connB and not self:ValidateConnection(inst, owner.connB) then
+          return false
+        end
+
+        if owner.parentSegA and not owner.parentSegA.alive then
+          return false
+        end
+
+        if owner.parentSegB and not owner.parentSegB.alive then
+          return false
+        end
+      elseif owner.target then
+        if not self:ValidateConnection(inst, owner) then
+          return false
+        end
+      end
+
+      return true
+    end
+
+    if task.kind == "travel" then
+      if task.owner then
+        if not task.owner.alive then
+          return false
+        end
+
+        if not task.nspNoSupportCheck then
+          local ref = task.owner.thread and task.owner.thread.ownerRef
+          local inst = ref and ref.inst
+
+          if inst then
+            if task.owner.connA or task.owner.connB then
+              if task.owner.connA and not self:ValidateConnection(inst, task.owner.connA) then
+                return false
+              end
+
+              if task.owner.connB and not self:ValidateConnection(inst, task.owner.connB) then
+                return false
+              end
+
+              if task.owner.parentSegA and not task.owner.parentSegA.alive then
+                return false
+              end
+
+              if task.owner.parentSegB and not task.owner.parentSegB.alive then
+                return false
+              end
+            elseif task.owner.target then
+              if not self:ValidateConnection(inst, task.owner) then
+                return false
+              end
+            end
+          end
+        end
+      end
+
+      if task.conn and not task.conn.alive then
+        return false
+      end
+
+      if task.conn and not task.nspNoSupportCheck then
+        local ref = task.conn.thread and task.conn.thread.ownerRef
+        local inst = ref and ref.inst
+
+        if inst and not self:ValidateConnection(inst, task.conn) then
+          return false
+        end
+      end
+
+      return true
+    end
+
+    return false
+  end
+
+  if task.nspCrawl and not task.nspNoSupportCheck then
+    if S.spider and S.spider:IsShown() then
+      local now = GetTime()
+      local interval = 0.10
+
+      if not task._nspCurSupportAt or (now - task._nspCurSupportAt) >= interval then
+        task._nspCurSupportAt = now
+        task._nspCurSupportOK = self:NP_ValidateTaskCurrentSupport(
+          task,
+          S.lastSpiderX or 0,
+          S.lastSpiderY or 0
+        )
+      end
+
+      if task._nspCurSupportOK == false then
+        return false
+      end
+    end
+  end
+
+  return true
 end
 
 function NSPauk:GetWebPointSpacing()
@@ -16422,26 +15436,23 @@ function NSPauk:GetWebPointSpacing()
 end
 
 function NSPauk:IsEmptyMovementTask(task)
-    if not task then
-        return false
-    end
-
-    if task.drop then
-        return false
-    end
-
-    if task.nspDuringDrag
-        or task.nspTempThread
-        or task.nspStartDragTask
-        or task.nspFall then
-        return false
-    end
-
-    if task.kind == "travel" or task.nspCrawl then
-        return true
-    end
-
+  if not task then
     return false
+  end
+
+  if task.drop then
+    return false
+  end
+
+  if task.nspDuringDrag or task.nspStartDragTask or task.nspFall then
+    return false
+  end
+
+  if task.kind == "travel" or task.nspCrawl then
+    return true
+  end
+
+  return false
 end
 
 function NSPauk:NP_MakeCrawlTask(a, b, plan)
@@ -16638,14 +15649,6 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
         pos = #S.tasks + 1
     end
 
-    ---------------------------------------------------------------
-    -- Маршрут через нижний край экрана:
-    --   1) падаем на нижний край;
-    --   2) ползём по краю до x цели;
-    --   3) поднимаемся к цели.
-    --
-    -- Но подниматься можно только туда, где реально есть опора.
-    ---------------------------------------------------------------
     local bottomY = gap * 0.25
     if bottomY < 1 then
         bottomY = 1
@@ -16684,13 +15687,6 @@ function NSPauk:NP_HandleRouteLoop(task, from, to, dragMode)
         insertIdx = insertIdx + 1
     end
 
-    -------------------------------------------------------------------
-    -- ИСПРАВЛЕНО: нельзя делать loop-breaker подъём в точку,
-    -- где нет опоры.
-    --
-    -- Раньше climbTask всегда получал nspNoSupportCheck = true,
-    -- из-за чего паук мог ползти из нижнего края прямо в воздух.
-    -------------------------------------------------------------------
     local climbTo = cp(target)
 
     local climbSupported = self:NP_NearSupportWithin(
@@ -16970,9 +15966,6 @@ function NSPauk:NP_ExecutePlan(task)
         return made
     end
 
-    -------------------------------------------------------------------
-    -- Продолжение перетаскивания после падения
-    -------------------------------------------------------------------
     if task.nspContinueDrag then
         local depth = tonumber(task.nspFallDepth) or 0
         local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y)
@@ -17063,9 +16056,6 @@ function NSPauk:NP_ExecutePlan(task)
         return inserted
     end
 
-    -------------------------------------------------------------------
-    -- Проверка опоры под пауком перед планом
-    -------------------------------------------------------------------
     local depth = tonumber(task.nspFallDepth) or 0
     local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y)
         or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
@@ -17089,9 +16079,6 @@ function NSPauk:NP_ExecutePlan(task)
 
     S.nspSupportCache = nil
 
-    -------------------------------------------------------------------
-    -- Перетаскивание нити (drag)
-    -------------------------------------------------------------------
     if task.nspDrag then
         self:NP_ClearGlobalDrag(false)
 
@@ -17137,9 +16124,6 @@ function NSPauk:NP_ExecutePlan(task)
         return inserted
     end
 
-    -------------------------------------------------------------------
-    -- Обычный плановый переход
-    -------------------------------------------------------------------
     local to = task.p2 and {
         x = task.p2.x,
         y = task.p2.y,
@@ -17156,10 +16140,6 @@ function NSPauk:NP_ExecutePlan(task)
 
     return inserted
 end
-
----------------------------------------------------------------------------
--- Anti-teleport helpers
----------------------------------------------------------------------------
 
 function NSPauk:NP_GetAntiTeleportTolerance()
     return 4
@@ -17197,29 +16177,23 @@ function NSPauk:NP_TaskAllowsImmediateStart(task)
 end
 
 function NSPauk:NP_TaskNeedsFixedStart(task)
-    if not task then
-        return false
-    end
-
-    -- Этим задачам важно стартовать именно из их p0.
-    -- Поэтому сначала пытаемся подойти к p0, а не телепортируемся.
-    if task.nspStartDragTask then
-        return true
-    end
-
-    if task.nspMothFreeze then
-        return true
-    end
-
-    if task.kind == "thread" then
-        return true
-    end
-
-    if task.nspTempThread then
-        return true
-    end
-
+  if not task then
     return false
+  end
+
+  if task.nspStartDragTask then
+    return true
+  end
+
+  if task.nspMothFreeze then
+    return true
+  end
+
+  if task.kind == "thread" then
+    return true
+  end
+
+  return false
 end
 
 function NSPauk:NP_RecalcTaskStartFromCurrent(task)
@@ -17303,13 +16277,6 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
         inst = self:GetOwnerInstance(task.conn)
     end
 
-    -----------------------------------------------------------------------
-    -- Кокон.
-    --
-    -- Для первой задачи кокона используем общий маршрутный подход.
-    -- Для внутренней обмотки и для мотылька оставляем быстрый прямой
-    -- подход, чтобы не ломать визуальную логику и не плодить Dijkstra.
-    -----------------------------------------------------------------------
     if task.nspCocoon then
         local useCommonRoute = task.nspCocoonEntry
             and inst
@@ -17379,9 +16346,6 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
         return true
     end
 
-    -----------------------------------------------------------------------
-    -- Для обычной паутины оставляем плановый подход.
-    -----------------------------------------------------------------------
     local plan = self:NP_MakePlanTask(
         "travel",
         {
@@ -17405,16 +16369,6 @@ function NSPauk:NP_InsertApproachBeforeTask(task)
     return true
 end
 
-function NSPauk:NP_ResetSessionBurst()
-    local S = self.S
-
-    if type(S) ~= "table" then
-        return
-    end
-
-    S.sessionBurstPoints = 0
-end
-
 function NSPauk:NP_FlushSessionBurst()
     local S = self.S
 
@@ -17430,15 +16384,8 @@ function NSPauk:NP_FlushSessionBurst()
         return
     end
 
-    -------------------------------------------------------------------
-    -- Сколько точек сплетено с предыдущего перебега.
-    -------------------------------------------------------------------
     local count = math.floor((tonumber(S.sessionBurstPoints) or 0) + 0.5)
 
-    -------------------------------------------------------------------
-    -- Сбрасываем burst сразу, чтобы одна и та же паутина
-    -- не учитывалась повторно.
-    -------------------------------------------------------------------
     S.sessionBurstPoints = 0
 
     if count <= 0 then
@@ -17453,28 +16400,10 @@ function NSPauk:NP_FlushSessionBurst()
 
     local oldBest = math.floor((tonumber(session.bestPoints) or 0) + 0.5)
 
-    -------------------------------------------------------------------
-    -- Если новый всплеск меньше или равен прошлому рекорду,
-    -- ничего не принимаем.
-    -------------------------------------------------------------------
     if count <= oldBest then
         return
     end
 
-    -------------------------------------------------------------------
-    -- ВАЖНО:
-    --
-    -- Новый рекорд засчитывается полностью.
-    --
-    -- Не делаем:
-    --   CalcWebExperience(count) - CalcWebExperience(oldBest)
-    --
-    -- Делаем:
-    --   CalcWebExperience(count)
-    --
-    -- То есть 5000 точек дают опыт как 5000 точек,
-    -- а не как 2000 точек сверху старого рекорда.
-    -------------------------------------------------------------------
     local expGain = self:CalcWebExperience(count)
 
     if type(expGain) ~= "number"
@@ -17568,581 +16497,565 @@ function NSPauk:NP_FlushSessionBurst()
 end
 
 function NSPauk:AdvanceTask()
-    local S = self.S
-    local old = S.currentTask
-    local gap = self:NP_GetGap()
+  local S = self.S
+  local old = S.currentTask
+  local gap = self:NP_GetGap()
 
-    local function makeContinueTask(task, fromPoint)
-        local to = task.p2 and {
-            x = task.p2.x,
-            y = task.p2.y,
-        } or {
-            x = fromPoint.x,
-            y = fromPoint.y,
+  local function makeContinueTask(task, fromPoint)
+    local to = task.p2 and {
+      x = task.p2.x,
+      y = task.p2.y,
+    } or {
+      x = fromPoint.x,
+      y = fromPoint.y,
+    }
+
+    local cont = self:NP_MakePlanTask("travel", fromPoint, to, task.conn, task.owner)
+    cont.nspFallDepth = task.nspFallDepth or 0
+
+    if task.nspDuringDrag and S.nspDrag then
+      cont.nspDrag = true
+      cont.nspContinueDrag = true
+      cont.finalThread = S.nspDrag.finalThread
+      cont.owner = S.nspDrag.owner or task.owner
+      cont.nspDragEnd = task.nspDragEnd
+    end
+
+    return cont
+  end
+
+  if old
+    and old.nspCrawl
+    and not old.nspNoSupportCheck
+    and not old.nspSupportLostHandled then
+    local ownerAlive = not (old.owner and not old.owner.alive)
+    local dragOwnerAlive = not (
+      old.nspDuringDrag
+      and S.nspDrag
+      and S.nspDrag.owner
+      and not S.nspDrag.owner.alive
+    )
+
+    if ownerAlive
+      and dragOwnerAlive
+      and not self:NP_ValidateTaskCurrentSupport(
+        old,
+        S.lastSpiderX or 0,
+        S.lastSpiderY or 0
+      ) then
+      if self:NP_NearSupportWithin(
+        S.lastSpiderX or 0,
+        S.lastSpiderY or 0,
+        gap * 1.5
+      ) then
+        old.nspSupportLostHandled = true
+      else
+        old.nspSupportLostHandled = true
+
+        local from = {
+          x = S.lastSpiderX or 0,
+          y = S.lastSpiderY or 0,
         }
-        local cont = self:NP_MakePlanTask("travel", fromPoint, to, task.conn, task.owner)
-        cont.nspFallDepth = task.nspFallDepth or 0
-        if task.nspDuringDrag and S.nspDrag then
-            cont.nspDrag = true
-            cont.nspContinueDrag = true
-            cont.finalThread = S.nspDrag.finalThread
-            cont.owner = S.nspDrag.owner or task.owner
-            cont.nspDragEnd = task.nspDragEnd
+        local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+
+        if old.nspDuringDrag then
+          fall.nspDuringDrag = true
         end
-        return cont
+
+        table.insert(S.tasks, S.taskIdx, fall)
+
+        local cont = makeContinueTask(old, {
+          x = fall.p2.x,
+          y = fall.p2.y,
+        })
+
+        table.insert(S.tasks, S.taskIdx + 1, cont)
+      end
     end
+  end
 
-    -------------------------------------------------------------------
-    -- ИСПРАВЛЕНО: запасная проверка после crawl перед падением.
-    -------------------------------------------------------------------
-    if old
-        and old.nspCrawl
-        and not old.nspNoSupportCheck
-        and not old.nspSupportLostHandled then
-        local ownerAlive = not (old.owner and not old.owner.alive)
-        local dragOwnerAlive = not (
-            old.nspDuringDrag
-            and S.nspDrag
-            and S.nspDrag.owner
-            and not S.nspDrag.owner.alive
-        )
-        if ownerAlive
-            and dragOwnerAlive
-            and not self:NP_ValidateTaskCurrentSupport(
-                old,
-                S.lastSpiderX or 0,
-                S.lastSpiderY or 0
-            ) then
-            if self:NP_NearSupportWithin(
-                S.lastSpiderX or 0,
-                S.lastSpiderY or 0,
-                gap * 1.5
-            ) then
-                old.nspSupportLostHandled = true
-            else
-                old.nspSupportLostHandled = true
-                local from = {
-                    x = S.lastSpiderX or 0,
-                    y = S.lastSpiderY or 0,
-                }
-                local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
-                if old.nspDuringDrag then
-                    fall.nspDuringDrag = true
-                end
-                table.insert(S.tasks, S.taskIdx, fall)
-                local cont = makeContinueTask(old, {
-                    x = fall.p2.x,
-                    y = fall.p2.y,
-                })
-                table.insert(S.tasks, S.taskIdx + 1, cont)
-            end
-        end
+  if old and old.nspDuringDrag and not old.nspSupportLostHandled then
+    if old.nspDragEnd then
+      if S.moveT and S.moveT >= 1 and self:IsTaskValid(old) then
+        self:NP_FinishGlobalDrag(old)
+      else
+        self:NP_ClearGlobalDrag(true)
+      end
+    else
+      if not self:IsTaskValid(old) then
+        self:NP_ClearGlobalDrag(true)
+      end
     end
+  end
 
-    if old and old.nspDuringDrag and not old.nspSupportLostHandled then
-        if old.nspDragEnd then
-            if S.moveT and S.moveT >= 1 and self:IsTaskValid(old) then
-                self:NP_FinishGlobalDrag(old)
-            else
-                self:NP_ClearGlobalDrag(true)
-            end
-        else
-            if not self:IsTaskValid(old) then
-                self:NP_ClearGlobalDrag(true)
-            end
-        end
-    end
+  if old and old.nspPlan then
+    S.currentTask = nil
+  end
 
-    if old and old.nspPlan then
-        S.currentTask = nil
-    end
-
-    if S.limitReturnPending or S.phase == "limitWait" then
-        if S.limitReturnPending then
-            S.limitReturnPending = false
-            S.phase = "limitWait"
-            S.limitWaitTimer = 0
-            S.completeTimer = 0
-        end
-        return
-    end
-
-    while S.taskIdx <= #S.tasks do
-        local task = S.tasks[S.taskIdx]
-
-        if self:IsTaskValid(task) then
-            local x = S.lastSpiderX or 0
-            local y = S.lastSpiderY or 0
-            local supported = true
-
-            local needPreFallCheck = S.spider
-                and S.spider:IsShown()
-                and not task.nspPlan
-                and not task.nspFall
-                and not task.nspNoSupportCheck
-                and not task.nspPreFallInserted
-
-            if needPreFallCheck then
-                supported = self:NP_ValidateTaskCurrentSupport(task, x, y)
-            end
-
-            -----------------------------------------------------------
-            -- ИСПРАВЛЕНО: запасная проверка перед pre-fall.
-            -----------------------------------------------------------
-            if needPreFallCheck and not supported then
-                if self:NP_NearSupportWithin(x, y, gap * 1.5) then
-                    supported = true
-                end
-            end
-
-            if needPreFallCheck and not supported then
-                task.nspPreFallInserted = true
-                local from = { x = x, y = y }
-                local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
-                table.insert(S.tasks, S.taskIdx, fall)
-
-            elseif task.nspPlan then
-                S.taskIdx = S.taskIdx + 1
-                self:NP_ExecutePlan(task)
-                if S.limitReturnPending or S.phase == "limitWait" then
-                    return
-                end
-            else
-                local skipStart = false
-                if not self:NP_TaskAllowsImmediateStart(task) then
-                    local cur = self:NP_GetSpiderPointIfShown()
-                    if cur
-                        and task.p0
-                        and type(task.p0.x) == "number"
-                        and type(task.p0.y) == "number" then
-                        local tol = self:NP_GetAntiTeleportTolerance()
-                        local dx = task.p0.x - cur.x
-                        local dy = task.p0.y - cur.y
-                        if dx * dx + dy * dy > tol * tol then
-                            if self:NP_TaskNeedsFixedStart(task) then
-                                if (task.nspApproachInserted or 0) < 3 then
-                                    if self:NP_InsertApproachBeforeTask(task) then
-                                        skipStart = true
-                                    else
-                                        self:NP_RecalcTaskStartFromCurrent(task)
-                                    end
-                                else
-                                    self:NP_RecalcTaskStartFromCurrent(task)
-                                    task.nspApproachFailed = true
-                                end
-                            else
-                                self:NP_RecalcTaskStartFromCurrent(task)
-                            end
-                        end
-                    end
-                end
-
-                if skipStart then
-                    S.currentTask = nil
-                else
-                    S.currentTask = task
-                    S.taskIdx = S.taskIdx + 1
-                    self:StartTask(task)
-                    return
-                end
-            end
-        else
-            local ownerAlive = not (task.owner and not task.owner.alive)
-            local dragOwnerAlive = not (
-                task.nspDuringDrag
-                and S.nspDrag
-                and S.nspDrag.owner
-                and not S.nspDrag.owner.alive
-            )
-
-            if task
-                and task.nspCrawl
-                and not task.nspNoSupportCheck
-                and not task.nspSupportLostConsumed
-                and ownerAlive
-                and dragOwnerAlive
-                and not self:NP_ValidateTaskCurrentSupport(
-                    task,
-                    S.lastSpiderX or 0,
-                    S.lastSpiderY or 0
-                ) then
-
-                if self:NP_NearSupportWithin(
-                    S.lastSpiderX or 0,
-                    S.lastSpiderY or 0,
-                    gap * 1.5
-                ) then
-                    task.nspSupportLostConsumed = true
-                    S.taskIdx = S.taskIdx + 1
-                else
-                    task.nspSupportLostConsumed = true
-                    local from = {
-                        x = S.lastSpiderX or 0,
-                        y = S.lastSpiderY or 0,
-                    }
-                    local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
-                    if task.nspDuringDrag then
-                        fall.nspDuringDrag = true
-                    end
-                    table.insert(S.tasks, S.taskIdx, fall)
-                    local cont = makeContinueTask(task, {
-                        x = fall.p2.x,
-                        y = fall.p2.y,
-                    })
-                    table.insert(S.tasks, S.taskIdx + 1, cont)
-                end
-            else
-                if task
-                    and task.nspDuringDrag
-                    and not task.nspTempThread
-                    and not task.nspSupportLostConsumed then
-                    self:NP_ClearGlobalDrag(true)
-                end
-                S.taskIdx = S.taskIdx + 1
-            end
-        end
-    end
-
+  if S.limitReturnPending or S.phase == "limitWait" then
     if S.limitReturnPending then
-        S.limitReturnPending = false
-        S.phase = "limitWait"
-        S.limitWaitTimer = 0
-        S.completeTimer = 0
-        return
+      S.limitReturnPending = false
+      S.phase = "limitWait"
+      S.limitWaitTimer = 0
+      S.completeTimer = 0
     end
 
-    S.phase = "instanceComplete"
-    S.completeTimer = 0
-end
+    return
+  end
 
-function NSPauk:StartTask(task)
-    local S = self.S
-    local C = self.C
+  while S.taskIdx <= #S.tasks do
+    local task = S.tasks[S.taskIdx]
 
-    if task.nspPlan then
-        S.currentTask = nil
+    if self:IsTaskValid(task) then
+      local x = S.lastSpiderX or 0
+      local y = S.lastSpiderY or 0
+      local supported = true
+      local needPreFallCheck = S.spider
+        and S.spider:IsShown()
+        and not task.nspPlan
+        and not task.nspFall
+        and not task.nspNoSupportCheck
+        and not task.nspPreFallInserted
+
+      if needPreFallCheck then
+        supported = self:NP_ValidateTaskCurrentSupport(task, x, y)
+      end
+
+      if needPreFallCheck and not supported then
+        if self:NP_NearSupportWithin(x, y, gap * 1.5) then
+          supported = true
+        end
+      end
+
+      if needPreFallCheck and not supported then
+        task.nspPreFallInserted = true
+
+        local from = {
+          x = x,
+          y = y,
+        }
+        local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+
+        table.insert(S.tasks, S.taskIdx, fall)
+      elseif task.nspPlan then
+        S.taskIdx = S.taskIdx + 1
         self:NP_ExecutePlan(task)
 
-        S.phase = "task"
-        S.moveDur = 0.05
-        S.moveT = 0
-
-        return
-    end
-
-    if task.nspMothRestore then
-        self:PutSpider(task.p0.x, task.p0.y)
-        self:RestoreMothStateImmediate(task.nspSaved)
-
-        return
-    end
-
-    if task.nspMothPounce then
-        local cur = self:NP_GetSpiderPointIfShown()
-
-        if cur
-            and task.p2
-            and type(task.p2.x) == "number"
-            and type(task.p2.y) == "number" then
-            task.p0 = {
-                x = cur.x,
-                y = cur.y,
-            }
-            task.p1 = {
-                x = (cur.x + task.p2.x) / 2,
-                y = (cur.y + task.p2.y) / 2,
-            }
+        if S.limitReturnPending or S.phase == "limitWait" then
+          return
         end
+      else
+        local skipStart = false
 
-        task.pathLength = nil
-        task.drop = false
-
-        local pounceLen = self:ApproxThreadLength(task)
-        if pounceLen < 1 then
-            pounceLen = 1
-        end
-
-        local pounceSpeed = self:RandomInt(1600, 2200)
-
-        S.currentTask = task
-        S.moveDur = pounceLen / pounceSpeed
-
-        if S.moveDur < 0.08 then
-            S.moveDur = 0.08
-        end
-
-        if S.moveDur > 0.28 then
-            S.moveDur = 0.28
-        end
-
-        S.moveT = 0
-        S.lastTaskT = 0
-        S.speedTimer = 0
-        S.phase = "task"
-
-        self:PutSpider(task.p0.x, task.p0.y)
-
-        return
-    end
-
-    if task.nspMothFreeze then
         if not self:NP_TaskAllowsImmediateStart(task) then
-            self:NP_RecalcTaskStartFromCurrent(task)
-        end
+          local cur = self:NP_GetSpiderPointIfShown()
 
-        if self.GetMothStuckInfo and not self:GetMothStuckInfo() then
-            self:AbortMothHunt(false, false, true)
-            return
-        end
-
-        if self.CallMoth then
-            self:CallMoth("Freeze")
-        end
-
-        if S.moth and S.moth.active then
-            S.moth.frozen = true
-            S.moth.phase = "wrap"
-        end
-
-        S.currentTask = task
-        task.drop = false
-
-        S.moveDur = 0.2
-        S.moveT = 0
-        S.lastTaskT = 0
-        S.speedTimer = 0
-        S.phase = "task"
-
-        self:PutSpider(task.p0.x, task.p0.y)
-
-        return
-    end
-
-    S.currentTask = task
-
-    if task.kind ~= "thread" then
-        task.drop = false
-    end
-
-    local cur = self:NP_GetSpiderPointIfShown()
-
-    if cur
-        and not self:NP_TaskAllowsImmediateStart(task)
-        and task.p0
-        and type(task.p0.x) == "number"
-        and type(task.p0.y) == "number" then
-        local tol = self:NP_GetAntiTeleportTolerance()
-
-        local dx = task.p0.x - cur.x
-        local dy = task.p0.y - cur.y
-
-        if dx * dx + dy * dy > tol * tol then
-            self:NP_RecalcTaskStartFromCurrent(task)
-        end
-    end
-
-    if task.nspFall then
-        if cur and task.p2 and type(task.p2.y) == "number" then
-            task.p0 = {
-                x = cur.x,
-                y = cur.y,
-            }
-
-            if task.p2.y > task.p0.y - 1 then
-                task.p2 = {
-                    x = task.p0.x,
-                    y = math.max(0, task.p0.y - 1),
-                }
-            else
-                task.p2 = {
-                    x = task.p0.x,
-                    y = task.p2.y,
-                }
-            end
-
-            task.p1 = {
-                x = task.p0.x,
-                y = (task.p0.y + task.p2.y) / 2,
-            }
-        end
-
-        task.pathLength = nil
-    end
-
-    if task.nspCrawl or task.nspTempThread then
-        if cur
-            and task.p2
-            and type(task.p2.x) == "number"
-            and type(task.p2.y) == "number" then
+          if cur
+            and task.p0
+            and type(task.p0.x) == "number"
+            and type(task.p0.y) == "number" then
+            local tol = self:NP_GetAntiTeleportTolerance()
             local dx = task.p0.x - cur.x
             local dy = task.p0.y - cur.y
 
-            if dx * dx + dy * dy > 1 then
-                task.p0 = {
-                    x = cur.x,
-                    y = cur.y,
-                }
-                task.p1 = {
-                    x = (cur.x + task.p2.x) / 2,
-                    y = (cur.y + task.p2.y) / 2,
-                }
-
-                task.pathLength = nil
+            if dx * dx + dy * dy > tol * tol then
+              if self:NP_TaskNeedsFixedStart(task) then
+                if (task.nspApproachInserted or 0) < 3 then
+                  if self:NP_InsertApproachBeforeTask(task) then
+                    skipStart = true
+                  else
+                    self:NP_RecalcTaskStartFromCurrent(task)
+                  end
+                else
+                  self:NP_RecalcTaskStartFromCurrent(task)
+                  task.nspApproachFailed = true
+                end
+              else
+                self:NP_RecalcTaskStartFromCurrent(task)
+              end
             end
+          end
         end
 
-        if task.nspTempThread and task.p2 and type(task.p2.y) == "number" then
-            task.p1 = {
-                x = task.p0.x,
-                y = (task.p0.y + task.p2.y) / 2,
-            }
-            task.p2 = {
-                x = task.p0.x,
-                y = task.p2.y,
-            }
-
-            task.pathLength = nil
+        if skipStart then
+          S.currentTask = nil
+        else
+          S.currentTask = task
+          S.taskIdx = S.taskIdx + 1
+          self:StartTask(task)
+          return
         end
+      end
+    else
+      local ownerAlive = not (task.owner and not task.owner.alive)
+      local dragOwnerAlive = not (
+        task.nspDuringDrag
+        and S.nspDrag
+        and S.nspDrag.owner
+        and not S.nspDrag.owner.alive
+      )
+
+      if task
+        and task.nspCrawl
+        and not task.nspNoSupportCheck
+        and not task.nspSupportLostConsumed
+        and ownerAlive
+        and dragOwnerAlive
+        and not self:NP_ValidateTaskCurrentSupport(
+          task,
+          S.lastSpiderX or 0,
+          S.lastSpiderY or 0
+        ) then
+        if self:NP_NearSupportWithin(
+          S.lastSpiderX or 0,
+          S.lastSpiderY or 0,
+          gap * 1.5
+        ) then
+          task.nspSupportLostConsumed = true
+          S.taskIdx = S.taskIdx + 1
+        else
+          task.nspSupportLostConsumed = true
+
+          local from = {
+            x = S.lastSpiderX or 0,
+            y = S.lastSpiderY or 0,
+          }
+          local fall = self:NP_MakeFallTask(from, self:NP_FindFallTarget(from.x, from.y))
+
+          if task.nspDuringDrag then
+            fall.nspDuringDrag = true
+          end
+
+          table.insert(S.tasks, S.taskIdx, fall)
+
+          local cont = makeContinueTask(task, {
+            x = fall.p2.x,
+            y = fall.p2.y,
+          })
+
+          table.insert(S.tasks, S.taskIdx + 1, cont)
+        end
+      else
+        if task
+          and task.nspDuringDrag
+          and not task.nspSupportLostConsumed then
+          self:NP_ClearGlobalDrag(true)
+        end
+
+        S.taskIdx = S.taskIdx + 1
+      end
+    end
+  end
+
+  if S.limitReturnPending then
+    S.limitReturnPending = false
+    S.phase = "limitWait"
+    S.limitWaitTimer = 0
+    S.completeTimer = 0
+    return
+  end
+
+  S.phase = "instanceComplete"
+  S.completeTimer = 0
+end
+
+function NSPauk:StartTask(task)
+  local S = self.S
+  local C = self.C
+
+  if task.nspPlan then
+    S.currentTask = nil
+    self:NP_ExecutePlan(task)
+    S.phase = "task"
+    S.moveDur = 0.05
+    S.moveT = 0
+    return
+  end
+
+  if task.nspMothRestore then
+    self:PutSpider(task.p0.x, task.p0.y)
+    self:RestoreMothStateImmediate(task.nspSaved)
+    return
+  end
+
+  if task.nspMothPounce then
+    local cur = self:NP_GetSpiderPointIfShown()
+
+    if cur and task.p2 and type(task.p2.x) == "number" and type(task.p2.y) == "number" then
+      task.p0 = {
+        x = cur.x,
+        y = cur.y,
+      }
+      task.p1 = {
+        x = (cur.x + task.p2.x) / 2,
+        y = (cur.y + task.p2.y) / 2,
+      }
     end
 
-    local pathLen = self:ApproxThreadLength(task)
-    task.pathLength = pathLen
+    task.pathLength = nil
+    task.drop = false
 
-    local len = pathLen
-    if len < 1 then
-        len = 1
+    local pounceLen = self:ApproxThreadLength(task)
+
+    if pounceLen < 1 then
+      pounceLen = 1
     end
 
-    local speed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX)
+    local pounceSpeed = self:RandomInt(1600, 2200)
 
-    if task.kind == "travel" then
-        speed = speed * C.TRAVEL_SPEED_MULT
+    S.currentTask = task
+    S.moveDur = pounceLen / pounceSpeed
+
+    if S.moveDur < 0.08 then
+      S.moveDur = 0.08
     end
 
-    if task.isCross then
-        speed = speed * C.CROSS_SPEED_MULT
-    end
-
-    if task.isMain then
-        speed = speed * C.MAIN_SPEED_MULT
-    end
-
-    if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
-        speed = speed * C.FAST_MODE
-    end
-
-    if self:IsEmptyMovementTask(task) then
-        speed = speed * (C.EMPTY_SPEED_MULT or 4)
-    end
-
-    if speed <= 0 then
-        speed = 1
-    end
-
-    S.moveDur = len / speed
-
-    if S.moveDur < 0.05 then
-        S.moveDur = 0.05
+    if S.moveDur > 0.28 then
+      S.moveDur = 0.28
     end
 
     S.moveT = 0
     S.lastTaskT = 0
     S.speedTimer = 0
     S.phase = "task"
-
-    S.lastDropX = task.p0.x
-    S.lastDropY = task.p0.y
-
     self:PutSpider(task.p0.x, task.p0.y)
+    return
+  end
 
-    if task.drop then
-        task.dropSpacing = self:GetWebPointSpacingForTask(task)
-        task.dropRemainder = 0
-
-        self:DropWebForTask(task, task.p0.x, task.p0.y)
-    else
-        task.dropSpacing = nil
-        task.dropRemainder = nil
+  if task.nspMothFreeze then
+    if not self:NP_TaskAllowsImmediateStart(task) then
+      self:NP_RecalcTaskStartFromCurrent(task)
     end
 
-    if task.nspStartDragTask then
-        self:NP_StartDrag(task)
+    if self.GetMothStuckInfo and not self:GetMothStuckInfo() then
+      self:AbortMothHunt(false, false, true)
+      return
     end
 
-    if task.nspFall then
-        local fallLen = self:ApproxThreadLength(task)
-        task.pathLength = fallLen
-
-        if fallLen < 1 then
-            fallLen = 1
-        end
-
-        local fallMult = math.max(3, (tonumber(C.TRAVEL_SPEED_MULT) or 6) * 0.8) * 4
-        local fallSpeed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX) * fallMult
-
-        if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
-            fallSpeed = fallSpeed * C.FAST_MODE
-        end
-
-        if fallSpeed <= 0 then
-            fallSpeed = 1
-        end
-
-        S.moveDur = fallLen / fallSpeed
-
-        if S.moveDur < 0.05 then
-            S.moveDur = 0.05
-        end
-
-        S.moveT = 0
-        S.lastTaskT = 0
-
-        self:PutSpider(task.p0.x, task.p0.y)
+    if self.CallMoth then
+      self:CallMoth("Freeze")
     end
 
-    if task.nspCrawl or task.nspTempThread then
-        local crawlLen = self:ApproxThreadLength(task)
-        task.pathLength = crawlLen
-
-        if crawlLen < 1 then
-            crawlLen = 1
-        end
-
-        local crawlSpeed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX)
-
-        if not task.nspTempThread then
-            if task.isCross then
-                crawlSpeed = crawlSpeed * (C.CROSS_SPEED_MULT or 1)
-            end
-
-            if task.isMain then
-                crawlSpeed = crawlSpeed * (C.MAIN_SPEED_MULT or 1)
-            end
-        end
-
-        if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
-            crawlSpeed = crawlSpeed * C.FAST_MODE
-        end
-
-        if self:IsEmptyMovementTask(task) then
-            crawlSpeed = crawlSpeed * (C.EMPTY_SPEED_MULT or 4)
-        end
-
-        if crawlSpeed <= 0 then
-            crawlSpeed = 1
-        end
-
-        S.moveDur = crawlLen / crawlSpeed
-
-        if S.moveDur < 0.05 then
-            S.moveDur = 0.05
-        end
-
-        S.moveT = 0
-        S.lastTaskT = 0
-
-        self:PutSpider(task.p0.x, task.p0.y)
+    if S.moth and S.moth.active then
+      S.moth.frozen = true
+      S.moth.phase = "wrap"
     end
+
+    S.currentTask = task
+    task.drop = false
+    S.moveDur = 0.2
+    S.moveT = 0
+    S.lastTaskT = 0
+    S.speedTimer = 0
+    S.phase = "task"
+    self:PutSpider(task.p0.x, task.p0.y)
+    return
+  end
+
+  S.currentTask = task
+
+  if task.kind ~= "thread" then
+    task.drop = false
+  end
+
+  local cur = self:NP_GetSpiderPointIfShown()
+
+  if cur
+    and not self:NP_TaskAllowsImmediateStart(task)
+    and task.p0
+    and type(task.p0.x) == "number"
+    and type(task.p0.y) == "number" then
+    local tol = self:NP_GetAntiTeleportTolerance()
+    local dx = task.p0.x - cur.x
+    local dy = task.p0.y - cur.y
+
+    if dx * dx + dy * dy > tol * tol then
+      self:NP_RecalcTaskStartFromCurrent(task)
+    end
+  end
+
+  if task.nspFall then
+    if cur and task.p2 and type(task.p2.y) == "number" then
+      task.p0 = {
+        x = cur.x,
+        y = cur.y,
+      }
+
+      if task.p2.y > task.p0.y - 1 then
+        task.p2 = {
+          x = task.p0.x,
+          y = math.max(0, task.p0.y - 1),
+        }
+      else
+        task.p2 = {
+          x = task.p0.x,
+          y = task.p2.y,
+        }
+      end
+
+      task.p1 = {
+        x = task.p0.x,
+        y = (task.p0.y + task.p2.y) / 2,
+      }
+    end
+
+    task.pathLength = nil
+  end
+
+  if task.nspCrawl then
+    if cur
+      and task.p2
+      and type(task.p2.x) == "number"
+      and type(task.p2.y) == "number" then
+      local dx = task.p0.x - cur.x
+      local dy = task.p0.y - cur.y
+
+      if dx * dx + dy * dy > 1 then
+        task.p0 = {
+          x = cur.x,
+          y = cur.y,
+        }
+        task.p1 = {
+          x = (cur.x + task.p2.x) / 2,
+          y = (cur.y + task.p2.y) / 2,
+        }
+        task.pathLength = nil
+      end
+    end
+  end
+
+  local pathLen = self:ApproxThreadLength(task)
+  task.pathLength = pathLen
+
+  local len = pathLen
+
+  if len < 1 then
+    len = 1
+  end
+
+  local speed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX)
+
+  if task.kind == "travel" then
+    speed = speed * C.TRAVEL_SPEED_MULT
+  end
+
+  if task.isCross then
+    speed = speed * C.CROSS_SPEED_MULT
+  end
+
+  if task.isMain then
+    speed = speed * C.MAIN_SPEED_MULT
+  end
+
+  if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
+    speed = speed * C.FAST_MODE
+  end
+
+  if self:IsEmptyMovementTask(task) then
+    speed = speed * (C.EMPTY_SPEED_MULT or 4)
+  end
+
+  if speed <= 0 then
+    speed = 1
+  end
+
+  S.moveDur = len / speed
+
+  if S.moveDur < 0.05 then
+    S.moveDur = 0.05
+  end
+
+  S.moveT = 0
+  S.lastTaskT = 0
+  S.speedTimer = 0
+  S.phase = "task"
+  S.lastDropX = task.p0.x
+  S.lastDropY = task.p0.y
+  self:PutSpider(task.p0.x, task.p0.y)
+
+  if task.drop then
+    task.dropSpacing = self:GetWebPointSpacingForTask(task)
+    task.dropRemainder = 0
+    self:DropWebForTask(task, task.p0.x, task.p0.y)
+  else
+    task.dropSpacing = nil
+    task.dropRemainder = nil
+  end
+
+  if task.nspStartDragTask then
+    self:NP_StartDrag(task)
+  end
+
+  if task.nspFall then
+    local fallLen = self:ApproxThreadLength(task)
+    task.pathLength = fallLen
+
+    if fallLen < 1 then
+      fallLen = 1
+    end
+
+    local fallMult = math.max(3, (tonumber(C.TRAVEL_SPEED_MULT) or 6) * 0.8) * 4
+    local fallSpeed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX) * fallMult
+
+    if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
+      fallSpeed = fallSpeed * C.FAST_MODE
+    end
+
+    if fallSpeed <= 0 then
+      fallSpeed = 1
+    end
+
+    S.moveDur = fallLen / fallSpeed
+
+    if S.moveDur < 0.05 then
+      S.moveDur = 0.05
+    end
+
+    S.moveT = 0
+    S.lastTaskT = 0
+    self:PutSpider(task.p0.x, task.p0.y)
+  end
+
+  if task.nspCrawl then
+    local crawlLen = self:ApproxThreadLength(task)
+    task.pathLength = crawlLen
+
+    if crawlLen < 1 then
+      crawlLen = 1
+    end
+
+    local crawlSpeed = self:RandomInt(C.SPIDER_SPEED_MIN, C.SPIDER_SPEED_MAX)
+
+    if task.isCross then
+      crawlSpeed = crawlSpeed * (C.CROSS_SPEED_MULT or 1)
+    end
+
+    if task.isMain then
+      crawlSpeed = crawlSpeed * (C.MAIN_SPEED_MULT or 1)
+    end
+
+    if type(C.FAST_MODE) == "number" and C.FAST_MODE > 0 then
+      crawlSpeed = crawlSpeed * C.FAST_MODE
+    end
+
+    if self:IsEmptyMovementTask(task) then
+      crawlSpeed = crawlSpeed * (C.EMPTY_SPEED_MULT or 4)
+    end
+
+    if crawlSpeed <= 0 then
+      crawlSpeed = 1
+    end
+
+    S.moveDur = crawlLen / crawlSpeed
+
+    if S.moveDur < 0.05 then
+      S.moveDur = 0.05
+    end
+
+    S.moveT = 0
+    S.lastTaskT = 0
+    self:PutSpider(task.p0.x, task.p0.y)
+  end
 end
 
 function NSPauk:AddInstance(inst)
@@ -18186,10 +17099,6 @@ function NSPauk:StartNewInstance(preferredHub)
         return
     end
 
-    -------------------------------------------------------------------
-    -- Если текущая обычная паутина ещё не достроена,
-    -- не начинаем новую, а принудительно продолжаем её.
-    -------------------------------------------------------------------
     local prev = S.currentInstance
 
     if prev
@@ -18210,9 +17119,6 @@ function NSPauk:StartNewInstance(preferredHub)
 
     local items = self:CollectVisibleItems()
 
-    -------------------------------------------------------------------
-    -- Кокон.
-    -------------------------------------------------------------------
     if math.random() < C.COCOON_CHANCE then
         local victim = self:PickCocoonVictim(items)
 
@@ -18227,12 +17133,6 @@ function NSPauk:StartNewInstance(preferredHub)
         C.TARGET_COUNT_MAX
     )
 
-    -------------------------------------------------------------------
-    -- Третий тип паутины: кольцевая паутина.
-    --
-    -- Шанс 1 из 3.
-    -- Если не удалось построить кольцо, дальше пойдёт обычная паутина.
-    -------------------------------------------------------------------
     if math.random(1, 3) == 3 then
         local ringInst = self:CreateRingInstance(targetCount, items)
 
@@ -18253,9 +17153,6 @@ function NSPauk:StartNewInstance(preferredHub)
         end
     end
 
-    -------------------------------------------------------------------
-    -- Обычная паутина: центральный или случайный хаб.
-    -------------------------------------------------------------------
     local hub = self:PickWebHub(items)
 
     if hub and hub.frame and not self:ValidateAnchorRect(hub) then
@@ -18861,7 +17758,7 @@ function NSPauk:NP_HasRequiredWebPending(inst)
     local hasAliveMain = false
 
     for _, conn in ipairs(inst.conns or {}) do
-        if conn.alive then
+        if conn.alive and not conn.isDiameter then
             hasAliveMain = true
 
             if not self:NP_IsWebOwnerDrawn(conn) then
@@ -18905,7 +17802,6 @@ function NSPauk:NP_HasRequiredWebPending(inst)
     end
 
     local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
-
     if spacing < 0.5 then
         spacing = 0.5
     end
@@ -18972,6 +17868,7 @@ function NSPauk:NP_HasRequiredWebPending(inst)
                         if type(segArc) == "number"
                             and segArc == segArc
                             and segArc > 0 then
+
                             local diff = math.abs(segArc - arcLen)
 
                             if diff < bestDiff then
@@ -19032,9 +17929,6 @@ function NSPauk:NP_ProcessQueueResume()
         return false
     end
 
-    -------------------------------------------------------------------
-    -- Защита от зависшего флага пересборки.
-    -------------------------------------------------------------------
     if S.nspQueueRebuildRunning then
         local now = GetTime()
 
@@ -19081,13 +17975,6 @@ function NSPauk:NP_ProcessQueueResume()
         return false
     end
 
-    -------------------------------------------------------------------
-    -- ГЛАВНЫЙ ФИКС:
-    --
-    -- Если drag есть, но текущей активной drag-задачи нет,
-    -- это осиротевший drag. Он не имеет права блокировать
-    -- обязательную достройку паутины.
-    -------------------------------------------------------------------
     if S.nspDrag then
         local activeDragTask = S.currentTask and S.currentTask.nspDuringDrag
 
@@ -19109,16 +17996,9 @@ function NSPauk:NP_ProcessQueueResume()
     S.nspQueueRebuildRunning = true
     S.nspQueueRebuildLockAt = GetTime()
 
-    -------------------------------------------------------------------
-    -- Сначала даём секторным проверкам создать недостающие сегменты.
-    -------------------------------------------------------------------
     self:NP_RecheckWebSectors(inst)
     self:NP_RecheckWebSectorsByTriangles(inst)
 
-    -------------------------------------------------------------------
-    -- Если после проверок вдруг остался осиротевший drag,
-    -- сразу убираем его.
-    -------------------------------------------------------------------
     if S.nspDrag then
         local activeDragTask = S.currentTask and S.currentTask.nspDuringDrag
 
@@ -19133,10 +18013,6 @@ function NSPauk:NP_ProcessQueueResume()
         return false
     end
 
-    -------------------------------------------------------------------
-    -- Если приоритетная перемычка была убита, но её опоры живы,
-    -- воскрешаем её и ставим первой.
-    -------------------------------------------------------------------
     if priority
         and not priority.alive
         and priority.connA
@@ -19180,7 +18056,6 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     local added = {}
 
     local cursor = nil
-
     if S.spider and S.spider:IsShown() then
         cursor = {
             x = S.lastSpiderX or 0,
@@ -19189,10 +18064,7 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     end
 
     local function isDrawn(owner)
-        return owner
-            and owner.alive
-            and owner.textures
-            and #owner.textures > 0
+        return self:NP_IsWebOwnerDrawn(owner)
     end
 
     local function isScheduled(owner)
@@ -19202,6 +18074,14 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     local function isAvailable(owner)
         if not owner or not owner.alive then
             return false
+        end
+
+        if owner.isDiameterHalf then
+            local dep = owner.hubDepConn
+            if not dep or not dep.alive then
+                return false
+            end
+            return isDrawn(dep) or isScheduled(dep)
         end
 
         if isDrawn(owner) then
@@ -19232,9 +18112,10 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
             return false
         end
 
-        -------------------------------------------------------------------
-        -- Если владелец был прерван мотыльком, возвращаем его в работу.
-        -------------------------------------------------------------------
+        if owner.isDiameterHalf then
+            return false
+        end
+
         if not owner.alive and owner._nspMothInterrupted then
             owner.alive = true
             owner._nspMothInterrupted = nil
@@ -19285,12 +18166,6 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         end
 
         local task = self:AddThreadTask(tasks, owner, thread)
-
-        -------------------------------------------------------------------
-        -- Если задачу не удалось создать, владелец считается битым.
-        -- Иначе он может вечно оставаться alive undrawn и блокировать
-        -- завершение паутины.
-        -------------------------------------------------------------------
         if not task then
             killOwner(owner)
             return false
@@ -19310,13 +18185,13 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         return true
     end
 
-    -------------------------------------------------------------------
-    -- Сначала основные нити.
-    -------------------------------------------------------------------
     for _, conn in ipairs(inst.conns or {}) do
-        if conn.alive and not isDrawn(conn) then
+        if conn.isDiameterHalf then
+            if conn.alive and (not conn.hubDepConn or not conn.hubDepConn.alive) then
+                killOwner(conn)
+            end
+        elseif conn.alive and not isDrawn(conn) then
             local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
-
             if drawThread then
                 addOwner(conn, drawThread, true)
             else
@@ -19327,7 +18202,6 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
             conn._nspMothInterrupted = nil
 
             local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
-
             if drawThread then
                 addOwner(conn, drawThread, true)
             else
@@ -19336,15 +18210,12 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         end
     end
 
-    -------------------------------------------------------------------
-    -- Приоритетный владелец, если он был передан.
-    -- Обычно это убитая/прерванная перемычка.
-    -------------------------------------------------------------------
     if priorityOwner
         and priorityOwner.alive
         and not isDrawn(priorityOwner)
         and not added[priorityOwner]
         and (priorityOwner.connA or priorityOwner.connB or priorityOwner.isInterCross) then
+
         local drawThread =
             self:NP_OrientThreadForCursor(priorityOwner.thread, cursor)
             or priorityOwner.thread
@@ -19352,9 +18223,6 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         addOwner(priorityOwner, drawThread, false)
     end
 
-    -------------------------------------------------------------------
-    -- Остальные перемычки.
-    -------------------------------------------------------------------
     local segs = {}
 
     for _, seg in ipairs(inst.crossSegs or {}) do
@@ -19369,21 +18237,18 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     table.sort(segs, function(a, b)
         local ka = a.planSectorKey or ""
         local kb = b.planSectorKey or ""
-
         if ka ~= kb then
             return ka < kb
         end
 
         local aa = tonumber(a.planArcLen) or 0
         local bb = tonumber(b.planArcLen) or 0
-
         if aa ~= bb then
             return aa < bb
         end
 
         local ta = tonumber(a.t) or 0
         local tb = tonumber(b.t) or 0
-
         return ta < tb
     end)
 
@@ -19434,10 +18299,6 @@ function NSPauk:RestoreMothStateImmediate(saved)
     S.limitWaitTimer = saved.limitWaitTimer or 0
     S.limitHomePoint = saved.limitHomePoint
 
-    -----------------------------------------------------------------------
-    -- Для обычной паутины после мотылька пересобираем очередь
-    -- с первой недорисованной задачи.
-    -----------------------------------------------------------------------
     if (S.phase == "task" or S.phase == "instanceComplete")
         and S.currentInstance
         and not S.currentInstance.torn
@@ -19656,9 +18517,6 @@ function NSPauk:ClearAllVisuals()
     self:AbortCocoon()
     self:RestoreDigestedFrames()
 
-    ---------------------------------------------------------------------------
-    -- Если идёт мерцание UIParent, немедленно возвращаем интерфейс.
-    ---------------------------------------------------------------------------
     self:CancelUIParentRestore(true)
 
     for _, inst in ipairs(S.instances) do
@@ -20055,10 +18913,6 @@ function NSPauk:HasPendingLevelUps()
     return pending > 0, pending
 end
 
----------------------------------------------------------------------------
--- Combat hide
----------------------------------------------------------------------------
-
 function NSPauk:NP_CombatHideDuration()
     return 600
 end
@@ -20066,18 +18920,10 @@ end
 function NSPauk:NP_ApplyCombatHiddenVisuals()
     local S = self.S
 
-    -------------------------------------------------------------------
-    -- Главный контейнер паутины.
-    -- Не прячем его через Hide(), иначе остановится OnUpdate-таймер.
-    -- Вместо этого делаем его полностью прозрачным.
-    -------------------------------------------------------------------
     if self.F_HIGH and self.F_HIGH.SetAlpha then
         self.F_HIGH:SetAlpha(0)
     end
 
-    -------------------------------------------------------------------
-    -- Контейнеры паука и клика.
-    -------------------------------------------------------------------
     if self.F_SPIDER and self.F_SPIDER.Hide then
         self.F_SPIDER:Hide()
     end
@@ -20086,9 +18932,6 @@ function NSPauk:NP_ApplyCombatHiddenVisuals()
         self.F_CLICK:Hide()
     end
 
-    -------------------------------------------------------------------
-    -- Сам паук и кнопка обработки кликов.
-    -------------------------------------------------------------------
     if S.spider and S.spider.Hide then
         S.spider:Hide()
     end
@@ -20097,9 +18940,6 @@ function NSPauk:NP_ApplyCombatHiddenVisuals()
         S.clickBtn:Hide()
     end
 
-    -------------------------------------------------------------------
-    -- Служебные окна.
-    -------------------------------------------------------------------
     if self.killConfirmFrame and self.killConfirmFrame.Hide then
         self.killConfirmFrame:Hide()
     end
@@ -20108,16 +18948,10 @@ function NSPauk:NP_ApplyCombatHiddenVisuals()
         self.levelUpFrame:Hide()
     end
 
-    -------------------------------------------------------------------
-    -- UI-restore мерцания UIParent.
-    -------------------------------------------------------------------
     if S.uiFlickerFrame and S.uiFlickerFrame.Hide then
         S.uiFlickerFrame:Hide()
     end
 
-    -------------------------------------------------------------------
-    -- Preview и отладка секторов.
-    -------------------------------------------------------------------
     if S.nspPreviewTextures then
         for _, tex in ipairs(S.nspPreviewTextures) do
             if tex and tex.Hide then
@@ -20148,10 +18982,6 @@ end
 function NSPauk:NP_SaveCombatHideState()
     local S = self.S
 
-    -------------------------------------------------------------------
-    -- Если состояние уже сохранено, не пересохраняем его.
-    -- Это важно при повторном входе в бой во время того же скрытия.
-    -------------------------------------------------------------------
     if type(S.nspCombatHideState) == "table" then
         return
     end
@@ -20165,18 +18995,12 @@ function NSPauk:NP_SaveCombatHideState()
 
     local state = {}
 
-    -------------------------------------------------------------------
-    -- Основная фаза и очередь задач.
-    -------------------------------------------------------------------
     state.phase = S.phase
     state.currentInstance = S.currentInstance
     state.tasks = S.tasks
     state.taskIdx = S.taskIdx
     state.currentTask = S.currentTask
 
-    -------------------------------------------------------------------
-    -- Таймеры движения и служебные таймеры.
-    -------------------------------------------------------------------
     state.moveDur = S.moveDur
     state.moveT = S.moveT
     state.lastTaskT = S.lastTaskT
@@ -20193,41 +19017,26 @@ function NSPauk:NP_SaveCombatHideState()
 
     state.mouseOnThread = S.mouseOnThread
 
-    -------------------------------------------------------------------
-    -- Последняя позиция паука.
-    -------------------------------------------------------------------
     state.lastSpiderX = S.lastSpiderX
     state.lastSpiderY = S.lastSpiderY
 
-    -------------------------------------------------------------------
-    -- Активные специальные режимы.
-    -------------------------------------------------------------------
     state.cocoon = S.cocoon
     state.moth = S.moth
     state.nspDrag = S.nspDrag
     state.nspTempOwners = S.nspTempOwners
 
-    -------------------------------------------------------------------
-    -- Отложенные секторные проверки и resume.
-    -------------------------------------------------------------------
     state.nspQueueResumePending = S.nspQueueResumePending
     state.nspQueueResumeInst = S.nspQueueResumeInst
     state.nspQueueResumePriority = S.nspQueueResumePriority
     state.nspSectorRecheckPending = S.nspSectorRecheckPending
     state.nspSectorRecheckInst = S.nspSectorRecheckInst
 
-    -------------------------------------------------------------------
-    -- Лимиты.
-    -------------------------------------------------------------------
     state.limitReached = S.limitReached
     state.limitReturnPending = S.limitReturnPending
     state.limitCocoonPending = S.limitCocoonPending
     state.limitWaitTimer = S.limitWaitTimer
     state.limitHomePoint = S.limitHomePoint
 
-    -------------------------------------------------------------------
-    -- UI-restore и адаптация.
-    -------------------------------------------------------------------
     state.uiFlicker = S.uiFlicker
     state.uiParentBaseAlpha = S.uiParentBaseAlpha
     state.adaptive = S.adaptive
@@ -20235,9 +19044,6 @@ function NSPauk:NP_SaveCombatHideState()
     state.nspDragVisualAt = S.nspDragVisualAt
     state.nspTempVisualAt = S.nspTempVisualAt
 
-    -------------------------------------------------------------------
-    -- Видимость визуальных объектов.
-    -------------------------------------------------------------------
     state.spiderShown = shown(S.spider)
     state.clickShown = shown(S.clickBtn)
     state.fSpiderShown = shown(self.F_SPIDER)
@@ -20264,9 +19070,6 @@ function NSPauk:NP_RestoreCombatHideState()
     local state = S.nspCombatHideState
     S.nspCombatHideState = nil
 
-    -------------------------------------------------------------------
-    -- Если состояния нет, возвращаемся в безопасный режим наблюдения.
-    -------------------------------------------------------------------
     if type(state) ~= "table" then
         S.phase = "watch"
         S.stillTimer = 0
@@ -20274,9 +19077,6 @@ function NSPauk:NP_RestoreCombatHideState()
         return
     end
 
-    -------------------------------------------------------------------
-    -- Фаза и очередь задач.
-    -------------------------------------------------------------------
     S.phase = state.phase or "watch"
 
     if S.phase == "combatHide" then
@@ -20292,9 +19092,6 @@ function NSPauk:NP_RestoreCombatHideState()
         S.tasks = {}
     end
 
-    -------------------------------------------------------------------
-    -- Таймеры движения и служебные таймеры.
-    -------------------------------------------------------------------
     S.moveDur = state.moveDur or 1
     S.moveT = state.moveT or 0
     S.lastTaskT = state.lastTaskT or 0
@@ -20311,41 +19108,26 @@ function NSPauk:NP_RestoreCombatHideState()
 
     S.mouseOnThread = state.mouseOnThread
 
-    -------------------------------------------------------------------
-    -- Позиция паука.
-    -------------------------------------------------------------------
     S.lastSpiderX = state.lastSpiderX or 0
     S.lastSpiderY = state.lastSpiderY or 0
 
-    -------------------------------------------------------------------
-    -- Специальные режимы.
-    -------------------------------------------------------------------
     S.cocoon = state.cocoon
     S.moth = state.moth
     S.nspDrag = state.nspDrag
     S.nspTempOwners = state.nspTempOwners or {}
 
-    -------------------------------------------------------------------
-    -- Отложенные проверки.
-    -------------------------------------------------------------------
     S.nspQueueResumePending = state.nspQueueResumePending
     S.nspQueueResumeInst = state.nspQueueResumeInst
     S.nspQueueResumePriority = state.nspQueueResumePriority
     S.nspSectorRecheckPending = state.nspSectorRecheckPending
     S.nspSectorRecheckInst = state.nspSectorRecheckInst
 
-    -------------------------------------------------------------------
-    -- Лимиты.
-    -------------------------------------------------------------------
     S.limitReached = state.limitReached
     S.limitReturnPending = state.limitReturnPending
     S.limitCocoonPending = state.limitCocoonPending
     S.limitWaitTimer = state.limitWaitTimer or 0
     S.limitHomePoint = state.limitHomePoint
 
-    -------------------------------------------------------------------
-    -- UI-restore и адаптация.
-    -------------------------------------------------------------------
     S.uiFlicker = state.uiFlicker
     S.uiParentBaseAlpha = state.uiParentBaseAlpha
     S.adaptive = state.adaptive
@@ -20353,10 +19135,6 @@ function NSPauk:NP_RestoreCombatHideState()
     S.nspDragVisualAt = state.nspDragVisualAt
     S.nspTempVisualAt = state.nspTempVisualAt
 
-    -------------------------------------------------------------------
-    -- Сброс кэшей маршрутизации и поддержки.
-    -- За 10 минут UI мог измениться.
-    -------------------------------------------------------------------
     self:NP_ResetRouteHistory()
 
     S.nspFrameCache = nil
@@ -20365,9 +19143,6 @@ function NSPauk:NP_RestoreCombatHideState()
     S.nspFreshSupportCache = nil
     S.nspAnchorRectCache = nil
 
-    -------------------------------------------------------------------
-    -- Восстановление визуальных объектов.
-    -------------------------------------------------------------------
     if state.spiderShown and not S.spider then
         self:MkSpider()
     end
@@ -20397,9 +19172,6 @@ function NSPauk:NP_RestoreCombatHideState()
     restoreFrame(self.levelUpFrame, state.levelUpShown)
     restoreFrame(self.killConfirmFrame, state.killConfirmShown)
 
-    -------------------------------------------------------------------
-    -- Preview и отладка секторов.
-    -------------------------------------------------------------------
     if S.nspPreviewTextures then
         for _, tex in ipairs(S.nspPreviewTextures) do
             if tex and tex.Show then
@@ -20426,27 +19198,14 @@ function NSPauk:NP_RestoreCombatHideState()
         end
     end
 
-    -------------------------------------------------------------------
-    -- Возвращаем паука на сохранённую позицию.
-    -------------------------------------------------------------------
     self:PutSpider(S.lastSpiderX, S.lastSpiderY)
 
-    -------------------------------------------------------------------
-    -- Если был paused UI-restore, продолжаем его.
-    -------------------------------------------------------------------
     if S.uiFlicker then
         self:NP_ResumeUIParentRestore()
     end
 
-    -------------------------------------------------------------------
-    -- За время боевого скрытия якоря могли уехать.
-    -- Проверяем и рвём только то, что реально сломалось.
-    -------------------------------------------------------------------
     self:CheckInstancesMovement()
 
-    -------------------------------------------------------------------
-    -- Чистка некорректных состояний после проверки движения.
-    -------------------------------------------------------------------
     if S.phase == "uiRestore" and not S.uiFlicker then
         S.phase = "watch"
         S.stillTimer = 0
@@ -20488,25 +19247,15 @@ function NSPauk:NP_PauseUIParentRestore()
         return
     end
 
-    -------------------------------------------------------------------
-    -- Запоминаем момент паузы, чтобы после боя продолжить
-    -- с того же места, а не сбрасывать эффект.
-    -------------------------------------------------------------------
     if type(S.uiFlickerPausedAt) ~= "number" then
         S.uiFlickerPausedAt = GetTime()
     end
 
-    -------------------------------------------------------------------
-    -- Останавливаем тикер.
-    -------------------------------------------------------------------
     if S.uiFlickerTicker then
         S.uiFlickerTicker:Cancel()
         S.uiFlickerTicker = nil
     end
 
-    -------------------------------------------------------------------
-    -- Останавливаем OnUpdate-драйвер.
-    -------------------------------------------------------------------
     if S.uiFlickerFrame then
         S.uiFlickerFrame:SetScript("OnUpdate", nil)
         S.uiFlickerFrame:Hide()
@@ -20520,9 +19269,6 @@ function NSPauk:NP_ResumeUIParentRestore()
         return
     end
 
-    -------------------------------------------------------------------
-    -- Компенсируем время, проведённое в боевом скрытии.
-    -------------------------------------------------------------------
     if type(S.uiFlickerPausedAt) == "number" then
         local paused = GetTime() - S.uiFlickerPausedAt
 
@@ -20533,9 +19279,6 @@ function NSPauk:NP_ResumeUIParentRestore()
         S.uiFlickerPausedAt = nil
     end
 
-    -------------------------------------------------------------------
-    -- Возобновляем OnUpdate-драйвер.
-    -------------------------------------------------------------------
     local f = S.uiFlickerFrame
 
     if f then
@@ -20546,9 +19289,6 @@ function NSPauk:NP_ResumeUIParentRestore()
         f:Show()
     end
 
-    -------------------------------------------------------------------
-    -- Возобновляем страховочный тикер.
-    -------------------------------------------------------------------
     if type(C_Timer) == "table"
         and type(C_Timer.NewTicker) == "function"
         and not S.uiFlickerTicker then
@@ -20589,10 +19329,6 @@ function NSPauk:NP_EnterCombatHide()
 
     S.inCombat = true
 
-    -------------------------------------------------------------------
-    -- Если уже находимся в боевом скрытии и снова вошли в бой,
-    -- сбрасываем таймер 10-минутного выхода.
-    -------------------------------------------------------------------
     if S.combatHide then
         S.combatHideUntil = 0
         return
@@ -20601,48 +19337,8 @@ function NSPauk:NP_EnterCombatHide()
     S.combatHide = true
     S.combatHideUntil = 0
 
-    -------------------------------------------------------------------
-    -- Сохраняем состояние, чтобы после таймаута вернуть всё как было.
-    -------------------------------------------------------------------
     self:NP_SaveCombatHideState()
 
-    -------------------------------------------------------------------
-    -- Если сейчас идёт восстановление UIParent после хардкор-кокона,
-    -- ставим его на паузу.
-    -------------------------------------------------------------------
-    self:NP_PauseUIParentRestore()
-
-    S.phase = "combatHide"
-
-    self:NP_ApplyCombatHiddenVisuals()
-end
-
-function NSPauk:NP_EnterCombatHide()
-    local S = self.S
-
-    S.inCombat = true
-
-    -------------------------------------------------------------------
-    -- Если уже находимся в боевом скрытии и снова вошли в бой,
-    -- сбрасываем таймер 10-минутного выхода.
-    -------------------------------------------------------------------
-    if S.combatHide then
-        S.combatHideUntil = 0
-        return
-    end
-
-    S.combatHide = true
-    S.combatHideUntil = 0
-
-    -------------------------------------------------------------------
-    -- Сохраняем состояние, чтобы после таймаута вернуть всё как было.
-    -------------------------------------------------------------------
-    self:NP_SaveCombatHideState()
-
-    -------------------------------------------------------------------
-    -- Если сейчас идёт восстановление UIParent после хардкор-кокона,
-    -- ставим его на паузу.
-    -------------------------------------------------------------------
     self:NP_PauseUIParentRestore()
 
     S.phase = "combatHide"
@@ -20667,9 +19363,6 @@ function NSPauk:NP_UpdateCombatHide(dt)
         return
     end
 
-    -------------------------------------------------------------------
-    -- Пока бой не закончился, ничего не восстанавливаем.
-    -------------------------------------------------------------------
     if S.inCombat then
         return
     end
@@ -21427,12 +20120,6 @@ function NSPauk:CreateLevelUpFrame()
     self.levelUpChild = child
     self.levelUpRows = {}
 
-    -----------------------------------------------------------------------
-    -- Финальный список параметров окна повышения.
-    --
-    -- Порядок здесь — это порядок строк в окне.
-    -- Служебные константы сюда не попадают.
-    -----------------------------------------------------------------------
     local orderedKeys = {
         -- Внешний вид
         "SPIDER_SIZE",
@@ -21702,48 +20389,46 @@ function NSPauk:EnterLimitIdle()
 end
 
 function NSPauk:CheckPointLimit()
-    local S = self.S
-    local C = self.C
+  local S = self.S
+  local C = self.C
+  local t = S.currentTask
 
-    local t = S.currentTask
-
-    if t and (t.nspTempThread or t.nspFall) then
-        return false
-    end
-
-    if S.phase == "task" and t and t.nspDuringDrag and not t.nspDragEnd then
-        return false
-    end
-
-    if S.limitReached or S.limitReturnPending or S.limitCocoonPending then
-        return false
-    end
-
-    if S.phase ~= "task" and S.phase ~= "instanceComplete" then
-        return false
-    end
-
-    if S.currentInstance and S.currentInstance.isCocoon then
-        return false
-    end
-
-    if S.cocoon then
-        return false
-    end
-
-    local max = tonumber(C.MAX_WEB_SEGS) or 0
-
-    if max <= 0 then
-        return false
-    end
-
-    if (S.webAliveCount or 0) >= max then
-        self:EnterLimitIdle()
-
-        return true
-    end
-
+  if t and t.nspFall then
     return false
+  end
+
+  if S.phase == "task" and t and t.nspDuringDrag and not t.nspDragEnd then
+    return false
+  end
+
+  if S.limitReached or S.limitReturnPending or S.limitCocoonPending then
+    return false
+  end
+
+  if S.phase ~= "task" and S.phase ~= "instanceComplete" then
+    return false
+  end
+
+  if S.currentInstance and S.currentInstance.isCocoon then
+    return false
+  end
+
+  if S.cocoon then
+    return false
+  end
+
+  local max = tonumber(C.MAX_WEB_SEGS) or 0
+
+  if max <= 0 then
+    return false
+  end
+
+  if (S.webAliveCount or 0) >= max then
+    self:EnterLimitIdle()
+    return true
+  end
+
+  return false
 end
 
 function NSPauk:StartLimitCocoon()
@@ -21815,6 +20500,12 @@ function NSPauk:NP_ClearSectorsDebug()
     if not dbg then
         return
     end
+
+    if dbg.workerFrame then
+        dbg.workerFrame:SetScript("OnUpdate", nil)
+        dbg.workerFrame:Hide()
+        dbg.workerFrame = nil
+    end
     if dbg.textures and #dbg.textures > 0 then
         self:RecycleTextures(dbg.textures)
     end
@@ -21839,115 +20530,160 @@ function NSPauk:NP_DrawSectorsDebug()
         return
     end
 
+    if inst.isCocoon or inst.isMoth then
+        self:Echo("Визуализация секторов недоступна для коконов и мотыльков.")
+        return
+    end
+
     local N = inst.conns and #inst.conns or 0
     if N < 2 then
         self:Echo("Меньше 2 нитей, нечего визуализировать.")
         return
     end
 
+    local sectorThreadCount = 0
+    for _, conn in ipairs(inst.conns) do
+        if conn.alive and not conn.noSector then
+            sectorThreadCount = sectorThreadCount + 1
+        end
+    end
+
+    if sectorThreadCount > 12 then
+        self:Echo(string.format(
+            "Слишком много секторных нитей (%d), визуализация отключена.",
+            sectorThreadCount
+        ))
+        return
+    end
+
     local dbg = {
         textures = {},
         fonts = {},
+        queue = {},
+        queueIdx = 1,
+        workerFrame = nil,
     }
+
     S.nspSectorsDebug = dbg
 
     local frame = S.activeFrame or UIParent
-    local palette = self.PreviewColors or {}
 
-    local function dot(x, y, color, alpha, size)
-        local tex
-        if #S.webPool > 0 then
-            tex = table.remove(S.webPool)
-            if tex then
-                tex._nspInPool = false
-            end
-        end
-        if not tex then
-            tex = frame:CreateTexture(nil, "OVERLAY")
-        end
-        if not tex then
-            return
-        end
-        tex:SetTexture(self.C.TEX_WEB)
-        tex:SetDrawLayer("OVERLAY")
-        tex:SetVertexColor(color.r, color.g, color.b, 1)
-        tex:SetAlpha(alpha or 0.9)
-        tex:SetWidth(size or 3)
-        tex:SetHeight(size or 3)
-        tex:ClearAllPoints()
-        tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
-        tex:Show()
-        dbg.textures[#dbg.textures + 1] = tex
+    local palette = self.PreviewColors
+    if type(palette) ~= "table" or #palette == 0 then
+        palette = {
+            { r = 1.0, g = 0.2, b = 0.2 },
+            { r = 0.2, g = 1.0, b = 0.2 },
+            { r = 0.2, g = 0.6, b = 1.0 },
+            { r = 1.0, g = 1.0, b = 0.2 },
+            { r = 1.0, g = 0.4, b = 1.0 },
+            { r = 0.2, g = 1.0, b = 1.0 },
+            { r = 1.0, g = 0.6, b = 0.2 },
+            { r = 0.7, g = 0.7, b = 1.0 },
+        }
     end
 
-    local function drawLine(x1, y1, x2, y2, color, alpha, step)
-        step = step or 4
-        local dx = x2 - x1
-        local dy = y2 - y1
-        local len = math.sqrt(dx * dx + dy * dy)
-        if len < 1 then
-            return
-        end
-        local n = math.max(2, math.floor(len / step) + 1)
-        for i = 0, n do
-            local t = i / n
-            dot(x1 + dx * t, y1 + dy * t, color, alpha, step * 0.8)
-        end
-    end
-
-    local function drawBezier(p0, p1, p2, color, alpha, step)
-        if not p0 or not p2 then
-            return
-        end
-        if not p1 then
-            p1 = {
-                x = (p0.x + p2.x) / 2,
-                y = (p0.y + p2.y) / 2,
-            }
-        end
-        step = step or 3
-        local dx = p2.x - p0.x
-        local dy = p2.y - p0.y
-        local chord = math.sqrt(dx * dx + dy * dy)
-        local n = math.max(2, math.floor(chord / step) + 1)
-        for i = 0, n do
-            local t = i / n
-            local m = 1 - t
-            local x = m * m * p0.x + 2 * m * t * p1.x + t * t * p2.x
-            local y = m * m * p0.y + 2 * m * t * p1.y + t * t * p2.y
-            dot(x, y, color, alpha, step * 0.9)
-        end
-    end
+    local C = self.C
 
     local function label(x, y, text, color, fontSize)
         local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         if not fs then
             return
         end
+
         fs:SetText(text)
         fs:SetTextColor(color.r, color.g, color.b, 1)
+
         if fontSize then
             local fontName = fs:GetFont()
             if fontName then
                 fs:SetFont(fontName, fontSize)
             end
         end
+
         fs:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+
         dbg.fonts[#dbg.fonts + 1] = fs
     end
 
-    local function fillTriangle(ax, ay, bx, by, cx, cy, color, alpha, step)
-        step = step or 14
+    local function queueDot(x, y, color, alpha, size)
+        dbg.queue[#dbg.queue + 1] = {
+            x = x,
+            y = y,
+            color = color,
+            alpha = alpha or 0.9,
+            size = size or 3,
+        }
+    end
+
+    local function queueLine(x1, y1, x2, y2, color, alpha, step)
+        step = step or 4
+
+        local dx = x2 - x1
+        local dy = y2 - y1
+        local len = math.sqrt(dx * dx + dy * dy)
+
+        if len < 1 then
+            return
+        end
+
+        local n = math.max(2, math.floor(len / step) + 1)
+
+        for i = 0, n do
+            local t = i / n
+            queueDot(
+                x1 + dx * t,
+                y1 + dy * t,
+                color,
+                alpha,
+                step * 0.8
+            )
+        end
+    end
+
+    local function queueBezier(p0, p1, p2, color, alpha, step)
+        if not p0 or not p2 then
+            return
+        end
+
+        if not p1 then
+            p1 = {
+                x = (p0.x + p2.x) / 2,
+                y = (p0.y + p2.y) / 2,
+            }
+        end
+
+        step = step or 3
+
+        local dx = p2.x - p0.x
+        local dy = p2.y - p0.y
+        local chord = math.sqrt(dx * dx + dy * dy)
+        local n = math.max(2, math.floor(chord / step) + 1)
+
+        for i = 0, n do
+            local t = i / n
+            local m = 1 - t
+
+            local x = m * m * p0.x + 2 * m * t * p1.x + t * t * p2.x
+            local y = m * m * p0.y + 2 * m * t * p1.y + t * t * p2.y
+
+            queueDot(x, y, color, alpha, step * 0.9)
+        end
+    end
+
+    local function queueTriangle(ax, ay, bx, by, cx, cy, color, alpha, step)
+        step = step or 22
+
         local minX = math.min(ax, bx, cx)
         local maxX = math.max(ax, bx, cx)
         local minY = math.min(ay, by, cy)
         local maxY = math.max(ay, by, cy)
+
         local y = minY
         while y <= maxY do
             local x = minX
             while x <= maxX do
                 if self:NP_PointInTriangle(x, y, ax, ay, bx, by, cx, cy) then
-                    dot(x, y, color, alpha, step * 0.6)
+                    queueDot(x, y, color, alpha, step * 0.6)
                 end
                 x = x + step
             end
@@ -21960,44 +20696,51 @@ function NSPauk:NP_DrawSectorsDebug()
 
     local validSectors = self:NP_GetValidTriangleSectors(inst)
     local validKeys = {}
+
     for _, sector in ipairs(validSectors or {}) do
         validKeys[sector.key] = true
     end
 
-    -- Треугольники для разрешённых секторов и красные линии для запрещённых пар
     for i = 1, N do
         for j = i + 1, N do
             local connA = inst.conns[i]
             local connB = inst.conns[j]
+
             if connA and connB
                 and connA.alive
                 and connB.alive
                 and connA.thread
-                and connB.thread then
+                and connB.thread
+                and not connA.noSector
+                and not connB.noSector then
 
                 local ax, ay = self:BzThread(connA.thread, 1)
                 local bx, by = self:BzThread(connB.thread, 1)
+
                 local key = i .. "-" .. j
 
                 if validKeys[key] then
                     local colA = palette[((i - 1) % #palette) + 1]
                     local colB = palette[((j - 1) % #palette) + 1]
+
                     if not colA then
                         colA = { r = 1, g = 1, b = 1 }
                     end
                     if not colB then
                         colB = { r = 1, g = 1, b = 1 }
                     end
+
                     local blend = {
                         r = (colA.r + colB.r) / 2,
                         g = (colA.g + colB.g) / 2,
                         b = (colA.b + colB.b) / 2,
                     }
 
-                    fillTriangle(hubX, hubY, ax, ay, bx, by, blend, 0.10, 14)
-                    drawLine(hubX, hubY, ax, ay, colA, 0.5, 5)
-                    drawLine(hubX, hubY, bx, by, colB, 0.5, 5)
-                    drawLine(ax, ay, bx, by, blend, 0.7, 5)
+                    queueTriangle(hubX, hubY, ax, ay, bx, by, blend, 0.10, 22)
+
+                    queueLine(hubX, hubY, ax, ay, colA, 0.5, 5)
+                    queueLine(hubX, hubY, bx, by, colB, 0.5, 5)
+                    queueLine(ax, ay, bx, by, blend, 0.7, 5)
 
                     local cx = (hubX + ax + bx) / 3
                     local cy = (hubY + ay + by) / 3
@@ -22006,16 +20749,20 @@ function NSPauk:NP_DrawSectorsDebug()
                     if type(self.NP_LocalAngleAtHub) == "function" then
                         local aAng = self:NP_LocalAngleAtHub(inst, connA)
                         local bAng = self:NP_LocalAngleAtHub(inst, connB)
+
                         local delta = bAng - aAng
+
                         while delta < 0 do
                             delta = delta + 2 * math.pi
                         end
                         while delta >= 2 * math.pi do
                             delta = delta - 2 * math.pi
                         end
+
                         if delta > math.pi then
                             delta = 2 * math.pi - delta
                         end
+
                         angle = delta * 180 / math.pi
                     end
 
@@ -22026,37 +20773,64 @@ function NSPauk:NP_DrawSectorsDebug()
                         blend,
                         11
                     )
-                else
-                    drawLine(ax, ay, bx, by, { r = 1, g = 0.15, b = 0.15 }, 0.9, 5)
+                elseif not inst.isNaturalRing then
+                    queueLine(ax, ay, bx, by, { r = 1, g = 0.15, b = 0.15 }, 0.9, 5)
+
                     local cx = (ax + bx) / 2
                     local cy = (ay + by) / 2
-                    label(cx, cy, key .. "\nЗАПРЕТ", { r = 1, g = 0.15, b = 0.15 }, 10)
+
+                    label(
+                        cx,
+                        cy,
+                        key .. "\nЗАПРЕТ",
+                        { r = 1, g = 0.15, b = 0.15 },
+                        10
+                    )
                 end
             end
         end
     end
 
-    -- Основные нити
     for i, conn in ipairs(inst.conns) do
         local col = palette[((i - 1) % #palette) + 1]
         if not col then
             col = { r = 1, g = 1, b = 1 }
         end
 
+        local alpha = 0.9
+        if conn.noSector then
+            alpha = 0.4
+        end
+
         if conn.alive and conn.thread then
-            drawBezier(
+            queueBezier(
                 conn.thread.p0,
                 conn.thread.p1,
                 conn.thread.p2,
                 col,
-                0.9,
+                alpha,
                 3
             )
+
             local ex, ey = self:BzThread(conn.thread, 1)
-            label(ex + 12, ey + 12, tostring(i), col, 16)
+
+            local typeLabel = tostring(i)
+            if conn.isDiameterHalf then
+                typeLabel = i .. " H"
+            elseif conn.isMidSpoke then
+                typeLabel = i .. " M"
+            elseif conn.isSpoke then
+                typeLabel = i .. " S"
+            elseif conn.isDiameter then
+                typeLabel = i .. " D"
+            elseif conn.isRingFrame then
+                typeLabel = i .. " P"
+            end
+
+            label(ex + 12, ey + 12, typeLabel, col, 14)
         else
             if conn.thread then
-                drawBezier(
+                queueBezier(
                     conn.thread.p0,
                     conn.thread.p1,
                     conn.thread.p2,
@@ -22068,10 +20842,9 @@ function NSPauk:NP_DrawSectorsDebug()
         end
     end
 
-    -- Маркер хаба
     for i = 0, 11 do
         local ang = (i / 12) * 2 * math.pi
-        dot(
+        queueDot(
             hubX + math.cos(ang) * 8,
             hubY + math.sin(ang) * 8,
             { r = 1, g = 1, b = 1 },
@@ -22079,44 +20852,128 @@ function NSPauk:NP_DrawSectorsDebug()
             3
         )
     end
+
     label(hubX, hubY - 14, "ХАБ", { r = 1, g = 1, b = 1 }, 10)
 
+    if #dbg.queue == 0 then
+        self:Echo("Визуализация: 0 точек.")
+        return
+    end
+
     self:Echo(string.format(
-        "Визуализация: %d текстур, %d подписей. Очистка: /nspsectors clear",
-        #dbg.textures,
-        #dbg.fonts
+        "Визуализация: %d точек в очереди, рисую пакетами...",
+        #dbg.queue
     ))
+
+    local BATCH_SIZE = 500
+    local BATCH_DELAY = 0.04
+
+    dbg.workerFrame = CreateFrame("Frame")
+
+    dbg.workerFrame:SetScript("OnUpdate", function(selfFrame, dt)
+        local currentDbg = S.nspSectorsDebug
+
+        if not currentDbg or not currentDbg.queue then
+            selfFrame:SetScript("OnUpdate", nil)
+            selfFrame:Hide()
+            return
+        end
+
+        currentDbg.workerElapsed = (currentDbg.workerElapsed or 0) + dt
+
+        if currentDbg.workerElapsed < BATCH_DELAY then
+            return
+        end
+
+        currentDbg.workerElapsed = 0
+
+        local idx = currentDbg.queueIdx or 1
+        local total = #currentDbg.queue
+        local drawn = 0
+
+        while idx <= total and drawn < BATCH_SIZE do
+            local op = currentDbg.queue[idx]
+            idx = idx + 1
+            drawn = drawn + 1
+
+            local tex
+
+            if #S.webPool > 0 then
+                tex = table.remove(S.webPool)
+                if tex then
+                    tex._nspInPool = false
+                end
+            end
+
+            if not tex then
+                tex = frame:CreateTexture(nil, "OVERLAY")
+            end
+
+            if tex then
+                tex:SetTexture(C.TEX_WEB)
+                tex:SetDrawLayer("OVERLAY")
+                tex:SetVertexColor(op.color.r, op.color.g, op.color.b, 1)
+                tex:SetAlpha(op.alpha)
+                tex:SetWidth(op.size)
+                tex:SetHeight(op.size)
+                tex:ClearAllPoints()
+                tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", op.x, op.y)
+                tex:Show()
+
+                currentDbg.textures[#currentDbg.textures + 1] = tex
+            end
+        end
+
+        currentDbg.queueIdx = idx
+
+        if idx > total then
+            selfFrame:SetScript("OnUpdate", nil)
+            selfFrame:Hide()
+
+            currentDbg.workerFrame = nil
+            currentDbg.queue = nil
+
+            self:Echo(string.format(
+                "Визуализация: %d текстур, %d подписей. Очистка: /nspsectors clear",
+                #currentDbg.textures,
+                #currentDbg.fonts
+            ))
+        end
+    end)
+
+    dbg.workerFrame:Show()
 end
 
 function NSPauk:NP_DebugSectors(noVisual)
     local S = self.S
     local inst = S.currentInstance
-
     if not inst then
         self:Echo("Нет текущей паутины: S.currentInstance = nil")
         return
     end
 
+    if inst.isCocoon or inst.isMoth then
+        self:Echo("Сектора не строятся для коконов и мотыльков.")
+        return
+    end
     local N = inst.conns and #inst.conns or 0
     local sectors = self:NP_GetValidTriangleSectors(inst)
-
     self:Echo(string.format(
-        "Instance id=%s, isCocoon=%s, isMoth=%s, conns=%d, sectors=%d, crossSegs=%d, torn=%s, phase=%s",
+        "Instance id=%s, isCocoon=%s, isMoth=%s, isNaturalRing=%s, conns=%d, sectors=%d, crossSegs=%d, torn=%s, phase=%s",
         tostring(inst.id),
         tostring(inst.isCocoon),
         tostring(inst.isMoth),
+        tostring(inst.isNaturalRing),
         N,
         #(sectors or {}),
         inst.crossSegs and #inst.crossSegs or 0,
         tostring(inst.torn),
         tostring(S.phase)
     ))
-
     if N == 0 then
         self:Echo("В текущей паутине нет нитей.")
         return
     end
-
     local hubValid = self:ValidateAnchorRect(inst.hub and inst.hub.rect)
     self:Echo(string.format(
         "Хаб: %s, anchor valid=%s",
@@ -22124,7 +20981,6 @@ function NSPauk:NP_DebugSectors(noVisual)
         tostring(hubValid)
     ))
 
-    -- Нити
     for i, conn in ipairs(inst.conns) do
         local targetName = conn.target and conn.target.name or "?"
         local anchorValid = false
@@ -22136,28 +20992,37 @@ function NSPauk:NP_DebugSectors(noVisual)
         if type(self.NP_LocalAngleAtHub) == "function" then
             localAng = self:NP_LocalAngleAtHub(inst, conn) * 180 / math.pi
         end
+
+        local threadType = "обычная"
+        if conn.isSpoke then
+            threadType = "спица"
+        elseif conn.isDiameter then
+            threadType = "диаметр"
+        elseif conn.isRingFrame then
+            threadType = "периметр"
+        end
+        local sectorFlag = conn.noSector and "нет" or "да"
         self:Echo(string.format(
-            "Нить %d: цель=%s, alive=%s, drawn=%d, arcLen=%.1f, угол у хаба=%.1f, anchor=%s",
+            "Нить %d [%s]: цель=%s, alive=%s, drawn=%d, arcLen=%.1f, угол=%.1f, anchor=%s, сектор=%s",
             i,
+            threadType,
             tostring(targetName),
             tostring(conn.alive),
             drawn,
             conn.arcLength or 0,
             localAng,
-            tostring(anchorValid)
+            tostring(anchorValid),
+            sectorFlag
         ))
     end
 
-    -- Сектора
     local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
     if spacing < 0.5 then
         spacing = 0.5
     end
-
     for _, sector in ipairs(sectors or {}) do
         local connA = inst.conns[sector.a]
         local connB = inst.conns[sector.b]
-
         local angle = 0
         if connA and connB and type(self.NP_LocalAngleAtHub) == "function" then
             local aAng = self:NP_LocalAngleAtHub(inst, connA)
@@ -22174,7 +21039,6 @@ function NSPauk:NP_DebugSectors(noVisual)
             end
             angle = delta * 180 / math.pi
         end
-
         local planned, drawn, pending, dead = 0, 0, 0, 0
         for _, seg in ipairs(inst.crossSegs or {}) do
             if seg.planSectorKey == sector.key and not seg.isInterCross then
@@ -22190,9 +21054,7 @@ function NSPauk:NP_DebugSectors(noVisual)
                 end
             end
         end
-
         local expectedRows = math.floor((sector.pairMin or 0) / spacing)
-
         self:Echo(string.format(
             "Сектор %s: угол=%.1f, pairMin=%.1f, рядов~%d, перемычек план=%d, нарисовано=%d, ожидает=%d, мертво=%d",
             tostring(sector.key),
@@ -22206,7 +21068,6 @@ function NSPauk:NP_DebugSectors(noVisual)
         ))
     end
 
-    -- Итог
     local stats = self:NP_GetWebCompletionStats(inst)
     self:Echo(string.format(
         "Итог: основные %d/%d, перемычки план=%d, нарисовано=%d, ожидает=%d, мертво=%d, crossSegs alive=%d/%d",
@@ -22219,14 +21080,12 @@ function NSPauk:NP_DebugSectors(noVisual)
         stats.crossSegAlive,
         stats.crossPlanned
     ))
-
     local scheduled = self:NP_CollectScheduledOwners()
     local schedCount = 0
     for _ in pairs(scheduled) do
         schedCount = schedCount + 1
     end
     self:Echo("Запланировано владельцев в очереди: " .. tostring(schedCount))
-
     if not noVisual then
         self:NP_DrawSectorsDebug()
     end
@@ -22268,45 +21127,47 @@ function NSPauk:NP_GetSectorRowArcs(connA, connB)
     if lenA < 0 then
         lenA = 0
     end
-
     if lenB < 0 then
         lenB = 0
     end
 
-    local maxLen = math.max(lenA, lenB)
+    local useMin = (connA and connA.isSpoke) or (connB and connB.isSpoke)
+
+    local limitLen
+    if useMin then
+        limitLen = math.min(lenA, lenB)
+    else
+        limitLen = math.max(lenA, lenB)
+    end
+
     local out = {}
 
-    if maxLen < minCross then
+    if limitLen < minCross then
         return out
     end
 
     local rows = 0
     local arcLen = spacing
 
-    while arcLen <= maxLen and rows < maxRows do
+    while arcLen <= limitLen and rows < maxRows do
         out[#out + 1] = arcLen
         arcLen = arcLen + spacing
         rows = rows + 1
     end
 
-    if maxLen >= minCross then
-        local last = out[#out]
-
-        if not last then
-            if rows < maxRows then
-                out[#out + 1] = maxLen
-            end
-        else
-            local tail = maxLen - last
-
-            if tail > 0.001 then
-                local snapTol = spacing * 0.6
-
-                if tail <= snapTol then
-                    out[#out] = maxLen
-                elseif rows < maxRows then
-                    out[#out + 1] = maxLen
-                end
+    local last = out[#out]
+    if not last then
+        if rows < maxRows then
+            out[#out + 1] = limitLen
+        end
+    else
+        local tail = limitLen - last
+        if tail > 0.001 then
+            local snapTol = spacing * 0.6
+            if tail <= snapTol then
+                out[#out] = limitLen
+            elseif rows < maxRows then
+                out[#out + 1] = limitLen
             end
         end
     end
@@ -22342,27 +21203,20 @@ end
 
 function NSPauk:OnUpdateGuarded(dt)
     local S = self.S
-
     if type(S) ~= "table" then
         return
     end
-
     if not self.initialized or S.runtimeOff or S.phase == "off" then
         return
     end
-
     if self:IsPersistentlyDisabled() then
         return
     end
-
     if type(self.NP_CombatHidePreUpdate) == "function" then
         if self:NP_CombatHidePreUpdate(dt) then
             return
         end
     end
-
-    self:UpdateSessionRecordFlush(dt)
-
     self:NP_UpdateAdaptive(dt)
     self:OnUpdate(dt)
     self:UpdateSpiderAnimation(dt)
@@ -22387,17 +21241,22 @@ function NSPauk:NP_GetWebCompletionStats(inst)
     end
 
     for _, conn in ipairs(inst.conns or {}) do
-        stats.mainTotal = stats.mainTotal + 1
-        if self:NP_IsWebOwnerDrawn(conn) then
-            stats.mainDrawn = stats.mainDrawn + 1
+        if not conn.isDiameter then
+            stats.mainTotal = stats.mainTotal + 1
+
+            if self:NP_IsWebOwnerDrawn(conn) then
+                stats.mainDrawn = stats.mainDrawn + 1
+            end
         end
     end
 
     for _, seg in ipairs(inst.crossSegs or {}) do
         if not seg.isInterCross then
             stats.crossPlanned = stats.crossPlanned + 1
+
             if seg.alive then
                 stats.crossSegAlive = stats.crossSegAlive + 1
+
                 if self:NP_IsWebOwnerDrawn(seg) then
                     stats.crossDrawn = stats.crossDrawn + 1
                     stats.crossSegDrawn = stats.crossSegDrawn + 1
@@ -22411,156 +21270,6 @@ function NSPauk:NP_GetWebCompletionStats(inst)
     end
 
     return stats
-end
-
-function NSPauk:NP_GetRequiredWebPending(inst)
-    if not inst or inst.torn then
-        return 0, nil
-    end
-
-    if inst.isCocoon or inst.isMoth then
-        return 0, nil
-    end
-
-    local stats = self:NP_GetWebCompletionStats(inst)
-    if type(stats) ~= "table" then
-        return 0, nil
-    end
-
-    local mainPending = (stats.mainTotal or 0) - (stats.mainDrawn or 0)
-    if mainPending < 0 then
-        mainPending = 0
-    end
-
-    local pending = mainPending
-        + (stats.crossPending or 0)
-        + (stats.crossMissing or 0)
-
-    return pending, stats
-end
-
-function NSPauk:NP_MandatoryResumeWeb(inst)
-    local S = self.S
-
-    if type(S) ~= "table" then
-        return false
-    end
-
-    if not self.initialized or S.runtimeOff or S.phase == "off" then
-        return false
-    end
-
-    if S.combatHide then
-        return false
-    end
-
-    -- Триггер: очередь закончилась и паутина пытается завершиться.
-    if S.phase ~= "instanceComplete" then
-        return false
-    end
-
-    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
-        return false
-    end
-
-    if inst ~= S.currentInstance then
-        return false
-    end
-
-    if S.limitReached or S.limitReturnPending or S.limitCocoonPending then
-        return false
-    end
-
-    if S.moth and S.moth.active then
-        return false
-    end
-
-    if S.nspDrag then
-        return false
-    end
-
-    if S.nspMandatoryRunning then
-        return false
-    end
-
-    if not self:InstanceHasAliveConn(inst) then
-        return false
-    end
-
-    local pending, stats = self:NP_GetRequiredWebPending(inst)
-
-    if pending <= 0 or type(stats) ~= "table" then
-        inst._nspMandDrawn = inst.drawnPoints or 0
-        inst._nspMandAttempts = 0
-        return false
-    end
-
-    -------------------------------------------------------------------
-    -- Защита от бесконечного цикла без прогресса.
-    --
-    -- Это не таймер. Счётчик сбрасывается, как только появились
-    -- новые нарисованные точки.
-    -------------------------------------------------------------------
-    local drawn = inst.drawnPoints or 0
-
-    if type(inst._nspMandDrawn) ~= "number"
-        or inst._nspMandDrawn ~= drawn then
-        inst._nspMandDrawn = drawn
-        inst._nspMandAttempts = 0
-    end
-
-    if (inst._nspMandAttempts or 0) >= 6 then
-        return false
-    end
-
-    inst._nspMandAttempts = (inst._nspMandAttempts or 0) + 1
-
-    S.nspMandatoryRunning = true
-
-    local resumed = false
-
-    -------------------------------------------------------------------
-    -- Сначала пробуем секторные проверки.
-    -- Они могут создать недостающие сегменты и добавить задачи.
-    -------------------------------------------------------------------
-    if (stats.crossPending or 0) > 0 or (stats.crossMissing or 0) > 0 then
-        local added = tonumber(self:NP_RecheckWebSectors(inst)) or 0
-        added = added + (tonumber(self:NP_RecheckWebSectorsByTriangles(inst)) or 0)
-
-        if added > 0 then
-            resumed = true
-        end
-    end
-
-    -------------------------------------------------------------------
-    -- Если секторные проверки ничего не добавили, принудительно
-    -- пересобираем очередь из сохранённого плана паутины.
-    -------------------------------------------------------------------
-    if not resumed then
-        local tasks = self:NP_RebuildInstanceTasks(inst)
-
-        if type(tasks) == "table"
-            and #tasks > 0
-            and not inst.torn then
-            S.tasks = tasks
-            S.taskIdx = 1
-            S.currentTask = nil
-            S.completeTimer = 0
-            S.phase = "task"
-
-            resumed = true
-        end
-    else
-        if S.phase == "instanceComplete" then
-            S.phase = "task"
-        end
-
-        S.completeTimer = 0
-    end
-
-    S.nspMandatoryRunning = false
-
-    return resumed
 end
 
 function NSPauk:RuntimeShutdown()
@@ -22630,9 +21339,7 @@ function NSPauk:RuntimeShutdown()
     safeCall(self.AbortCocoon, self)
     safeCall(self.RestoreDigestedFrames, self)
 
-    ---------------------------------------------------------------------------
-    -- Интерфейс обязан вернуться даже при аварийном выключении.
-    ---------------------------------------------------------------------------
+
     safeCall(self.CancelUIParentRestore, self, true)
 
     S.suppressSettle = false
@@ -22885,10 +21592,6 @@ function NSPauk:Init()
     end)
 end
 
----------------------------------------------------------------------------
--- Modes / BaseMethods
----------------------------------------------------------------------------
-
 NSPauk.Modes = {}
 NSPauk.BaseMethods = {}
 
@@ -22947,10 +21650,6 @@ if not NSPauk:Activate() then
     NSPauk.S.phase = "off"
 end
 
----------------------------------------------------------------------------
--- Spider texture profiles / animation / rotation
----------------------------------------------------------------------------
-
 function NSPauk:GetSpiderProfileKey()
     local db = self:EnsureDB()
 
@@ -22961,9 +21660,6 @@ function NSPauk:GetSpiderProfileKey()
 
     local key = db.spiderProfile
 
-    ---------------------------------------------------------------------------
-    -- Совместимость со старым ключом animated.
-    ---------------------------------------------------------------------------
     if key == "animated" then
         key = "default"
         db.spiderProfile = key
@@ -23017,12 +21713,6 @@ function NSPauk:SetSpiderProfile(key)
 
     local profiles = self.SpiderTextureProfiles or {}
 
-    ---------------------------------------------------------------------------
-    -- Совместимость со старой командой:
-    -- /nspider profile animated
-    --
-    -- Теперь она просто выбирает default, который является анимированным.
-    ---------------------------------------------------------------------------
     if key == "animated" then
         key = "default"
     end
@@ -23400,30 +22090,6 @@ function NSPauk:HandleSpiderCommand(msg)
     self:Echo("Неизвестная команда. Используй /nspider help.")
 end
 
----------------------------------------------------------------------------
--- Slash commands
----------------------------------------------------------------------------
-
-if type(SlashCmdList) == "table" then
-    local cmdName = "NSPAUKCRAWLDEBUG"
-
-    if not SlashCmdList[cmdName] then
-        SlashCmdList[cmdName] = function()
-            if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
-                NSPauk:Echo("Паук выключен. Для включения используй /paukblock.")
-                return
-            end
-
-            NSPauk:NP_DebugPrint()
-        end
-
-        if _G then
-            _G["SLASH_" .. cmdName .. "1"] = "/nspmap"
-            _G["SLASH_" .. cmdName .. "2"] = "/paukmap"
-        end
-    end
-end
-
 if type(SlashCmdList) == "table" then
     local cmdName = "NSPAUKSPIDER"
 
@@ -23578,603 +22244,6 @@ end
 
 
 
-
-
-
-
-
-
-
-
-
-
-
----------------------------------------------------------------------------
--- Превью паутины v2: подхватывает предыдущую паутину и доделывает её.
---
--- /nsppreview new [нити] [%%] [мёртвая1] [мёртвая2] ...
---   Создать НОВУЮ паутину.
---
--- /nsppreview [%%] [мёртвая1] [мёртвая2] ...
---   Продолжить ПРЕДЫДУЩУЮ паутину с новыми параметрами.
---   Если предыдущей нет — создаёт новую (4 нити).
---
--- /nsppreview clear
---   Убрать схему с экрана и сбросить сохранённую геометрию.
---
--- Примеры:
---   /nsppreview new 6 100       — новая паутина, 6 нитей, 100%
---   /nsppreview 60 3            — та же паутина, 60%, нить 3 умерла
---   /nsppreview 80 3 5          — та же паутина, 80%, нити 3 и 5 умерли
---   /nsppreview 100             — та же паутина, 100%, все живы
---   /nsppreview clear           — убрать всё
----------------------------------------------------------------------------
-
-NSPauk.PreviewColors = {
-    { name = "красный",    r = 1.00, g = 0.25, b = 0.25 },
-    { name = "зелёный",    r = 0.30, g = 1.00, b = 0.35 },
-    { name = "синий",      r = 0.40, g = 0.60, b = 1.00 },
-    { name = "жёлтый",     r = 1.00, g = 0.92, b = 0.25 },
-    { name = "фиолетовый", r = 0.85, g = 0.45, b = 1.00 },
-    { name = "бирюзовый",  r = 0.25, g = 0.95, b = 0.90 },
-    { name = "оранжевый",  r = 1.00, g = 0.55, b = 0.15 },
-    { name = "розовый",    r = 1.00, g = 0.55, b = 0.80 },
-}
-
-function NSPauk:NP_ClearPreview()
-    local S = self.S
-    if S.nspPreviewTextures and #S.nspPreviewTextures > 0 then
-        self:RecycleTextures(S.nspPreviewTextures)
-    end
-    S.nspPreviewTextures = nil
-    S.nspPreviewInfo = nil
-    S.nspPreviewStored = nil
-end
-
-function NSPauk:NP_ClearPreviewTextures()
-    local S = self.S
-    if S.nspPreviewTextures and #S.nspPreviewTextures > 0 then
-        self:RecycleTextures(S.nspPreviewTextures)
-    end
-    S.nspPreviewTextures = nil
-end
-
----------------------------------------------------------------------------
--- Точный локальный угол нити у хаба.
--- Берём точку на 100px дуги от старта и смотрим направление из центра
--- хаба в эту точку. Это учитывает провисание и надёжнее, чем угол по
--- точке выхода из хаба (thread.angle). Аналог боевого NP_LocalAngleAtHub.
----------------------------------------------------------------------------
-function NSPauk:NP_PreviewLocalAngle(thread, hubX, hubY)
-    local total = thread.arcLength or 0
-    local angle = nil
-    if total > 1 then
-        local dist = 100
-        if dist > total * 0.5 then
-            dist = total * 0.5
-        end
-        local t = self:ThreadTAtLength(thread, dist)
-        if t then
-            local x, y = self:BzThread(thread, t)
-            local ax = x - hubX
-            local ay = y - hubY
-            if ax * ax + ay * ay > 0.01 then
-                angle = math.atan2(ay, ax)
-            end
-        end
-    end
-    if not angle then
-        angle = thread.angle or 0
-    end
-    local twoPi = math.pi * 2
-    while angle < 0 do
-        angle = angle + twoPi
-    end
-    while angle >= twoPi do
-        angle = angle - twoPi
-    end
-    return angle
-end
-
-function NSPauk:NP_PreviewWeb(buildPercent, deadIndices, threadCount, forceNew)
-    if type(self.C) ~= "table" or type(self.C.WEB_SIZE) ~= "number" then
-        self:LoadConstants()
-    end
-    local C = self.C
-    local S = self.S
-
-    -----------------------------------------------------------------------
-    -- Аргументы
-    -----------------------------------------------------------------------
-    buildPercent = math.floor((tonumber(buildPercent) or 100) + 0.5)
-    if buildPercent < 0 then
-        buildPercent = 0
-    elseif buildPercent > 100 then
-        buildPercent = 100
-    end
-
-    if type(deadIndices) ~= "table" then
-        deadIndices = {}
-    end
-
-    threadCount = math.floor((tonumber(threadCount) or 4) + 0.5)
-    if threadCount < 2 then
-        threadCount = 2
-    end
-    if threadCount > #self.PreviewColors then
-        threadCount = #self.PreviewColors
-    end
-
-    -----------------------------------------------------------------------
-    -- Очищаем старые текстуры (геометрию не трогаем, если не forceNew)
-    -----------------------------------------------------------------------
-    self:NP_ClearPreviewTextures()
-
-    -----------------------------------------------------------------------
-    -- Получаем или создаём геометрию паутины
-    -----------------------------------------------------------------------
-    local hub = nil
-    local threads = nil
-    local stored = S.nspPreviewStored
-
-    if stored and not forceNew then
-        ---------------------------------------------------------------
-        -- Подхватываем предыдущую паутину
-        ---------------------------------------------------------------
-        hub = stored.hub
-        threads = stored.threads
-        threadCount = #threads
-        self:Echo(string.format(
-            "Продолжаю паутину: %d нитей, хаб %s",
-            threadCount,
-            tostring(hub.name or "?")
-        ))
-    else
-        ---------------------------------------------------------------
-        -- Создаём новую паутину
-        ---------------------------------------------------------------
-        S.nspPreviewStored = nil
-
-        local items = self:CollectVisibleItems()
-        hub = self:PickWebHub(items)
-        local candidates = {}
-        if hub then
-            candidates = self:CollectTargetCandidates(hub, items)
-        end
-        if (not hub) or #candidates == 0 then
-            hub, candidates = self:FallbackHubAndTargets()
-        end
-
-        ---------------------------------------------------------------
-        -- Нити с проверкой минимального расстояния между ними.
-        -- Это то, что делает боевой CreateInstance через
-        -- ThreadsTooClose + WEB_THREAD_MIN_SEPARATION.
-        -- Без этой проверки несколько кнопок одной панели дают
-        -- почти совпадающие нити и вырожденные сектора ~0°.
-        ---------------------------------------------------------------
-        threads = {}
-        local minSep = tonumber(C.WEB_THREAD_MIN_SEPARATION) or 20
-        if minSep < 0 then
-            minSep = 20
-        end
-        local ignoreHubDist = tonumber(C.WEB_HUB_IGNORE_DIST) or 100
-        if ignoreHubDist < 0 then
-            ignoreHubDist = 100
-        end
-
-        for _, cand in ipairs(candidates) do
-            if #threads >= threadCount then
-                break
-            end
-            local target = cand and cand.item
-            if target and target ~= hub and target.frame ~= hub.frame then
-                local thread = nil
-                -- До 3 попыток попасть в цель без конфликта с уже
-                -- взятыми нитями (как в CreateInstance).
-                for _ = 1, 3 do
-                    local t = self:MakeRadialThread(hub, target, 1, 1)
-                    if not t then
-                        break
-                    end
-                    local conflict = false
-                    for _, other in ipairs(threads) do
-                        if self:ThreadsTooClose(t, other, minSep, ignoreHubDist) then
-                            conflict = true
-                            break
-                        end
-                    end
-                    if not conflict then
-                        thread = t
-                        break
-                    end
-                end
-                if thread then
-                    thread.previewTargetName = target.name or "?"
-                    threads[#threads + 1] = thread
-                end
-            end
-        end
-
-        if #threads < 2 then
-            self:Echo("Превью: не удалось построить даже 2 нити (цели слишком близко друг к другу или их мало).")
-            return nil
-        end
-
-        if #threads < threadCount then
-            self:Echo(string.format(
-                "Превью: запрошено %d нитей, но из-за мин. расстояния между нитями (%.0fpx) построено только %d.",
-                threadCount,
-                minSep,
-                #threads
-            ))
-        end
-
-        threadCount = #threads
-        self:Echo(string.format(
-            "Новая паутина: %d нитей, хаб %s",
-            threadCount,
-            tostring(hub.name or "?")
-        ))
-    end
-
-    -----------------------------------------------------------------------
-    -- Общая геометрия: arc samples + точный угол у хаба + сортировка.
-    -- Считается и для новой, и для продолженной паутины, чтобы порядок
-    -- нитей всегда соответствовал реальному угловому порядку.
-    -----------------------------------------------------------------------
-    local hubX = hub.cx or 0
-    local hubY = hub.cy or 0
-    for _, th in ipairs(threads) do
-        if not th.arcSamples or not th.arcLength or th.arcLength <= 0 then
-            local samples, total = self:BuildArcSamples(th)
-            th.arcSamples = samples
-            th.arcLength = total
-        end
-        th.previewAngle = self:NP_PreviewLocalAngle(th, hubX, hubY)
-    end
-
-    table.sort(threads, function(a, b)
-        return (a.previewAngle or 0) < (b.previewAngle or 0)
-    end)
-    for i, th in ipairs(threads) do
-        th.previewId = i
-    end
-
-    -----------------------------------------------------------------------
-    -- Сбрасываем и применяем флаги смерти
-    -----------------------------------------------------------------------
-    for _, th in ipairs(threads) do
-        th.previewDead = false
-    end
-    for _, idx in ipairs(deadIndices) do
-        idx = math.floor(tonumber(idx) or 0)
-        if idx >= 1 and idx <= #threads then
-            threads[idx].previewDead = true
-        end
-    end
-
-    -----------------------------------------------------------------------
-    -- Сектора: только соседние живые нити в угловом порядке
-    -----------------------------------------------------------------------
-    local alive = {}
-    for _, th in ipairs(threads) do
-        if not th.previewDead then
-            alive[#alive + 1] = th
-        end
-    end
-
-    local sectors = {}
-    local M = #alive
-    if M >= 2 then
-        for p = 1, M do
-            local a = alive[p]
-            local b = alive[(p % M) + 1]
-            local delta = (b.previewAngle or 0) - (a.previewAngle or 0)
-            while delta < 0 do
-                delta = delta + 2 * math.pi
-            end
-            while delta >= 2 * math.pi do
-                delta = delta - 2 * math.pi
-            end
-            local effective = delta
-            if M == 2 then
-                effective = math.min(delta, 2 * math.pi - delta)
-            end
-            sectors[#sectors + 1] = {
-                a = a,
-                b = b,
-                angleDeg = effective * 180 / math.pi,
-            }
-        end
-    end
-
-    -----------------------------------------------------------------------
-    -- Цвета
-    -----------------------------------------------------------------------
-    local palette = self.PreviewColors
-    local function threadColor(th)
-        return palette[((th.previewId - 1) % #palette) + 1]
-    end
-    local function blendColors(c1, c2)
-        return {
-            name = c1.name .. "+" .. c2.name,
-            r = (c1.r + c2.r) / 2,
-            g = (c1.g + c2.g) / 2,
-            b = (c1.b + c2.b) / 2,
-        }
-    end
-
-    -----------------------------------------------------------------------
-    -- Мгновенная отрисовка
-    -----------------------------------------------------------------------
-    local frame = S.activeFrame or UIParent
-    local textures = {}
-    local dotSize = math.max(2.5, (tonumber(C.WEB_SIZE) or 2) * 1.6)
-
-    local function dot(x, y, color, alpha, size)
-        local tex
-        if #S.webPool > 0 then
-            tex = table.remove(S.webPool)
-            if tex then
-                tex._nspInPool = false
-            end
-        end
-        if not tex then
-            tex = frame:CreateTexture(nil, "OVERLAY")
-        end
-        if not tex then
-            return
-        end
-        tex:SetTexture(C.TEX_WEB)
-        tex:SetDrawLayer("OVERLAY")
-        tex:SetVertexColor(color.r, color.g, color.b, 1)
-        tex:SetAlpha(alpha or 0.9)
-        tex:SetWidth(size or dotSize)
-        tex:SetHeight(size or dotSize)
-        tex:ClearAllPoints()
-        tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
-        tex:Show()
-        textures[#textures + 1] = tex
-    end
-
-    local function drawBezier(p0, p1, p2, color, alpha, step)
-        if not p1 then
-            p1 = {
-                x = (p0.x + p2.x) / 2,
-                y = (p0.y + p2.y) / 2,
-            }
-        end
-        step = step or 3
-        local dx = p2.x - p0.x
-        local dy = p2.y - p0.y
-        local chord = math.sqrt(dx * dx + dy * dy)
-        local n = math.max(2, math.floor(chord / step) + 1)
-        for i = 0, n do
-            local t = i / n
-            local m = 1 - t
-            local x = m * m * p0.x + 2 * m * t * p1.x + t * t * p2.x
-            local y = m * m * p0.y + 2 * m * t * p1.y + t * t * p2.y
-            dot(x, y, color, alpha)
-        end
-    end
-
-    -- Белый маркер хаба
-    for i = 0, 11 do
-        local ang = (i / 12) * 2 * math.pi
-        dot(
-            hubX + math.cos(ang) * 7,
-            hubY + math.sin(ang) * 7,
-            { r = 1, g = 1, b = 1 },
-            0.85,
-            dotSize
-        )
-    end
-
-    -----------------------------------------------------------------------
-    -- Перемычки секторов: только для разрешённых углов
-    -----------------------------------------------------------------------
-    local maxDeg = tonumber(C.CROSS_MAX_SECTOR_ANGLE) or 160
-    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
-    if spacing < 6 then
-        spacing = 6
-    end
-    local pct = buildPercent / 100
-
-    for _, sector in ipairs(sectors) do
-        local col = blendColors(threadColor(sector.a), threadColor(sector.b))
-        sector.color = col
-        sector.allowed = sector.angleDeg <= maxDeg
-
-        if sector.allowed then
-            local lenA = sector.a.arcLength or 0
-            local lenB = sector.b.arcLength or 0
-            local maxArc = math.min(lenA, lenB) * pct
-            local arcLen = spacing
-            while arcLen <= maxArc do
-                local tA = self:ThreadTAtLength(sector.a, arcLen)
-                local tB = self:ThreadTAtLength(sector.b, arcLen)
-                if tA and tB then
-                    local ax, ay = self:BzThread(sector.a, tA)
-                    local bx, by = self:BzThread(sector.b, tB)
-                    local cross = {
-                        p0 = { x = ax, y = ay },
-                        p2 = { x = bx, y = by },
-                    }
-                    self:MakeSag(cross, "cross", hubX, hubY)
-                    drawBezier(cross.p0, cross.p1, cross.p2, col, 0.85, 3)
-                end
-                arcLen = arcLen + spacing
-            end
-        end
-    end
-
-    -----------------------------------------------------------------------
-    -- Основные нити поверх перемычек
-    -----------------------------------------------------------------------
-    for _, th in ipairs(threads) do
-        if th.previewDead then
-            drawBezier(
-                th.p0, th.p1, th.p2,
-                { r = 0.45, g = 0.10, b = 0.10 },
-                0.45,
-                4
-            )
-        else
-            local col = threadColor(th)
-            drawBezier(th.p0, th.p1, th.p2, col, 0.95, 3)
-        end
-    end
-
-    -----------------------------------------------------------------------
-    -- Сохраняем геометрию для следующего вызова
-    -----------------------------------------------------------------------
-    S.nspPreviewTextures = textures
-    S.nspPreviewInfo = {
-        hub = hub,
-        threads = threads,
-        sectors = sectors,
-    }
-    S.nspPreviewStored = {
-        hub = hub,
-        threads = threads,
-        threadCount = #threads,
-    }
-
-    -----------------------------------------------------------------------
-    -- Отладочный вывод
-    -----------------------------------------------------------------------
-    self:Echo(string.format(
-        "Превью: нитей %d, построение %d%%, хаб %s",
-        #threads,
-        buildPercent,
-        tostring(hub.name or "?")
-    ))
-    for _, th in ipairs(threads) do
-        local col = threadColor(th)
-        if th.previewDead then
-            self:Echo(string.format(
-                "Нить %d: %s — УМЕРЛА (цель %s)",
-                th.previewId,
-                col.name,
-                tostring(th.previewTargetName)
-            ))
-        else
-            self:Echo(string.format(
-                "Нить %d: %s (цель %s)",
-                th.previewId,
-                col.name,
-                tostring(th.previewTargetName)
-            ))
-        end
-    end
-    for _, sector in ipairs(sectors) do
-        if sector.allowed then
-            self:Echo(string.format(
-                "Сектор %d-%d: цвет %s, угол %.1f°",
-                sector.a.previewId,
-                sector.b.previewId,
-                sector.color and sector.color.name or "?",
-                sector.angleDeg
-            ))
-        else
-            self:Echo(string.format(
-                "Сектор %d-%d: угол %.1f° > лимита %.0f° — ПЕРЕМЫЧКИ НЕ РИСУЮТСЯ",
-                sector.a.previewId,
-                sector.b.previewId,
-                sector.angleDeg,
-                maxDeg
-            ))
-        end
-    end
-    self:Echo(string.format(
-        "Точек: %d. Очистка: /nsppreview clear",
-        #textures
-    ))
-    return threads, sectors
-end
-
----------------------------------------------------------------------------
--- Slash-команда
----------------------------------------------------------------------------
-if type(SlashCmdList) == "table" then
-    local cmdName = "NSPAUKPREVIEW"
-    if not SlashCmdList[cmdName] then
-        SlashCmdList[cmdName] = function(msg)
-            msg = type(msg) == "string" and msg or ""
-            msg = msg:gsub("^%s+", "")
-            msg = msg:gsub("%s+$", "")
-
-            if msg == "clear" then
-                NSPauk:NP_ClearPreview()
-                NSPauk:Echo("Превью очищено.")
-                return
-            end
-
-            local tokens = {}
-            for tok in msg:gmatch("%S+") do
-                tokens[#tokens + 1] = tok
-            end
-
-            if #tokens == 0 then
-                NSPauk:Echo("Использование:")
-                NSPauk:Echo("  /nsppreview new [нити] [%%] [мёртвые...]")
-                NSPauk:Echo("  /nsppreview [%%] [мёртвые...]  (продолжить)")
-                NSPauk:Echo("  /nsppreview clear")
-                return
-            end
-
-            local forceNew = false
-            local pos = 1
-
-            if tokens[1] == "new" then
-                forceNew = true
-                pos = 2
-            end
-
-            local hasStored = NSPauk.S.nspPreviewStored ~= nil
-            local threadCount = nil
-            local buildPercent = nil
-            local deadIndices = {}
-
-            if forceNew then
-                -- new [нити] [проценты] [мёртвые...]
-                threadCount = tonumber(tokens[pos])
-                buildPercent = tonumber(tokens[pos + 1])
-                for i = pos + 2, #tokens do
-                    local idx = tonumber(tokens[i])
-                    if idx then
-                        deadIndices[#deadIndices + 1] = idx
-                    end
-                end
-            elseif hasStored then
-                -- [проценты] [мёртвые...]
-                buildPercent = tonumber(tokens[pos])
-                for i = pos + 1, #tokens do
-                    local idx = tonumber(tokens[i])
-                    if idx then
-                        deadIndices[#deadIndices + 1] = idx
-                    end
-                end
-            else
-                -- Нет сохранённой: [нити] [проценты] [мёртвые...]
-                threadCount = tonumber(tokens[pos])
-                buildPercent = tonumber(tokens[pos + 1])
-                for i = pos + 2, #tokens do
-                    local idx = tonumber(tokens[i])
-                    if idx then
-                        deadIndices[#deadIndices + 1] = idx
-                    end
-                end
-            end
-
-            NSPauk:NP_PreviewWeb(buildPercent, deadIndices, threadCount, forceNew)
-        end
-        if _G then
-            _G["SLASH_" .. cmdName .. "1"] = "/nsppreview"
-            _G["SLASH_" .. cmdName .. "2"] = "/paukpreview"
-        end
-    end
-end
 
 
 
