@@ -7064,9 +7064,11 @@ function NSPauk:IsGoodAnchorName(name)
     if type(name) ~= "string" or name == "" then
         return false
     end
+
     if name:sub(1, 1) == "(" then
         return false
     end
+
     if name == "WorldFrame" or name == "UIParent" or name == "MinimapCluster" then
         return false
     end
@@ -7074,7 +7076,12 @@ function NSPauk:IsGoodAnchorName(name)
     if name:find("Moth", 1, true) then
         return false
     end
+
     if name:find("NSPauk_Moth", 1, true) then
+        return false
+    end
+
+    if name:find("NSPaukWeb", 1, true) then
         return false
     end
 
@@ -7387,19 +7394,24 @@ function NSPauk:PickWebHub(items)
     end
 
     local good = {}
+
     for _, item in ipairs(items) do
-        if self:IsGoodAnchorName(item.name) then
+        if not item.webInst
+            and item.frame
+            and self:IsGoodAnchorName(item.name) then
             good[#good + 1] = item
         end
     end
 
     local pool = good
+
     if #pool == 0 then
         pool = items
     end
 
     if math.random(1, 2) == 1 then
         local hub = self:PickCentralHub(pool)
+
         if hub then
             return hub
         end
@@ -7414,18 +7426,23 @@ function NSPauk:ChooseNextHub(inst)
     end
 
     local good = {}
+
     for _, r in ipairs(inst.anchorCandidates) do
-        if self:IsGoodAnchorName(r.name) then
+        if r.frame
+            and not r.webInst
+            and self:IsGoodAnchorName(r.name) then
             good[#good + 1] = r
         end
     end
 
     local source = good
+
     if #source == 0 then
         source = inst.anchorCandidates
     end
 
     local list = {}
+
     for i, r in ipairs(source) do
         list[i] = r
     end
@@ -7433,13 +7450,15 @@ function NSPauk:ChooseNextHub(inst)
     self:Shuffle(list)
 
     for _, r in ipairs(list) do
-        if r.frame then
+        if r.frame
+            and not r.webInst
+            and self:IsGoodAnchorName(r.name) then
+
             local cur = self:ComputeFrameVisibleInner(r.frame)
+
             if cur then
                 return cur
             end
-        elseif r.left and r.right and r.bottom and r.top then
-            return self:NormalizeFallbackRect(self:CopyRect(r))
         end
     end
 
@@ -7449,19 +7468,24 @@ end
 function NSPauk:CollectTargetCandidates(hub, items)
     local good = {}
     local all = {}
+
     local function sameAnchor(a, b)
         if not a or not b then
             return false
         end
+
         if a == b then
             return true
         end
+
         if a.virtualId and b.virtualId then
             return a.virtualId == b.virtualId
         end
+
         if a.frame and b.frame then
             return a.frame == b.frame
         end
+
         return false
     end
 
@@ -7469,38 +7493,51 @@ function NSPauk:CollectTargetCandidates(hub, items)
         if not item then
             return true
         end
+
         local name = item.name
+
         if type(name) == "string" then
             if name:find("Moth", 1, true) then
                 return true
             end
+
             if name:find("NSPauk_Moth", 1, true) then
                 return true
             end
         end
+
         if item.frame then
             local frameName = item.frame.GetName and item.frame:GetName()
+
             if type(frameName) == "string" then
                 if frameName:find("Moth", 1, true) then
                     return true
                 end
             end
         end
+
         return false
     end
 
     for _, item in ipairs(items) do
-        if not sameAnchor(item, hub) and not isDynamicObject(item) then
+        if not sameAnchor(item, hub)
+            and not isDynamicObject(item)
+            and not item.webInst then
+
             all[#all + 1] = { item = item }
+
             if self:IsGoodAnchorName(item.name) then
                 good[#good + 1] = { item = item }
             end
         end
     end
+
     local pool = good
+
     if #pool == 0 then
         pool = all
     end
+
     return self:Shuffle(pool)
 end
 
