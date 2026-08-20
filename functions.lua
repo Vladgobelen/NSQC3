@@ -11436,47 +11436,66 @@ end
 
 function NSPauk:NP_GetRingRowArcs(connA, connB)
     local C = self.C or {}
+
     local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+
     if spacing < 0.5 then
         spacing = 0.5
     end
+
     local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+
     if minCross < 0 then
         minCross = 4
     end
+
     local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
+
     if maxRows < 0 then
         maxRows = 1600
     end
+
     local lenA = tonumber(connA and connA.arcLength) or 0
     local lenB = tonumber(connB and connB.arcLength) or 0
+
     if lenA < 0 then
         lenA = 0
     end
+
     if lenB < 0 then
         lenB = 0
     end
-    local maxLen = math.min(lenA, lenB)
+
+    -- Тоже используем более длинную нить.
+    local maxLen = math.max(lenA, lenB)
+
     local out = {}
+
     if maxLen < minCross then
         return out
     end
+
     local rows = 0
     local arcLen = spacing
+
     while arcLen <= maxLen and rows < maxRows do
         out[#out + 1] = arcLen
         arcLen = arcLen + spacing
         rows = rows + 1
     end
+
     local last = out[#out]
+
     if not last then
         if rows < maxRows then
             out[#out + 1] = maxLen
         end
     else
         local tail = maxLen - last
+
         if tail > 0.001 then
             local snapTol = spacing * 0.6
+
             if tail <= snapTol then
                 out[#out] = maxLen
             elseif rows < maxRows then
@@ -11484,6 +11503,7 @@ function NSPauk:NP_GetRingRowArcs(connA, connB)
             end
         end
     end
+
     return out
 end
 
@@ -11553,6 +11573,91 @@ function NSPauk:NP_GetRingSectors(inst)
     end
 
     return out
+end
+
+function NSPauk:NP_ChooseRingIntermediateCounts(N)
+    local C = self.C or {}
+
+    local counts = {}
+
+    for i = 1, N do
+        counts[i] = 1
+    end
+
+    if N < 1 then
+        return counts
+    end
+
+    local minSetting = math.floor(tonumber(C.TARGET_COUNT_MIN) or 3)
+    local maxSetting = math.floor(tonumber(C.TARGET_COUNT_MAX) or 6)
+
+    -- Базово: N углов + N середин = 2*N сектора.
+    -- Для 4 углов это 8 секторов.
+    local baseSectors = 2 * N
+
+    local minSectors = math.max(baseSectors, 8, minSetting)
+    local maxSectors = math.max(minSectors, maxSetting)
+
+    local desiredSectors = self:RandomInt(minSectors, maxSectors)
+
+    -- Всего радиальных нитей должно быть desiredSectors.
+    -- Из них N — углы, остальные — промежуточные спицы.
+    local totalIntermediates = desiredSectors - N
+
+    if totalIntermediates < N then
+        totalIntermediates = N
+    end
+
+    -- Ограничение, чтобы не сделать слишком много точек.
+    -- 7 промежуточных точек на сторону = до 8 сегментов на сторону.
+    local maxPerSide = 7
+    local maxTotal = N * maxPerSide
+
+    if totalIntermediates > maxTotal then
+        totalIntermediates = maxTotal
+    end
+
+    local remaining = totalIntermediates - N
+
+    if remaining > 0 then
+        local order = {}
+
+        for i = 1, N do
+            order[i] = i
+        end
+
+        self:Shuffle(order)
+
+        local idx = 1
+        local guard = 0
+
+        while remaining > 0 and guard < 10000 do
+            local side = order[((idx - 1) % N) + 1]
+
+            if counts[side] < maxPerSide then
+                counts[side] = counts[side] + 1
+                remaining = remaining - 1
+            end
+
+            idx = idx + 1
+            guard = guard + 1
+
+            local canAddMore = false
+
+            for i = 1, N do
+                if counts[i] < maxPerSide then
+                    canAddMore = true
+                    break
+                end
+            end
+
+            if not canAddMore then
+                break
+            end
+        end
+    end
+
+    return counts
 end
 
 function NSPauk:NP_ConvexHull(points)
@@ -12085,6 +12190,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
     inst.conns[#inst.conns + 1] = diamConn
     inst.hubDepConn = diamConn
 
+    -- Спицы от хаба к углам.
     for i = 1, N do
         local anchor = anchors[i]
 
@@ -12130,51 +12236,66 @@ function NSPauk:CreateRingInstance(targetCount, items)
         inst.conns[#inst.conns + 1] = conn
     end
 
+    -- Промежуточные спицы от хаба к точкам на внешних линиях.
+    -- Количество точек на каждой внешней линии выбирается рандомно
+    -- в зависимости от TARGET_COUNT_MIN / TARGET_COUNT_MAX.
+    local intermediateCounts = self:NP_ChooseRingIntermediateCounts(N)
+
     for i = 1, N do
         local pThread = perimeterThreads[i]
         local perConn = perimeterConns[i]
 
-        local midX, midY = self:BzThread(pThread, 0.5)
+        local count = intermediateCounts[i] or 1
 
-        local thread = self:NP_MakeGravityThread(
-            { x = hx, y = hy },
-            { x = midX, y = midY },
-            "cross",
-            0.35
-        )
-
-        local angle = math.atan2(midY - hy, midX - hx)
-
-        if angle < 0 then
-            angle = angle + 2 * math.pi
+        if count < 1 then
+            count = 1
         end
 
-        thread.angle = angle
+        for k = 1, count do
+            local t = k / (count + 1)
 
-        local conn = {
-            id = #inst.conns + 1,
-            target = {
-                frame = nil,
-                name = "MidPerimeter",
-                rect = nil,
-            },
-            ringStartRect = self:CopyRect(hubRect),
-            thread = thread,
-            angle = angle,
-            textures = {},
-            alive = true,
-            isSpoke = true,
-            isMidSpoke = true,
-            hubDepConn = diamConn,
-            perimeterConn = perConn,
-        }
+            local midX, midY = self:BzThread(pThread, t)
 
-        thread.ownerRef = {
-            inst = inst,
-            conn = conn,
-        }
+            local thread = self:NP_MakeGravityThread(
+                { x = hx, y = hy },
+                { x = midX, y = midY },
+                "cross",
+                0.35
+            )
 
-        inst.conns[#inst.conns + 1] = conn
+            local angle = math.atan2(midY - hy, midX - hx)
+
+            if angle < 0 then
+                angle = angle + 2 * math.pi
+            end
+
+            thread.angle = angle
+
+            local conn = {
+                id = #inst.conns + 1,
+                target = {
+                    frame = nil,
+                    name = "MidPerimeter",
+                    rect = nil,
+                },
+                ringStartRect = self:CopyRect(hubRect),
+                thread = thread,
+                angle = angle,
+                textures = {},
+                alive = true,
+                isSpoke = true,
+                isMidSpoke = true,
+                perimeterConn = perConn,
+                hubDepConn = diamConn,
+            }
+
+            thread.ownerRef = {
+                inst = inst,
+                conn = conn,
+            }
+
+            inst.conns[#inst.conns + 1] = conn
+        end
     end
 
     self:BuildInstanceTasks(inst)
@@ -12191,43 +12312,41 @@ function NSPauk:NP_BuildNaturalRingMainTasks(inst, tasks, cursorPoint)
 
     local perimeter = {}
     local diameter = nil
-    local radial = {}
+    local spokes = {}
 
     for _, conn in ipairs(inst.conns or {}) do
         if conn.isRingFrame then
             perimeter[#perimeter + 1] = conn
         elseif conn.isDiameter then
             diameter = conn
-        elseif conn.isSpoke and not conn.isDiameterHalf then
-            radial[#radial + 1] = conn
+        elseif conn.isSpoke then
+            spokes[#spokes + 1] = conn
         end
     end
 
-    table.sort(radial, function(a, b)
+    table.sort(spokes, function(a, b)
         local aa = a.angle or 0
         local bb = b.angle or 0
+
         if aa == bb then
             return (a.id or 0) < (b.id or 0)
         end
+
         return aa < bb
     end)
 
-    local function addMain(conn)
+    for _, conn in ipairs(perimeter) do
         local drawThread = self:NP_OrientThreadForCursor(conn.thread, cursor) or conn.thread
 
         if cursor then
-            self:AddTravelPointTask(
-                tasks,
-                cursor,
-                drawThread.p0,
-                conn,
-                conn
-            )
+            self:AddTravelPointTask(tasks, cursor, drawThread.p0, conn, conn)
         end
 
         local task = self:AddThreadTask(tasks, conn, drawThread)
+
         if task then
             task.isMain = true
+
             cursor = {
                 x = drawThread.p2.x,
                 y = drawThread.p2.y,
@@ -12236,15 +12355,41 @@ function NSPauk:NP_BuildNaturalRingMainTasks(inst, tasks, cursorPoint)
     end
 
     if diameter then
-        addMain(diameter)
+        local drawThread = self:NP_OrientThreadForCursor(diameter.thread, cursor) or diameter.thread
+
+        if cursor then
+            self:AddTravelPointTask(tasks, cursor, drawThread.p0, diameter, diameter)
+        end
+
+        local task = self:AddThreadTask(tasks, diameter, drawThread)
+
+        if task then
+            task.isMain = true
+
+            cursor = {
+                x = drawThread.p2.x,
+                y = drawThread.p2.y,
+            }
+        end
     end
 
-    for _, conn in ipairs(perimeter) do
-        addMain(conn)
-    end
+    for _, conn in ipairs(spokes) do
+        local drawThread = self:NP_OrientThreadForCursor(conn.thread, cursor) or conn.thread
 
-    for _, conn in ipairs(radial) do
-        addMain(conn)
+        if cursor then
+            self:AddTravelPointTask(tasks, cursor, drawThread.p0, conn, conn)
+        end
+
+        local task = self:AddThreadTask(tasks, conn, drawThread)
+
+        if task then
+            task.isMain = true
+
+            cursor = {
+                x = drawThread.p2.x,
+                y = drawThread.p2.y,
+            }
+        end
     end
 
     return cursor
@@ -21948,16 +22093,19 @@ function NSPauk:NP_GetSectorRowArcs(connA, connB)
     local C = self.C or {}
 
     local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+
     if spacing < 0.5 then
         spacing = 0.5
     end
 
     local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+
     if minCross < 0 then
         minCross = 4
     end
 
     local maxRows = tonumber(C.MAX_CROSS_ROWS) or 1600
+
     if maxRows < 0 then
         maxRows = 1600
     end
@@ -21973,26 +22121,21 @@ function NSPauk:NP_GetSectorRowArcs(connA, connB)
         lenB = 0
     end
 
-    local useMin = (connA and connA.isSpoke) or (connB and connB.isSpoke)
-
-    local limitLen
-
-    if useMin then
-        limitLen = math.min(lenA, lenB)
-    else
-        limitLen = math.max(lenA, lenB)
-    end
+    -- Важно: берём более длинную нить.
+    -- Короткая нить дальше своей последней точки уже не идёт,
+    -- а длинная продолжает тянуться.
+    local maxLen = math.max(lenA, lenB)
 
     local out = {}
 
-    if limitLen < minCross then
+    if maxLen < minCross then
         return out
     end
 
     local rows = 0
     local arcLen = spacing
 
-    while arcLen <= limitLen and rows < maxRows do
+    while arcLen <= maxLen and rows < maxRows do
         out[#out + 1] = arcLen
         arcLen = arcLen + spacing
         rows = rows + 1
@@ -22002,18 +22145,18 @@ function NSPauk:NP_GetSectorRowArcs(connA, connB)
 
     if not last then
         if rows < maxRows then
-            out[#out + 1] = limitLen
+            out[#out + 1] = maxLen
         end
     else
-        local tail = limitLen - last
+        local tail = maxLen - last
 
         if tail > 0.001 then
             local snapTol = spacing * 0.6
 
             if tail <= snapTol then
-                out[#out] = limitLen
+                out[#out] = maxLen
             elseif rows < maxRows then
-                out[#out + 1] = limitLen
+                out[#out + 1] = maxLen
             end
         end
     end
