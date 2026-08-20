@@ -7604,13 +7604,6 @@ function NSPauk:ValidateConnection(inst, conn)
         return true
     end
 
-    if conn.isDiameterHalf
-        and conn.hubDepConn
-        and not conn.hubDepConn.alive then
-        self:KillConnection(inst, conn)
-        return false
-    end
-
     if not self:ValidateAnchorRect(conn.target.rect) then
         self:KillConnection(inst, conn)
         return false
@@ -11504,6 +11497,7 @@ function NSPauk:NP_GetRingSectors(inst)
     local C = self.C or {}
 
     local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+
     if minCross < 0 then
         minCross = 4
     end
@@ -11511,16 +11505,14 @@ function NSPauk:NP_GetRingSectors(inst)
     local radial = {}
 
     for _, conn in ipairs(inst.conns) do
-        if conn.alive and not conn.noSector and conn.thread then
+        if not conn.noSector and conn.thread then
             if not conn.arcLength or conn.arcLength <= 0 then
                 local samples, total = self:BuildArcSamples(conn.thread)
                 conn.arcSamples = samples
                 conn.arcLength = total
             end
 
-            if type(conn.arcLength) == "number" and conn.arcLength >= minCross then
-                radial[#radial + 1] = conn
-            end
+            radial[#radial + 1] = conn
         end
     end
 
@@ -11539,33 +11531,22 @@ function NSPauk:NP_GetRingSectors(inst)
         return aa < bb
     end)
 
-    local seen = {}
     local M = #radial
 
     for i = 1, M do
         local connA = radial[i]
         local connB = radial[(i % M) + 1]
 
-        local pairMin = math.min(connA.arcLength or 0, connB.arcLength or 0)
+        if connA.alive and connB.alive then
+            local lenA = tonumber(connA.arcLength) or 0
+            local lenB = tonumber(connB.arcLength) or 0
 
-        if pairMin >= minCross then
-            local idA = connA.id or 0
-            local idB = connB.id or 0
-
-            if idA > idB then
-                idA, idB = idB, idA
-            end
-
-            local key = tostring(idA) .. "-" .. tostring(idB)
-
-            if not seen[key] then
-                seen[key] = true
-
+            if lenA >= minCross and lenB >= minCross then
                 out[#out + 1] = {
-                    a = idA,
-                    b = idB,
-                    key = key,
-                    pairMin = pairMin,
+                    a = connA.id,
+                    b = connB.id,
+                    key = tostring(connA.id) .. "-" .. tostring(connB.id),
+                    pairMin = math.min(lenA, lenB),
                 }
             end
         end
@@ -11893,9 +11874,11 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     targetCount = math.floor(tonumber(targetCount) or 4)
+
     if targetCount < 4 then
         targetCount = 4
     end
+
     if targetCount % 2 ~= 0 then
         targetCount = targetCount + 1
     end
@@ -11905,6 +11888,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     local anchors = self:NP_CollectRingAnchors(items, targetCount)
+
     if not anchors or #anchors < 4 then
         return nil
     end
@@ -11924,11 +11908,13 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     local N = #anchors
+
     if N < 4 then
         return nil
     end
 
     local points = {}
+
     for _, item in ipairs(anchors) do
         points[#points + 1] = {
             x = item.cx or 0,
@@ -11938,6 +11924,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     local hull = self:NP_ConvexHull(points)
+
     if not hull or #hull < 4 then
         return nil
     end
@@ -11951,9 +11938,11 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     anchors = {}
+
     for _, p in ipairs(hull) do
         anchors[#anchors + 1] = p.item
     end
+
     N = #anchors
 
     local idxA = 1
@@ -11961,6 +11950,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
 
     local a = anchors[idxA]
     local b = anchors[idxB]
+
     if not a or not b then
         return nil
     end
@@ -12007,6 +11997,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
 
     inst.anchorCandidates[#inst.anchorCandidates + 1] = self:CopyRect(hubRect)
 
+    local perimeterThreads = {}
     local perimeterConns = {}
 
     for i = 1, N do
@@ -12024,9 +12015,11 @@ function NSPauk:CreateRingInstance(targetCount, items)
             (q.cy or 0) - (p.cy or 0),
             (q.cx or 0) - (p.cx or 0)
         )
+
         if angle < 0 then
             angle = angle + 2 * math.pi
         end
+
         thread.angle = angle
 
         local conn = {
@@ -12052,6 +12045,8 @@ function NSPauk:CreateRingInstance(targetCount, items)
 
         inst.conns[#inst.conns + 1] = conn
         inst.anchorCandidates[#inst.anchorCandidates + 1] = self:CopyRect(q)
+
+        perimeterThreads[#perimeterThreads + 1] = thread
         perimeterConns[i] = conn
     end
 
@@ -12059,9 +12054,11 @@ function NSPauk:CreateRingInstance(targetCount, items)
         (b.cy or 0) - (a.cy or 0),
         (b.cx or 0) - (a.cx or 0)
     )
+
     if diamAngle < 0 then
         diamAngle = diamAngle + 2 * math.pi
     end
+
     diamThread.angle = diamAngle
 
     local diamConn = {
@@ -12087,38 +12084,26 @@ function NSPauk:CreateRingInstance(targetCount, items)
 
     inst.conns[#inst.conns + 1] = diamConn
     inst.hubDepConn = diamConn
-    inst.diameterConn = diamConn
 
     for i = 1, N do
         local anchor = anchors[i]
-        local isHalf = (i == idxA or i == idxB)
 
-        local thread
-
-        if isHalf then
-            if i == idxA then
-                thread = self:NP_SubBezierThread(diamThread, 0, 0.5, true)
-            else
-                thread = self:NP_SubBezierThread(diamThread, 0.5, 1, false)
-            end
-        end
-
-        if not thread then
-            thread = self:NP_MakeGravityThread(
-                { x = hx, y = hy },
-                { x = anchor.cx or 0, y = anchor.cy or 0 },
-                "cross",
-                0.35
-            )
-        end
+        local thread = self:NP_MakeGravityThread(
+            { x = hx, y = hy },
+            { x = anchor.cx or 0, y = anchor.cy or 0 },
+            "cross",
+            0.35
+        )
 
         local angle = math.atan2(
             (anchor.cy or 0) - hy,
             (anchor.cx or 0) - hx
         )
+
         if angle < 0 then
             angle = angle + 2 * math.pi
         end
+
         thread.angle = angle
 
         local conn = {
@@ -12134,12 +12119,8 @@ function NSPauk:CreateRingInstance(targetCount, items)
             textures = {},
             alive = true,
             isSpoke = true,
+            hubDepConn = diamConn,
         }
-
-        if isHalf then
-            conn.isDiameterHalf = true
-            conn.hubDepConn = diamConn
-        end
 
         thread.ownerRef = {
             inst = inst,
@@ -12150,19 +12131,8 @@ function NSPauk:CreateRingInstance(targetCount, items)
     end
 
     for i = 1, N do
+        local pThread = perimeterThreads[i]
         local perConn = perimeterConns[i]
-        local pThread = perConn and perConn.thread
-
-        if not pThread then
-            local p = anchors[i]
-            local q = anchors[(i % N) + 1]
-            pThread = self:NP_MakeGravityThread(
-                { x = p.cx or 0, y = p.cy or 0 },
-                { x = q.cx or 0, y = q.cy or 0 },
-                "main",
-                1.0
-            )
-        end
 
         local midX, midY = self:BzThread(pThread, 0.5)
 
@@ -12174,9 +12144,11 @@ function NSPauk:CreateRingInstance(targetCount, items)
         )
 
         local angle = math.atan2(midY - hy, midX - hx)
+
         if angle < 0 then
             angle = angle + 2 * math.pi
         end
+
         thread.angle = angle
 
         local conn = {
@@ -12193,6 +12165,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
             alive = true,
             isSpoke = true,
             isMidSpoke = true,
+            hubDepConn = diamConn,
             perimeterConn = perConn,
         }
 
@@ -14553,7 +14526,7 @@ function NSPauk:KillSeg(seg)
     end
 end
 
-function NSPauk:KillConnection(inst, conn)
+function NSPauk:KillConnection(inst, conn, silent)
     if not conn or not conn.alive then
         return
     end
@@ -14561,12 +14534,35 @@ function NSPauk:KillConnection(inst, conn)
     conn.alive = false
 
     if #conn.textures > 0 then
-        conn._nspHadTextures = true
         self:StartLocalFade(conn.textures, self.C.TEAR_FADE_DURATION)
         conn.textures = {}
     end
 
     if inst then
+        for _, other in ipairs(inst.conns) do
+            if other ~= conn and other.alive then
+                local killDependent = false
+
+                if other.perimeterConn == conn then
+                    killDependent = true
+                end
+
+                if other.hubDepConn == conn then
+                    killDependent = true
+                end
+
+                if conn.isDiameter
+                    and inst.hubDepConn == conn
+                    and other.isSpoke then
+                    killDependent = true
+                end
+
+                if killDependent then
+                    self:KillConnection(inst, other, true)
+                end
+            end
+        end
+
         for _, seg in ipairs(inst.crossSegs) do
             if seg.alive and (seg.connA == conn or seg.connB == conn) then
                 self:KillSeg(seg)
@@ -14575,13 +14571,8 @@ function NSPauk:KillConnection(inst, conn)
 
         self:CheckInstanceDead(inst)
 
-        if not inst.torn then
-            if inst.isNaturalRing then
-                inst.nspRingCrossQueueDirty = true
-                self:NP_RequestRingQueueRebuild(inst, nil)
-            else
-                self:NP_RecheckWebSectors(inst)
-            end
+        if not silent and not inst.torn then
+            self:NP_RecheckWebSectors(inst)
         end
     end
 end
@@ -14636,13 +14627,6 @@ function NSPauk:CheckInstancesMovement()
     local function frameMovedCached(storedRect, frame)
         if not frame then
             return false
-        end
-
-        if storedRect and storedRect.family then
-            local live = self:NP_FindFamilyFrame(storedRect.family, frame)
-            if live then
-                frame = live
-            end
         end
 
         if not storedRect then
@@ -14724,9 +14708,27 @@ function NSPauk:CheckInstancesMovement()
         local k = false
 
         for _, conn in ipairs(inst.conns) do
-            if conn.alive and conn.target and conn.target.frame then
+            if conn.alive then
                 if full or isProtectedInst(inst) then
-                    if frameMovedCached(conn.target.rect, conn.target.frame) then
+                    local moved = false
+
+                    if conn.target
+                        and conn.target.frame
+                        and conn.target.rect then
+                        if frameMovedCached(conn.target.rect, conn.target.frame) then
+                            moved = true
+                        end
+                    end
+
+                    if not moved
+                        and conn.ringStartRect
+                        and conn.ringStartRect.frame then
+                        if frameMovedCached(conn.ringStartRect, conn.ringStartRect.frame) then
+                            moved = true
+                        end
+                    end
+
+                    if moved then
                         self:KillConnection(inst, conn)
                         k = true
                     end
@@ -23565,39 +23567,37 @@ function NSPauk_Moth:CreateWidgets()
         return
     end
 
+    if self.blocked or self:IsBlockedByDB() then
+        return
+    end
+
     local cfg = self.cfg
     local parent = self:GetAnchorFrame()
 
     local frameName = "NSPauk_MothFrame"
-
     if _G[frameName] then
         frameName = nil
     end
 
     local f = CreateFrame("Frame", frameName, parent)
-
     f:SetFrameStrata("TOOLTIP")
     f:SetFrameLevel(103)
     f:SetWidth(cfg.CLICK_AREA)
     f:SetHeight(cfg.CLICK_AREA)
     f:EnableMouse(true)
     f:Hide()
-
     self.frame = f
 
     local tex = f:CreateTexture(nil, "OVERLAY")
-
     tex:SetWidth(cfg.SIZE)
     tex:SetHeight(cfg.SIZE)
     tex:SetPoint("CENTER", f, "CENTER", 0, 0)
     tex:SetDrawLayer("OVERLAY")
     tex:Show()
-
     self.tex = tex
 
     self.tex1 = self:GetTexturePath("m1.tga")
     self.tex2 = self:GetTexturePath("m2.tga")
-
     self:ApplyTexture()
 
     f:SetScript("OnUpdate", function(_, elapsed)
@@ -24414,27 +24414,31 @@ function NSPauk_Moth:EnsureTimerFrame()
         return
     end
 
+    if self.blocked or self:IsBlockedByDB() then
+        return
+    end
+
     local f = CreateFrame("Frame")
-
     f:Hide()
-
     f:SetScript("OnUpdate", function(_, elapsed)
         NSPauk_Moth:OnRespawnTimer(elapsed)
     end)
-
     self.timerFrame = f
 end
 
 function NSPauk_Moth:ScheduleRespawn()
+    if self.blocked or self:IsBlockedByDB() then
+        self:CancelRespawn()
+        return
+    end
+
     local min = self.cfg.RESPAWN_MIN_SECONDS or (10 * 60)
     local max = self.cfg.RESPAWN_MAX_SECONDS or (30 * 60)
-
     if max < min then
         max = min
     end
 
     self.respawnRemaining = math.random(min, max)
-
     self:EnsureTimerFrame()
 
     if self.timerFrame then
@@ -24451,16 +24455,19 @@ function NSPauk_Moth:CancelRespawn()
 end
 
 function NSPauk_Moth:OnRespawnTimer(dt)
+    if self.blocked or self:IsBlockedByDB() then
+        self:CancelRespawn()
+        return
+    end
+
     if not self.respawnRemaining then
         if self.timerFrame then
             self.timerFrame:Hide()
         end
-
         return
     end
 
     self.respawnRemaining = self.respawnRemaining - dt
-
     if self.respawnRemaining <= 0 then
         self:Respawn()
     end
@@ -24538,6 +24545,11 @@ function NSPauk_Moth:ResetState()
 end
 
 function NSPauk_Moth:Init()
+    if self.blocked or self:IsBlockedByDB() then
+        self.blocked = true
+        return
+    end
+
     if self.destroyed then
         return
     end
@@ -24547,12 +24559,16 @@ function NSPauk_Moth:Init()
     end
 
     self.state = self.state or {}
-
     self.stuckInfo = self.stuckInfo or {
         stuck = false,
         x = 0,
         y = 0,
     }
+
+    if self.stuckInfo then
+        self.stuckInfo.destroyed = nil
+        self.stuckInfo.blocked = nil
+    end
 
     local shouldFreeze = self.freezeRequested or self.state.frozen
 
@@ -24561,7 +24577,6 @@ function NSPauk_Moth:Init()
 
     local sw, sh = self:ScreenSize()
     local s = self.state
-
     s.x = sw * 0.5
     s.y = sh * 0.5
 
@@ -24576,7 +24591,6 @@ function NSPauk_Moth:Init()
     end
 
     self.inited = true
-
     _G.NSPauk_Moth_StuckInfo = self.stuckInfo
 
     self:Place()
@@ -24596,6 +24610,13 @@ function NSPauk_Moth:Init()
 end
 
 function NSPauk_Moth:Destroy()
+    if self.blocked or self:IsBlockedByDB() then
+        if not self.blocked then
+            self:Block()
+        end
+        return
+    end
+
     if self.destroyed then
         return
     end
@@ -24605,25 +24626,8 @@ function NSPauk_Moth:Destroy()
     self.inited = false
 
     self:CancelRespawn()
+    self:TeardownWidgets(false)
 
-    if self.frame then
-        self.frame:EnableMouse(false)
-        self.frame:SetScript("OnUpdate", nil)
-        self.frame:SetScript("OnMouseDown", nil)
-        self.frame:Hide()
-        self.frame:ClearAllPoints()
-        self.frame = nil
-    end
-
-    if self.tex then
-        self.tex:SetTexture(nil)
-        self.tex:ClearAllPoints()
-        self.tex:Hide()
-        self.tex = nil
-    end
-
-    self.tex1 = nil
-    self.tex2 = nil
     self.lastWebInfo = nil
     self.lastStuckInfo = nil
 
@@ -24631,19 +24635,13 @@ function NSPauk_Moth:Destroy()
         for k in pairs(self.stuckInfo) do
             self.stuckInfo[k] = nil
         end
-
         self.stuckInfo.destroyed = true
         self.stuckInfo.stuck = false
-    end
-
-    if _G.NSPauk_MothFrame then
-        _G.NSPauk_MothFrame = nil
     end
 
     _G.NSPauk_Moth_StuckInfo = self.stuckInfo
 
     self:ResetState()
-
     self.state.frozen = true
     self.state.destroyed = true
 
@@ -24652,6 +24650,10 @@ end
 
 function NSPauk_Moth:Respawn()
     self:CancelRespawn()
+
+    if self.blocked or self:IsBlockedByDB() then
+        return
+    end
 
     if not self.destroyed and self.inited then
         return
@@ -24667,7 +24669,6 @@ function NSPauk_Moth:Respawn()
     end
 
     self.inited = false
-
     self:Init()
 end
 
@@ -24676,13 +24677,12 @@ end
 ---------------------------------------------------------------------------
 
 function NSPauk_Moth:Show()
-    if self.destroyed then
+    if self.destroyed or self.blocked or self:IsBlockedByDB() then
         return
     end
 
     if not self.inited then
         self:Init()
-
         return
     end
 
@@ -24714,6 +24714,149 @@ function NSPauk_Moth:Toggle()
         self:Hide()
     elseif not self.state.dead then
         self:Show()
+    end
+end
+
+---------------------------------------------------------------------------
+-- Persistent block via nsDbc
+---------------------------------------------------------------------------
+function NSPauk_Moth:EnsureDb()
+    if type(_G.nsDbc) ~= "table" then
+        _G.nsDbc = {}
+    end
+    return _G.nsDbc
+end
+
+function NSPauk_Moth:IsBlockedByDB()
+    local db = _G.nsDbc
+    if type(db) ~= "table" then
+        return false
+    end
+
+    local moth = db.moth
+    if moth == nil or moth == false then
+        return false
+    end
+
+    if type(moth) == "table" then
+        return moth.blocked ~= false
+    end
+
+    return true
+end
+
+function NSPauk_Moth:SetBlockedDB(value)
+    local db = self:EnsureDb()
+    if value then
+        db.moth = {
+            blocked = true,
+            time = GetTime and GetTime() or 0,
+        }
+    else
+        db.moth = nil
+    end
+end
+
+function NSPauk_Moth:TeardownWidgets(removeBootstrap)
+    self:CancelRespawn()
+
+    if self.timerFrame then
+        self.timerFrame:SetScript("OnUpdate", nil)
+        self.timerFrame:Hide()
+        self.timerFrame = nil
+    end
+
+    if self.frame then
+        self.frame:EnableMouse(false)
+        self.frame:SetScript("OnUpdate", nil)
+        self.frame:SetScript("OnMouseDown", nil)
+        self.frame:Hide()
+        self.frame:ClearAllPoints()
+        self.frame = nil
+    end
+
+    if self.tex then
+        self.tex:SetTexture(nil)
+        self.tex:ClearAllPoints()
+        self.tex:Hide()
+        self.tex = nil
+    end
+
+    self.tex1 = nil
+    self.tex2 = nil
+
+    if removeBootstrap and self.bootstrap then
+        if self.bootstrap.UnregisterEvent then
+            self.bootstrap:UnregisterEvent("PLAYER_LOGIN")
+        end
+        self.bootstrap:Hide()
+        self.bootstrap = nil
+    end
+
+    if _G.NSPauk_MothFrame then
+        _G.NSPauk_MothFrame = nil
+    end
+end
+
+function NSPauk_Moth:Block()
+    self.blocked = true
+    self.freezeRequested = false
+    self.destroyed = true
+    self.inited = false
+
+    self:TeardownWidgets(true)
+
+    self.lastWebInfo = nil
+    self.lastStuckInfo = nil
+
+    if self.stuckInfo then
+        for k in pairs(self.stuckInfo) do
+            self.stuckInfo[k] = nil
+        end
+        self.stuckInfo.destroyed = true
+        self.stuckInfo.blocked = true
+        self.stuckInfo.stuck = false
+    end
+
+    self:ResetState()
+    self.state.frozen = true
+    self.state.destroyed = true
+
+    _G.NSPauk_Moth_StuckInfo = self.stuckInfo
+end
+
+function NSPauk_Moth:Unblock()
+    self.blocked = false
+    self.freezeRequested = false
+    self.destroyed = false
+    self.inited = false
+
+    if self.state then
+        self.state.frozen = false
+        self.state.destroyed = false
+        self.state.dead = false
+    end
+
+    if self.stuckInfo then
+        for k in pairs(self.stuckInfo) do
+            self.stuckInfo[k] = nil
+        end
+        self.stuckInfo.stuck = false
+        self.stuckInfo.x = 0
+        self.stuckInfo.y = 0
+    end
+
+    _G.NSPauk_Moth_StuckInfo = self.stuckInfo
+    self:Init()
+end
+
+function NSPauk_Moth:ToggleBlocked()
+    if self:IsBlockedByDB() then
+        self:SetBlockedDB(false)
+        self:Unblock()
+    else
+        self:SetBlockedDB(true)
+        self:Block()
     end
 end
 
@@ -25030,21 +25173,33 @@ function NSPauk_Moth:OnUpdate(dt)
 end
 
 ---------------------------------------------------------------------------
--- Bootstrap
+-- Bootstrap + /nsmothblock
 ---------------------------------------------------------------------------
+if type(SlashCmdList) == "table" then
+    _G.SLASH_NSPAUKMOTHBLOCK1 = "/nsmothblock"
+    SlashCmdList["NSPAUKMOTHBLOCK"] = function(msg)
+        NSPauk_Moth:ToggleBlocked()
+    end
+end
 
-local bootstrap = CreateFrame("Frame")
+if NSPauk_Moth:IsBlockedByDB() then
+    NSPauk_Moth:Block()
+else
+    local bootstrap = CreateFrame("Frame")
+    NSPauk_Moth.bootstrap = bootstrap
 
-NSPauk_Moth.bootstrap = bootstrap
+    bootstrap:RegisterEvent("PLAYER_LOGIN")
+    bootstrap:SetScript("OnEvent", function()
+        if NSPauk_Moth:IsBlockedByDB() then
+            NSPauk_Moth:Block()
+        else
+            NSPauk_Moth:Init()
+        end
+    end)
 
-bootstrap:RegisterEvent("PLAYER_LOGIN")
-
-bootstrap:SetScript("OnEvent", function()
-    NSPauk_Moth:Init()
-end)
-
-if IsLoggedIn and IsLoggedIn() then
-    NSPauk_Moth:Init()
+    if IsLoggedIn and IsLoggedIn() then
+        NSPauk_Moth:Init()
+    end
 end
 
 ---------------------------------------------------------------------------
