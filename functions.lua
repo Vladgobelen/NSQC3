@@ -7541,6 +7541,140 @@ function NSPauk:CollectTargetCandidates(hub, items)
     return self:Shuffle(pool)
 end
 
+function NSPauk:NP_CanReviveRingConn(inst, conn)
+    if not inst or not conn then
+        return false
+    end
+
+    if conn.alive then
+        return false
+    end
+
+    if not self:ValidateAnchorRect(inst.hub.rect) then
+        return false
+    end
+
+    if conn.ringStartRect then
+        if not self:ValidateAnchorRect(conn.ringStartRect) then
+            return false
+        end
+    end
+
+    if conn.isSpoke
+        and inst.isNaturalRing
+        and inst.hubDepConn
+        and not inst.hubDepConn.alive then
+        return false
+    end
+
+    if conn.isDiameterHalf
+        and conn.hubDepConn
+        and not conn.hubDepConn.alive then
+        return false
+    end
+
+    if conn.isMidSpoke then
+        if conn.perimeterConn and not conn.perimeterConn.alive then
+            return false
+        end
+
+        return true
+    end
+
+    if conn.target and conn.target.rect then
+        return self:ValidateAnchorRect(conn.target.rect)
+    end
+
+    return false
+end
+
+function NSPauk:NP_AreRingMainsDrawn(inst)
+    if not inst or not inst.conns then
+        return false
+    end
+
+    local anyAlive = false
+
+    for _, conn in ipairs(inst.conns) do
+        if conn.alive then
+            anyAlive = true
+
+            if not self:NP_IsWebOwnerDrawn(conn) then
+                return false
+            end
+        end
+    end
+
+    return anyAlive
+end
+
+function NSPauk:NP_RepairRingDeadOwners(inst)
+    if not inst or not inst.isNaturalRing or inst.torn then
+        return false
+    end
+
+    local changed = false
+    local priorityOwner = nil
+
+    -- Сначала воскрешаем основные нити.
+    for _, conn in ipairs(inst.conns or {}) do
+        if not conn.alive and self:NP_CanReviveRingConn(inst, conn) then
+            conn.alive = true
+
+            if not conn.textures then
+                conn.textures = {}
+            end
+
+            conn._nspRepaired = true
+            changed = true
+
+            if not priorityOwner then
+                priorityOwner = conn
+            end
+        end
+    end
+
+    -- После воскрешения нитей пересчитываем валидные сектора.
+    local sectors = self:NP_GetValidTriangleSectors(inst)
+    local validKeys = {}
+
+    for _, sector in ipairs(sectors or {}) do
+        validKeys[sector.key] = true
+    end
+
+    -- Теперь воскрешаем мёртвые перемычки, если их нити живы
+    -- и сектор снова существует.
+    for _, seg in ipairs(inst.crossSegs or {}) do
+        if not seg.alive
+            and seg.connA
+            and seg.connB
+            and seg.connA.alive
+            and seg.connB.alive then
+
+            if seg.planSectorKey and validKeys[seg.planSectorKey] then
+                seg.alive = true
+
+                if not seg.textures then
+                    seg.textures = {}
+                end
+
+                seg._nspRepaired = true
+                changed = true
+
+                if not priorityOwner then
+                    priorityOwner = seg
+                end
+            end
+        end
+    end
+
+    if changed then
+        self:NP_RequestQueueResume(inst, priorityOwner)
+    end
+
+    return changed
+end
+
 function NSPauk:ValidateAnchorRect(rect)
     if not rect then
         return false
@@ -7628,6 +7762,13 @@ function NSPauk:ValidateConnection(inst, conn)
         and inst.isNaturalRing
         and inst.hubDepConn
         and not inst.hubDepConn.alive then
+        self:KillConnection(inst, conn)
+        return false
+    end
+
+    if conn.isDiameterHalf
+        and conn.hubDepConn
+        and not conn.hubDepConn.alive then
         self:KillConnection(inst, conn)
         return false
     end
@@ -10958,36 +11099,36 @@ function NSPauk:NP_PostUpdate()
     end
 
     if S.phase == "task" or S.phase == "instanceComplete" then
-        local inst = S.currentInstance
+        local now = GetTime()
+        local ringInst = S.currentInstance
 
-        local activeDrag = S.nspDrag
-            and S.currentTask
-            and S.currentTask.nspDuringDrag
+        if ringInst
+            and ringInst.isNaturalRing
+            and not ringInst.torn
+            and not S.nspDrag
+            and not S.nspQueueRebuildRunning then
 
-        if inst
-            and inst.isNaturalRing
-            and not inst.torn
-            and not activeDrag
-            and not S.nspQueueRebuildRunning
-            and (inst.nspRingCrossQueueDirty or S.nspRingQueueRebuildPending)
-            and self:NP_AreRingMainsDrawn(inst) then
+            if type(S.nspRingRepairAt) ~= "number"
+                or (now - S.nspRingRepairAt) >= 1.0 then
 
-            S.nspRingQueueRebuildPending = false
+                S.nspRingRepairAt = now
 
-            local priority = S.nspRingQueuePriority
-            S.nspRingQueuePriority = nil
+                self:NP_RepairRingDeadOwners(ringInst)
 
-            self:NP_RebuildRingCrossQueue(inst, priority)
+                if self:NP_AreRingMainsDrawn(ringInst) then
+                    self:NP_RecheckWebSectors(ringInst)
+                end
+            end
         end
 
         if S.nspSectorRecheckPending then
             S.nspSectorRecheckPending = false
 
-            local recheckInst = S.nspSectorRecheckInst or S.currentInstance
+            local inst = S.nspSectorRecheckInst or S.currentInstance
             S.nspSectorRecheckInst = nil
 
-            if recheckInst and recheckInst == S.currentInstance then
-                self:NP_RecheckWebSectors(recheckInst)
+            if inst and inst == S.currentInstance then
+                self:NP_RecheckWebSectors(inst)
             end
         end
 
@@ -10996,15 +11137,11 @@ function NSPauk:NP_PostUpdate()
         end
 
         if S.phase == "instanceComplete" and not S.nspQueueResumePending then
-            local pendingInst = S.currentInstance
+            local inst = S.currentInstance
 
-            if pendingInst
-                and not pendingInst.torn
-                and not pendingInst.isCocoon
-                and not pendingInst.isMoth then
-
-                if self:NP_HasRequiredWebPending(pendingInst) then
-                    self:NP_RequestQueueResume(pendingInst, nil)
+            if inst and not inst.torn and not inst.isCocoon and not inst.isMoth then
+                if self:NP_HasRequiredWebPending(inst) then
+                    self:NP_RequestQueueResume(inst, nil)
                     self:NP_ProcessQueueResume()
                 end
             end
@@ -12227,7 +12364,6 @@ function NSPauk:CreateRingInstance(targetCount, items)
     inst.conns[#inst.conns + 1] = diamConn
     inst.hubDepConn = diamConn
 
-    -- Спицы от хаба к углам.
     for i = 1, N do
         local anchor = anchors[i]
 
@@ -12273,66 +12409,51 @@ function NSPauk:CreateRingInstance(targetCount, items)
         inst.conns[#inst.conns + 1] = conn
     end
 
-    -- Промежуточные спицы от хаба к точкам на внешних линиях.
-    -- Количество точек на каждой внешней линии выбирается рандомно
-    -- в зависимости от TARGET_COUNT_MIN / TARGET_COUNT_MAX.
-    local intermediateCounts = self:NP_ChooseRingIntermediateCounts(N)
-
     for i = 1, N do
         local pThread = perimeterThreads[i]
         local perConn = perimeterConns[i]
 
-        local count = intermediateCounts[i] or 1
+        local midX, midY = self:BzThread(pThread, 0.5)
 
-        if count < 1 then
-            count = 1
+        local thread = self:NP_MakeGravityThread(
+            { x = hx, y = hy },
+            { x = midX, y = midY },
+            "cross",
+            0.35
+        )
+
+        local angle = math.atan2(midY - hy, midX - hx)
+
+        if angle < 0 then
+            angle = angle + 2 * math.pi
         end
 
-        for k = 1, count do
-            local t = k / (count + 1)
+        thread.angle = angle
 
-            local midX, midY = self:BzThread(pThread, t)
+        local conn = {
+            id = #inst.conns + 1,
+            target = {
+                frame = nil,
+                name = "MidPerimeter",
+                rect = nil,
+            },
+            ringStartRect = self:CopyRect(hubRect),
+            thread = thread,
+            angle = angle,
+            textures = {},
+            alive = true,
+            isSpoke = true,
+            isMidSpoke = true,
+            hubDepConn = diamConn,
+            perimeterConn = perConn,
+        }
 
-            local thread = self:NP_MakeGravityThread(
-                { x = hx, y = hy },
-                { x = midX, y = midY },
-                "cross",
-                0.35
-            )
+        thread.ownerRef = {
+            inst = inst,
+            conn = conn,
+        }
 
-            local angle = math.atan2(midY - hy, midX - hx)
-
-            if angle < 0 then
-                angle = angle + 2 * math.pi
-            end
-
-            thread.angle = angle
-
-            local conn = {
-                id = #inst.conns + 1,
-                target = {
-                    frame = nil,
-                    name = "MidPerimeter",
-                    rect = nil,
-                },
-                ringStartRect = self:CopyRect(hubRect),
-                thread = thread,
-                angle = angle,
-                textures = {},
-                alive = true,
-                isSpoke = true,
-                isMidSpoke = true,
-                perimeterConn = perConn,
-                hubDepConn = diamConn,
-            }
-
-            thread.ownerRef = {
-                inst = inst,
-                conn = conn,
-            }
-
-            inst.conns[#inst.conns + 1] = conn
-        end
+        inst.conns[#inst.conns + 1] = conn
     end
 
     self:BuildInstanceTasks(inst)
@@ -18973,21 +19094,13 @@ end
 
 function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     local S = self.S
-
     if not inst or inst.torn then
         return nil
     end
 
-    if inst.isNaturalRing
-        and type(self.NP_NormalizeRingCrossSegs) == "function" then
-        self:NP_NormalizeRingCrossSegs(inst)
-    end
-
     local tasks = {}
     local added = {}
-
     local cursor = nil
-
     if S.spider and S.spider:IsShown() then
         cursor = {
             x = S.lastSpiderX or 0,
@@ -18995,13 +19108,19 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         }
     end
 
-    local spacing = tonumber(self.C.CROSS_ROW_SPACING) or 20
-    if spacing < 0.5 then
-        spacing = 0.5
+    local function safeNumber(value, default)
+        value = tonumber(value)
+        if type(value) ~= "number" or value ~= value then
+            return default
+        end
+        return value
     end
 
     local function isDrawn(owner)
-        return self:NP_IsWebOwnerDrawn(owner)
+        return owner
+            and owner.alive
+            and owner.textures
+            and #owner.textures > 0
     end
 
     local function isScheduled(owner)
@@ -19012,25 +19131,12 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         if not owner or not owner.alive then
             return false
         end
-
-        if owner.isDiameterHalf then
-            local dep = owner.hubDepConn or inst.hubDepConn
-
-            if not dep or not dep.alive then
-                return false
-            end
-
-            return isDrawn(dep) or isScheduled(dep)
-        end
-
         if isDrawn(owner) then
             return true
         end
-
         if isScheduled(owner) then
             return true
         end
-
         return false
     end
 
@@ -19038,7 +19144,6 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         if not owner or not owner.alive then
             return
         end
-
         if self.NP_KillOwnerHard then
             self:NP_KillOwnerHard(owner)
         else
@@ -19046,29 +19151,8 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         end
     end
 
-    local function killDuplicate(seg)
-        if not seg or not seg.alive then
-            return
-        end
-
-        if isDrawn(seg) then
-            return
-        end
-
-        seg.alive = false
-
-        if seg.textures and #seg.textures > 0 then
-            self:StartLocalFade(seg.textures, self.C.TEAR_FADE_DURATION)
-            seg.textures = {}
-        end
-    end
-
     local function addOwner(owner, thread, isMain)
         if not owner then
-            return false
-        end
-
-        if owner.isDiameterHalf then
             return false
         end
 
@@ -19122,7 +19206,6 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         end
 
         local task = self:AddThreadTask(tasks, owner, thread)
-
         if not task then
             killOwner(owner)
             return false
@@ -19133,24 +19216,31 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         end
 
         added[owner] = true
-
         cursor = {
             x = thread.p2.x,
             y = thread.p2.y,
         }
-
         return true
     end
 
-    for _, conn in ipairs(inst.conns or {}) do
-        if conn.isDiameterHalf then
-            if conn.alive
-                and (not conn.hubDepConn or not conn.hubDepConn.alive) then
-                killOwner(conn)
-            end
-        elseif conn.alive and not isDrawn(conn) then
-            local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
+    -- Если приоритетом является основная нить, начинаем с неё.
+    if priorityOwner
+        and priorityOwner.alive
+        and not isDrawn(priorityOwner)
+        and not added[priorityOwner]
+        and priorityOwner.target
+        and not priorityOwner.connA
+        and not priorityOwner.connB
+        and not priorityOwner.isInterCross then
+        local drawThread = self:MakeTopDownDrawThread(priorityOwner.thread, cursor)
+        if drawThread then
+            addOwner(priorityOwner, drawThread, true)
+        end
+    end
 
+    for _, conn in ipairs(inst.conns or {}) do
+        if conn.alive and not isDrawn(conn) then
+            local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
             if drawThread then
                 addOwner(conn, drawThread, true)
             else
@@ -19159,9 +19249,7 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         elseif not conn.alive and conn._nspMothInterrupted then
             conn.alive = true
             conn._nspMothInterrupted = nil
-
             local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
-
             if drawThread then
                 addOwner(conn, drawThread, true)
             else
@@ -19175,16 +19263,13 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         and not isDrawn(priorityOwner)
         and not added[priorityOwner]
         and (priorityOwner.connA or priorityOwner.connB or priorityOwner.isInterCross) then
-
         local drawThread =
             self:NP_OrientThreadForCursor(priorityOwner.thread, cursor)
             or priorityOwner.thread
-
         addOwner(priorityOwner, drawThread, false)
     end
 
     local segs = {}
-
     for _, seg in ipairs(inst.crossSegs or {}) do
         if not seg.isInterCross
             and seg.alive
@@ -19195,82 +19280,73 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     end
 
     if inst.isNaturalRing then
-        local angleCache = {}
+        -- Кольцевая паутина:
+        -- сначала рисуем кольцо на минимальном радиусе,
+        -- по одной перемычке в каждом секторе,
+        -- затем следующее кольцо и так далее.
+        local entries = {}
 
-        local function segAngle(seg)
-            local ang = angleCache[seg]
-
-            if not ang then
-                ang = self:NP_GetCrossSegSortAngle(seg)
-                angleCache[seg] = ang
+        for i, seg in ipairs(segs) do
+            local arc = safeNumber(seg.planArcLen, nil)
+            if arc == nil then
+                arc = safeNumber(seg.recheckArcLen, math.huge)
             end
 
-            return ang
+            local ang = 0
+            if type(self.NP_GetCrossSegSortAngle) == "function" then
+                ang = safeNumber(self:NP_GetCrossSegSortAngle(seg), 0)
+            end
+
+            entries[i] = {
+                seg = seg,
+                arc = arc,
+                ang = ang,
+                key = seg.planSectorKey or "",
+                t = safeNumber(seg.t, 0),
+            }
         end
 
-        table.sort(segs, function(a, b)
-            local aa = tonumber(a.planArcLen) or 0
-            local bb = tonumber(b.planArcLen) or 0
-
-            if aa ~= bb then
-                return aa < bb
+        table.sort(entries, function(a, b)
+            if a.arc ~= b.arc then
+                return a.arc < b.arc
             end
 
-            local angA = segAngle(a)
-            local angB = segAngle(b)
-
-            if angA ~= angB then
-                return angA < angB
+            if a.ang ~= b.ang then
+                return a.ang < b.ang
             end
 
-            local ka = a.planSectorKey or ""
-            local kb = b.planSectorKey or ""
+            if a.key ~= b.key then
+                return a.key < b.key
+            end
 
-            return ka < kb
+            return a.t < b.t
         end)
 
-        local seenCross = {}
-
-        for _, seg in ipairs(segs) do
-            local arc = tonumber(seg.planArcLen) or 0
-
-            local dedupeKey = string.format(
-                "%s@%.1f",
-                tostring(seg.planSectorKey or "?"),
-                arc
-            )
-
-            if not seenCross[dedupeKey] then
-                seenCross[dedupeKey] = true
-
-                local drawThread =
-                    self:NP_OrientThreadForCursor(seg.thread, cursor)
-                    or seg.thread
-
-                addOwner(seg, drawThread, false)
-            else
-                killDuplicate(seg)
-            end
+        for _, entry in ipairs(entries) do
+            local seg = entry.seg
+            local drawThread =
+                self:NP_OrientThreadForCursor(seg.thread, cursor)
+                or seg.thread
+            addOwner(seg, drawThread, false)
         end
     else
+        -- Обычная паутина: оставляем прежний порядок,
+        -- чтобы не ломать существующую логику секторов.
         table.sort(segs, function(a, b)
             local ka = a.planSectorKey or ""
             local kb = b.planSectorKey or ""
-
             if ka ~= kb then
                 return ka < kb
             end
 
             local aa = tonumber(a.planArcLen) or 0
             local bb = tonumber(b.planArcLen) or 0
-
             if aa ~= bb then
                 return aa < bb
             end
 
             local ta = tonumber(a.t) or 0
             local tb = tonumber(b.t) or 0
-
             return ta < tb
         end)
 
@@ -19278,19 +19354,16 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
             local drawThread =
                 self:NP_OrientThreadForCursor(seg.thread, cursor)
                 or seg.thread
-
             addOwner(seg, drawThread, false)
         end
     end
 
     self:CheckInstanceDead(inst)
-
     if inst.torn then
         return {}
     end
 
     inst.tasks = tasks
-
     return tasks
 end
 
