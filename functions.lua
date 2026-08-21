@@ -7634,35 +7634,34 @@ function NSPauk:NP_RepairRingDeadOwners(inst)
         end
     end
 
-    -- После воскрешения нитей пересчитываем валидные сектора.
-    local sectors = self:NP_GetValidTriangleSectors(inst)
-    local validKeys = {}
+    -- Перемычки можно чинить только когда все основные нити уже построены.
+    if self:NP_AreAllRingMainsBuilt(inst) then
+        local sectors = self:NP_GetValidTriangleSectors(inst)
+        local validKeys = {}
 
-    for _, sector in ipairs(sectors or {}) do
-        validKeys[sector.key] = true
-    end
+        for _, sector in ipairs(sectors or {}) do
+            validKeys[sector.key] = true
+        end
 
-    -- Теперь воскрешаем мёртвые перемычки, если их нити живы
-    -- и сектор снова существует.
-    for _, seg in ipairs(inst.crossSegs or {}) do
-        if not seg.alive
-            and seg.connA
-            and seg.connB
-            and seg.connA.alive
-            and seg.connB.alive then
+        for _, seg in ipairs(inst.crossSegs or {}) do
+            if not seg.alive
+                and seg.connA
+                and seg.connB
+                and seg.connA.alive
+                and seg.connB.alive then
+                if seg.planSectorKey and validKeys[seg.planSectorKey] then
+                    seg.alive = true
 
-            if seg.planSectorKey and validKeys[seg.planSectorKey] then
-                seg.alive = true
+                    if not seg.textures then
+                        seg.textures = {}
+                    end
 
-                if not seg.textures then
-                    seg.textures = {}
-                end
+                    seg._nspRepaired = true
+                    changed = true
 
-                seg._nspRepaired = true
-                changed = true
-
-                if not priorityOwner then
-                    priorityOwner = seg
+                    if not priorityOwner then
+                        priorityOwner = seg
+                    end
                 end
             end
         end
@@ -17898,14 +17897,13 @@ function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
         return false
     end
 
-    if not self:NP_AreRingMainsDrawn(inst) then
+    if not self:NP_AreAllRingMainsBuilt(inst) then
         return false
     end
 
     self:NP_NormalizeRingCrossSegs(inst)
 
     local priority = prioritySeg
-
     if priority
         and (not priority.alive or self:NP_IsWebOwnerDrawn(priority)) then
         priority = self:NP_FindRingPriorityReplacement(inst, priority)
@@ -17933,7 +17931,6 @@ function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
         end
 
         inst.nspRingCrossQueueDirty = false
-
         return true
     end
 
@@ -19131,12 +19128,15 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         if not owner or not owner.alive then
             return false
         end
+
         if isDrawn(owner) then
             return true
         end
+
         if isScheduled(owner) then
             return true
         end
+
         return false
     end
 
@@ -19144,6 +19144,7 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         if not owner or not owner.alive then
             return
         end
+
         if self.NP_KillOwnerHard then
             self:NP_KillOwnerHard(owner)
         else
@@ -19249,6 +19250,7 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         elseif not conn.alive and conn._nspMothInterrupted then
             conn.alive = true
             conn._nspMothInterrupted = nil
+
             local drawThread = self:MakeTopDownDrawThread(conn.thread, cursor)
             if drawThread then
                 addOwner(conn, drawThread, true)
@@ -19258,7 +19260,15 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
         end
     end
 
-    if priorityOwner
+    -- Для кольцевой паутины перемычки разрешены только после того,
+    -- как все основные нити кольца реально построены.
+    local ringCrossAllowed = true
+    if inst.isNaturalRing then
+        ringCrossAllowed = self:NP_AreAllRingMainsBuilt(inst)
+    end
+
+    if ringCrossAllowed
+        and priorityOwner
         and priorityOwner.alive
         and not isDrawn(priorityOwner)
         and not added[priorityOwner]
@@ -19270,12 +19280,14 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
     end
 
     local segs = {}
-    for _, seg in ipairs(inst.crossSegs or {}) do
-        if not seg.isInterCross
-            and seg.alive
-            and not isDrawn(seg)
-            and seg ~= priorityOwner then
-            segs[#segs + 1] = seg
+    if ringCrossAllowed then
+        for _, seg in ipairs(inst.crossSegs or {}) do
+            if not seg.isInterCross
+                and seg.alive
+                and not isDrawn(seg)
+                and seg ~= priorityOwner then
+                segs[#segs + 1] = seg
+            end
         end
     end
 
@@ -19365,6 +19377,28 @@ function NSPauk:NP_RebuildInstanceTasks(inst, priorityOwner)
 
     inst.tasks = tasks
     return tasks
+end
+
+function NSPauk:NP_AreAllRingMainsBuilt(inst)
+    if not inst or not inst.isNaturalRing or inst.torn then
+        return false
+    end
+
+    if type(inst.conns) ~= "table" or #inst.conns == 0 then
+        return false
+    end
+
+    for _, conn in ipairs(inst.conns) do
+        if not conn.alive then
+            return false
+        end
+
+        if not self:NP_IsWebOwnerDrawn(conn) then
+            return false
+        end
+    end
+
+    return true
 end
 
 function NSPauk:RestoreMothStateImmediate(saved)
