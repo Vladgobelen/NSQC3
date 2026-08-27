@@ -6656,7 +6656,7 @@ function NSPauk:HookChatFrames()
             cf:EnableMouse(true) -- Включаем обработку мыши для ScrollingMessageFrame
             cf:HookScript("OnEnter", function(self)
                 self._nspOldStrata = self:GetFrameStrata()
-                self:SetFrameStrata("TOOLTIP")
+                self:SetFrameStrata("FULLSCREEN")
             end)
             cf:HookScript("OnLeave", function(self)
                 if self._nspOldStrata then
@@ -6671,7 +6671,7 @@ function NSPauk:HookChatFrames()
             -- Для вкладок EnableMouse не нужен, они и так ловят мышь
             tab:HookScript("OnEnter", function(self)
                 self._nspOldStrata = self:GetFrameStrata()
-                self:SetFrameStrata("TOOLTIP")
+                self:SetFrameStrata("FULLSCREEN")
             end)
             tab:HookScript("OnLeave", function(self)
                 if self._nspOldStrata then
@@ -19881,7 +19881,7 @@ function NSPauk:CreateKillConfirmFrame()
     f:SetWidth(360)
     f:SetHeight(140)
     f:SetPoint("CENTER")
-    f:SetFrameStrata("TOOLTIP")
+    f:SetFrameStrata("DIALOG")
     f:SetFrameLevel(200)
     f:EnableMouse(true)
     f:SetMovable(true)
@@ -22681,11 +22681,11 @@ function NSPauk:Init()
         self[field] = f
         return f
     end
-    self.F_HIGH = prepareFrame("F_HIGH", C.ADDON .. "_WebHigh", "TOOLTIP", 100)
+    self.F_HIGH = prepareFrame("F_HIGH", C.ADDON .. "_WebHigh", "DIALOG", 100)
     S.activeFrame = self.F_HIGH
-    self.F_SPIDER = prepareFrame("F_SPIDER", C.ADDON .. "_SpiderHigh", "TOOLTIP", 101)
+    self.F_SPIDER = prepareFrame("F_SPIDER", C.ADDON .. "_SpiderHigh", "DIALOG", 101)
     S.spiderFrame = self.F_SPIDER
-    self.F_CLICK = prepareFrame("F_CLICK", C.ADDON .. "_ClickHigh", "TOOLTIP", 102)
+    self.F_CLICK = prepareFrame("F_CLICK", C.ADDON .. "_ClickHigh", "DIALOG", 102)
     S.clickFrame = self.F_CLICK
     if type(C.EXCLUDE_FRAMES) ~= "table" then
         C.EXCLUDE_FRAMES = {}
