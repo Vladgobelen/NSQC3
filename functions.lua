@@ -6653,6 +6653,7 @@ function NSPauk:HookChatFrames()
         local cf = _G["ChatFrame" .. i]
         if cf and not cf._nspChatHooked then
             cf._nspChatHooked = true
+            cf:EnableMouse(true) -- Включаем обработку мыши для ScrollingMessageFrame
             cf:HookScript("OnEnter", function(self)
                 self._nspOldStrata = self:GetFrameStrata()
                 self:SetFrameStrata("TOOLTIP")
@@ -6667,6 +6668,7 @@ function NSPauk:HookChatFrames()
         local tab = _G["ChatFrame" .. i .. "Tab"]
         if tab and not tab._nspChatHooked then
             tab._nspChatHooked = true
+            -- Для вкладок EnableMouse не нужен, они и так ловят мышь
             tab:HookScript("OnEnter", function(self)
                 self._nspOldStrata = self:GetFrameStrata()
                 self:SetFrameStrata("TOOLTIP")
@@ -25648,3 +25650,5 @@ if type(SlashCmdList) == "table" then
         NSPauk_Moth:Print("unknown command:", msg, "type /nsmoth help")
     end
 end
+
+
