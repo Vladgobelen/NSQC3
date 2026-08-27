@@ -19390,21 +19390,57 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
     if not inst or not inst.isNaturalRing or inst.torn then
         return false
     end
-
     if type(inst.conns) ~= "table" or #inst.conns == 0 then
         return false
     end
-
     for _, conn in ipairs(inst.conns) do
-        if not conn.alive then
-            return false
-        end
-
-        if not self:NP_IsWebOwnerDrawn(conn) then
-            return false
+        -- Пропускаем перемычки (у них есть connA/connB)
+        if not conn.connA and not conn.connB then
+            if conn.alive then
+                -- Нить жива — она должна быть нарисована
+                if not self:NP_IsWebOwnerDrawn(conn) then
+                    return false
+                end
+            else
+                -- Нить мертва. Проверяем, существуют ли её реальные привязки (якоря).
+                local hasValidAnchor = false
+                
+                -- Проверяем целевой фрейм (если он есть)
+                if conn.target and conn.target.rect and conn.target.rect.frame then
+                    if self:ValidateAnchorRect(conn.target.rect) then
+                        hasValidAnchor = true
+                    end
+                end
+                
+                -- Проверяем начальную точку кольца (если у неё есть фрейм)
+                if conn.ringStartRect and conn.ringStartRect.frame then
+                    if self:ValidateAnchorRect(conn.ringStartRect) then
+                        hasValidAnchor = true
+                    end
+                end
+                
+                -- Для обычных спиц: если диаметр жив, значит хаб существует
+                if conn.isSpoke and not conn.isMidSpoke then
+                    if conn.hubDepConn and conn.hubDepConn.alive then
+                        hasValidAnchor = true
+                    end
+                end
+                
+                -- Для средних спиц: если периметр жив, значит точка привязки существует
+                if conn.isMidSpoke then
+                    if conn.perimeterConn and conn.perimeterConn.alive then
+                        hasValidAnchor = true
+                    end
+                end
+                
+                if hasValidAnchor then
+                    -- Привязки существуют и не сдвинулись, но нить мертва — блокируем перемычки
+                    return false
+                end
+                -- Все привязки исчезли или сдвинулись — пропускаем эту нить, она не блокирует
+            end
         end
     end
-
     return true
 end
 
