@@ -6648,15 +6648,39 @@ function NSPauk:DisplayName(f)
     return "(" .. (pn or "?") .. ")"
 end
 
+function NSPauk:HookChatFrames()
+    for i = 1, 10 do
+        local cf = _G["ChatFrame" .. i]
+        if cf and not cf._nspChatHooked then
+            cf._nspChatHooked = true
+            cf:EnableMouse(true) -- Без этого OnEnter не сработает
+            
+            cf:HookScript("OnEnter", function(self)
+                self._nspOldStrata = self:GetFrameStrata()
+                self._nspOldLevel = self:GetFrameLevel()
+                self:SetFrameStrata("TOOLTIP")
+                self:SetFrameLevel(1000)
+            end)
+            
+            cf:HookScript("OnLeave", function(self)
+                if self._nspOldStrata then
+                    self:SetFrameStrata(self._nspOldStrata)
+                end
+                if self._nspOldLevel then
+                    self:SetFrameLevel(self._nspOldLevel)
+                end
+            end)
+        end
+    end
+end
+
 function NSPauk:NP_GetAnchorFamily(name)
     if type(name) ~= "string" or name == "" then
         return nil
     end
-
-    if name:find("^ChatFrame%d+$") then
+    if name:find("^ChatFrame") then
         return "ChatFrame"
     end
-
     return nil
 end
 
@@ -6664,78 +6688,54 @@ function NSPauk:NP_FindFamilyFrame(family, preferFrame)
     if family ~= "ChatFrame" then
         return preferFrame
     end
-
-    if preferFrame
-        and preferFrame.IsVisible
-        and preferFrame:IsVisible() then
-        return preferFrame
-    end
-
-    for i = 1, 10 do
-        local f = _G["ChatFrame" .. i]
-
-        if f
-            and f ~= preferFrame
-            and f.IsVisible
-            and f:IsVisible() then
-            return f
-        end
-    end
-
+    -- Для чатов всегда возвращаем исходный фрейм, чтобы проверять сдвиг именно его.
+    -- Прозрачность и видимость игнорируются в ComputeFrameVisibleRect для чатов.
     return preferFrame
 end
 
 function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     local C = self.C
-
     if not f or f == UIParent or f == WorldFrame then
         return nil
     end
-
     if self.F_HIGH and f == self.F_HIGH then
         return nil
     end
-
     local name = f.GetName and f:GetName()
-
     if name and C.EXCLUDE_FRAMES[name] then
         return nil
     end
-
-    if not f.IsVisible or not f:IsVisible() then
-        return nil
+    local isChat = false
+    if name and name:find("^ChatFrame") then
+        isChat = true
     end
-
-    local fa = self:EffAlpha(f)
-    if fa < 0.02 then
-        return nil
+    if not isChat then
+        if not f.IsVisible or not f:IsVisible() then
+            return nil
+        end
+        local fa = self:EffAlpha(f)
+        if fa < 0.02 then
+            return nil
+        end
     end
-
     if not uiScale then
         uiScale = self:EffScale(UIParent)
     end
-
     if not baseX then
         baseX = (UIParent.GetLeft and UIParent:GetLeft() or 0) * uiScale
     end
-
     if not baseY then
         baseY = (UIParent.GetBottom and UIParent:GetBottom() or 0) * uiScale
     end
-
     if not scrW then
         scrW = ((GetScreenWidth and GetScreenWidth()) or UIParent:GetWidth() or 1) * uiScale
     end
-
     if not scrH then
         scrH = ((GetScreenHeight and GetScreenHeight()) or UIParent:GetHeight() or 1) * uiScale
     end
-
     local fs = self:EffScale(f)
-
     local draws = false
     local ul, ur, ub, ut
-
     local function grow(l, r, b, t)
         if not ul then
             ul, ur, ub, ut = l, r, b, t
@@ -6753,50 +6753,48 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
                 ut = t
             end
         end
-
         draws = true
     end
 
-    if self:VisibleBackdrop(f) then
+    if isChat then
         local l, r, b, t = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
-
         if l and r and b and t then
             grow(l * fs, r * fs, b * fs, t * fs)
         end
-    end
-
-    local fallbackUsed = false
-
-    if f.GetRegions then
-        for _, region in ipairs({ f:GetRegions() }) do
-            if region.IsVisible and region:IsVisible() then
-                local kind = region:GetObjectType()
-                local ok = false
-
-                if kind == "Texture" then
-                    ok = self:VisibleTexture(region)
-                elseif kind == "FontString" then
-                    ok = self:VisibleText(region)
-                end
-
-                if ok then
-                    local l, r2, b, t
-
-                    if region.GetLeft then
-                        l = region:GetLeft()
-                        r2 = region:GetRight()
-                        b = region:GetBottom()
-                        t = region:GetTop()
+    else
+        if self:VisibleBackdrop(f) then
+            local l, r, b, t = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
+            if l and r and b and t then
+                grow(l * fs, r * fs, b * fs, t * fs)
+            end
+        end
+        local fallbackUsed = false
+        if f.GetRegions then
+            for _, region in ipairs({ f:GetRegions() }) do
+                if region.IsVisible and region:IsVisible() then
+                    local kind = region:GetObjectType()
+                    local ok = false
+                    if kind == "Texture" then
+                        ok = self:VisibleTexture(region)
+                    elseif kind == "FontString" then
+                        ok = self:VisibleText(region)
                     end
-
-                    if l and r2 and b and t then
-                        grow(l * fs, r2 * fs, b * fs, t * fs)
-                    elseif not fallbackUsed then
-                        local fl, fr, fb, ft = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
-
-                        if fl and fr and fb and ft then
-                            fallbackUsed = true
-                            grow(fl * fs, fr * fs, fb * fs, ft * fs)
+                    if ok then
+                        local l, r2, b, t
+                        if region.GetLeft then
+                            l = region:GetLeft()
+                            r2 = region:GetRight()
+                            b = region:GetBottom()
+                            t = region:GetTop()
+                        end
+                        if l and r2 and b and t then
+                            grow(l * fs, r2 * fs, b * fs, t * fs)
+                        elseif not fallbackUsed then
+                            local fl, fr, fb, ft = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
+                            if fl and fr and fb and ft then
+                                fallbackUsed = true
+                                grow(fl * fs, fr * fs, fb * fs, ft * fs)
+                            end
                         end
                     end
                 end
@@ -6807,21 +6805,16 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     if not draws then
         return nil
     end
-
     local w = ur - ul
     local h = ut - ub
-
     if w < C.MIN_ANCHOR_SIZE or h < C.MIN_ANCHOR_SIZE then
         return nil
     end
-
     if ur < baseX or ul > baseX + scrW or ut < baseY or ub > baseY + scrH then
         return nil
     end
-
     local rawName = self:DisplayName(f)
     local family = self:NP_GetAnchorFamily(rawName)
-
     return {
         name = family or rawName,
         family = family,
@@ -7678,32 +7671,31 @@ function NSPauk:ValidateAnchorRect(rect)
     if not rect then
         return false
     end
-
     if rect.webInst then
         return self:NP_IsWebAnchorAlive(rect)
     end
-
     if not rect.frame then
         return true
     end
-
     local frame = rect.frame
+    local isChat = false
+    if rect.family == "ChatFrame" then
+        isChat = true
+    elseif type(rect.name) == "string" and rect.name:find("^ChatFrame") then
+        isChat = true
+    end
 
-    if rect.family then
+    if rect.family and not isChat then
         local live = self:NP_FindFamilyFrame(rect.family, frame)
         if live then
             frame = live
         end
     end
-
     local S = self.S
     local now = GetTime()
     local tol = tonumber(self.C.MOVEMENT_TOLERANCE) or 2.0
-
     S.nspAnchorRectCache = S.nspAnchorRectCache or {}
-
     local entry = S.nspAnchorRectCache[frame]
-
     if entry
         and entry.rectLeft == rect.left
         and entry.rectRight == rect.right
@@ -7712,22 +7704,30 @@ function NSPauk:ValidateAnchorRect(rect)
         and (now - (entry.t or 0)) < 0.25 then
         return entry.ok
     end
-
     local cur = self:ComputeFrameVisibleInner(frame)
-
+    if not cur then
+        if isChat then
+            S.nspAnchorRectCache[frame] = {
+                t = now,
+                rectLeft = rect.left,
+                rectRight = rect.right,
+                rectBottom = rect.bottom,
+                rectTop = rect.top,
+                ok = true,
+            }
+            return true
+        end
+    end
     local ok = false
-
     if cur then
         ok = math.abs(cur.left - rect.left) <= tol
-            and math.abs(cur.right - rect.right) <= tol
-            and math.abs(cur.bottom - rect.bottom) <= tol
-            and math.abs(cur.top - rect.top) <= tol
+        and math.abs(cur.right - rect.right) <= tol
+        and math.abs(cur.bottom - rect.bottom) <= tol
+        and math.abs(cur.top - rect.top) <= tol
     end
-
     if ok and rect.family and frame ~= rect.frame then
         rect.frame = frame
     end
-
     S.nspAnchorRectCache[frame] = {
         t = now,
         rectLeft = rect.left,
@@ -7736,7 +7736,6 @@ function NSPauk:ValidateAnchorRect(rect)
         rectTop = rect.top,
         ok = ok,
     }
-
     return ok
 end
 
@@ -22639,22 +22638,17 @@ function NSPauk:Init()
     if self.initialized then
         return
     end
-
     if self:IsPersistentlyDisabled() then
         return
     end
-
     self.initialized = true
     self:LoadConstants()
-
     local C = self.C
     local S = self.S
-
     S.runtimeOff = false
     if S.phase == "off" then
         S.phase = "watch"
     end
-
     S.SW, S.SH = self:GetScreenSize()
     S.webAliveCount = 0
     S.limitReached = false
@@ -22662,67 +22656,53 @@ function NSPauk:Init()
     S.limitCocoonPending = false
     S.limitWaitTimer = 0
     S.limitHomePoint = nil
-
     local function prepareFrame(field, name, strata, level)
         local f = self[field]
-
         if not f and _G then
             f = _G[name]
         end
-
         if not f then
             f = CreateFrame("Frame", name, UIParent)
         end
-
         f:ClearAllPoints()
         f:SetAllPoints(UIParent)
         f:SetFrameStrata(strata)
         f:SetFrameLevel(level)
         f:EnableMouse(false)
         f:Show()
-
         self[field] = f
         return f
     end
-
     self.F_HIGH = prepareFrame("F_HIGH", C.ADDON .. "_WebHigh", "TOOLTIP", 100)
     S.activeFrame = self.F_HIGH
-
     self.F_SPIDER = prepareFrame("F_SPIDER", C.ADDON .. "_SpiderHigh", "TOOLTIP", 101)
     S.spiderFrame = self.F_SPIDER
-
     self.F_CLICK = prepareFrame("F_CLICK", C.ADDON .. "_ClickHigh", "TOOLTIP", 102)
     S.clickFrame = self.F_CLICK
-
     if type(C.EXCLUDE_FRAMES) ~= "table" then
         C.EXCLUDE_FRAMES = {}
     end
-
     C.EXCLUDE_FRAMES[C.ADDON .. "_WebHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_SpiderHigh"] = true
     C.EXCLUDE_FRAMES[C.ADDON .. "_ClickHigh"] = true
-
     self.F_HIGH:SetScript("OnUpdate", function(_, dt)
         NSPauk:OnUpdateGuarded(dt)
     end)
-
     if self.F_HIGH.HookScript and self.postUpdateHookedFrame ~= self.F_HIGH then
         self.F_HIGH:HookScript("OnUpdate", function()
             NSPauk:NP_PostUpdate()
         end)
         self.postUpdateHookedFrame = self.F_HIGH
     end
-
     if not self.eventFrame then
         self.eventFrame = CreateFrame("Frame")
     end
-
     self.eventFrame:RegisterEvent("PLAYER_LOGIN")
     self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-
     self.eventFrame:SetScript("OnEvent", function(_, event)
         NSPauk:OnEvent(event)
     end)
+    self:HookChatFrames()
 end
 
 NSPauk.Modes = {}
