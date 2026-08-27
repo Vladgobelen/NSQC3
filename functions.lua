@@ -6653,21 +6653,27 @@ function NSPauk:HookChatFrames()
         local cf = _G["ChatFrame" .. i]
         if cf and not cf._nspChatHooked then
             cf._nspChatHooked = true
-            cf:EnableMouse(true) -- Без этого OnEnter не сработает
-            
             cf:HookScript("OnEnter", function(self)
                 self._nspOldStrata = self:GetFrameStrata()
-                self._nspOldLevel = self:GetFrameLevel()
                 self:SetFrameStrata("TOOLTIP")
-                self:SetFrameLevel(1000)
             end)
-            
             cf:HookScript("OnLeave", function(self)
                 if self._nspOldStrata then
                     self:SetFrameStrata(self._nspOldStrata)
                 end
-                if self._nspOldLevel then
-                    self:SetFrameLevel(self._nspOldLevel)
+            end)
+        end
+
+        local tab = _G["ChatFrame" .. i .. "Tab"]
+        if tab and not tab._nspChatHooked then
+            tab._nspChatHooked = true
+            tab:HookScript("OnEnter", function(self)
+                self._nspOldStrata = self:GetFrameStrata()
+                self:SetFrameStrata("TOOLTIP")
+            end)
+            tab:HookScript("OnLeave", function(self)
+                if self._nspOldStrata then
+                    self:SetFrameStrata(self._nspOldStrata)
                 end
             end)
         end
