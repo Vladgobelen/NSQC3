@@ -6270,26 +6270,21 @@ function NSPauk:ShowProgress()
     local db = self:EnsureDB()
     local progress = db.progress
     local perLevel = C.POINTS_PER_LEVEL or 60000
-
     if type(perLevel) ~= "number" or perLevel ~= perLevel or perLevel <= 0 then
         perLevel = 60000
     end
-
     local total = progress.totalPoints or 0
     local level = math.floor(total / perLevel)
     local left = perLevel - (total % perLevel)
-
     if left == perLevel then
         left = 0
     end
-
     local currentThreads = 0
     if S.currentInstance and type(S.currentInstance.conns) == "table" then
         currentThreads = #S.currentInstance.conns
     end
-
     local session = S.session or { bestPoints = 0, bestExpAwarded = 0 }
-
+    
     -- 1. Уровень и прогресс
     self:SendOfficer(string.format(
         "Павук: уровень %d, всего милиметров %d, до уровня %d",
@@ -6297,6 +6292,29 @@ function NSPauk:ShowProgress()
         total,
         left
     ))
+
+    -- Текущая паутина и потенциальный опыт
+    local alivePoints = S.webAliveCount or 0
+    local burstPoints = S.sessionBurstPoints or 0
+    
+    local aliveExp, alivePct = self:CalcWebExperience(alivePoints)
+    local burstExp, burstPct = self:CalcWebExperience(burstPoints)
+
+    self:SendOfficer(string.format(
+        "Сплетено сейчас: %d точек (опыт: %d, %.2f%% уровня)",
+        alivePoints,
+        aliveExp or 0,
+        (alivePct or 0) * 100
+    ))
+    
+    if burstPoints > 0 and burstPoints ~= alivePoints then
+        self:SendOfficer(string.format(
+            "Накоплено в сессии: %d точек (опыт: %d, %.2f%% уровня)",
+            burstPoints,
+            burstExp or 0,
+            (burstPct or 0) * 100
+        ))
+    end
 
     -- 2. Краткая текущая статистика
     self:SendOfficer(string.format(
@@ -6308,38 +6326,31 @@ function NSPauk:ShowProgress()
         tostring(C.TARGET_COUNT_MAX),
         currentThreads
     ))
-
+    
     local descriptions = self.ConstantDescriptions
     local changed = {}
-
     for key, defValue in pairs(self.DefaultConstants) do
         if key ~= "SURVIVAL_CHANCE" then
             local label = nil
-
             if type(descriptions) == "table"
-                and type(descriptions[key]) == "string"
-                and descriptions[key] ~= "" then
+            and type(descriptions[key]) == "string"
+            and descriptions[key] ~= "" then
                 label = descriptions[key]
             end
-
             if label then
                 local curValue = C[key]
-
                 if type(curValue) == "number"
-                    and curValue == curValue
-                    and type(defValue) == "number"
-                    and defValue == defValue then
+                and curValue == curValue
+                and type(defValue) == "number"
+                and defValue == defValue then
                     local diff = curValue - defValue
-
                     if math.abs(diff) > 1e-9 then
                         local valueText
-
                         if type(self.FormatConstantValue) == "function" then
                             valueText = self:FormatConstantValue(key, curValue)
                         else
                             valueText = tostring(curValue)
                         end
-
                         changed[#changed + 1] = {
                             key = key,
                             text = label .. ": " .. valueText,
@@ -6349,19 +6360,15 @@ function NSPauk:ShowProgress()
             end
         end
     end
-
     table.sort(changed, function(a, b)
         return a.key < b.key
     end)
-
     if #changed > 0 then
         local prefix = "Павук: изменено: "
         local line = prefix
         local limit = 190
-
         for _, item in ipairs(changed) do
             local addition = item.text
-
             if line == prefix then
                 line = prefix .. addition
             else
@@ -6373,30 +6380,26 @@ function NSPauk:ShowProgress()
                 end
             end
         end
-
         if line ~= prefix then
             self:SendOfficer(line)
         end
     end
-
+    
     -- 4. Выживаемость паучка
     local survival = tonumber(C.SURVIVAL_CHANCE) or 0
-
     if type(survival) ~= "number" or survival ~= survival then
         survival = 0
     end
-
     if survival < 0 then
         survival = 0
     elseif survival > 1 then
         survival = 1
     end
-
     self:SendOfficer(string.format(
         "Выживаемость: %.1f%%",
         survival * 100
     ))
-
+    
     -- 5. Рекорд сессии и опыт за рекорды
     self:SendOfficer(string.format(
         "Рекорд сессии: %d милиметров, учтено опыта за рекорды: %d",
@@ -19394,50 +19397,54 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
         return false
     end
     for _, conn in ipairs(inst.conns) do
-        -- Пропускаем перемычки (у них есть connA/connB)
+        -- Проверяем только основные нити (у перемычек есть connA/connB)
         if not conn.connA and not conn.connB then
-            if conn.alive then
-                -- Нить жива — она должна быть нарисована
-                if not self:NP_IsWebOwnerDrawn(conn) then
-                    return false
-                end
-            else
-                -- Нить мертва. Проверяем, существуют ли её реальные привязки (якоря).
-                local hasValidAnchor = false
+            if not self:NP_IsWebOwnerDrawn(conn) then
+                local anchorAlive = false
                 
-                -- Проверяем целевой фрейм (если он есть)
-                if conn.target and conn.target.rect and conn.target.rect.frame then
-                    if self:ValidateAnchorRect(conn.target.rect) then
-                        hasValidAnchor = true
+                if conn.isRingFrame then
+                    -- ПЕРИМЕТР: жив, если ОБА конца на месте (и старт, и финиш)
+                    local startOk = not conn.ringStartRect or self:ValidateAnchorRect(conn.ringStartRect)
+                    local targetOk = not conn.target or not conn.target.rect or self:ValidateAnchorRect(conn.target.rect)
+                    if startOk and targetOk then
+                        anchorAlive = true
                     end
-                end
-                
-                -- Проверяем начальную точку кольца (если у неё есть фрейм)
-                if conn.ringStartRect and conn.ringStartRect.frame then
-                    if self:ValidateAnchorRect(conn.ringStartRect) then
-                        hasValidAnchor = true
+                    
+                elseif conn.isDiameter then
+                    -- ДИАМЕТР: жив, если хаб на месте И оба конца диаметра на месте
+                    local hubOk = not inst.hub or not inst.hub.rect or self:ValidateAnchorRect(inst.hub.rect)
+                    local startOk = not conn.ringStartRect or self:ValidateAnchorRect(conn.ringStartRect)
+                    local targetOk = not conn.target or not conn.target.rect or self:ValidateAnchorRect(conn.target.rect)
+                    if hubOk and startOk and targetOk then
+                        anchorAlive = true
                     end
-                end
-                
-                -- Для обычных спиц: если диаметр жив, значит хаб существует
-                if conn.isSpoke and not conn.isMidSpoke then
-                    if conn.hubDepConn and conn.hubDepConn.alive then
-                        hasValidAnchor = true
-                    end
-                end
-                
-                -- Для средних спиц: если периметр жив, значит точка привязки существует
-                if conn.isMidSpoke then
+                    
+                elseif conn.isMidSpoke then
+                    -- СРЕДНЯЯ СПИЦА: жива, если жив её периметр
                     if conn.perimeterConn and conn.perimeterConn.alive then
-                        hasValidAnchor = true
+                        anchorAlive = true
+                    end
+                    
+                elseif conn.isSpoke then
+                    -- ОБЫЧНАЯ СПИЦА: жива, если жив диаметр (их база)
+                    if conn.hubDepConn and conn.hubDepConn.alive then
+                        anchorAlive = true
+                    end
+                    
+                else
+                    -- ОБЫЧНАЯ НИТЬ: жива, если цель на месте
+                    if conn.target and conn.target.rect and self:ValidateAnchorRect(conn.target.rect) then
+                        anchorAlive = true
                     end
                 end
                 
-                if hasValidAnchor then
-                    -- Привязки существуют и не сдвинулись, но нить мертва — блокируем перемычки
+                -- Если якоря существуют, но нить не нарисована — блокируем перемычки,
+                -- пусть паук сначала восстановит/дорисует эту нить.
+                if anchorAlive then
                     return false
                 end
-                -- Все привязки исчезли или сдвинулись — пропускаем эту нить, она не блокирует
+                -- Если хотя бы один якорь исчез (как у Нити 4 из-за мертвого старта) — 
+                -- пропускаем эту нить, она не блокирует систему.
             end
         end
     end
@@ -19911,27 +19918,22 @@ function NSPauk:CreateKillConfirmFrame()
     if self.killConfirmFrame then
         return
     end
-
     local f = CreateFrame("Frame", "NSPauk_KillConfirmFrame", UIParent)
-
     f:SetWidth(360)
     f:SetHeight(140)
     f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
+    f:SetFrameStrata("TOOLTIP")
     f:SetFrameLevel(200)
     f:EnableMouse(true)
     f:SetMovable(true)
     f:SetClampedToScreen(true)
     f:RegisterForDrag("LeftButton")
-
     f:SetScript("OnDragStart", function(frame)
         frame:StartMoving()
     end)
-
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
     end)
-
     f:Hide()
 
     if type(UISpecialFrames) == "table" and f:GetName() then
@@ -19939,10 +19941,7 @@ function NSPauk:CreateKillConfirmFrame()
     end
 
     local function setColor(tex, r, g, b, a)
-        if not tex then
-            return
-        end
-
+        if not tex then return end
         if tex.SetColorTexture then
             tex:SetColorTexture(r, g, b, a or 1)
         else
@@ -19954,70 +19953,59 @@ function NSPauk:CreateKillConfirmFrame()
     local border = f:CreateTexture(nil, "BACKGROUND")
     border:SetAllPoints(f)
     setColor(border, 0.50, 0.20, 0.20, 1)
-
+    
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetDrawLayer("BACKGROUND", 1)
     bg:SetPoint("TOPLEFT", 2, -2)
     bg:SetPoint("BOTTOMRIGHT", -2, 2)
     setColor(bg, 0.10, 0.07, 0.07, 0.96)
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    -- GameFontHighlightLarge может отсутствовать в 3.3.5, используем GameFontNormalLarge
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -22)
     title:SetText("Убить паука?")
-
+    
     local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -8)
     sub:SetText("Это обнулит его прогресс.")
 
+    local baseLevel = f:GetFrameLevel()
+
     local yesBtn = CreateFrame("Button", nil, f)
+    yesBtn:SetFrameStrata("TOOLTIP")
+    yesBtn:SetFrameLevel(baseLevel + 10) -- ЯВНО ПОДНИМАЕМ КНОПКУ НАД ОКНОМ
     yesBtn:SetWidth(120)
     yesBtn:SetHeight(30)
     yesBtn:SetPoint("BOTTOMLEFT", 30, 18)
     yesBtn:EnableMouse(true)
-
     local yesBg = yesBtn:CreateTexture(nil, "BACKGROUND")
     yesBg:SetAllPoints(yesBtn)
     setColor(yesBg, 0.45, 0.14, 0.14, 1)
-
-    local yesText = yesBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local yesText = yesBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     yesText:SetPoint("CENTER")
     yesText:SetText("Да")
-
-    yesBtn:SetScript("OnEnter", function()
-        setColor(yesBg, 0.58, 0.20, 0.20, 1)
-    end)
-
-    yesBtn:SetScript("OnLeave", function()
-        setColor(yesBg, 0.45, 0.14, 0.14, 1)
-    end)
-
+    yesBtn:SetScript("OnEnter", function() setColor(yesBg, 0.58, 0.20, 0.20, 1) end)
+    yesBtn:SetScript("OnLeave", function() setColor(yesBg, 0.45, 0.14, 0.14, 1) end)
     yesBtn:SetScript("OnClick", function()
         self:HideKillConfirm()
         self:KillSpider("LeftButton")
     end)
 
     local noBtn = CreateFrame("Button", nil, f)
+    noBtn:SetFrameStrata("TOOLTIP")
+    noBtn:SetFrameLevel(baseLevel + 10) -- ЯВНО ПОДНИМАЕМ КНОПКУ НАД ОКНОМ
     noBtn:SetWidth(120)
     noBtn:SetHeight(30)
     noBtn:SetPoint("BOTTOMRIGHT", -30, 18)
     noBtn:EnableMouse(true)
-
     local noBg = noBtn:CreateTexture(nil, "BACKGROUND")
     noBg:SetAllPoints(noBtn)
     setColor(noBg, 0.16, 0.36, 0.18, 1)
-
-    local noText = noBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local noText = noBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     noText:SetPoint("CENTER")
     noText:SetText("Нет")
-
-    noBtn:SetScript("OnEnter", function()
-        setColor(noBg, 0.22, 0.48, 0.24, 1)
-    end)
-
-    noBtn:SetScript("OnLeave", function()
-        setColor(noBg, 0.16, 0.36, 0.18, 1)
-    end)
-
+    noBtn:SetScript("OnEnter", function() setColor(noBg, 0.22, 0.48, 0.24, 1) end)
+    noBtn:SetScript("OnLeave", function() setColor(noBg, 0.16, 0.36, 0.18, 1) end)
     noBtn:SetScript("OnClick", function()
         self:HideKillConfirm()
     end)
@@ -20027,15 +20015,39 @@ end
 
 function NSPauk:ShowKillConfirm()
     self:CreateKillConfirmFrame()
-
     if not self.killConfirmFrame then
         return
     end
-
+    
+    -- Отменяем предыдущий таймер, если окно показали повторно
+    if self.killConfirmTimerFrame then
+        self.killConfirmTimerFrame:Hide()
+        self.killConfirmTimerFrame = nil
+    end
+    
     self.killConfirmFrame:Show()
+    
+    -- Автозакрытие через 10 секунд через OnUpdate (так как C_Timer нет в 3.3.5)
+    local timerFrame = CreateFrame("Frame")
+    timerFrame.startTime = GetTime()
+    timerFrame:SetScript("OnUpdate", function(frame)
+        if GetTime() - frame.startTime >= 10 then
+            frame:Hide()
+            if self.killConfirmFrame and self.killConfirmFrame:IsShown() then
+                self:HideKillConfirm()
+            end
+        end
+    end)
+    self.killConfirmTimerFrame = timerFrame
 end
 
+
 function NSPauk:HideKillConfirm()
+    if self.killConfirmTimerFrame then
+        self.killConfirmTimerFrame:Hide()
+        self.killConfirmTimerFrame = nil
+    end
+    
     if self.killConfirmFrame then
         self.killConfirmFrame:Hide()
     end
