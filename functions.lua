@@ -5731,6 +5731,7 @@ NSPauk.DefaultConstants = {
     WEB_HUB_IGNORE_DIST = 100,
     WEB_TARGET_REROLL_ATTEMPTS = 8,
     SURVIVAL_CHANCE = 0,
+    WEB_OBJECT_MIN_DISTANCE = 100,
 }
 
 NSPauk.ConstantDescriptions = {
@@ -6072,7 +6073,14 @@ function NSPauk:LoadConstants()
     local db = self:EnsureDB()
     self.DB = db
     self.C = db.constants
+
     self:ApplyRuntimeConstants()
+
+    if type(self.C.WEB_OBJECT_MIN_DISTANCE) ~= "number"
+        or self.C.WEB_OBJECT_MIN_DISTANCE ~= self.C.WEB_OBJECT_MIN_DISTANCE
+        or self.C.WEB_OBJECT_MIN_DISTANCE < 0 then
+        self.C.WEB_OBJECT_MIN_DISTANCE = 100
+    end
 end
 
 function NSPauk:ResetConstants()
@@ -6080,6 +6088,7 @@ function NSPauk:ResetConstants()
     self.DB = db
 
     local constants = db.constants
+
     for key in pairs(constants) do
         constants[key] = nil
     end
@@ -6088,8 +6097,152 @@ function NSPauk:ResetConstants()
         constants[key] = value
     end
 
+    constants.WEB_OBJECT_MIN_DISTANCE = 100
+
     self.C = constants
+
     self:ApplyRuntimeConstants()
+end
+
+function NSPauk:NP_GetObjectMinDistance()
+    local v = tonumber(self.C.WEB_OBJECT_MIN_DISTANCE) or 100
+
+    if type(v) ~= "number" or v ~= v or v < 0 then
+        v = 100
+    end
+
+    return v
+end
+
+function NSPauk:NP_ObjectsTooClose(a, b)
+    if not a or not b then
+        return false
+    end
+
+    local minDist = self:NP_GetObjectMinDistance()
+
+    if minDist <= 0 then
+        return false
+    end
+
+    local ax = tonumber(a.cx) or 0
+    local ay = tonumber(a.cy) or 0
+    local bx = tonumber(b.cx) or 0
+    local by = tonumber(b.cy) or 0
+
+    local dx = ax - bx
+    local dy = ay - by
+
+    return (dx * dx + dy * dy) < (minDist * minDist)
+end
+
+function NSPauk:NP_CanBuildOwnerFast(inst, owner)
+    if not inst or inst.torn then
+        return false
+    end
+
+    if not owner or not owner.alive then
+        return false
+    end
+
+    -- Уже нарисовано — строить не нужно.
+    if self:NP_IsWebOwnerDrawn(owner) then
+        return false
+    end
+
+    if not owner.thread or not owner.thread.p0 or not owner.thread.p2 then
+        return false
+    end
+
+    -- Обычная основная нить.
+    if owner.target then
+        if inst.hub and inst.hub.rect then
+            if not self:ValidateAnchorRect(inst.hub.rect) then
+                return false
+            end
+        end
+
+        if owner.target.rect then
+            if not self:ValidateAnchorRect(owner.target.rect) then
+                return false
+            end
+        end
+
+        return true
+    end
+
+    -- Перемычка.
+    if owner.connA or owner.connB then
+        if owner.connA and not self:NP_IsWebOwnerDrawn(owner.connA) then
+            return false
+        end
+
+        if owner.connB and not self:NP_IsWebOwnerDrawn(owner.connB) then
+            return false
+        end
+
+        return true
+    end
+
+    return true
+end
+
+function NSPauk:NP_AppendOwnerTasksFast(inst, owner)
+    if not self:NP_CanBuildOwnerFast(inst, owner) then
+        return false
+    end
+
+    local S = self.S
+
+    local cursor = self:NP_GetSpiderPointIfShown()
+        or {
+            x = S.lastSpiderX or 0,
+            y = S.lastSpiderY or 0,
+        }
+
+    local drawThread = self:NP_OrientThreadForCursor(owner.thread, cursor)
+        or owner.thread
+
+    if not drawThread then
+        return false
+    end
+
+    local tasks = S.tasks
+
+    if type(tasks) ~= "table" then
+        tasks = {}
+        S.tasks = tasks
+    end
+
+    local travelConn = owner.connA or owner
+
+    self:AddTravelPointTask(
+        tasks,
+        cursor,
+        drawThread.p0,
+        travelConn,
+        owner
+    )
+
+    local task = self:AddThreadTask(tasks, owner, drawThread)
+
+    if not task then
+        return false
+    end
+
+    if owner.target and not owner.connA and not owner.connB then
+        task.isMain = true
+    end
+
+    if S.phase == "instanceComplete" then
+        S.phase = "task"
+        S.completeTimer = 0
+        self:AdvanceTask()
+    elseif not S.currentTask then
+        self:AdvanceTask()
+    end
+
+    return true
 end
 
 function NSPauk:ResetSessionRecord()
@@ -6704,49 +6857,68 @@ function NSPauk:NP_FindFamilyFrame(family, preferFrame)
     return preferFrame
 end
 
-function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
+function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH, ignoreSize)
     local C = self.C
+
+    if type(C) ~= "table" or type(C.MIN_ANCHOR_SIZE) ~= "number" then
+        self:LoadConstants()
+        C = self.C
+    end
+
     if not f or f == UIParent or f == WorldFrame then
         return nil
     end
+
     if self.F_HIGH and f == self.F_HIGH then
         return nil
     end
+
     local name = f.GetName and f:GetName()
-    if name and C.EXCLUDE_FRAMES[name] then
+
+    if name and type(C.EXCLUDE_FRAMES) == "table" and C.EXCLUDE_FRAMES[name] then
         return nil
     end
+
     local isChat = false
     if name and name:find("^ChatFrame") then
         isChat = true
     end
+
     if not isChat then
         if not f.IsVisible or not f:IsVisible() then
             return nil
         end
+
         local fa = self:EffAlpha(f)
         if fa < 0.02 then
             return nil
         end
     end
+
     if not uiScale then
         uiScale = self:EffScale(UIParent)
     end
+
     if not baseX then
         baseX = (UIParent.GetLeft and UIParent:GetLeft() or 0) * uiScale
     end
+
     if not baseY then
         baseY = (UIParent.GetBottom and UIParent:GetBottom() or 0) * uiScale
     end
+
     if not scrW then
         scrW = ((GetScreenWidth and GetScreenWidth()) or UIParent:GetWidth() or 1) * uiScale
     end
+
     if not scrH then
         scrH = ((GetScreenHeight and GetScreenHeight()) or UIParent:GetHeight() or 1) * uiScale
     end
+
     local fs = self:EffScale(f)
     local draws = false
     local ul, ur, ub, ut
+
     local function grow(l, r, b, t)
         if not ul then
             ul, ur, ub, ut = l, r, b, t
@@ -6779,25 +6951,31 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
                 grow(l * fs, r * fs, b * fs, t * fs)
             end
         end
+
         local fallbackUsed = false
+
         if f.GetRegions then
             for _, region in ipairs({ f:GetRegions() }) do
                 if region.IsVisible and region:IsVisible() then
                     local kind = region:GetObjectType()
                     local ok = false
+
                     if kind == "Texture" then
                         ok = self:VisibleTexture(region)
                     elseif kind == "FontString" then
                         ok = self:VisibleText(region)
                     end
+
                     if ok then
                         local l, r2, b, t
+
                         if region.GetLeft then
                             l = region:GetLeft()
                             r2 = region:GetRight()
                             b = region:GetBottom()
                             t = region:GetTop()
                         end
+
                         if l and r2 and b and t then
                             grow(l * fs, r2 * fs, b * fs, t * fs)
                         elseif not fallbackUsed then
@@ -6816,16 +6994,25 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     if not draws then
         return nil
     end
+
     local w = ur - ul
     local h = ut - ub
-    if w < C.MIN_ANCHOR_SIZE or h < C.MIN_ANCHOR_SIZE then
+
+    if w <= 0 or h <= 0 then
         return nil
     end
+
+    if not ignoreSize and (w < C.MIN_ANCHOR_SIZE or h < C.MIN_ANCHOR_SIZE) then
+        return nil
+    end
+
     if ur < baseX or ul > baseX + scrW or ut < baseY or ub > baseY + scrH then
         return nil
     end
+
     local rawName = self:DisplayName(f)
     local family = self:NP_GetAnchorFamily(rawName)
+
     return {
         name = family or rawName,
         family = family,
@@ -6838,14 +7025,25 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     }
 end
 
-function NSPauk:MakeInnerRect(r)
+function NSPauk:MakeInnerRect(r, ignoreSize)
     local C = self.C
+
+    if type(C) ~= "table" or type(C.MIN_ANCHOR_SIZE) ~= "number" then
+        self:LoadConstants()
+        C = self.C
+    end
 
     local w = r.right - r.left
     local h = r.top - r.bottom
 
-    if w < C.MIN_ANCHOR_SIZE or h < C.MIN_ANCHOR_SIZE then
+    if w <= 0 or h <= 0 then
         return nil
+    end
+
+    if not ignoreSize then
+        if w < C.MIN_ANCHOR_SIZE or h < C.MIN_ANCHOR_SIZE then
+            return nil
+        end
     end
 
     local ix = w * 0.10
@@ -6859,8 +7057,22 @@ function NSPauk:MakeInnerRect(r)
     local iw = right - left
     local ih = top - bottom
 
-    if iw < C.MIN_INNER_SIZE or ih < C.MIN_INNER_SIZE then
-        return nil
+    if ignoreSize then
+        -- Для режима "все видимые объекты" не отбрасываем мелкие фреймы.
+        -- Если внутренняя область слишком маленькая или выродилась,
+        -- используем весь прямоугольник фрейма.
+        if iw < 1 or ih < 1 then
+            left = r.left
+            right = r.right
+            bottom = r.bottom
+            top = r.top
+            iw = w
+            ih = h
+        end
+    else
+        if iw < C.MIN_INNER_SIZE or ih < C.MIN_INNER_SIZE then
+            return nil
+        end
     end
 
     return {
@@ -6877,7 +7089,11 @@ function NSPauk:MakeInnerRect(r)
     }
 end
 
-function NSPauk:ComputeFrameVisibleInner(frame)
+function NSPauk:ComputeFrameVisibleInner(frame, ignoreSize)
+    if type(ignoreSize) ~= "boolean" then
+        ignoreSize = true
+    end
+
     if type(self.C) ~= "table" or type(self.C.MIN_ANCHOR_SIZE) ~= "number" then
         self:LoadConstants()
     end
@@ -6905,7 +7121,7 @@ function NSPauk:ComputeFrameVisibleInner(frame)
             cy = sh / 2,
         }
 
-        local inner = self:MakeInnerRect(raw)
+        local inner = self:MakeInnerRect(raw, ignoreSize)
 
         if inner then
             inner.frame = UIParent
@@ -6915,12 +7131,21 @@ function NSPauk:ComputeFrameVisibleInner(frame)
         return inner
     end
 
-    local rect = self:ComputeFrameVisibleRect(frame)
+    local rect = self:ComputeFrameVisibleRect(
+        frame,
+        nil,
+        nil,
+        nil,
+        nil,
+        nil,
+        ignoreSize
+    )
+
     if not rect then
         return nil
     end
 
-    return self:MakeInnerRect(rect)
+    return self:MakeInnerRect(rect, ignoreSize)
 end
 
 function NSPauk:MakeUIParentCocoonItem()
@@ -7014,26 +7239,45 @@ function NSPauk:CollectCocoonCandidates(items, excludeActive)
     return pool
 end
 
-function NSPauk:CollectVisibleItems()
+function NSPauk:CollectVisibleItems(ignoreSize)
     local C = self.C
+
+    if type(C) ~= "table" then
+        self:LoadConstants()
+        C = self.C
+    end
 
     local items = {}
 
     local uiScale = self:EffScale(UIParent)
-
     local baseX = (UIParent.GetLeft and UIParent:GetLeft() or 0) * uiScale
     local baseY = (UIParent.GetBottom and UIParent:GetBottom() or 0) * uiScale
-
     local scrW = ((GetScreenWidth and GetScreenWidth()) or UIParent:GetWidth() or 1) * uiScale
     local scrH = ((GetScreenHeight and GetScreenHeight()) or UIParent:GetHeight() or 1) * uiScale
+
+    local maxRects = math.floor(tonumber(C.MAX_VISIBLE_RECTS) or 300)
+
+    -- Для обычной паутины в режиме "все видимые объекты"
+    -- поднимаем потолок, чтобы не терять кандидаты.
+    if ignoreSize then
+        maxRects = math.max(maxRects, 3000)
+    end
 
     local f = EnumerateFrames()
 
     while f do
-        local rect = self:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
+        local rect = self:ComputeFrameVisibleRect(
+            f,
+            uiScale,
+            baseX,
+            baseY,
+            scrW,
+            scrH,
+            ignoreSize
+        )
 
         if rect then
-            local inner = self:MakeInnerRect(rect)
+            local inner = self:MakeInnerRect(rect, ignoreSize)
 
             if inner then
                 inner.frame = f
@@ -7042,18 +7286,18 @@ function NSPauk:CollectVisibleItems()
             end
         end
 
-        if #items >= C.MAX_VISIBLE_RECTS then
+        if #items >= maxRects then
             break
         end
 
         f = EnumerateFrames(f)
     end
 
-    if #items < C.MAX_VISIBLE_RECTS then
+    if #items < maxRects then
         local webItems = self:NP_CollectWebAnchorItems()
 
         for _, item in ipairs(webItems) do
-            if #items >= C.MAX_VISIBLE_RECTS then
+            if #items >= maxRects then
                 break
             end
 
@@ -7397,25 +7641,34 @@ function NSPauk:PickWebHub(items)
         return nil
     end
 
-    local good = {}
+    local pool = {}
 
+    -- Берём все подходящие видимые объекты, не только "хорошие" имена.
     for _, item in ipairs(items) do
-        if not item.webInst
+        if item
             and item.frame
-            and self:IsGoodAnchorName(item.name) then
-            good[#good + 1] = item
+            and not item.webInst
+            and self:IsAcceptableWebObjectName(item.name) then
+            pool[#pool + 1] = item
         end
     end
 
-    local pool = good
-
+    -- Если по имени ничего не прошло, берём вообще все объекты с фреймом.
     if #pool == 0 then
-        pool = items
+        for _, item in ipairs(items) do
+            if item and item.frame and not item.webInst then
+                pool[#pool + 1] = item
+            end
+        end
     end
 
+    if #pool == 0 then
+        return nil
+    end
+
+    -- Иногда берём центральный хаб, иногда случайный.
     if math.random(1, 2) == 1 then
         local hub = self:PickCentralHub(pool)
-
         if hub then
             return hub
         end
@@ -7470,8 +7723,7 @@ function NSPauk:ChooseNextHub(inst)
 end
 
 function NSPauk:CollectTargetCandidates(hub, items)
-    local good = {}
-    local all = {}
+    local pool = {}
 
     local function sameAnchor(a, b)
         if not a or not b then
@@ -7523,26 +7775,132 @@ function NSPauk:CollectTargetCandidates(hub, items)
         return false
     end
 
-    for _, item in ipairs(items) do
-        if not sameAnchor(item, hub)
+    -- Основной пул: все видимые подходящие объекты, без фильтра по размеру.
+    for _, item in ipairs(items or {}) do
+        if item
+            and item.frame
+            and not item.webInst
+            and not sameAnchor(item, hub)
             and not isDynamicObject(item)
-            and not item.webInst then
+            and self:IsAcceptableWebObjectName(item.name) then
+            pool[#pool + 1] = { item = item }
+        end
+    end
 
-            all[#all + 1] = { item = item }
-
-            if self:IsGoodAnchorName(item.name) then
-                good[#good + 1] = { item = item }
+    -- Если по имени ничего не осталось, берём все оставшиеся объекты.
+    if #pool == 0 then
+        for _, item in ipairs(items or {}) do
+            if item
+                and item.frame
+                and not item.webInst
+                and not sameAnchor(item, hub)
+                and not isDynamicObject(item) then
+                pool[#pool + 1] = { item = item }
             end
         end
     end
 
-    local pool = good
+    return self:Shuffle(pool)
+end
 
-    if #pool == 0 then
-        pool = all
+function NSPauk:MakeRadialThreadAny(hubRect, targetRect)
+    if not hubRect or not targetRect then
+        return nil
     end
 
-    return self:Shuffle(pool)
+    local twoPi = math.pi * 2
+
+    -- Делаем несколько случайных попыток найти хоть какую-то нить.
+    -- Главное отличие от MakeRadialThread:
+    -- здесь нет требования MIN_WEB_GAP, поэтому подходят даже очень короткие цели.
+    for _ = 1, 12 do
+        local tx = (targetRect.cx or 0)
+            + (math.random() - 0.5) * (targetRect.width or 0) * 0.50
+
+        local ty = (targetRect.cy or 0)
+            + (math.random() - 0.5) * (targetRect.height or 0) * 0.50
+
+        local hx = (hubRect.cx or 0)
+            + (math.random() - 0.5) * (hubRect.width or 0) * 0.45
+
+        local hy = (hubRect.cy or 0)
+            + (math.random() - 0.5) * (hubRect.height or 0) * 0.45
+
+        local sx, sy = self:EdgePoint(hubRect, tx, ty)
+        local ex, ey = self:EdgePoint(targetRect, hx, hy)
+
+        local dx = ex - sx
+        local dy = ey - sy
+        local len = math.sqrt(dx * dx + dy * dy)
+
+        if len >= 0.5 then
+            local thread = {
+                p0 = { x = sx, y = sy },
+                p2 = { x = ex, y = ey },
+            }
+
+            self:MakeSag(thread, "main")
+
+            local ax = sx - (hubRect.cx or 0)
+            local ay = sy - (hubRect.cy or 0)
+
+            if ax == 0 and ay == 0 then
+                ax = (targetRect.cx or 0) - (hubRect.cx or 0)
+                ay = (targetRect.cy or 0) - (hubRect.cy or 0)
+            end
+
+            local angle = math.atan2(ay, ax)
+
+            if angle < 0 then
+                angle = angle + twoPi
+            end
+
+            thread.angle = angle
+
+            return thread
+        end
+    end
+
+    -- Запасной вариант: центр -> центр.
+    local sx, sy = self:EdgePoint(
+        hubRect,
+        targetRect.cx or 0,
+        targetRect.cy or 0
+    )
+
+    local ex, ey = self:EdgePoint(
+        targetRect,
+        hubRect.cx or 0,
+        hubRect.cy or 0
+    )
+
+    local dx = ex - sx
+    local dy = ey - sy
+    local len = math.sqrt(dx * dx + dy * dy)
+
+    if len < 0.5 then
+        return nil
+    end
+
+    local thread = {
+        p0 = { x = sx, y = sy },
+        p2 = { x = ex, y = ey },
+    }
+
+    self:MakeSag(thread, "main")
+
+    local angle = math.atan2(
+        (targetRect.cy or 0) - (hubRect.cy or 0),
+        (targetRect.cx or 0) - (hubRect.cx or 0)
+    )
+
+    if angle < 0 then
+        angle = angle + twoPi
+    end
+
+    thread.angle = angle
+
+    return thread
 end
 
 function NSPauk:NP_CanReviveRingConn(inst, conn)
@@ -10629,10 +10987,77 @@ function NSPauk:NP_GetAdaptiveDB()
             level = 0,
             interval = 0,
             density = 0,
+            date = self:NP_GetTodayDateString(),
         }
     end
 
     local adaptive = db.adaptive
+    local today = self:NP_GetTodayDateString()
+
+    -- Если дата не совпадает, начинаем адаптивный режим заново.
+    if type(adaptive.date) ~= "string" or adaptive.date ~= today then
+        -- Флаг включённости сохраняем, чтобы /nspadapt off не слетал каждый день.
+        -- Если хочешь полностью сбрасывать и его, поставь здесь:
+        -- local enabled = true
+        local enabled = true
+
+        if type(adaptive.enabled) == "boolean" then
+            enabled = adaptive.enabled
+        elseif adaptive.enabled == false or adaptive.enabled == 0 then
+            enabled = false
+        else
+            enabled = true
+        end
+
+        db.adaptive = {
+            enabled = enabled,
+            level = 0,
+            interval = 0,
+            density = 0,
+            date = today,
+        }
+
+        adaptive = db.adaptive
+
+        -- Также сбрасываем текущие таймеры наблюдения в памяти.
+        if type(self.S) == "table" then
+            self.S.adaptive = nil
+        end
+    end
+
+    if type(adaptive.enabled) ~= "boolean" then
+        if adaptive.enabled == 0 or adaptive.enabled == false then
+            adaptive.enabled = false
+        else
+            adaptive.enabled = true
+        end
+    end
+
+    if type(adaptive.level) ~= "number"
+        or adaptive.level ~= adaptive.level
+        or adaptive.level < 0 then
+        adaptive.level = 0
+    end
+
+    adaptive.level = math.floor(adaptive.level + 0.5)
+
+    if type(adaptive.interval) ~= "number"
+        or adaptive.interval ~= adaptive.interval
+        or adaptive.interval < 0 then
+        adaptive.interval = 0
+    end
+
+    local maxInterval = self.DefaultConstants.ADAPTIVE_MAX_INTERVAL
+
+    if type(maxInterval) ~= "number"
+        or maxInterval ~= maxInterval
+        or maxInterval <= 0 then
+        maxInterval = 0.5
+    end
+
+    if adaptive.interval > maxInterval then
+        adaptive.interval = maxInterval
+    end
 
     if type(adaptive.density) ~= "number"
         or adaptive.density ~= adaptive.density
@@ -10645,6 +11070,8 @@ function NSPauk:NP_GetAdaptiveDB()
     if adaptive.density > 2 then
         adaptive.density = 2
     end
+
+    adaptive.date = today
 
     return adaptive
 end
@@ -10708,11 +11135,13 @@ function NSPauk:NP_SaveAdaptive(level, interval)
     local C = self.C or {}
 
     local step = tonumber(C.ADAPTIVE_STEP) or 0.05
+
     if step <= 0 then
         step = 0.05
     end
 
     local maxInterval = tonumber(C.ADAPTIVE_MAX_INTERVAL) or 0.5
+
     if maxInterval < step then
         maxInterval = step
     end
@@ -10725,6 +11154,7 @@ function NSPauk:NP_SaveAdaptive(level, interval)
     end
 
     local maxLevel = math.max(0, math.floor(maxInterval / step + 0.5))
+
     if level > maxLevel then
         level = maxLevel
     end
@@ -10739,6 +11169,8 @@ function NSPauk:NP_SaveAdaptive(level, interval)
         db.level = level
         db.interval = interval
     end
+
+    db.date = self:NP_GetTodayDateString()
 end
 
 function NSPauk:NP_UpdateAdaptive(dt)
@@ -10756,31 +11188,56 @@ function NSPauk:NP_UpdateAdaptive(dt)
         return
     end
 
+    local adaptive = self:NP_GetAdaptiveDB()
+
     if not self:NP_IsAdaptiveEnabled() then
         S.adaptive = nil
         return
     end
 
-    local C = self.C or {}
+    local LOW_FPS = 10
+    local OBSERVE_SECONDS = 10
 
     if type(S.adaptive) ~= "table" then
         S.adaptive = {
-            timer = 0,
-            sum = 0,
-            min = math.huge,
-            samples = 0,
+            lowTimer = 0,
+            lowSum = 0,
+            lowSamples = 0,
+            cooldown = 0,
         }
     end
 
     local st = S.adaptive
 
+    if type(st.lowTimer) ~= "number"
+        or st.lowTimer ~= st.lowTimer
+        or st.lowTimer < 0 then
+        st.lowTimer = 0
+    end
+
+    if type(st.lowSum) ~= "number"
+        or st.lowSum ~= st.lowSum
+        or st.lowSum < 0 then
+        st.lowSum = 0
+    end
+
+    if type(st.lowSamples) ~= "number"
+        or st.lowSamples ~= st.lowSamples
+        or st.lowSamples < 0 then
+        st.lowSamples = 0
+    end
+
+    if type(st.cooldown) ~= "number"
+        or st.cooldown ~= st.cooldown
+        or st.cooldown < 0 then
+        st.cooldown = 0
+    end
+
     dt = tonumber(dt) or 0
 
     if dt < 0 then
         dt = 0
-    end
-
-    if dt > 0.25 then
+    elseif dt > 0.25 then
         dt = 0.25
     end
 
@@ -10790,101 +11247,94 @@ function NSPauk:NP_UpdateAdaptive(dt)
         fps = 60
     end
 
-    st.sum = (st.sum or 0) + fps
-    st.samples = (st.samples or 0) + 1
+    if st.cooldown > 0 then
+        st.cooldown = st.cooldown - dt
 
-    if type(st.min) ~= "number" or st.min ~= st.min or fps < st.min then
-        st.min = fps
+        if st.cooldown < 0 then
+            st.cooldown = 0
+        end
     end
 
-    st.timer = (st.timer or 0) + dt
-
-    local checkEvery = tonumber(C.ADAPTIVE_CHECK) or 1.0
-
-    if checkEvery < 0.25 then
-        checkEvery = 1.0
-    end
-
-    if st.timer < checkEvery then
+    -- Если FPS выше жёсткого порога, наблюдение сбрасывается.
+    if fps > LOW_FPS then
+        st.lowTimer = 0
+        st.lowSum = 0
+        st.lowSamples = 0
         return
     end
 
-    local avg = st.sum / math.max(1, st.samples)
-    local minFps = st.min
-
-    st.timer = 0
-    st.sum = 0
-    st.min = math.huge
-    st.samples = 0
-
-    local target = tonumber(C.ADAPTIVE_FPS_MIN) or 29
-    local step = tonumber(C.ADAPTIVE_STEP) or 0.05
-    local maxInterval = tonumber(C.ADAPTIVE_MAX_INTERVAL) or 0.5
-
-    if step <= 0 then
-        step = 0.05
+    -- После применения градации даём короткую паузу,
+    -- чтобы не менять уровень несколько раз подряд мгновенно.
+    if st.cooldown > 0 then
+        return
     end
 
-    if maxInterval < step then
-        maxInterval = step
-    end
+    -- FPS <= 10: начинаем/продолжаем 10-секундное наблюдение.
+    st.lowTimer = st.lowTimer + dt
+    st.lowSum = st.lowSum + fps
+    st.lowSamples = st.lowSamples + 1
 
-    local maxLevel = math.max(1, math.floor(maxInterval / step + 0.5))
+    if st.lowTimer >= OBSERVE_SECONDS then
+        local avg = st.lowSum / math.max(1, st.lowSamples)
 
-    local adaptive = self:NP_GetAdaptiveDB()
+        if avg <= LOW_FPS then
+            local C = self.C or {}
 
-    local level = math.floor(tonumber(adaptive.level) or 0 + 0.5)
+            local step = tonumber(C.ADAPTIVE_STEP) or 0.05
 
-    if level < 0 then
-        level = 0
-    end
+            if step <= 0 then
+                step = 0.05
+            end
 
-    if level > maxLevel then
-        level = maxLevel
-    end
+            local maxInterval = tonumber(C.ADAPTIVE_MAX_INTERVAL) or 0.5
 
-    local density = math.floor(tonumber(adaptive.density) or 0 + 0.5)
+            if maxInterval < step then
+                maxInterval = step
+            end
 
-    if density < 0 then
-        density = 0
-    end
+            local maxLevel = math.max(1, math.floor(maxInterval / step + 0.5))
 
-    if density > 2 then
-        density = 2
-    end
+            local level = math.floor(tonumber(adaptive.level) or 0 + 0.5)
 
-    local lowFps = avg < target or minFps < (target - 3)
+            if level < 0 then
+                level = 0
+            end
 
-    if lowFps then
-        if level < maxLevel then
-            level = level + 1
+            -- Одна градация вверх = сильнее адаптация = меньше нагрузки.
+            if level < maxLevel then
+                level = level + 1
+            end
+
+            local interval = math.min(level * step, maxInterval)
+
+            local density = math.floor(tonumber(adaptive.density) or 0 + 0.5)
+
+            if density < 0 then
+                density = 0
+            end
+
+            if density > 2 then
+                density = 2
+            end
+
+            -- Если упёрлись в максимум адаптивного интервала
+            -- или FPS совсем плохой, дополнительно снижаем плотность точек.
+            if (level >= maxLevel or avg <= 7) and density < 2 then
+                density = density + 1
+            end
+
+            self:NP_SaveAdaptive(level, interval)
+
+            adaptive = self:NP_GetAdaptiveDB()
+            adaptive.density = density
         end
 
-        local interval = math.min(level * step, maxInterval)
-
-        -- Если интервал уже максимальный или FPS очень низкий,
-        -- дополнительно уменьшаем плотность точек паутины.
-        if (level >= maxLevel or minFps < (target - 8)) and density < 2 then
-            density = density + 1
-        end
-
-        self:NP_SaveAdaptive(level, interval)
-    else
-        local interval = 0
-
-        if level > 0 then
-            interval = math.min(level * step, maxInterval)
-        end
-
-        -- При стабильно высоком FPS сначала возвращаем плотность точек.
-        if avg >= (target + 8) and density > 0 then
-            density = density - 1
-        end
-
-        self:NP_SaveAdaptive(level, interval)
+        -- Начинаем следить заново.
+        st.lowTimer = 0
+        st.lowSum = 0
+        st.lowSamples = 0
+        st.cooldown = 1.0
     end
-
-    adaptive.density = density
 end
 
 function NSPauk:HandleAdaptiveCommand(msg)
@@ -10896,35 +11346,59 @@ function NSPauk:HandleAdaptiveCommand(msg)
 
     if msg == "" or msg == "status" then
         local fps = GetFramerate and GetFramerate() or 0
+        local st = self.S and self.S.adaptive
 
         self:Echo(string.format(
-            "Адаптация: %s, FPS=%.1f, интервал=%.3f сек, уровень=%d, порог=%d, макс=%.2f",
+            "Адаптация: %s, дата=%s, FPS=%.1f, уровень=%d, интервал=%.3f, плотность=%d, порог=10, таймер=%.1f/10",
             db.enabled and "вкл" or "выкл",
+            tostring(db.date or "?"),
             fps,
-            tonumber(db.interval) or 0,
             tonumber(db.level) or 0,
-            tonumber((self.C or {}).ADAPTIVE_FPS_MIN) or 29,
-            tonumber((self.C or {}).ADAPTIVE_MAX_INTERVAL) or 0.5
+            tonumber(db.interval) or 0,
+            tonumber(db.density) or 0,
+            type(st) == "table" and tonumber(st.lowTimer) or 0
         ))
+
         return
     end
 
     if msg == "on" then
         db.enabled = true
+
+        if type(self.S) == "table" then
+            self.S.adaptive = nil
+        end
+
         self:Echo("Адаптивный режим включён.")
+
         return
     end
 
     if msg == "off" then
         db.enabled = false
+
+        if type(self.S) == "table" then
+            self.S.adaptive = nil
+        end
+
         self:Echo("Адаптивный режим выключен.")
+
         return
     end
 
     if msg == "reset" then
         self:NP_SaveAdaptive(0, 0)
-        self.S.adaptive = nil
-        self:Echo("Адаптивный интервал сброшен.")
+
+        db = self:NP_GetAdaptiveDB()
+        db.density = 0
+        db.date = self:NP_GetTodayDateString()
+
+        if type(self.S) == "table" then
+            self.S.adaptive = nil
+        end
+
+        self:Echo("Адаптивный режим сброшен.")
+
         return
     end
 
@@ -11055,6 +11529,11 @@ function NSPauk:NP_PostUpdate()
         return
     end
 
+    -- Порционный пересчёт секторов.
+    if S.nspSectorJob then
+        self:NP_ProcessSectorRecheckJob()
+    end
+
     if S.phase == "task" then
         local task = S.currentTask
 
@@ -11082,7 +11561,6 @@ function NSPauk:NP_PostUpdate()
                 if interval <= 0
                     or not S.nspDragVisualAt
                     or (now - S.nspDragVisualAt) >= interval then
-
                     S.nspDragVisualAt = now
                     self:NP_UpdateGlobalDrag()
                 end
@@ -11119,7 +11597,6 @@ function NSPauk:NP_PostUpdate()
 
             if type(S.nspRingRepairAt) ~= "number"
                 or (now - S.nspRingRepairAt) >= 1.0 then
-
                 S.nspRingRepairAt = now
 
                 self:NP_RepairRingDeadOwners(ringInst)
@@ -11160,49 +11637,66 @@ end
 
 function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
     local S = self.S
+
     local SW = S.SW or 0
     local SH = S.SH or 0
+
     if SW <= 0 or SH <= 0 then
         SW, SH = self:GetScreenSize()
     end
+
     if SW <= 0 or SH <= 0 then
         return nil
     end
+
     targetCount = math.floor(tonumber(targetCount) or 4)
+
     if targetCount < 4 then
         targetCount = 4
     end
+
     local gridDim = targetCount
+
     if gridDim < 4 then
         gridDim = 4
     end
+
     if gridDim > 12 then
         gridDim = 12
     end
+
     local twoPi = math.pi * 2
+
     local function normAngle(a)
         while a < 0 do
             a = a + twoPi
         end
+
         while a >= twoPi do
             a = a - twoPi
         end
+
         return a
     end
+
     local cells = {}
     local maxR2 = 0
     local minCenterDist = math.min(SW, SH) * 0.05
+
     for gy = 1, gridDim do
         for gx = 1, gridDim do
             local left = (gx - 1) * SW / gridDim
             local right = gx * SW / gridDim
             local bottom = (gy - 1) * SH / gridDim
             local top = gy * SH / gridDim
+
             local cx = (left + right) / 2
             local cy = (bottom + top) / 2
+
             local dx = cx - SW / 2
             local dy = cy - SH / 2
             local r2 = dx * dx + dy * dy
+
             if r2 >= minCenterDist * minCenterDist then
                 cells[#cells + 1] = {
                     left = left,
@@ -11214,104 +11708,176 @@ function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
                     angle = normAngle(math.atan2(dy, dx)),
                     r2 = r2,
                 }
+
                 if r2 > maxR2 then
                     maxR2 = r2
                 end
             end
         end
     end
+
     if #cells == 0 then
         return nil
     end
+
     local chosenCells = {}
+
     if #cells <= targetCount then
         for _, cell in ipairs(cells) do
             chosenCells[#chosenCells + 1] = cell
         end
     else
         local usedCells = {}
+
         for k = 0, targetCount - 1 do
             local targetAngle = normAngle(k * twoPi / targetCount)
+
             local bestCell = nil
             local bestScore = nil
+
             for _, cell in ipairs(cells) do
                 if not usedCells[cell] then
                     local diff = math.abs(cell.angle - targetAngle)
+
                     if diff > math.pi then
                         diff = twoPi - diff
                     end
+
                     local radiusScore = 0
+
                     if maxR2 > 0 then
                         radiusScore = cell.r2 / maxR2
                     end
+
                     local score = diff - radiusScore * 0.35
+
                     if not bestScore or score < bestScore then
                         bestScore = score
                         bestCell = cell
                     end
                 end
             end
+
             if bestCell then
                 usedCells[bestCell] = true
                 chosenCells[#chosenCells + 1] = bestCell
             end
         end
     end
+
     if #chosenCells == 0 then
         return nil
     end
+
+    local minObjDist = self:NP_GetObjectMinDistance()
+    local minObjDist2 = minObjDist * minObjDist
+
     local usedItems = {}
     local anchors = {}
+
     local function addItem(item)
         if not item or usedItems[item] then
             return false
         end
+
         usedItems[item] = true
         anchors[#anchors + 1] = item
+
         return true
     end
+
+    local function farEnoughFromAnchors(item)
+        if minObjDist <= 0 then
+            return true
+        end
+
+        if not item then
+            return false
+        end
+
+        local ix = tonumber(item.cx) or 0
+        local iy = tonumber(item.cy) or 0
+
+        for _, a in ipairs(anchors) do
+            local ax = tonumber(a.cx) or 0
+            local ay = tonumber(a.cy) or 0
+
+            local dx = ix - ax
+            local dy = iy - ay
+
+            if dx * dx + dy * dy < minObjDist2 then
+                return false
+            end
+        end
+
+        return true
+    end
+
     for _, cell in ipairs(chosenCells) do
         local bestItem = nil
         local bestScore = nil
+
+        local fallbackItem = nil
+        local fallbackScore = nil
+
         for _, item in ipairs(pool) do
             if not usedItems[item] then
                 local dx = (item.cx or 0) - cell.cx
                 local dy = (item.cy or 0) - cell.cy
                 local d2 = dx * dx + dy * dy
+
                 local inside = item.cx >= cell.left
                     and item.cx <= cell.right
                     and item.cy >= cell.bottom
                     and item.cy <= cell.top
+
                 local score = d2
+
                 if not inside then
                     score = score + 1000000
                 end
-                if not bestScore or score < bestScore then
-                    bestScore = score
-                    bestItem = item
+
+                if not fallbackScore or score < fallbackScore then
+                    fallbackScore = score
+                    fallbackItem = item
+                end
+
+                if farEnoughFromAnchors(item) then
+                    if not bestScore or score < bestScore then
+                        bestScore = score
+                        bestItem = item
+                    end
                 end
             end
         end
+
         if bestItem then
             addItem(bestItem)
+        elseif fallbackItem and minObjDist <= 0 then
+            addItem(fallbackItem)
         end
     end
+
     while #anchors < targetCount do
         local added = false
+
         for _, item in ipairs(pool) do
-            if not usedItems[item] then
+            if not usedItems[item] and farEnoughFromAnchors(item) then
                 addItem(item)
                 added = true
                 break
             end
         end
+
         if not added then
             break
         end
     end
+
     if #anchors < 4 then
         return nil
     end
+
     return anchors
 end
 
@@ -11359,74 +11925,134 @@ end
 function NSPauk:NP_CollectRingAnchors(items, targetCount)
     local good = {}
     local all = {}
+
     for _, item in ipairs(items or {}) do
         if item and item.frame then
             if self:IsGoodAnchorName(item.name) then
                 good[#good + 1] = item
             end
+
             all[#all + 1] = item
         end
     end
+
     local pool = good
+
     if #pool == 0 then
         pool = all
     end
+
     if #pool < 4 then
         return nil
     end
+
     targetCount = math.floor(tonumber(targetCount) or 4)
+
     if targetCount < 4 then
         targetCount = 4
     end
+
     if targetCount % 2 ~= 0 then
         targetCount = targetCount + 1
     end
+
     if targetCount > #pool then
         targetCount = #pool - (#pool % 2)
     end
+
     if targetCount < 4 then
         return nil
     end
-    local bestHull = nil
-    for _ = 1, 16 do
-        local picked = self:NP_PickRingAnchorsOnce(pool, targetCount)
-        if picked and #picked >= 4 then
-            local points = {}
-            for _, item in ipairs(picked) do
-                points[#points + 1] = {
-                    x = item.cx or 0,
-                    y = item.cy or 0,
-                    item = item,
-                }
-            end
-            local hull = self:NP_ConvexHull(points)
-            if hull and #hull >= 4 then
-                if #hull % 2 ~= 0 then
-                    hull = self:NP_MakeHullEven(hull)
+
+    -- Пытаемся сначала желаемое количество.
+    -- Если не выходит из-за минимальной дистанции, пробуем меньше.
+    for wanted = targetCount, 4, -2 do
+        local bestHull = nil
+
+        for _ = 1, 8 do
+            local picked = self:NP_PickRingAnchorsOnce(pool, wanted)
+
+            if picked and #picked >= 4 then
+                local points = {}
+
+                for _, item in ipairs(picked) do
+                    points[#points + 1] = {
+                        x = item.cx or 0,
+                        y = item.cy or 0,
+                        item = item,
+                    }
                 end
-                if hull and #hull >= 4 and #hull % 2 == 0 then
-                    if #hull == targetCount then
-                        local out = {}
-                        for _, p in ipairs(hull) do
-                            out[#out + 1] = p.item
+
+                local hull = self:NP_ConvexHull(points)
+
+                if hull and #hull >= 4 then
+                    if #hull % 2 ~= 0 then
+                        hull = self:NP_MakeHullEven(hull)
+                    end
+
+                    if hull and #hull >= 4 and #hull % 2 == 0 then
+                        if #hull == wanted then
+                            local out = {}
+
+                            for _, p in ipairs(hull) do
+                                out[#out + 1] = p.item
+                            end
+
+                            return out
                         end
-                        return out
-                    end
-                    if not bestHull or #hull > #bestHull then
-                        bestHull = hull
+
+                        if not bestHull or #hull > #bestHull then
+                            bestHull = hull
+                        end
                     end
                 end
             end
         end
-    end
-    if bestHull then
-        local out = {}
-        for _, p in ipairs(bestHull) do
-            out[#out + 1] = p.item
+
+        if bestHull then
+            local out = {}
+
+            for _, p in ipairs(bestHull) do
+                out[#out + 1] = p.item
+            end
+
+            return out
         end
-        return out
     end
+
     return nil
+end
+
+function NSPauk:NP_GetTodayDateString()
+    local now = GetTime()
+
+    -- Небольшой кэш, чтобы не вызывать date() каждый кадр.
+    if type(self.nspAdaptiveDateCache) == "string"
+        and type(self.nspAdaptiveDateCacheAt) == "number"
+        and self.nspAdaptiveDateCacheAt == self.nspAdaptiveDateCacheAt
+        and now - self.nspAdaptiveDateCacheAt < 5 then
+        return self.nspAdaptiveDateCache
+    end
+
+    local s
+
+    if type(date) == "function" then
+        s = date("%Y-%m-%d")
+    elseif type(GetDate) == "function" then
+        local d, m, y = GetDate()
+        s = string.format("%04d-%02d-%02d", y or 0, m or 0, d or 0)
+    else
+        s = "unknown"
+    end
+
+    if type(s) ~= "string" or s == "" then
+        s = "unknown"
+    end
+
+    self.nspAdaptiveDateCache = s
+    self.nspAdaptiveDateCacheAt = now
+
+    return s
 end
 
 function NSPauk:NP_MakeRingSagThread(p0, p2, mode, sagMult)
@@ -12153,11 +12779,7 @@ function NSPauk:NP_ChooseRingDiameter(anchors)
 end
 
 function NSPauk:CreateRingInstance(targetCount, items)
-    local S = self.S
-    local C = self.C
-
-    if type(self.NP_CollectRingAnchors) ~= "function"
-        or type(self.NP_ConvexHull) ~= "function" then
+    if type(self.NP_CollectRingAnchors) ~= "function" then
         return nil
     end
 
@@ -12201,40 +12823,100 @@ function NSPauk:CreateRingInstance(targetCount, items)
         return nil
     end
 
-    local points = {}
+    -- Сортируем выбранные объекты по углу вокруг их общего центра,
+    -- чтобы периметр кольца шёл по кругу, а не в случайном порядке.
+    local sumX = 0
+    local sumY = 0
 
     for _, item in ipairs(anchors) do
-        points[#points + 1] = {
-            x = item.cx or 0,
-            y = item.cy or 0,
-            item = item,
-        }
+        sumX = sumX + (item.cx or 0)
+        sumY = sumY + (item.cy or 0)
     end
 
-    local hull = self:NP_ConvexHull(points)
+    local centerX = sumX / N
+    local centerY = sumY / N
+    local twoPi = math.pi * 2
 
-    if not hull or #hull < 4 then
-        return nil
+    local function normAngle(a)
+        if type(a) ~= "number" or a ~= a then
+            return 0
+        end
+
+        while a < 0 do
+            a = a + twoPi
+        end
+
+        while a >= twoPi do
+            a = a - twoPi
+        end
+
+        return a
     end
 
-    if #hull % 2 ~= 0 then
-        table.remove(hull)
+    for _, item in ipairs(anchors) do
+        item._nspRingSortAngle = normAngle(math.atan2(
+            (item.cy or 0) - centerY,
+            (item.cx or 0) - centerX
+        ))
     end
 
-    if #hull < 4 then
-        return nil
+    table.sort(anchors, function(a, b)
+        local aa = a._nspRingSortAngle or 0
+        local bb = b._nspRingSortAngle or 0
+
+        if aa ~= bb then
+            return aa < bb
+        end
+
+        local ax = a.cx or 0
+        local bx = b.cx or 0
+
+        if ax ~= bx then
+            return ax < bx
+        end
+
+        return (a.cy or 0) < (b.cy or 0)
+    end)
+
+    for _, item in ipairs(anchors) do
+        item._nspRingSortAngle = nil
     end
 
-    anchors = {}
+    local idxA, idxB
 
-    for _, p in ipairs(hull) do
-        anchors[#anchors + 1] = p.item
+    if type(self.NP_ChooseRingDiameter) == "function" then
+        idxA, idxB = self:NP_ChooseRingDiameter(anchors)
     end
 
-    N = #anchors
+    if type(idxA) ~= "number" or type(idxB) ~= "number" then
+        idxA = 1
+        idxB = 1 + math.floor(N / 2)
+    end
 
-    local idxA = 1
-    local idxB = 1 + math.floor(N / 2)
+    idxA = math.floor(idxA)
+    idxB = math.floor(idxB)
+
+    if idxA < 1 or idxA > N then
+        idxA = 1
+    end
+
+    if idxB < 1 or idxB > N then
+        idxB = 1 + math.floor(N / 2)
+    end
+
+    if idxA == idxB then
+        idxB = idxA + math.floor(N / 2)
+        if idxB > N then
+            idxB = idxB - N
+        end
+    end
+
+    if idxA == idxB then
+        idxB = idxA + 1
+        if idxB > N then
+            idxB = 1
+        end
+    end
 
     local a = anchors[idxA]
     local b = anchors[idxB]
@@ -12305,7 +12987,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
         )
 
         if angle < 0 then
-            angle = angle + 2 * math.pi
+            angle = angle + twoPi
         end
 
         thread.angle = angle
@@ -12344,7 +13026,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
     )
 
     if diamAngle < 0 then
-        diamAngle = diamAngle + 2 * math.pi
+        diamAngle = diamAngle + twoPi
     end
 
     diamThread.angle = diamAngle
@@ -12389,7 +13071,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
         )
 
         if angle < 0 then
-            angle = angle + 2 * math.pi
+            angle = angle + twoPi
         end
 
         thread.angle = angle
@@ -12434,7 +13116,7 @@ function NSPauk:CreateRingInstance(targetCount, items)
         local angle = math.atan2(midY - hy, midX - hx)
 
         if angle < 0 then
-            angle = angle + 2 * math.pi
+            angle = angle + twoPi
         end
 
         thread.angle = angle
@@ -12468,6 +13150,32 @@ function NSPauk:CreateRingInstance(targetCount, items)
     self:BuildInstanceTasks(inst)
 
     return inst
+end
+
+function NSPauk:IsAcceptableWebObjectName(name)
+    if type(name) ~= "string" or name == "" then
+        return true
+    end
+
+    if name == "WorldFrame"
+        or name == "UIParent"
+        or name == "MinimapCluster" then
+        return false
+    end
+
+    if name:find("Moth", 1, true) then
+        return false
+    end
+
+    if name:find("NSPauk_Moth", 1, true) then
+        return false
+    end
+
+    if name:find("NSPaukWeb", 1, true) then
+        return false
+    end
+
+    return true
 end
 
 function NSPauk:NP_BuildNaturalRingMainTasks(inst, tasks, cursorPoint)
@@ -12739,7 +13447,6 @@ end
 
 function NSPauk:NP_RecheckWebSectors(inst)
     local S = self.S
-    local C = self.C
 
     if not inst or inst.torn then
         return 0
@@ -12758,38 +13465,28 @@ function NSPauk:NP_RecheckWebSectors(inst)
         return 0
     end
 
-    if S.nspSectorRecheckRunning then
-        local now = GetTime()
-
-        if type(S.nspSectorRecheckLockAt) ~= "number"
-            or (now - S.nspSectorRecheckLockAt) > 3 then
-            S.nspSectorRecheckRunning = false
-        else
-            return 0
-        end
-    end
-
-    S.nspSectorRecheckRunning = true
-    S.nspSectorRecheckLockAt = GetTime()
-
-    local N = inst.conns and #inst.conns or 0
-
-    if N < 2 then
-        S.nspSectorRecheckRunning = false
+    if S.nspSectorJob and S.nspSectorJob.inst == inst then
         return 0
     end
 
-    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
-    if spacing < 0.5 then
-        spacing = 0.5
+    self:NP_StartSectorRecheckJob(inst)
+
+    return 0
+end
+
+function NSPauk:NP_StartSectorRecheckJob(inst)
+    local S = self.S
+
+    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
+        return
     end
 
-    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
-    if minCross < 0 then
-        minCross = 4
+    if S.nspSectorJob and S.nspSectorJob.inst == inst then
+        return
     end
 
     local sectors = self:NP_GetValidTriangleSectors(inst)
+
     inst.webSectors = sectors
 
     local scheduled = self:NP_CollectScheduledOwners()
@@ -12798,65 +13495,15 @@ function NSPauk:NP_RecheckWebSectors(inst)
         scheduled = {}
     end
 
-    local tasks = {}
-    local added = 0
-
     local cursor = self:NP_GetSpiderPointIfShown()
         or {
             x = S.lastSpiderX or 0,
             y = S.lastSpiderY or 0,
         }
 
-    local function isDrawn(owner)
-        return self:NP_IsWebOwnerDrawn(owner)
-    end
+    local work = {}
 
-    local function addSegTasks(seg)
-        if not seg
-            or not seg.alive
-            or isDrawn(seg)
-            or scheduled[seg] then
-            return nil
-        end
-
-        local thread = seg.thread
-
-        if not thread or not thread.p0 or not thread.p2 then
-            return nil
-        end
-
-        local drawThread =
-            self:NP_OrientThreadForCursor(thread, cursor)
-            or thread
-
-        local travelConn = seg.connA or seg.connB
-        local before = #tasks
-
-        self:AddTravelPointTask(
-            tasks,
-            cursor,
-            drawThread.p0,
-            travelConn,
-            seg
-        )
-
-        local task = self:AddThreadTask(tasks, seg, drawThread)
-
-        added = added + (#tasks - before)
-
-        if task then
-            scheduled[seg] = true
-
-            return {
-                x = drawThread.p2.x,
-                y = drawThread.p2.y,
-            }
-        end
-
-        return nil
-    end
-
-    for _, sector in ipairs(sectors) do
+    for _, sector in ipairs(sectors or {}) do
         local connA = inst.conns[sector.a]
         local connB = inst.conns[sector.b]
 
@@ -12864,8 +13511,8 @@ function NSPauk:NP_RecheckWebSectors(inst)
             and connB
             and connA.alive
             and connB.alive
-            and isDrawn(connA)
-            and isDrawn(connB) then
+            and self:NP_IsWebOwnerDrawn(connA)
+            and self:NP_IsWebOwnerDrawn(connB) then
 
             if connA.thread
                 and (not connA.arcLength or connA.arcLength <= 0) then
@@ -12881,89 +13528,205 @@ function NSPauk:NP_RecheckWebSectors(inst)
                 connB.arcLength = total
             end
 
-            local function ensureArc(arcLen)
-                if type(arcLen) ~= "number"
-                    or arcLen ~= arcLen
-                    or arcLen < minCross then
-                    return
-                end
+            local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
 
-                local seg = self:NP_FindPairSegAtArc(
-                    inst,
-                    connA,
-                    connB,
-                    arcLen,
-                    spacing
-                )
+            for _, arcLen in ipairs(rowArcs or {}) do
+                work[#work + 1] = {
+                    sector = sector,
+                    connA = connA,
+                    connB = connB,
+                    arcLen = arcLen,
+                }
+            end
+        end
+    end
 
-                if not seg then
-                    local targetA = math.min(arcLen, connA.arcLength or 0)
-                    local targetB = math.min(arcLen, connB.arcLength or 0)
+    S.nspSectorJob = {
+        inst = inst,
+        work = work,
+        idx = 1,
+        scheduled = scheduled,
+        tasks = {},
+        added = 0,
+        cursor = cursor,
+        startedAt = GetTime(),
+    }
 
-                    if targetA > 0 and targetB > 0 then
-                        local tA = self:ThreadTAtLength(connA, targetA)
-                        local tB = self:ThreadTAtLength(connB, targetB)
+    S.nspSectorRecheckRunning = true
+end
 
-                        if tA and tB then
-                            seg = self:CreateCrossSegArc(
-                                inst,
-                                connA,
-                                connB,
-                                tA,
-                                tB,
-                                minCross
-                            )
+function NSPauk:NP_ProcessSectorRecheckJob()
+    local S = self.S
+    local job = S.nspSectorJob
 
-                            if seg then
-                                seg.planSectorKey = sector.key
-                                seg.planArcLen = arcLen
-                                seg.isRecheck = true
-                            end
+    if not job then
+        return
+    end
+
+    local inst = job.inst
+
+    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
+        S.nspSectorJob = nil
+        S.nspSectorRecheckRunning = false
+        return
+    end
+
+    local C = self.C
+
+    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+    if spacing < 0.5 then
+        spacing = 0.5
+    end
+
+    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
+    if minCross < 0 then
+        minCross = 4
+    end
+
+    local function isDrawn(owner)
+        return self:NP_IsWebOwnerDrawn(owner)
+    end
+
+    local function addSegTasks(seg)
+        if not seg
+            or not seg.alive
+            or isDrawn(seg)
+            or job.scheduled[seg] then
+            return nil
+        end
+
+        local thread = seg.thread
+
+        if not thread or not thread.p0 or not thread.p2 then
+            return nil
+        end
+
+        local drawThread =
+            self:NP_OrientThreadForCursor(thread, job.cursor)
+            or thread
+
+        local travelConn = seg.connA or seg.connB
+
+        local before = #job.tasks
+
+        self:AddTravelPointTask(
+            job.tasks,
+            job.cursor,
+            drawThread.p0,
+            travelConn,
+            seg
+        )
+
+        local task = self:AddThreadTask(job.tasks, seg, drawThread)
+
+        job.added = job.added + (#job.tasks - before)
+
+        if task then
+            job.scheduled[seg] = true
+
+            return {
+                x = drawThread.p2.x,
+                y = drawThread.p2.y,
+            }
+        end
+
+        return nil
+    end
+
+    -- Бюджет времени на один кадр.
+    -- 0.008 сек = примерно 8 миллисекунд.
+    -- Если всё равно будут подвисания, можно уменьшить до 0.004.
+    local budget = 0.008
+    local deadline = GetTime() + budget
+    local guard = 0
+
+    while job.idx <= #job.work
+        and GetTime() < deadline
+        and guard < 80 do
+
+        guard = guard + 1
+
+        local item = job.work[job.idx]
+        job.idx = job.idx + 1
+
+        if item
+            and item.connA
+            and item.connB
+            and item.connA.alive
+            and item.connB.alive
+            and isDrawn(item.connA)
+            and isDrawn(item.connB) then
+
+            local seg = self:NP_FindPairSegAtArc(
+                inst,
+                item.connA,
+                item.connB,
+                item.arcLen,
+                spacing
+            )
+
+            if not seg then
+                local targetA = math.min(item.arcLen, item.connA.arcLength or 0)
+                local targetB = math.min(item.arcLen, item.connB.arcLength or 0)
+
+                if targetA > 0 and targetB > 0 then
+                    local tA = self:ThreadTAtLength(item.connA, targetA)
+                    local tB = self:ThreadTAtLength(item.connB, targetB)
+
+                    if tA and tB then
+                        seg = self:CreateCrossSegArc(
+                            inst,
+                            item.connA,
+                            item.connB,
+                            tA,
+                            tB,
+                            minCross
+                        )
+
+                        if seg then
+                            seg.planSectorKey = item.sector.key
+                            seg.planArcLen = item.arcLen
+                            seg.isRecheck = true
                         end
                     end
                 end
+            end
 
-                if seg then
-                    local newCursor = addSegTasks(seg)
+            if seg then
+                local newCursor = addSegTasks(seg)
 
-                    if newCursor then
-                        cursor = newCursor
-                    end
+                if newCursor then
+                    job.cursor = newCursor
                 end
             end
+        end
+    end
 
-            local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
+    if job.idx > #job.work then
+        if job.added > 0 then
+            for _, task in ipairs(job.tasks) do
+                S.tasks[#S.tasks + 1] = task
+            end
 
-            for _, rowArc in ipairs(rowArcs) do
-                ensureArc(rowArc)
+            if S.phase == "instanceComplete" then
+                S.phase = "task"
+                S.completeTimer = 0
+                self:AdvanceTask()
+            elseif not S.currentTask then
+                self:AdvanceTask()
             end
         end
+
+        inst.lastSectorRecheck = {
+            at = GetTime(),
+            crossCount = inst.builtCrossCount or 0,
+            sectors = #(inst.webSectors or {}),
+            added = job.added,
+        }
+
+        S.nspSectorJob = nil
+        S.nspSectorRecheckRunning = false
     end
-
-    if added > 0 then
-        for _, task in ipairs(tasks) do
-            S.tasks[#S.tasks + 1] = task
-        end
-
-        if S.phase == "instanceComplete" then
-            S.phase = "task"
-            S.completeTimer = 0
-            self:AdvanceTask()
-        elseif not S.currentTask then
-            self:AdvanceTask()
-        end
-    end
-
-    inst.lastSectorRecheck = {
-        at = GetTime(),
-        crossCount = inst.builtCrossCount or 0,
-        sectors = #sectors,
-        added = added,
-    }
-
-    S.nspSectorRecheckRunning = false
-
-    return added
 end
 
 function NSPauk:NP_PointInTriangle(px, py, ax, ay, bx, by, cx, cy)
@@ -13311,56 +14074,74 @@ function NSPauk:NP_ThreadsFarEnough(threadA, threadB, ignoreHubDist, minDist)
 end
 
 function NSPauk:NP_TriangleSectorClear(inst, connA, connB)
-    if not inst
-        or not connA
-        or not connB
-        or not connA.thread
-        or not connB.thread then
+    if not inst or not connA or not connB or not connA.thread or not connB.thread then
         return false
     end
-
+    
     local hubX = (inst.hub.rect and inst.hub.rect.cx) or 0
     local hubY = (inst.hub.rect and inst.hub.rect.cy) or 0
-
     local ax, ay = self:BzThread(connA.thread, 1)
     local bx, by = self:BzThread(connB.thread, 1)
-
-    local area = math.abs(
-        (ax - hubX) * (by - hubY)
-        - (bx - hubX) * (ay - hubY)
-    )
-
+    
+    -- Площадь треугольника Хаб-A-B (отсекаем вырожденные)
+    local area = math.abs((ax - hubX) * (by - hubY) - (bx - hubX) * (ay - hubY))
     if area < 100 then
         return false
     end
+    
+    -- Генерируем точки кривой Безье с мелким шагом (24 точки)
+    local function getCurvePoints(conn)
+        local pts = {}
+        for i = 0, 24 do
+            local t = i / 24
+            local x, y = self:BzThread(conn.thread, t)
+            pts[#pts + 1] = {x = x, y = y}
+        end
+        return pts
+    end
+    
+    -- Математика пересечения двух отрезков
+    local function segIntersect(p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y)
+        local d1x, d1y = p2x - p1x, p2y - p1y
+        local d2x, d2y = p4x - p3x, p4y - p3y
+        local cross = d1x * d2y - d1y * d2x
+        if math.abs(cross) < 1e-6 then return false end
+        local t = ((p3x - p1x) * d2y - (p3y - p1y) * d2x) / cross
+        local u = ((p3x - p1x) * d1y - (p3y - p1y) * d1x) / cross
+        return t > 0.05 and t < 0.95 and u > 0.05 and u < 0.95
+    end
 
     local ignoreHub = self:NP_GetTriangleCheckHubIgnore()
+    local ignoreHub2 = ignoreHub * ignoreHub
 
     for _, connC in ipairs(inst.conns or {}) do
-        if connC ~= connA
-            and connC ~= connB
-            and connC.alive
-            and connC.thread
-            and not connC.noSector then
-            local pts = self:SampleThreadPoints(connC.thread, ignoreHub)
-
-            for _, p in ipairs(pts) do
-                if self:NP_PointInTriangle(
-                    p.x or 0,
-                    p.y or 0,
-                    hubX,
-                    hubY,
-                    ax,
-                    ay,
-                    bx,
-                    by
-                ) then
-                    return false
+        if connC ~= connA and connC ~= connB and connC.alive and connC.thread and not connC.noSector then
+            local ptsC = getCurvePoints(connC)
+            
+            -- 1. Проверяем пересечение ломаной C с хордой A-B (между концами нитей)
+            for i = 1, #ptsC - 1 do
+                local p1 = ptsC[i]
+                local p2 = ptsC[i+1]
+                local d1 = (p1.x - hubX)^2 + (p1.y - hubY)^2
+                local d2 = (p2.x - hubX)^2 + (p2.y - hubY)^2
+                if d1 > ignoreHub2 or d2 > ignoreHub2 then
+                    if segIntersect(p1.x, p1.y, p2.x, p2.y, ax, ay, bx, by) then
+                        return false -- Нить C пересекает линию между A и B
+                    end
+                end
+            end
+            
+            -- 2. Дополнительно: старая проверка попадания в треугольник (на случай коротких нитей)
+            for _, p in ipairs(ptsC) do
+                local d = (p.x - hubX)^2 + (p.y - hubY)^2
+                if d > ignoreHub2 then
+                    if self:NP_PointInTriangle(p.x, p.y, hubX, hubY, ax, ay, bx, by) then
+                        return false
+                    end
                 end
             end
         end
     end
-
     return true
 end
 
@@ -13568,7 +14349,9 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
 
     local C = self.C
 
-    local targetMinDist = tonumber(C.WEB_TARGET_MIN_DISTANCE) or 200
+    -- НОВОЕ: минимальное расстояние между выбранными объектами.
+    local targetMinDist = tonumber(C.WEB_OBJECT_MIN_DISTANCE) or 100
+
     local threadHubSkip = tonumber(C.WEB_THREAD_HUB_SKIP) or 200
     local threadMinDist = tonumber(C.WEB_THREAD_MIN_DISTANCE) or 100
 
@@ -13587,6 +14370,7 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
         end
 
         local d2 = dist2(item.cx, item.cy, hub.cx, hub.cy)
+
         return d2 >= targetMinDist * targetMinDist
     end
 
@@ -13608,7 +14392,9 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
 
     local made = 0
     local totalAttempts = 0
+
     local maxAttempts = tonumber(C.WEB_TARGET_REROLL_ATTEMPTS)
+
     if type(maxAttempts) ~= "number"
         or maxAttempts ~= maxAttempts
         or maxAttempts < 1 then
@@ -13626,8 +14412,10 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
         if target
             and target ~= hub
             and target.frame ~= hub.frame then
+
             if targetFarFromHub(target)
                 and targetFarFromAccepted(target) then
+
                 for _ = 1, 3 do
                     local thread = self:MakeRadialThread(
                         inst.hub.rect,
@@ -13679,6 +14467,7 @@ function NSPauk:CreateInstance(hub, candidates, targetCount)
                             }
 
                             inst.conns[#inst.conns + 1] = conn
+
                             acceptedThreads[#acceptedThreads + 1] = thread
                             acceptedTargets[#acceptedTargets + 1] = target
 
@@ -17911,9 +18700,38 @@ function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
         return false
     end
 
+    -- Сначала пробуем быстрый путь для приоритетной перемычки.
+    local priority = prioritySeg
+
+    if priority then
+        if not priority.alive or self:NP_IsWebOwnerDrawn(priority) then
+            priority = self:NP_FindRingPriorityReplacement(inst, priority)
+        end
+
+        if priority then
+            if not priority.alive
+                and priority.connA
+                and priority.connB
+                and priority.connA.alive
+                and priority.connB.alive
+                and self:NP_IsWebOwnerDrawn(priority.connA)
+                and self:NP_IsWebOwnerDrawn(priority.connB) then
+                priority.alive = true
+                priority._nspQueueRevive = true
+            end
+
+            if self:NP_AppendOwnerTasksFast(inst, priority) then
+                inst.nspRingCrossQueueDirty = false
+                return true
+            end
+        end
+    end
+
+    -- Если быстрый путь не подошёл, делаем обычную нормализацию и пересборку.
     self:NP_NormalizeRingCrossSegs(inst)
 
-    local priority = prioritySeg
+    priority = prioritySeg
+
     if priority
         and (not priority.alive or self:NP_IsWebOwnerDrawn(priority)) then
         priority = self:NP_FindRingPriorityReplacement(inst, priority)
@@ -17941,6 +18759,7 @@ function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
         end
 
         inst.nspRingCrossQueueDirty = false
+
         return true
     end
 
@@ -18171,7 +18990,8 @@ function NSPauk:StartNewInstance(preferredHub)
 
     S.SW, S.SH = self:GetScreenSize()
 
-    local items = self:CollectVisibleItems()
+    -- Обычный сбор для кокона и кольца оставляем как был.
+    local items = self:CollectVisibleItems(false)
 
     if math.random() < C.COCOON_CHANCE then
         local victim = self:PickCocoonVictim(items)
@@ -18192,7 +19012,6 @@ function NSPauk:StartNewInstance(preferredHub)
 
         if ringInst then
             self:AddInstance(ringInst)
-
             S.currentInstance = ringInst
             S.tasks = ringInst.tasks
             S.taskIdx = 1
@@ -18207,24 +19026,35 @@ function NSPauk:StartNewInstance(preferredHub)
         end
     end
 
-    local hub = self:PickWebHub(items)
+    -- Для обычной паутины берём все видимые объекты без ограничений по размеру.
+    local webItems = self:CollectVisibleItems(true)
 
-    if hub and hub.frame and not self:ValidateAnchorRect(hub) then
-        hub = nil
+    local inst = nil
+    local hub = nil
+    local candidates = nil
+
+    -- Несколько попыток найти рабочий хаб и цели.
+    for _ = 1, 8 do
+        hub = self:PickWebHub(webItems)
+
+        if hub and hub.frame and not self:ValidateAnchorRect(hub) then
+            hub = nil
+        end
+
+        if hub then
+            candidates = self:CollectTargetCandidates(hub, webItems)
+
+            if candidates and #candidates > 0 then
+                inst = self:CreateInstance(hub, candidates, targetCount)
+
+                if inst and #inst.conns > 0 then
+                    break
+                end
+            end
+        end
     end
 
-    local candidates = {}
-
-    if hub then
-        candidates = self:CollectTargetCandidates(hub, items)
-    end
-
-    if not hub or #candidates == 0 then
-        hub, candidates, targetCount = self:FallbackHubAndTargets()
-    end
-
-    local inst = self:CreateInstance(hub, candidates, targetCount)
-
+    -- Если совсем ничего не нашли, используем запасной виртуальный вариант.
     if not inst or #inst.conns == 0 then
         hub, candidates, targetCount = self:FallbackHubAndTargets()
         inst = self:CreateInstance(hub, candidates, targetCount)
@@ -18247,7 +19077,6 @@ function NSPauk:StartNewInstance(preferredHub)
 
     self:MkSpider()
     self:MkClickBtn()
-
     self:AdvanceTask()
 end
 
@@ -19043,6 +19872,26 @@ function NSPauk:NP_ProcessQueueResume()
     S.nspQueueResumeInst = nil
     S.nspQueueResumePriority = nil
 
+    -- Быстрый путь.
+    -- Если есть конкретная перемычка/нить, пробуем добавить только её,
+    -- не пересчитывая всю паутину.
+    if priority then
+        if not priority.alive
+            and priority.connA
+            and priority.connB
+            and priority.connA.alive
+            and priority.connB.alive
+            and self:NP_IsWebOwnerDrawn(priority.connA)
+            and self:NP_IsWebOwnerDrawn(priority.connB) then
+            priority.alive = true
+            priority._nspQueueRevive = true
+        end
+
+        if self:NP_AppendOwnerTasksFast(inst, priority) then
+            return true
+        end
+    end
+
     if not self:NP_HasRequiredWebPending(inst) then
         return false
     end
@@ -19050,6 +19899,8 @@ function NSPauk:NP_ProcessQueueResume()
     S.nspQueueRebuildRunning = true
     S.nspQueueRebuildLockAt = GetTime()
 
+    -- Полный пересчёт оставляем только для случаев,
+    -- когда быстрый путь не сработал.
     self:NP_RecheckWebSectors(inst)
     self:NP_RecheckWebSectorsByTriangles(inst)
 
@@ -19090,7 +19941,9 @@ function NSPauk:NP_ProcessQueueResume()
         S.lastTaskT = 0
         S.phase = "task"
         S.nspQueueRebuildRunning = false
+
         self:AdvanceTask()
+
         return true
     end
 
