@@ -16737,13 +16737,12 @@ function NSPauk:NP_ExecutePlan(task)
     local insertIndex = S.taskIdx
     local inserted = 0
     local loopHit = false
-    
-    -- Определяем, нужно ли ограничивать граф только текущей паутиной (для перемычек)
+
     local restrictToInst = nil
     if task.owner and (task.owner.connA or task.owner.connB) then
         restrictToInst = self:GetOwnerInstance(task.owner)
     end
-    
+
     local function insert(t)
         if t then
             table.insert(S.tasks, insertIndex, t)
@@ -16751,6 +16750,7 @@ function NSPauk:NP_ExecutePlan(task)
             inserted = inserted + 1
         end
     end
+
     local function cleanupInserted()
         if inserted > 0 then
             for _ = 1, inserted do table.remove(S.tasks, startInsertIndex) end
@@ -16758,6 +16758,64 @@ function NSPauk:NP_ExecutePlan(task)
             inserted = 0
         end
     end
+
+    local isCrossSeg = task.owner and task.owner.connA and task.owner.connB
+    if isCrossSeg then
+        local connA = task.owner.connA
+        local connB = task.owner.connB
+        if connA.alive and connB.alive 
+           and self:NP_IsWebOwnerDrawn(connA) 
+           and self:NP_IsWebOwnerDrawn(connB) then
+           
+            local destP0 = task.p0 and { x = task.p0.x, y = task.p0.y } or from
+            local destP2 = task.p2 and { x = task.p2.x, y = task.p2.y } or destP0
+            local destP1 = task.p1 and { x = task.p1.x, y = task.p1.y } or { x = (destP0.x + destP2.x)/2, y = (destP0.y + destP2.y)/2 }
+            
+            if task.kind == "travel" then
+                local dx = from.x - destP2.x
+                local dy = from.y - destP2.y
+                if dx*dx + dy*dy > 4 then
+                    local crawlToStart = self:NP_MakeCrawlTask(from, destP2, task)
+                    crawlToStart.nspNoSupportCheck = true
+                    crawlToStart.isCross = task.isCross
+                    insert(crawlToStart)
+                end
+                return inserted
+            end
+            
+            if task.kind == "thread" then
+                local dx = from.x - destP0.x
+                local dy = from.y - destP0.y
+                if dx*dx + dy*dy > 4 then
+                    local crawlToStart = self:NP_MakeCrawlTask(from, destP0, task)
+                    crawlToStart.nspNoSupportCheck = true
+                    crawlToStart.isCross = task.isCross
+                    insert(crawlToStart)
+                end
+                
+                local drawTask = {
+                    kind = "thread",
+                    owner = task.owner,
+                    drop = true,
+                    p0 = destP0,
+                    p1 = destP1,
+                    p2 = destP2,
+                    isCross = true,
+                    nspNoInsert = true,
+                    nspNoSupportCheck = true,
+                }
+                if task.finalThread then
+                    drawTask.finalThread = task.finalThread
+                end
+                insert(drawTask)
+                
+                self:NP_InvalidateRouteCaches(drawTask.finalThread or task.owner.thread, task.owner)
+                
+                return inserted
+            end
+        end
+    end
+
     local planTarget
     if task.nspContinueDrag then planTarget = task.p2
     elseif task.nspDrag and task.finalThread then planTarget = task.finalThread.p2
@@ -16784,7 +16842,7 @@ function NSPauk:NP_ExecutePlan(task)
             end
         end
     end
-    
+
     local function insertRoute(fromPoint, toPoint, dragMode, plan)
         -- Передаем restrictToInst для ускорения
         local route = self:NP_BuildRoute(fromPoint, toPoint, restrictToInst)
@@ -16827,7 +16885,7 @@ function NSPauk:NP_ExecutePlan(task)
         end
         return made
     end
-    
+
     if task.nspContinueDrag then
         local depth = tonumber(task.nspFallDepth) or 0
         local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y) or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
@@ -16865,8 +16923,6 @@ function NSPauk:NP_ExecutePlan(task)
                 end
             end
         else
-            -- ФИЗИКА: Путь не найден. Не летим по воздуху!
-            -- Падаем на дно, ползем по дну до X, и взбираемся.
             local drop = self:NP_MakeTempDropTask(from, { x = from.x, y = 0 })
             if dragMode then drop.nspDuringDrag = true end
             insert(drop)
@@ -16888,7 +16944,7 @@ function NSPauk:NP_ExecutePlan(task)
         end
         return inserted
     end
-    
+
     local depth = tonumber(task.nspFallDepth) or 0
     local fromSupported = self:NP_FreshHasSupportAt(from.x, from.y) or self:NP_NearSupportWithin(from.x, from.y, gap * 1.5)
     if task.nspPlan and not task.nspAllowNoSupport and not fromSupported then
@@ -16904,7 +16960,9 @@ function NSPauk:NP_ExecutePlan(task)
             task.nspAllowNoSupport = true
         end
     end
+
     S.nspSupportCache = nil
+
     if task.nspDrag then
         self:NP_ClearGlobalDrag(false)
         local anchor = (task.finalThread and task.finalThread.p0) or task.p0
@@ -16927,10 +16985,10 @@ function NSPauk:NP_ExecutePlan(task)
         end
         return inserted
     end
+
     local to = task.p2 and { x = task.p2.x, y = task.p2.y } or { x = from.x, y = from.y }
     local made = insertRoute(from, to, false, task)
     if loopHit then cleanupInserted() return self:NP_HandleRouteLoop(task, from, to, false) end
-    
     if made == 0 then
         local drop = self:NP_MakeTempDropTask(from, { x = from.x, y = 0 })
         insert(drop)
