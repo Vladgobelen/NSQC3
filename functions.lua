@@ -12707,158 +12707,118 @@ function NSPauk:CreateRingInstance(targetCount, items)
     if type(self.NP_CollectRingAnchors) ~= "function" then
         return nil
     end
-
     targetCount = math.floor(tonumber(targetCount) or 4)
-
     if targetCount < 4 then
         targetCount = 4
     end
-
     if targetCount % 2 ~= 0 then
         targetCount = targetCount + 1
     end
-
     if not items then
         items = self:CollectVisibleItems()
     end
-
     local anchors = self:NP_CollectRingAnchors(items, targetCount)
-
     if not anchors or #anchors < 4 then
         return nil
     end
-
     for i = #anchors, 1, -1 do
         if not self:ValidateAnchorRect(anchors[i]) then
             table.remove(anchors, i)
         end
     end
-
     if #anchors < 4 then
         return nil
     end
-
     if #anchors % 2 ~= 0 then
         table.remove(anchors)
     end
-
     local N = #anchors
-
     if N < 4 then
         return nil
     end
-
-    -- Сортируем выбранные объекты по углу вокруг их общего центра,
-    -- чтобы периметр кольца шёл по кругу, а не в случайном порядке.
     local sumX = 0
     local sumY = 0
-
     for _, item in ipairs(anchors) do
         sumX = sumX + (item.cx or 0)
         sumY = sumY + (item.cy or 0)
     end
-
     local centerX = sumX / N
     local centerY = sumY / N
     local twoPi = math.pi * 2
-
     local function normAngle(a)
         if type(a) ~= "number" or a ~= a then
             return 0
         end
-
         while a < 0 do
             a = a + twoPi
         end
-
         while a >= twoPi do
             a = a - twoPi
         end
-
         return a
     end
-
     for _, item in ipairs(anchors) do
         item._nspRingSortAngle = normAngle(math.atan2(
             (item.cy or 0) - centerY,
             (item.cx or 0) - centerX
         ))
     end
-
     table.sort(anchors, function(a, b)
         local aa = a._nspRingSortAngle or 0
         local bb = b._nspRingSortAngle or 0
-
         if aa ~= bb then
             return aa < bb
         end
-
         local ax = a.cx or 0
         local bx = b.cx or 0
-
         if ax ~= bx then
             return ax < bx
         end
-
         return (a.cy or 0) < (b.cy or 0)
     end)
-
     for _, item in ipairs(anchors) do
         item._nspRingSortAngle = nil
     end
-
     local idxA, idxB
-
     if type(self.NP_ChooseRingDiameter) == "function" then
         idxA, idxB = self:NP_ChooseRingDiameter(anchors)
     end
-
     if type(idxA) ~= "number" or type(idxB) ~= "number" then
         idxA = 1
         idxB = 1 + math.floor(N / 2)
     end
-
     idxA = math.floor(idxA)
     idxB = math.floor(idxB)
-
     if idxA < 1 or idxA > N then
         idxA = 1
     end
-
     if idxB < 1 or idxB > N then
         idxB = 1 + math.floor(N / 2)
     end
-
     if idxA == idxB then
         idxB = idxA + math.floor(N / 2)
         if idxB > N then
             idxB = idxB - N
         end
     end
-
     if idxA == idxB then
         idxB = idxA + 1
         if idxB > N then
             idxB = 1
         end
     end
-
     local a = anchors[idxA]
     local b = anchors[idxB]
-
     if not a or not b then
         return nil
     end
-
     local diamThread = self:NP_MakeGravityThread(
         { x = a.cx or 0, y = a.cy or 0 },
         { x = b.cx or 0, y = b.cy or 0 },
         "main",
         1.0
     )
-
     local hx, hy = self:BzThread(diamThread, 0.5)
-
     local hubRect = self:NormalizeFallbackRect({
         name = "RingHub",
         left = hx - 16,
@@ -12866,7 +12826,6 @@ function NSPauk:CreateRingInstance(targetCount, items)
         bottom = hy - 16,
         top = hy + 16,
     })
-
     local inst = {
         id = self.nextInstanceId,
         isRing = true,
@@ -12887,36 +12846,27 @@ function NSPauk:CreateRingInstance(targetCount, items)
         drawnPoints = 0,
         settled = false,
     }
-
     self.nextInstanceId = self.nextInstanceId + 1
-
     inst.anchorCandidates[#inst.anchorCandidates + 1] = self:CopyRect(hubRect)
-
     local perimeterThreads = {}
     local perimeterConns = {}
-
     for i = 1, N do
         local p = anchors[i]
         local q = anchors[(i % N) + 1]
-
         local thread = self:NP_MakeGravityThread(
             { x = p.cx or 0, y = p.cy or 0 },
             { x = q.cx or 0, y = q.cy or 0 },
             "main",
             1.0
         )
-
         local angle = math.atan2(
             (q.cy or 0) - (p.cy or 0),
             (q.cx or 0) - (p.cx or 0)
         )
-
         if angle < 0 then
             angle = angle + twoPi
         end
-
         thread.angle = angle
-
         local conn = {
             id = #inst.conns + 1,
             target = {
@@ -12932,30 +12882,23 @@ function NSPauk:CreateRingInstance(targetCount, items)
             noSector = true,
             isRingFrame = true,
         }
-
         thread.ownerRef = {
             inst = inst,
             conn = conn,
         }
-
         inst.conns[#inst.conns + 1] = conn
         inst.anchorCandidates[#inst.anchorCandidates + 1] = self:CopyRect(q)
-
         perimeterThreads[#perimeterThreads + 1] = thread
         perimeterConns[i] = conn
     end
-
     local diamAngle = math.atan2(
         (b.cy or 0) - (a.cy or 0),
         (b.cx or 0) - (a.cx or 0)
     )
-
     if diamAngle < 0 then
         diamAngle = diamAngle + twoPi
     end
-
     diamThread.angle = diamAngle
-
     local diamConn = {
         id = #inst.conns + 1,
         target = {
@@ -12971,36 +12914,28 @@ function NSPauk:CreateRingInstance(targetCount, items)
         noSector = true,
         isDiameter = true,
     }
-
     diamThread.ownerRef = {
         inst = inst,
         conn = diamConn,
     }
-
     inst.conns[#inst.conns + 1] = diamConn
     inst.hubDepConn = diamConn
-
     for i = 1, N do
         local anchor = anchors[i]
-
         local thread = self:NP_MakeGravityThread(
             { x = hx, y = hy },
             { x = anchor.cx or 0, y = anchor.cy or 0 },
             "cross",
             0.35
         )
-
         local angle = math.atan2(
             (anchor.cy or 0) - hy,
             (anchor.cx or 0) - hx
         )
-
         if angle < 0 then
             angle = angle + twoPi
         end
-
         thread.angle = angle
-
         local conn = {
             id = #inst.conns + 1,
             target = {
@@ -13016,64 +12951,81 @@ function NSPauk:CreateRingInstance(targetCount, items)
             isSpoke = true,
             hubDepConn = diamConn,
         }
-
         thread.ownerRef = {
             inst = inst,
             conn = conn,
         }
-
         inst.conns[#inst.conns + 1] = conn
     end
-
+    
+    -- ИСПРАВЛЕНИЕ: Проверяем минимальное расстояние для промежуточных спиц
+    local minObjDist = self:NP_GetObjectMinDistance()
+    local minObjDist2 = minObjDist * minObjDist
+    
+    -- Собираем все существующие точки (углы + хаб)
+    local existingPoints = {}
+    existingPoints[#existingPoints + 1] = { x = hx, y = hy }
+    for _, anchor in ipairs(anchors) do
+        existingPoints[#existingPoints + 1] = { x = anchor.cx or 0, y = anchor.cy or 0 }
+    end
+    
     for i = 1, N do
         local pThread = perimeterThreads[i]
         local perConn = perimeterConns[i]
-
         local midX, midY = self:BzThread(pThread, 0.5)
-
-        local thread = self:NP_MakeGravityThread(
-            { x = hx, y = hy },
-            { x = midX, y = midY },
-            "cross",
-            0.35
-        )
-
-        local angle = math.atan2(midY - hy, midX - hx)
-
-        if angle < 0 then
-            angle = angle + twoPi
+        
+        -- Проверяем, не слишком ли близко к другим точкам
+        local tooClose = false
+        for _, pt in ipairs(existingPoints) do
+            local dx = midX - pt.x
+            local dy = midY - pt.y
+            if dx * dx + dy * dy < minObjDist2 then
+                tooClose = true
+                break
+            end
         end
-
-        thread.angle = angle
-
-        local conn = {
-            id = #inst.conns + 1,
-            target = {
-                frame = nil,
-                name = "MidPerimeter",
-                rect = nil,
-            },
-            ringStartRect = self:CopyRect(hubRect),
-            thread = thread,
-            angle = angle,
-            textures = {},
-            alive = true,
-            isSpoke = true,
-            isMidSpoke = true,
-            hubDepConn = diamConn,
-            perimeterConn = perConn,
-        }
-
-        thread.ownerRef = {
-            inst = inst,
-            conn = conn,
-        }
-
-        inst.conns[#inst.conns + 1] = conn
+        
+        -- Если слишком близко, пропускаем эту промежуточную спицу
+        if not tooClose then
+            local thread = self:NP_MakeGravityThread(
+                { x = hx, y = hy },
+                { x = midX, y = midY },
+                "cross",
+                0.35
+            )
+            local angle = math.atan2(midY - hy, midX - hx)
+            if angle < 0 then
+                angle = angle + twoPi
+            end
+            thread.angle = angle
+            local conn = {
+                id = #inst.conns + 1,
+                target = {
+                    frame = nil,
+                    name = "MidPerimeter",
+                    rect = nil,
+                },
+                ringStartRect = self:CopyRect(hubRect),
+                thread = thread,
+                angle = angle,
+                textures = {},
+                alive = true,
+                isSpoke = true,
+                isMidSpoke = true,
+                hubDepConn = diamConn,
+                perimeterConn = perConn,
+            }
+            thread.ownerRef = {
+                inst = inst,
+                conn = conn,
+            }
+            inst.conns[#inst.conns + 1] = conn
+            
+            existingPoints[#existingPoints + 1] = { x = midX, y = midY }
+        end
     end
-
+    
     self:BuildInstanceTasks(inst)
-
     return inst
 end
 
@@ -15209,43 +15161,137 @@ function NSPauk:StartLocalFade(textures, duration)
     self:AddFade(textures, duration, nil)
 end
 
+function NSPauk:SaveMothState()
+    local S = self.S
+    local instances = {}
+    for i, inst in ipairs(S.instances) do
+        instances[i] = inst
+    end
+    
+    -- Сохраняем приоритетную перемычку если есть
+    local prioritySeg = nil
+    if S.nspQueueResumePriority then
+        prioritySeg = S.nspQueueResumePriority
+    end
+    
+    return {
+        phase = S.phase,
+        currentInstance = S.currentInstance,
+        tasks = S.tasks,
+        taskIdx = S.taskIdx,
+        cocoon = S.cocoon,
+        completeTimer = S.completeTimer,
+        moveDur = S.moveDur,
+        moveT = S.moveT,
+        lastTaskT = S.lastTaskT,
+        stillTimer = S.stillTimer,
+        limitReached = S.limitReached,
+        limitReturnPending = S.limitReturnPending,
+        limitCocoonPending = S.limitCocoonPending,
+        limitWaitTimer = S.limitWaitTimer,
+        limitHomePoint = S.limitHomePoint,
+        spiderX = S.lastSpiderX or 0,
+        spiderY = S.lastSpiderY or 0,
+        instances = instances,
+        prioritySeg = prioritySeg,
+    }
+end
+
+function NSPauk:RestoreMothStateImmediate(saved)
+    local S = self.S
+    if not saved then
+        S.phase = "watch"
+        S.stillTimer = 0
+        S.speedTimer = 0
+        return
+    end
+    S.phase = saved.phase or "watch"
+    S.currentInstance = saved.currentInstance
+    S.tasks = saved.tasks or {}
+    S.taskIdx = saved.taskIdx or 1
+    S.currentTask = nil
+    S.cocoon = saved.cocoon
+    S.completeTimer = saved.completeTimer or 0
+    S.moveDur = saved.moveDur or 1
+    S.moveT = 0
+    S.lastTaskT = 0
+    S.speedTimer = 0
+    S.stillTimer = saved.stillTimer or 0
+    S.limitReached = saved.limitReached
+    S.limitReturnPending = saved.limitReturnPending
+    S.limitCocoonPending = saved.limitCocoonPending
+    S.limitWaitTimer = saved.limitWaitTimer or 0
+    S.limitHomePoint = saved.limitHomePoint
+    if (S.phase == "task" or S.phase == "instanceComplete")
+    and S.currentInstance
+    and not S.currentInstance.torn
+    and not S.currentInstance.isCocoon
+    and not S.currentInstance.isMoth then
+        local rebuilt = self:NP_RebuildInstanceTasks(S.currentInstance, saved.prioritySeg)
+        if rebuilt then
+            S.tasks = rebuilt
+            S.taskIdx = 1
+            S.currentTask = nil
+            if #rebuilt == 0 then
+                S.phase = "instanceComplete"
+                S.completeTimer = 0
+            else
+                S.phase = "task"
+            end
+        end
+        self:NP_RequestQueueResume(S.currentInstance, saved.prioritySeg)
+    end
+    if S.phase == "dissolve" and not S.cocoon then
+        S.phase = "watch"
+    end
+end
+
 function NSPauk:KillSeg(seg)
     if not seg or not seg.alive then
         return
     end
-
     seg.alive = false
-
     if #seg.textures > 0 then
         seg._nspHadTextures = true
         self:StartLocalFade(seg.textures, self.C.TEAR_FADE_DURATION)
         seg.textures = {}
     end
-
     local ref = seg.thread and seg.thread.ownerRef
     local inst = ref and ref.inst
-
     if inst and inst.interSegs then
         for _, inter in ipairs(inst.interSegs) do
             if inter.alive
-                and (inter.parentSegA == seg or inter.parentSegB == seg) then
+            and (inter.parentSegA == seg or inter.parentSegB == seg) then
                 self:KillSeg(inter)
             end
         end
     end
-
+    -- ИСПРАВЛЕНО: проверяем все активные instances, не только currentInstance
     if inst
-        and not inst.torn
-        and not inst.isCocoon
-        and not inst.isMoth
-        and inst == self.S.currentInstance
-        and not seg.isInterCross then
-
-        if inst.isNaturalRing then
-            inst.nspRingCrossQueueDirty = true
-            self:NP_RequestRingQueueRebuild(inst, seg)
+    and not inst.torn
+    and not inst.isCocoon
+    and not inst.isMoth
+    and not seg.isInterCross then
+        local shouldResume = false
+        if inst == self.S.currentInstance then
+            shouldResume = true
         else
-            self:NP_RequestQueueResume(inst, seg)
+            -- Проверяем, активна ли эта паутина
+            for _, activeInst in ipairs(self.S.instances or {}) do
+                if activeInst == inst and not activeInst.torn then
+                    shouldResume = true
+                    break
+                end
+            end
+        end
+        
+        if shouldResume then
+            if inst.isNaturalRing then
+                inst.nspRingCrossQueueDirty = true
+                self:NP_RequestRingQueueRebuild(inst, seg)
+            else
+                self:NP_RequestQueueResume(inst, seg)
+            end
         end
     end
 end
@@ -19205,37 +19251,6 @@ function NSPauk:UpdateMothEat(dt)
     end
 end
 
-function NSPauk:SaveMothState()
-    local S = self.S
-
-    local instances = {}
-
-    for i, inst in ipairs(S.instances) do
-        instances[i] = inst
-    end
-
-    return {
-        phase = S.phase,
-        currentInstance = S.currentInstance,
-        tasks = S.tasks,
-        taskIdx = S.taskIdx,
-        cocoon = S.cocoon,
-        completeTimer = S.completeTimer,
-        moveDur = S.moveDur,
-        moveT = S.moveT,
-        lastTaskT = S.lastTaskT,
-        stillTimer = S.stillTimer,
-        limitReached = S.limitReached,
-        limitReturnPending = S.limitReturnPending,
-        limitCocoonPending = S.limitCocoonPending,
-        limitWaitTimer = S.limitWaitTimer,
-        limitHomePoint = S.limitHomePoint,
-        spiderX = S.lastSpiderX or 0,
-        spiderY = S.lastSpiderY or 0,
-        instances = instances,
-    }
-end
-
 function NSPauk:NP_HasRequiredWebPending(inst)
     if not inst or inst.torn or inst.isCocoon or inst.isMoth then
         return false
@@ -19387,22 +19402,24 @@ end
 
 function NSPauk:NP_RequestQueueResume(inst, priorityOwner)
     local S = self.S
-
     if type(S) ~= "table" then
         return
     end
-
     if not inst or inst.torn or inst.isCocoon or inst.isMoth then
         return
     end
-
-    if inst ~= S.currentInstance then
+    local isActive = false
+    for _, activeInst in ipairs(S.instances or {}) do
+        if activeInst == inst and not activeInst.torn then
+            isActive = true
+            break
+        end
+    end
+    if not isActive then
         return
     end
-
     S.nspQueueResumePending = true
     S.nspQueueResumeInst = inst
-
     if priorityOwner then
         S.nspQueueResumePriority = priorityOwner
     end
@@ -19410,132 +19427,113 @@ end
 
 function NSPauk:NP_ProcessQueueResume()
     local S = self.S
-
     if type(S) ~= "table" then
         return false
     end
-
     if S.nspQueueRebuildRunning then
         local now = GetTime()
-
         if type(S.nspQueueRebuildLockAt) == "number"
-            and S.nspQueueRebuildLockAt == S.nspQueueRebuildLockAt
-            and (now - S.nspQueueRebuildLockAt) > 3 then
+        and S.nspQueueRebuildLockAt == S.nspQueueRebuildLockAt
+        and (now - S.nspQueueRebuildLockAt) > 3 then
             S.nspQueueRebuildRunning = false
         else
             return false
         end
     end
-
     if not S.nspQueueResumePending then
         return false
     end
-
     local inst = S.nspQueueResumeInst or S.currentInstance
     local priority = S.nspQueueResumePriority
-
-    if not inst
-        or inst.torn
-        or inst.isCocoon
-        or inst.isMoth
-        or inst ~= S.currentInstance then
+    -- ИСПРАВЛЕНО: проверяем активность паутины, а не только currentInstance
+    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
         S.nspQueueResumePending = false
         S.nspQueueResumeInst = nil
         S.nspQueueResumePriority = nil
         return false
     end
-
+    local isActive = false
+    for _, activeInst in ipairs(S.instances or {}) do
+        if activeInst == inst and not activeInst.torn then
+            isActive = true
+            break
+        end
+    end
+    if not isActive then
+        S.nspQueueResumePending = false
+        S.nspQueueResumeInst = nil
+        S.nspQueueResumePriority = nil
+        return false
+    end
     if S.phase ~= "task" and S.phase ~= "instanceComplete" then
         return false
     end
-
     if S.limitReached or S.limitReturnPending or S.limitCocoonPending then
         return false
     end
-
     if S.moth and S.moth.active then
         return false
     end
-
     if S.combatHide then
         return false
     end
-
     if S.nspDrag then
         local activeDragTask = S.currentTask and S.currentTask.nspDuringDrag
-
         if activeDragTask then
             return false
         end
-
         self:NP_ClearGlobalDrag(true)
     end
-
     S.nspQueueResumePending = false
     S.nspQueueResumeInst = nil
     S.nspQueueResumePriority = nil
-
-    -- Быстрый путь.
-    -- Если есть конкретная перемычка/нить, пробуем добавить только её,
-    -- не пересчитывая всю паутину.
+    -- Быстрый путь
     if priority then
         if not priority.alive
-            and priority.connA
-            and priority.connB
-            and priority.connA.alive
-            and priority.connB.alive
-            and self:NP_IsWebOwnerDrawn(priority.connA)
-            and self:NP_IsWebOwnerDrawn(priority.connB) then
+        and priority.connA
+        and priority.connB
+        and priority.connA.alive
+        and priority.connB.alive
+        and self:NP_IsWebOwnerDrawn(priority.connA)
+        and self:NP_IsWebOwnerDrawn(priority.connB) then
             priority.alive = true
             priority._nspQueueRevive = true
         end
-
         if self:NP_AppendOwnerTasksFast(inst, priority) then
             return true
         end
     end
-
     if not self:NP_HasRequiredWebPending(inst) then
         return false
     end
-
     S.nspQueueRebuildRunning = true
     S.nspQueueRebuildLockAt = GetTime()
-
-    -- Полный пересчёт оставляем только для случаев,
-    -- когда быстрый путь не сработал.
     self:NP_RecheckWebSectors(inst)
     self:NP_RecheckWebSectorsByTriangles(inst)
-
     if S.nspDrag then
         local activeDragTask = S.currentTask and S.currentTask.nspDuringDrag
-
         if not activeDragTask then
             self:NP_ClearGlobalDrag(false)
         end
     end
-
     if inst.torn
-        or (S.phase ~= "task" and S.phase ~= "instanceComplete") then
+    or (S.phase ~= "task" and S.phase ~= "instanceComplete") then
         S.nspQueueRebuildRunning = false
         return false
     end
-
     if priority
-        and not priority.alive
-        and priority.connA
-        and priority.connB
-        and priority.connA.alive
-        and priority.connB.alive then
+    and not priority.alive
+    and priority.connA
+    and priority.connB
+    and priority.connA.alive
+    and priority.connB.alive then
         priority.alive = true
         priority._nspQueueRevive = true
     end
-
     local tasks = self:NP_RebuildInstanceTasks(inst, priority)
-
     if type(tasks) == "table"
-        and #tasks > 0
-        and not inst.torn then
+    and #tasks > 0
+    and not inst.torn then
         S.tasks = tasks
         S.taskIdx = 1
         S.currentTask = nil
@@ -19544,14 +19542,10 @@ function NSPauk:NP_ProcessQueueResume()
         S.lastTaskT = 0
         S.phase = "task"
         S.nspQueueRebuildRunning = false
-
         self:AdvanceTask()
-
         return true
     end
-
     S.nspQueueRebuildRunning = false
-
     return false
 end
 
@@ -19905,62 +19899,6 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
         end
     end
     return true
-end
-
-function NSPauk:RestoreMothStateImmediate(saved)
-    local S = self.S
-
-    if not saved then
-        S.phase = "watch"
-        S.stillTimer = 0
-        S.speedTimer = 0
-        return
-    end
-
-    S.phase = saved.phase or "watch"
-    S.currentInstance = saved.currentInstance
-    S.tasks = saved.tasks or {}
-    S.taskIdx = saved.taskIdx or 1
-    S.currentTask = nil
-    S.cocoon = saved.cocoon
-    S.completeTimer = saved.completeTimer or 0
-    S.moveDur = saved.moveDur or 1
-    S.moveT = 0
-    S.lastTaskT = 0
-    S.speedTimer = 0
-    S.stillTimer = saved.stillTimer or 0
-    S.limitReached = saved.limitReached
-    S.limitReturnPending = saved.limitReturnPending
-    S.limitCocoonPending = saved.limitCocoonPending
-    S.limitWaitTimer = saved.limitWaitTimer or 0
-    S.limitHomePoint = saved.limitHomePoint
-
-    if (S.phase == "task" or S.phase == "instanceComplete")
-        and S.currentInstance
-        and not S.currentInstance.torn
-        and not S.currentInstance.isCocoon
-        and not S.currentInstance.isMoth then
-        local rebuilt = self:NP_RebuildInstanceTasks(S.currentInstance, nil)
-
-        if rebuilt then
-            S.tasks = rebuilt
-            S.taskIdx = 1
-            S.currentTask = nil
-
-            if #rebuilt == 0 then
-                S.phase = "instanceComplete"
-                S.completeTimer = 0
-            else
-                S.phase = "task"
-            end
-        end
-
-        self:NP_RequestQueueResume(S.currentInstance, nil)
-    end
-
-    if S.phase == "dissolve" and not S.cocoon then
-        S.phase = "watch"
-    end
 end
 
 function NSPauk:StartMothReturn(saved)
