@@ -16695,6 +16695,7 @@ function NSPauk:NP_ExecutePlan(task)
     local inserted = 0
     local loopHit = false
 
+    -- Определяем, нужно ли ограничивать граф только текущей паутиной (для перемычек)
     local restrictToInst = nil
     if task.owner and (task.owner.connA or task.owner.connB) then
         restrictToInst = self:GetOwnerInstance(task.owner)
@@ -16716,9 +16717,7 @@ function NSPauk:NP_ExecutePlan(task)
         end
     end
 
-    -- БЫСТРЫЙ ПУТЬ ДЛЯ ПЕРЕМЫЧЕК (CROSS-SEGMENTS)
-    -- Если обе родительские нити живы и нарисованы, пропускаем тяжелый NP_BuildRoute.
-    -- Используем координаты из задачи, которые уже правильно заданы при планировании.
+    -- ПЕРЕМЫЧКИ (CROSS-SEGMENTS): подход по существующей паутине + отрисовка по безье
     local isCrossSeg = task.owner and task.owner.connA and task.owner.connB
     if isCrossSeg then
         local connA = task.owner.connA
@@ -16727,43 +16726,33 @@ function NSPauk:NP_ExecutePlan(task)
            and self:NP_IsWebOwnerDrawn(connA) 
            and self:NP_IsWebOwnerDrawn(connB) then
            
-            -- Используем координаты из задачи (они уже с провисанием!)
             local destP0 = task.p0 and { x = task.p0.x, y = task.p0.y } or from
             local destP2 = task.p2 and { x = task.p2.x, y = task.p2.y } or destP0
             local destP1 = task.p1 and { x = task.p1.x, y = task.p1.y } or { x = (destP0.x + destP2.x)/2, y = (destP0.y + destP2.y)/2 }
             
             if task.kind == "travel" then
-                -- Для задачи подхода ползем до p2 (цели travel)
-                local dx = from.x - destP2.x
-                local dy = from.y - destP2.y
-                if dx*dx + dy*dy > 4 then
-                    local crawlToStart = self:NP_MakeCrawlTask(from, destP2, task)
-                    crawlToStart.isCross = task.isCross
-                    crawlToStart.conn = task.conn
-                    crawlToStart.owner = task.owner
-                    insert(crawlToStart)
-                end
+                -- Для travel: маршрут по паутине от from до p2 через NP_BuildRoute
+                local made = insertRoute(from, destP2, false, task)
+                if loopHit then cleanupInserted() return self:NP_HandleRouteLoop(task, from, destP2, false) end
                 return inserted
             end
             
             if task.kind == "thread" then
-                -- Для задачи отрисовки: ползем к началу перемычки, затем рисуем
+                -- Шаг 1: подход от from до p0 ПО СУЩЕСТВУЮЩЕЙ ПАУТИНЕ (NP_BuildRoute)
                 local dx = from.x - destP0.x
                 local dy = from.y - destP0.y
                 if dx*dx + dy*dy > 4 then
-                    local crawlToStart = self:NP_MakeCrawlTask(from, destP0, task)
-                    crawlToStart.isCross = task.isCross
-                    crawlToStart.conn = task.conn
-                    crawlToStart.owner = task.owner
-                    insert(crawlToStart)
+                    local made = insertRoute(from, destP0, false, task)
+                    if loopHit then cleanupInserted() return self:NP_HandleRouteLoop(task, from, destP0, false) end
                 end
                 
+                -- Шаг 2: отрисовка перемычки по безье p0->p1->p2
                 local drawTask = {
                     kind = "thread",
                     owner = task.owner,
                     drop = true,
                     p0 = destP0,
-                    p1 = destP1,  -- Управляющая точка с провисанием!
+                    p1 = destP1,
                     p2 = destP2,
                     isCross = true,
                     nspNoInsert = true,
@@ -16808,6 +16797,7 @@ function NSPauk:NP_ExecutePlan(task)
     end
 
     local function insertRoute(fromPoint, toPoint, dragMode, plan)
+        -- Передаем restrictToInst для ускорения
         local route = self:NP_BuildRoute(fromPoint, toPoint, restrictToInst)
         local pendingDrop = nil
         local routeFrom = fromPoint
@@ -16886,6 +16876,8 @@ function NSPauk:NP_ExecutePlan(task)
                 end
             end
         else
+            -- ФИЗИКА: Путь не найден. Не летим по воздуху!
+            -- Падаем на дно, ползем по дну до X, и взбираемся.
             local drop = self:NP_MakeTempDropTask(from, { x = from.x, y = 0 })
             if dragMode then drop.nspDuringDrag = true end
             insert(drop)
