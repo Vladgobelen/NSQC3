@@ -16717,63 +16717,11 @@ function NSPauk:NP_ExecutePlan(task)
         end
     end
 
-    -- ПЕРЕМЫЧКИ (CROSS-SEGMENTS): подход по существующей паутине + отрисовка по безье
-    local isCrossSeg = task.owner and task.owner.connA and task.owner.connB
-    if isCrossSeg then
-        local connA = task.owner.connA
-        local connB = task.owner.connB
-        if connA.alive and connB.alive 
-           and self:NP_IsWebOwnerDrawn(connA) 
-           and self:NP_IsWebOwnerDrawn(connB) then
-           
-            local destP0 = task.p0 and { x = task.p0.x, y = task.p0.y } or from
-            local destP2 = task.p2 and { x = task.p2.x, y = task.p2.y } or destP0
-            local destP1 = task.p1 and { x = task.p1.x, y = task.p1.y } or { x = (destP0.x + destP2.x)/2, y = (destP0.y + destP2.y)/2 }
-            
-            if task.kind == "travel" then
-                -- Для travel: маршрут по паутине от from до p2 через NP_BuildRoute
-                local made = insertRoute(from, destP2, false, task)
-                if loopHit then cleanupInserted() return self:NP_HandleRouteLoop(task, from, destP2, false) end
-                return inserted
-            end
-            
-            if task.kind == "thread" then
-                -- Шаг 1: подход от from до p0 ПО СУЩЕСТВУЮЩЕЙ ПАУТИНЕ (NP_BuildRoute)
-                local dx = from.x - destP0.x
-                local dy = from.y - destP0.y
-                if dx*dx + dy*dy > 4 then
-                    local made = insertRoute(from, destP0, false, task)
-                    if loopHit then cleanupInserted() return self:NP_HandleRouteLoop(task, from, destP0, false) end
-                end
-                
-                -- Шаг 2: отрисовка перемычки по безье p0->p1->p2
-                local drawTask = {
-                    kind = "thread",
-                    owner = task.owner,
-                    drop = true,
-                    p0 = destP0,
-                    p1 = destP1,
-                    p2 = destP2,
-                    isCross = true,
-                    nspNoInsert = true,
-                }
-                if task.finalThread then
-                    drawTask.finalThread = task.finalThread
-                end
-                insert(drawTask)
-                
-                self:NP_InvalidateRouteCaches(drawTask.finalThread or task.owner.thread, task.owner)
-                
-                return inserted
-            end
-        end
-    end
-
     local planTarget
     if task.nspContinueDrag then planTarget = task.p2
     elseif task.nspDrag and task.finalThread then planTarget = task.finalThread.p2
     else planTarget = task.p2 end
-    
+
     if planTarget and planTarget.x and planTarget.y then
         local targetSupported = self:NP_FreshHasSupportAt(planTarget.x, planTarget.y) or self:NP_NearSupportWithin(planTarget.x, planTarget.y, gap * 1.25)
         if not targetSupported then
