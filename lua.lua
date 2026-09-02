@@ -27369,14 +27369,12 @@ end
 function UI:_CreateMain()
     local f = CreateFrame("Frame", nil, self.parent)
     self.frame = f
-
     f:SetSize(self.baseFrameWidth or 620, 450)
     f:SetPoint("CENTER")
     f:EnableMouse(true)
     f:SetMovable(true)
     f:SetClampedToScreen(true)
     f:SetFrameStrata("HIGH")
-
     addBackgroundBorder(f)
 
     local titleBg = f:CreateTexture(nil, "ARTWORK")
@@ -27430,14 +27428,11 @@ function UI:_CreateMain()
 
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
-
     closeButton:SetScript("OnClick", function()
         self:HideHelp()
-
         if self.callbacks.onClose then
             self.callbacks.onClose()
         end
-
         f:Hide()
     end)
 
@@ -27483,7 +27478,6 @@ function UI:_CreateMain()
     self.prevButton:SetSize(110, 24)
     self.prevButton:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 15, 8)
     self.prevButton:SetText("<  Назад")
-
     self.prevButton:SetScript("OnClick", function()
         if self.callbacks.onPrev then
             self.callbacks.onPrev()
@@ -27494,12 +27488,10 @@ function UI:_CreateMain()
     self.nextButton:SetSize(110, 24)
     self.nextButton:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -15, 8)
     self.nextButton:SetText("Вперед  >")
-
     self.nextButton:SetScript("OnClick", function()
         if self.currentModuleIndex then
             self:MarkModuleReadIfInfo(self.currentModuleIndex)
         end
-
         if self.callbacks.onNext then
             self.callbacks.onNext()
         end
@@ -27518,30 +27510,25 @@ function UI:_CreateMain()
     scaleButton:SetScript("OnEnter", function()
         scaleTexture:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     end)
-
     scaleButton:SetScript("OnLeave", function()
         scaleTexture:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     end)
 
     scaleButton:RegisterForDrag("LeftButton")
-
     scaleButton:SetScript("OnDragStart", function()
         self.isScaling = true
         self.scaleStartScale = f:GetScale() or 1
         self.scaleStartX, self.scaleStartY = GetCursorPosition()
     end)
-
     scaleButton:SetScript("OnDragStop", function()
         self.isScaling = false
         self:SaveState()
     end)
 
     f:RegisterForDrag("LeftButton")
-
     f:SetScript("OnDragStart", function(frame)
         frame:StartMoving()
     end)
-
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
         self:SaveState()
@@ -27552,20 +27539,26 @@ function UI:_CreateMain()
             self.layoutDirty = false
             self:Layout()
         end
-
         if self.isScaling then
             local mx, my = GetCursorPosition()
             local dx = mx - self.scaleStartX
             local dy = my - self.scaleStartY
-
             local newScale = self.scaleStartScale + (dx - dy) / 1000
             newScale = math.max(0.75, math.min(2.0, newScale))
-
             local currentScale = f:GetScale() or 1
-
             if math.abs(newScale - currentScale) > 0.001 then
                 f:SetScale(newScale)
             end
+        end
+        
+        -- Динамическое изменение страты при наведении мыши
+        local isOver = f:IsMouseOver()
+        if isOver and not self._mainMouseOver then
+            self._mainMouseOver = true
+            f:SetFrameStrata("FULLSCREEN")
+        elseif not isOver and self._mainMouseOver then
+            self._mainMouseOver = false
+            f:SetFrameStrata("HIGH")
         end
     end)
 
@@ -27574,7 +27567,6 @@ function UI:_CreateMain()
             self.stateLoaded = true
             self:LoadState()
         end
-
         self.layoutDirty = true
     end)
 
@@ -27585,14 +27577,11 @@ function UI:_CreateMain()
         self.isScaling = false
         self:SaveState()
     end)
-
     f:Hide()
 end
 
 function UI:_CreateHelp()
-    if self.helpFrame then
-        return
-    end
+    if self.helpFrame then return end
 
     local f = CreateFrame("Frame", nil, UIParent)
     f:SetSize(700, 580)
@@ -27601,7 +27590,6 @@ function UI:_CreateHelp()
     f:SetMovable(true)
     f:SetClampedToScreen(true)
     f:SetFrameStrata("DIALOG")
-
     addBackgroundBorder(f)
 
     local titleBg = f:CreateTexture(nil, "ARTWORK")
@@ -27618,7 +27606,6 @@ function UI:_CreateHelp()
 
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
-
     closeButton:SetScript("OnClick", function()
         f:Hide()
     end)
@@ -27639,17 +27626,26 @@ function UI:_CreateHelp()
     )
 
     f:RegisterForDrag("LeftButton")
-
     f:SetScript("OnDragStart", function(frame)
         frame:StartMoving()
     end)
-
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
     end)
 
-    self.helpFrame = f
+    -- Отслеживание наведения мыши для переключения страты
+    f:SetScript("OnUpdate", function()
+        local isOver = f:IsMouseOver()
+        if isOver and not self._helpMouseOver then
+            self._helpMouseOver = true
+            f:SetFrameStrata("FULLSCREEN")
+        elseif not isOver and self._helpMouseOver then
+            self._helpMouseOver = false
+            f:SetFrameStrata("DIALOG")
+        end
+    end)
 
+    self.helpFrame = f
     f:Hide()
 end
 
