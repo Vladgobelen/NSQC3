@@ -16716,6 +16716,9 @@ function NSPauk:NP_ExecutePlan(task)
         end
     end
 
+    -- БЫСТРЫЙ ПУТЬ ДЛЯ ПЕРЕМЫЧЕК (CROSS-SEGMENTS)
+    -- Если обе родительские нити живы и нарисованы, пропускаем тяжелый NP_BuildRoute.
+    -- Используем координаты из задачи, которые уже правильно заданы при планировании.
     local isCrossSeg = task.owner and task.owner.connA and task.owner.connB
     if isCrossSeg then
         local connA = task.owner.connA
@@ -16724,33 +16727,19 @@ function NSPauk:NP_ExecutePlan(task)
            and self:NP_IsWebOwnerDrawn(connA) 
            and self:NP_IsWebOwnerDrawn(connB) then
            
-            -- НАХОДИМ БЛИЖАЙШИЕ ТОЧКИ НА НИТЯХ
-            local tA, distA = self:NP_NearestThreadT(connA.thread, from.x, from.y)
-            local ax, ay = self:BzThread(connA.thread, tA)
-            local tB, distB = self:NP_NearestThreadT(connB.thread, from.x, from.y)
-            local bx, by = self:BzThread(connB.thread, tB)
-            
-            -- Выбираем направление: ползем к ближайшей нити, затем рисуем к другой
-            local startThread, startX, startY, startY, endThread, endX, endY
-            if distA < distB then
-                startThread, startX, startY = connA, ax, ay
-                endThread, endX, endY = connB, bx, by
-            else
-                startThread, startX, startY = connB, bx, by
-                endThread, endX, endY = connA, ax, ay
-            end
-            
-            local destP0 = { x = startX, y = startY }
-            local destP1 = { x = (startX + endX)/2, y = (startY + endY)/2 }
-            local destP2 = { x = endX, y = endY }
+            -- Используем координаты из задачи (они уже с провисанием!)
+            local destP0 = task.p0 and { x = task.p0.x, y = task.p0.y } or from
+            local destP2 = task.p2 and { x = task.p2.x, y = task.p2.y } or destP0
+            local destP1 = task.p1 and { x = task.p1.x, y = task.p1.y } or { x = (destP0.x + destP2.x)/2, y = (destP0.y + destP2.y)/2 }
             
             if task.kind == "travel" then
-                local dx = from.x - destP0.x
-                local dy = from.y - destP0.y
+                -- Для задачи подхода ползем до p2 (цели travel)
+                local dx = from.x - destP2.x
+                local dy = from.y - destP2.y
                 if dx*dx + dy*dy > 4 then
-                    local crawlToStart = self:NP_MakeCrawlTask(from, destP0, task)
+                    local crawlToStart = self:NP_MakeCrawlTask(from, destP2, task)
                     crawlToStart.isCross = task.isCross
-                    crawlToStart.conn = startThread
+                    crawlToStart.conn = task.conn
                     crawlToStart.owner = task.owner
                     insert(crawlToStart)
                 end
@@ -16758,12 +16747,13 @@ function NSPauk:NP_ExecutePlan(task)
             end
             
             if task.kind == "thread" then
+                -- Для задачи отрисовки: ползем к началу перемычки, затем рисуем
                 local dx = from.x - destP0.x
                 local dy = from.y - destP0.y
                 if dx*dx + dy*dy > 4 then
                     local crawlToStart = self:NP_MakeCrawlTask(from, destP0, task)
                     crawlToStart.isCross = task.isCross
-                    crawlToStart.conn = startThread
+                    crawlToStart.conn = task.conn
                     crawlToStart.owner = task.owner
                     insert(crawlToStart)
                 end
@@ -16773,11 +16763,10 @@ function NSPauk:NP_ExecutePlan(task)
                     owner = task.owner,
                     drop = true,
                     p0 = destP0,
-                    p1 = destP1,
+                    p1 = destP1,  -- Управляющая точка с провисанием!
                     p2 = destP2,
                     isCross = true,
                     nspNoInsert = true,
-                    -- НЕ ставим nspNoSupportCheck - перемычка рисуется по паутине
                 }
                 if task.finalThread then
                     drawTask.finalThread = task.finalThread
