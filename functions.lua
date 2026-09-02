@@ -14351,7 +14351,6 @@ end
 function NSPauk:BeginDissolve(inst)
     local S = self.S
     local C = self.C
-
     if not inst then
         if S.limitReached or S.limitCocoonPending then
             S.limitCocoonPending = false
@@ -14361,24 +14360,18 @@ function NSPauk:BeginDissolve(inst)
             S.stillTimer = 0
             S.speedTimer = 0
         end
-
         return
     end
-
     local frame = inst.hub.frame
-
     local aliveCount = 0
     for _, conn in ipairs(inst.conns) do
         if conn.alive then
             aliveCount = aliveCount + 1
         end
     end
-
     local isUIParent = frame == UIParent
-
     if not frame or not frame.SetAlpha or not frame.GetAlpha or aliveCount == 0 then
         self:TearInstance(inst)
-
         if S.limitReached or S.limitCocoonPending then
             S.limitCocoonPending = false
             self:ReturnToLimitHome()
@@ -14387,20 +14380,10 @@ function NSPauk:BeginDissolve(inst)
             S.stillTimer = 0
             S.speedTimer = 0
         end
-
         return
     end
-
     local baseAlpha = frame:GetAlpha() or 1
-
-    local minAlpha
-    if isUIParent then
-
-        minAlpha = baseAlpha
-    else
-        minAlpha = math.min(C.MIN_COCOON_ALPHA, baseAlpha)
-    end
-
+    local minAlpha = math.min(C.MIN_COCOON_ALPHA, baseAlpha)
     S.cocoon = {
         inst = inst,
         frame = frame,
@@ -14411,7 +14394,6 @@ function NSPauk:BeginDissolve(inst)
         digested = false,
         isUIParent = isUIParent,
     }
-
     S.phase = "dissolve"
     S.speedTimer = 0
 end
@@ -14572,7 +14554,6 @@ end
 function NSPauk:FinishCocoonDigestion()
     local S = self.S
     local c = S.cocoon
-
     if not c then
         if S.limitReached or S.limitCocoonPending then
             self:ReturnToLimitHome()
@@ -14581,12 +14562,9 @@ function NSPauk:FinishCocoonDigestion()
             S.stillTimer = 0
             S.speedTimer = 0
         end
-
         return
     end
-
     local victimName
-
     if c.inst
         and c.inst.hub
         and type(c.inst.hub.name) == "string"
@@ -14595,61 +14573,40 @@ function NSPauk:FinishCocoonDigestion()
     elseif c.frame and c.frame.GetName then
         victimName = c.frame:GetName()
     end
-
     local isUIParent = c.isUIParent
         or c.frame == UIParent
         or victimName == "UIParent"
-
     if c.inst then
         self:SettleInstance(c.inst)
     end
-
     local victimDesc = self:DescribeVictim(c.frame, victimName)
-
     if isUIParent then
-
-        if UIParent and UIParent.GetAlpha then
-            S.uiParentBaseAlpha = UIParent:GetAlpha() or 1
-        end
-
+        S.uiParentBaseAlpha = c.baseAlpha or 1
         self:HideSpider()
-
-        if UIParent and UIParent.SetAlpha then
-            UIParent:SetAlpha(0)
-        end
-
         self:AwardImmediateLevel(victimDesc)
     else
         self:AwardCocoonExperience(victimDesc)
     end
-
     if c.frame and not isUIParent then
         self:SafeHideFrame(c.frame)
         self:AddDigestedFrame(c.frame, c.baseAlpha or 1)
     end
-
     if c.inst then
         self:HideInstanceTextures(c.inst)
         self:RemoveInstance(c.inst)
     end
-
     if not isUIParent then
         self:BreakAnchoredToFrame(c.frame)
     end
-
     S.cocoon = nil
-
     S.tasks = {}
     S.taskIdx = 1
     S.currentTask = nil
     S.completeTimer = 0
-
     if isUIParent then
-
         self:StartUIParentRestore(10)
         return
     end
-
     if S.limitReached or S.limitCocoonPending then
         self:ReturnToLimitHome()
     else
@@ -16767,17 +16724,34 @@ function NSPauk:NP_ExecutePlan(task)
            and self:NP_IsWebOwnerDrawn(connA) 
            and self:NP_IsWebOwnerDrawn(connB) then
            
-            local destP0 = task.p0 and { x = task.p0.x, y = task.p0.y } or from
-            local destP2 = task.p2 and { x = task.p2.x, y = task.p2.y } or destP0
-            local destP1 = task.p1 and { x = task.p1.x, y = task.p1.y } or { x = (destP0.x + destP2.x)/2, y = (destP0.y + destP2.y)/2 }
+            -- НАХОДИМ БЛИЖАЙШИЕ ТОЧКИ НА НИТЯХ
+            local tA, distA = self:NP_NearestThreadT(connA.thread, from.x, from.y)
+            local ax, ay = self:BzThread(connA.thread, tA)
+            local tB, distB = self:NP_NearestThreadT(connB.thread, from.x, from.y)
+            local bx, by = self:BzThread(connB.thread, tB)
+            
+            -- Выбираем направление: ползем к ближайшей нити, затем рисуем к другой
+            local startThread, startX, startY, startY, endThread, endX, endY
+            if distA < distB then
+                startThread, startX, startY = connA, ax, ay
+                endThread, endX, endY = connB, bx, by
+            else
+                startThread, startX, startY = connB, bx, by
+                endThread, endX, endY = connA, ax, ay
+            end
+            
+            local destP0 = { x = startX, y = startY }
+            local destP1 = { x = (startX + endX)/2, y = (startY + endY)/2 }
+            local destP2 = { x = endX, y = endY }
             
             if task.kind == "travel" then
-                local dx = from.x - destP2.x
-                local dy = from.y - destP2.y
+                local dx = from.x - destP0.x
+                local dy = from.y - destP0.y
                 if dx*dx + dy*dy > 4 then
-                    local crawlToStart = self:NP_MakeCrawlTask(from, destP2, task)
-                    crawlToStart.nspNoSupportCheck = true
+                    local crawlToStart = self:NP_MakeCrawlTask(from, destP0, task)
                     crawlToStart.isCross = task.isCross
+                    crawlToStart.conn = startThread
+                    crawlToStart.owner = task.owner
                     insert(crawlToStart)
                 end
                 return inserted
@@ -16788,8 +16762,9 @@ function NSPauk:NP_ExecutePlan(task)
                 local dy = from.y - destP0.y
                 if dx*dx + dy*dy > 4 then
                     local crawlToStart = self:NP_MakeCrawlTask(from, destP0, task)
-                    crawlToStart.nspNoSupportCheck = true
                     crawlToStart.isCross = task.isCross
+                    crawlToStart.conn = startThread
+                    crawlToStart.owner = task.owner
                     insert(crawlToStart)
                 end
                 
@@ -16802,7 +16777,7 @@ function NSPauk:NP_ExecutePlan(task)
                     p2 = destP2,
                     isCross = true,
                     nspNoInsert = true,
-                    nspNoSupportCheck = true,
+                    -- НЕ ставим nspNoSupportCheck - перемычка рисуется по паутине
                 }
                 if task.finalThread then
                     drawTask.finalThread = task.finalThread
@@ -16844,7 +16819,6 @@ function NSPauk:NP_ExecutePlan(task)
     end
 
     local function insertRoute(fromPoint, toPoint, dragMode, plan)
-        -- Передаем restrictToInst для ускорения
         local route = self:NP_BuildRoute(fromPoint, toPoint, restrictToInst)
         local pendingDrop = nil
         local routeFrom = fromPoint
@@ -23727,6 +23701,43 @@ if type(SlashCmdList) == "table" then
 end
 
 if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKUIPARENT"
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function()
+            if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
+                NSPauk:Echo("Паук выключен. Для включения используй /paukblock.")
+                return
+            end
+            
+            local S = NSPauk.S
+            if S.combatHide or S.inCombat then
+                NSPauk:Echo("Нельзя запустить кокон в бою.")
+                return
+            end
+            
+            -- Прерываем текущие задачи
+            if S.phase == "task" or S.phase == "instanceComplete" then
+                NSPauk:Interrupt()
+            end
+            
+            -- Получаем UIParent как жертву
+            local victim = NSPauk:MakeUIParentCocoonItem()
+            if not victim then
+                NSPauk:Echo("Не удалось создать объект UIParent.")
+                return
+            end
+            
+            NSPauk:Echo("Запускаю кокон на UIParent...")
+            NSPauk:StartCocoon(victim)
+        end
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspuiparent"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukuiparent"
+        end
+    end
+end
+
+if type(SlashCmdList) == "table" then
     local cmdName = "NSPAUKSECTORS"
     if not SlashCmdList[cmdName] then
         SlashCmdList[cmdName] = function(msg)
@@ -23850,6 +23861,205 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
+
+function NSPauk:NP_ClearAnchorsDebug()
+    local S = self.S
+    local dbg = S.nspAnchorsDebug
+    if not dbg then return end
+    if dbg.textures then
+        self:RecycleTextures(dbg.textures)
+    end
+    if dbg.fonts then
+        for _, fs in ipairs(dbg.fonts) do
+            if fs and fs.Hide then fs:Hide() end
+        end
+    end
+    S.nspAnchorsDebug = nil
+    self:Echo("Подсветка якорей скрыта.")
+end
+
+function NSPauk:NP_DebugAnchors()
+    self:NP_ClearAnchorsDebug()
+    
+    local S = self.S
+    local C = self.C
+    
+    -- Собираем объекты точно так же, как это делает StartNewInstance
+    local items = self:CollectVisibleItems()
+    if not items or #items == 0 then
+        self:Echo("Нет видимых объектов для выбора якорей.")
+        return
+    end
+    
+    local hub = self:PickWebHub(items)
+    if not hub then
+        self:Echo("Не удалось выбрать хаб.")
+        return
+    end
+    
+    local targetMinDist = tonumber(C.WEB_OBJECT_MIN_DISTANCE) or 100
+    local targetMinDist2 = targetMinDist * targetMinDist
+    
+    local candidates = self:CollectTargetCandidates(hub, items)
+    
+    -- Фильтруем кандидатов: оставляем только тех, кто достаточно далеко от хаба
+    local validCandidates = {}
+    for _, cand in ipairs(candidates) do
+        local item = cand.item
+        local dx = item.cx - hub.cx
+        local dy = item.cy - hub.cy
+        if dx*dx + dy*dy >= targetMinDist2 then
+            validCandidates[#validCandidates + 1] = item
+        end
+    end
+    
+    -- Жадный выбор целей (эмулирует CreateInstance, но детерминированно)
+    local targetCountMax = tonumber(C.TARGET_COUNT_MAX) or 6
+    local chosen = {}
+    for _, item in ipairs(validCandidates) do
+        if #chosen >= targetCountMax then break end
+        local far = true
+        for _, acc in ipairs(chosen) do
+            local dx = item.cx - acc.item.cx
+            local dy = item.cy - acc.item.cy
+            if dx*dx + dy*dy < targetMinDist2 then
+                far = false
+                break
+            end
+        end
+        if far then
+            -- Считаем конкурентов: другие валидные кандидаты в радиусе MIN_DISTANCE
+            local comp = 0
+            for _, other in ipairs(validCandidates) do
+                if other ~= item then
+                    local dx = item.cx - other.cx
+                    local dy = item.cy - other.cy
+                    if dx*dx + dy*dy < targetMinDist2 then
+                        comp = comp + 1
+                    end
+                end
+            end
+            chosen[#chosen + 1] = { item = item, competitors = comp }
+        end
+    end
+    
+    -- Визуализация
+    local dbg = { textures = {}, fonts = {} }
+    S.nspAnchorsDebug = dbg
+    
+    local palette = {
+        { r = 0.2, g = 1.0, b = 0.2 }, -- Зеленый
+        { r = 0.2, g = 0.6, b = 1.0 }, -- Синий
+        { r = 1.0, g = 1.0, b = 0.2 }, -- Желтый
+        { r = 1.0, g = 0.2, b = 1.0 }, -- Маджента
+        { r = 0.2, g = 1.0, b = 1.0 }, -- Циан
+        { r = 1.0, g = 0.5, b = 0.2 }, -- Оранжевый
+    }
+    local hubColor = { r = 1.0, g = 0.2, b = 0.2 } -- Красный
+    
+    local function addDot(x, y, color, size)
+        local tex
+        if #S.webPool > 0 then
+            tex = table.remove(S.webPool)
+            if tex then tex._nspInPool = false end
+        end
+        if not tex then
+            tex = S.activeFrame:CreateTexture(nil, "OVERLAY")
+        end
+        if tex then
+            tex:SetTexture(C.TEX_WEB)
+            tex:SetWidth(size or 4)
+            tex:SetHeight(size or 4)
+            tex:SetVertexColor(color.r, color.g, color.b, 0.85)
+            tex:SetDrawLayer("OVERLAY")
+            tex:ClearAllPoints()
+            tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+            tex:Show()
+            table.insert(dbg.textures, tex)
+        end
+    end
+    
+    local function highlightRect(item, color)
+        local step = 6
+        local size = 4
+        for x = item.left, item.right, step do
+            addDot(x, item.top, color, size)
+            addDot(x, item.bottom, color, size)
+        end
+        for y = item.bottom, item.top, step do
+            addDot(item.left, y, color, size)
+            addDot(item.right, y, color, size)
+        end
+        addDot(item.cx, item.cy, color, 8) -- Центр
+    end
+    
+    local function addLabel(x, y, text, color)
+        local fs = S.activeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        if fs then
+            fs:SetText(text)
+            fs:SetTextColor(color.r, color.g, color.b, 1)
+            fs:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+            table.insert(dbg.fonts, fs)
+        end
+    end
+    
+    -- Рисуем ХАБ
+    highlightRect(hub, hubColor)
+    addLabel(hub.cx, hub.top + 12, "ХАБ: " .. tostring(hub.name), hubColor)
+    self:Echo(string.format("|cffff3333ХАБ:|r %s |cff888888(%.0f, %.0f)|r", tostring(hub.name), hub.cx, hub.cy))
+    
+    -- Рисуем ЦЕЛИ
+    self:Echo(string.format("Выбрано целей: %d (мин. дистанция: %.0f)", #chosen, targetMinDist))
+    for i, c in ipairs(chosen) do
+        local color = palette[((i - 1) % #palette) + 1]
+        highlightRect(c.item, color)
+        local label = string.format("%d: %s [%d]", i, tostring(c.item.name), c.competitors)
+        addLabel(c.item.cx, c.item.top + 12, label, color)
+        
+        self:Echo(string.format("|cff33ff33ЦЕЛЬ %d:|r %s |cff888888(%.0f, %.0f)|r [конкурентов: |cffffff00%d|r]", 
+            i, tostring(c.item.name), c.item.cx, c.item.cy, c.competitors))
+    end
+    
+    if #chosen == 0 then
+        self:Echo("Не удалось выбрать цели (все слишком близко к хабу или друг к другу).")
+    end
+    
+    self:Echo("Используй |cffffff00/nspanchors clear|r для скрытия подсветки.")
+end
+
+if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKANCHORS"
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function(msg)
+            if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
+                NSPauk:Echo("Паук выключен. Для включения используй /paukblock.")
+                return
+            end
+            msg = type(msg) == "string" and msg or ""
+            msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
+            
+            if msg == "clear" or msg == "hide" then
+                NSPauk:NP_ClearAnchorsDebug()
+                return
+            end
+            
+            NSPauk:NP_DebugAnchors()
+        end
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspanchors"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukanchors"
+        end
+    end
+end
 
 
 
