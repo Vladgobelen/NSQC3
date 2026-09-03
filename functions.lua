@@ -11562,247 +11562,171 @@ end
 
 function NSPauk:NP_PickRingAnchorsOnce(pool, targetCount)
     local S = self.S
-
     local SW = S.SW or 0
     local SH = S.SH or 0
-
     if SW <= 0 or SH <= 0 then
         SW, SH = self:GetScreenSize()
     end
-
     if SW <= 0 or SH <= 0 then
         return nil
     end
-
     targetCount = math.floor(tonumber(targetCount) or 4)
-
     if targetCount < 4 then
         targetCount = 4
     end
-
     local gridDim = targetCount
-
     if gridDim < 4 then
         gridDim = 4
     end
-
     if gridDim > 12 then
         gridDim = 12
     end
-
     local twoPi = math.pi * 2
-
     local function normAngle(a)
-        while a < 0 do
-            a = a + twoPi
-        end
-
-        while a >= twoPi do
-            a = a - twoPi
-        end
-
+        while a < 0 do a = a + twoPi end
+        while a >= twoPi do a = a - twoPi end
         return a
     end
-
     local cells = {}
     local maxR2 = 0
     local minCenterDist = math.min(SW, SH) * 0.05
-
     for gy = 1, gridDim do
         for gx = 1, gridDim do
             local left = (gx - 1) * SW / gridDim
             local right = gx * SW / gridDim
             local bottom = (gy - 1) * SH / gridDim
             local top = gy * SH / gridDim
-
             local cx = (left + right) / 2
             local cy = (bottom + top) / 2
-
             local dx = cx - SW / 2
             local dy = cy - SH / 2
             local r2 = dx * dx + dy * dy
-
             if r2 >= minCenterDist * minCenterDist then
                 cells[#cells + 1] = {
-                    left = left,
-                    right = right,
-                    bottom = bottom,
-                    top = top,
-                    cx = cx,
-                    cy = cy,
+                    left = left, right = right,
+                    bottom = bottom, top = top,
+                    cx = cx, cy = cy,
                     angle = normAngle(math.atan2(dy, dx)),
                     r2 = r2,
                 }
-
-                if r2 > maxR2 then
-                    maxR2 = r2
-                end
+                if r2 > maxR2 then maxR2 = r2 end
             end
         end
     end
-
-    if #cells == 0 then
-        return nil
-    end
-
+    if #cells == 0 then return nil end
+    
     local chosenCells = {}
-
     if #cells <= targetCount then
         for _, cell in ipairs(cells) do
             chosenCells[#chosenCells + 1] = cell
         end
     else
         local usedCells = {}
-
         for k = 0, targetCount - 1 do
             local targetAngle = normAngle(k * twoPi / targetCount)
-
             local bestCell = nil
             local bestScore = nil
-
             for _, cell in ipairs(cells) do
                 if not usedCells[cell] then
                     local diff = math.abs(cell.angle - targetAngle)
-
-                    if diff > math.pi then
-                        diff = twoPi - diff
-                    end
-
+                    if diff > math.pi then diff = twoPi - diff end
                     local radiusScore = 0
-
-                    if maxR2 > 0 then
-                        radiusScore = cell.r2 / maxR2
-                    end
-
+                    if maxR2 > 0 then radiusScore = cell.r2 / maxR2 end
                     local score = diff - radiusScore * 0.35
-
                     if not bestScore or score < bestScore then
                         bestScore = score
                         bestCell = cell
                     end
                 end
             end
-
             if bestCell then
                 usedCells[bestCell] = true
                 chosenCells[#chosenCells + 1] = bestCell
             end
         end
     end
-
-    if #chosenCells == 0 then
-        return nil
-    end
-
+    if #chosenCells == 0 then return nil end
+    
     local minObjDist = self:NP_GetObjectMinDistance()
     local minObjDist2 = minObjDist * minObjDist
-
     local usedItems = {}
     local anchors = {}
-
+    
     local function addItem(item)
-        if not item or usedItems[item] then
-            return false
-        end
-
+        if not item or usedItems[item] then return false end
         usedItems[item] = true
         anchors[#anchors + 1] = item
-
         return true
     end
-
+    
     local function farEnoughFromAnchors(item)
-        if minObjDist <= 0 then
-            return true
-        end
-
-        if not item then
-            return false
-        end
-
+        if minObjDist <= 0 then return true end
+        if not item then return false end
         local ix = tonumber(item.cx) or 0
         local iy = tonumber(item.cy) or 0
-
         for _, a in ipairs(anchors) do
             local ax = tonumber(a.cx) or 0
             local ay = tonumber(a.cy) or 0
-
             local dx = ix - ax
             local dy = iy - ay
-
-            if dx * dx + dy * dy < minObjDist2 then
-                return false
-            end
+            if dx * dx + dy * dy < minObjDist2 then return false end
         end
-
         return true
     end
-
+    
     for _, cell in ipairs(chosenCells) do
-        local bestItem = nil
-        local bestScore = nil
-
-        local fallbackItem = nil
-        local fallbackScore = nil
-
+        -- Собираем ВСЕ подходящие объекты внутри этой клетки
+        local candidatesInside = {}
+        local candidatesOutside = {}
+        
         for _, item in ipairs(pool) do
             if not usedItems[item] then
-                local dx = (item.cx or 0) - cell.cx
-                local dy = (item.cy or 0) - cell.cy
-                local d2 = dx * dx + dy * dy
-
                 local inside = item.cx >= cell.left
                     and item.cx <= cell.right
                     and item.cy >= cell.bottom
                     and item.cy <= cell.top
-
-                local score = d2
-
-                if not inside then
-                    score = score + 1000000
-                end
-
-                if not fallbackScore or score < fallbackScore then
-                    fallbackScore = score
-                    fallbackItem = item
-                end
-
-                if farEnoughFromAnchors(item) then
-                    if not bestScore or score < bestScore then
-                        bestScore = score
-                        bestItem = item
+                
+                if inside then
+                    if farEnoughFromAnchors(item) then
+                        candidatesInside[#candidatesInside + 1] = item
+                    end
+                else
+                    if farEnoughFromAnchors(item) then
+                        candidatesOutside[#candidatesOutside + 1] = item
                     end
                 end
             end
         end
-
-        if bestItem then
-            addItem(bestItem)
-        elseif fallbackItem and minObjDist <= 0 then
-            addItem(fallbackItem)
+        
+        -- Выбираем СЛУЧАЙНЫЙ объект из клетки (не ближайший к центру!)
+        if #candidatesInside > 0 then
+            local pick = candidatesInside[math.random(1, #candidatesInside)]
+            addItem(pick)
+        elseif #candidatesOutside > 0 and minObjDist <= 0 then
+            -- Фолбэк: если в клетке ничего нет, берём случайный снаружи
+            local pick = candidatesOutside[math.random(1, #candidatesOutside)]
+            addItem(pick)
         end
     end
-
+    
+    -- Добираем если не хватило
     while #anchors < targetCount do
         local added = false
-
+        local remaining = {}
         for _, item in ipairs(pool) do
             if not usedItems[item] and farEnoughFromAnchors(item) then
-                addItem(item)
-                added = true
-                break
+                remaining[#remaining + 1] = item
             end
         end
-
-        if not added then
-            break
+        if #remaining > 0 then
+            local pick = remaining[math.random(1, #remaining)]
+            addItem(pick)
+            added = true
         end
+        if not added then break end
     end
-
-    if #anchors < 4 then
-        return nil
-    end
-
+    
+    if #anchors < 4 then return nil end
     return anchors
 end
 
@@ -23615,6 +23539,137 @@ function NSPauk:HandleSpiderCommand(msg)
 end
 
 if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKDIAG"
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function()
+            local S = NSPauk.S
+            local C = NSPauk.C
+            NSPauk:Echo("=== ДИАГНОСТИКА ЗАВИСАНИЯ ===")
+            NSPauk:Echo(string.format("phase=%s", tostring(S.phase)))
+            NSPauk:Echo(string.format("completeTimer=%.2f / %.2f", S.completeTimer or 0, C.COMPLETE_PAUSE or 2.5))
+            NSPauk:Echo(string.format("currentInstance=%s", tostring(S.currentInstance ~= nil)))
+            
+            if S.currentInstance then
+                local inst = S.currentInstance
+                NSPauk:Echo(string.format("  id=%s, torn=%s, isCocoon=%s, isMoth=%s, isNaturalRing=%s",
+                    tostring(inst.id), tostring(inst.torn), tostring(inst.isCocoon), 
+                    tostring(inst.isMoth), tostring(inst.isNaturalRing)))
+                
+                -- Проверяем основные нити
+                local mainDrawn = 0
+                local mainTotal = 0
+                for _, conn in ipairs(inst.conns or {}) do
+                    if conn.alive and not conn.isDiameter then
+                        mainTotal = mainTotal + 1
+                        if NSPauk:NP_IsWebOwnerDrawn(conn) then
+                            mainDrawn = mainDrawn + 1
+                        else
+                            NSPauk:Echo(string.format("  [!] Основная нить НЕ нарисована: id=%s, drawn=%d",
+                                tostring(conn.id), conn.textures and #conn.textures or 0))
+                        end
+                    end
+                end
+                NSPauk:Echo(string.format("  Основные нити: %d/%d нарисовано", mainDrawn, mainTotal))
+                
+                -- Проверяем перемычки
+                local crossDrawn = 0
+                local crossAlive = 0
+                for _, seg in ipairs(inst.crossSegs or {}) do
+                    if seg.alive then
+                        crossAlive = crossAlive + 1
+                        if NSPauk:NP_IsWebOwnerDrawn(seg) then
+                            crossDrawn = crossDrawn + 1
+                        else
+                            NSPauk:Echo(string.format("  [!] Перемычка НЕ нарисована: connA=%s, connB=%s, drawn=%d",
+                                tostring(seg.connA and seg.connA.id), 
+                                tostring(seg.connB and seg.connB.id),
+                                seg.textures and #seg.textures or 0))
+                        end
+                    end
+                end
+                NSPauk:Echo(string.format("  Перемычки: %d/%d нарисовано (alive=%d)", crossDrawn, #inst.crossSegs, crossAlive))
+                
+                -- Вызываем NP_HasRequiredWebPending с логированием
+                local pending = NSPauk:NP_HasRequiredWebPending(inst)
+                NSPauk:Echo(string.format("  NP_HasRequiredWebPending=%s", tostring(pending)))
+                
+                if pending then
+                    NSPauk:Echo("  [!] Паутина считается незавершённой — новая не создаётся")
+                    
+                    -- Проверяем секторы детально
+                    local sectors = inst.webSectors or {}
+                    if type(sectors) ~= "table" or #sectors == 0 then
+                        sectors = NSPauk:NP_GetValidTriangleSectors(inst)
+                    end
+                    
+                    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
+                    local missing = 0
+                    
+                    for _, sector in ipairs(sectors) do
+                        local connA = inst.conns and inst.conns[sector.a]
+                        local connB = inst.conns and inst.conns[sector.b]
+                        
+                        if connA and connB and connA.alive and connB.alive then
+                            if not connA.arcLength or connA.arcLength <= 0 then
+                                local samples, total = NSPauk:BuildArcSamples(connA.thread)
+                                connA.arcSamples = samples
+                                connA.arcLength = total
+                            end
+                            if not connB.arcLength or connB.arcLength <= 0 then
+                                local samples, total = NSPauk:BuildArcSamples(connB.thread)
+                                connB.arcSamples = samples
+                                connB.arcLength = total
+                            end
+                            
+                            local rowArcs = NSPauk:NP_GetSectorRowArcs(connA, connB)
+                            
+                            for _, arcLen in ipairs(rowArcs) do
+                                -- Ищем сегмент для этой дуги
+                                local found = false
+                                for _, seg in ipairs(inst.crossSegs or {}) do
+                                    if seg.alive then
+                                        local direct = seg.connA == connA and seg.connB == connB
+                                        local reverse = seg.connA == connB and seg.connB == connA
+                                        if direct or reverse then
+                                            local segArc = seg.planArcLen or seg.recheckArcLen
+                                            if segArc and math.abs(segArc - arcLen) < spacing * 0.6 then
+                                                if not NSPauk:NP_IsWebOwnerDrawn(seg) then
+                                                    NSPauk:Echo(string.format("    [!] Сектор %s, arcLen=%.1f: сегмент есть, но НЕ нарисован",
+                                                        sector.key, arcLen))
+                                                    missing = missing + 1
+                                                end
+                                                found = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                                if not found then
+                                    NSPauk:Echo(string.format("    [!] Сектор %s, arcLen=%.1f: сегмент ОТСУТСТВУЕТ",
+                                        sector.key, arcLen))
+                                    missing = missing + 1
+                                end
+                            end
+                        end
+                    end
+                    
+                    NSPauk:Echo(string.format("  Всего проблемных секторов: %d", missing))
+                end
+            end
+            
+            NSPauk:Echo(string.format("webAliveCount=%d / MAX=%d", S.webAliveCount or 0, C.MAX_WEB_SEGS or 0))
+            NSPauk:Echo(string.format("limitReached=%s, limitReturnPending=%s, limitCocoonPending=%s",
+                tostring(S.limitReached), tostring(S.limitReturnPending), tostring(S.limitCocoonPending)))
+            NSPauk:Echo(string.format("nspQueueResumePending=%s", tostring(S.nspQueueResumePending)))
+        end
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspdiag"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukdiag"
+        end
+    end
+end
+
+if type(SlashCmdList) == "table" then
     local cmdName = "NSPAUKSPIDER"
 
     if not SlashCmdList[cmdName] then
@@ -23997,6 +24052,379 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function NSPauk:NP_ClearRingAnchorsDebug()
+    local S = self.S
+    local dbg = S.nspRingAnchorsDebug
+    if not dbg then return end
+    if dbg.textures then
+        self:RecycleTextures(dbg.textures)
+    end
+    if dbg.fonts then
+        for _, fs in ipairs(dbg.fonts) do
+            if fs and fs.Hide then fs:Hide() end
+        end
+    end
+    S.nspRingAnchorsDebug = nil
+    self:Echo("Подсветка якорей кольцевой паутины скрыта.")
+end
+
+function NSPauk:NP_DebugRingAnchors()
+    self:NP_ClearRingAnchorsDebug()
+    
+    local S = self.S
+    local C = self.C
+    
+    -- Собираем объекты
+    local items = self:CollectVisibleItems()
+    if not items or #items == 0 then
+        self:Echo("Нет видимых объектов.")
+        return
+    end
+    
+    local targetCount = self:RandomInt(C.TARGET_COUNT_MIN, C.TARGET_COUNT_MAX)
+    if targetCount < 4 then targetCount = 4 end
+    if targetCount % 2 ~= 0 then targetCount = targetCount + 1 end
+    
+    -- Эмулируем NP_CollectRingAnchors
+    local good = {}
+    local all = {}
+    for _, item in ipairs(items) do
+        if item and item.frame then
+            if self:IsGoodAnchorName(item.name) then
+                good[#good + 1] = item
+            end
+            all[#all + 1] = item
+        end
+    end
+    local pool = good
+    if #pool == 0 then pool = all end
+    
+    if #pool < 4 then
+        self:Echo("Мало объектов для кольцевой паутины (нужно >= 4)")
+        return
+    end
+    
+    -- Эмулируем NP_PickRingAnchorsOnce
+    local SW = S.SW or 0
+    local SH = S.SH or 0
+    if SW <= 0 or SH <= 0 then
+        SW, SH = self:GetScreenSize()
+    end
+    
+    local gridDim = targetCount
+    if gridDim < 4 then gridDim = 4 end
+    if gridDim > 12 then gridDim = 12 end
+    
+    local twoPi = math.pi * 2
+    local function normAngle(a)
+        while a < 0 do a = a + twoPi end
+        while a >= twoPi do a = a - twoPi end
+        return a
+    end
+    
+    -- Строим клетки сетки
+    local cells = {}
+    local maxR2 = 0
+    local minCenterDist = math.min(SW, SH) * 0.05
+    for gy = 1, gridDim do
+        for gx = 1, gridDim do
+            local left = (gx - 1) * SW / gridDim
+            local right = gx * SW / gridDim
+            local bottom = (gy - 1) * SH / gridDim
+            local top = gy * SH / gridDim
+            local cx = (left + right) / 2
+            local cy = (bottom + top) / 2
+            local dx = cx - SW / 2
+            local dy = cy - SH / 2
+            local r2 = dx * dx + dy * dy
+            if r2 >= minCenterDist * minCenterDist then
+                cells[#cells + 1] = {
+                    gx = gx, gy = gy,
+                    left = left, right = right,
+                    bottom = bottom, top = top,
+                    cx = cx, cy = cy,
+                    angle = normAngle(math.atan2(dy, dx)),
+                    r2 = r2,
+                    candidates = {},
+                }
+                if r2 > maxR2 then maxR2 = r2 end
+            end
+        end
+    end
+    
+    -- Распределяем объекты по клеткам
+    for _, item in ipairs(pool) do
+        for _, cell in ipairs(cells) do
+            if item.cx >= cell.left and item.cx <= cell.right
+               and item.cy >= cell.bottom and item.cy <= cell.top then
+                cell.candidates[#cell.candidates + 1] = item
+                break
+            end
+        end
+    end
+    
+    -- Выбираем клетки по углам (как в NP_PickRingAnchorsOnce)
+    local chosenCells = {}
+    if #cells <= targetCount then
+        for _, cell in ipairs(cells) do
+            chosenCells[#chosenCells + 1] = cell
+        end
+    else
+        local usedCells = {}
+        for k = 0, targetCount - 1 do
+            local targetAngle = normAngle(k * twoPi / targetCount)
+            local bestCell = nil
+            local bestScore = nil
+            for _, cell in ipairs(cells) do
+                if not usedCells[cell] then
+                    local diff = math.abs(cell.angle - targetAngle)
+                    if diff > math.pi then diff = twoPi - diff end
+                    local radiusScore = 0
+                    if maxR2 > 0 then radiusScore = cell.r2 / maxR2 end
+                    local score = diff - radiusScore * 0.35
+                    if not bestScore or score < bestScore then
+                        bestScore = score
+                        bestCell = cell
+                    end
+                end
+            end
+            if bestCell then
+                usedCells[bestCell] = true
+                chosenCells[#chosenCells + 1] = bestCell
+            end
+        end
+    end
+    
+    -- Выбираем якоря из клеток
+    local minObjDist = self:NP_GetObjectMinDistance()
+    local minObjDist2 = minObjDist * minObjDist
+    local chosenAnchors = {}
+    local usedItems = {}
+    
+    local function farEnoughFromAnchors(item)
+        if minObjDist <= 0 then return true end
+        for _, a in ipairs(chosenAnchors) do
+            local dx = item.cx - a.cx
+            local dy = item.cy - a.cy
+            if dx*dx + dy*dy < minObjDist2 then return false end
+        end
+        return true
+    end
+    
+    for _, cell in ipairs(chosenCells) do
+        local bestItem = nil
+        local bestScore = nil
+        for _, item in ipairs(cell.candidates) do
+            if not usedItems[item] then
+                local dx = item.cx - cell.cx
+                local dy = item.cy - cell.cy
+                local score = dx*dx + dy*dy
+                if farEnoughFromAnchors(item) then
+                    if not bestScore or score < bestScore then
+                        bestScore = score
+                        bestItem = item
+                    end
+                end
+            end
+        end
+        if bestItem then
+            usedItems[bestItem] = true
+            chosenAnchors[#chosenAnchors + 1] = bestItem
+            cell.chosen = bestItem
+        end
+    end
+    
+    -- Визуализация
+    local dbg = { textures = {}, fonts = {} }
+    S.nspRingAnchorsDebug = dbg
+    
+    local function addDot(x, y, color, size)
+        local tex
+        if #S.webPool > 0 then
+            tex = table.remove(S.webPool)
+            if tex then tex._nspInPool = false end
+        end
+        if not tex then tex = S.activeFrame:CreateTexture(nil, "OVERLAY") end
+        if tex then
+            tex:SetTexture(C.TEX_WEB)
+            tex:SetWidth(size or 4)
+            tex:SetHeight(size or 4)
+            tex:SetVertexColor(color.r, color.g, color.b, 0.85)
+            tex:SetDrawLayer("OVERLAY")
+            tex:ClearAllPoints()
+            tex:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+            tex:Show()
+            table.insert(dbg.textures, tex)
+        end
+    end
+    
+    local function addLine(x1, y1, x2, y2, color, step)
+        step = step or 6
+        local dx = x2 - x1
+        local dy = y2 - y1
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len < 1 then return end
+        local n = math.max(2, math.floor(len / step) + 1)
+        for i = 0, n do
+            local t = i / n
+            addDot(x1 + dx*t, y1 + dy*t, color, step * 0.7)
+        end
+    end
+    
+    local function addLabel(x, y, text, color)
+        local fs = S.activeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        if fs then
+            fs:SetText(text)
+            fs:SetTextColor(color.r, color.g, color.b, 1)
+            fs:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+            table.insert(dbg.fonts, fs)
+        end
+    end
+    
+    local function highlightRect(item, color)
+        local step = 6
+        local size = 4
+        for x = item.left, item.right, step do
+            addDot(x, item.top, color, size)
+            addDot(x, item.bottom, color, size)
+        end
+        for y = item.bottom, item.top, step do
+            addDot(item.left, y, color, size)
+            addDot(item.right, y, color, size)
+        end
+        addDot(item.cx, item.cy, color, 8)
+    end
+    
+    -- Рисуем клетки сетки
+    local gridColor = { r = 0.3, g = 0.3, b = 0.3 }
+    for _, cell in ipairs(cells) do
+        local c = gridColor
+        if cell.chosen then
+            c = { r = 0.5, g = 0.5, b = 0.1 } -- Выбранная клетка - желтая
+        elseif #cell.candidates > 0 then
+            c = { r = 0.2, g = 0.4, b = 0.2 } -- Есть кандидаты - зеленая
+        end
+        -- Рамка клетки
+        addLine(cell.left, cell.bottom, cell.right, cell.bottom, c, 8)
+        addLine(cell.right, cell.bottom, cell.right, cell.top, c, 8)
+        addLine(cell.right, cell.top, cell.left, cell.top, c, 8)
+        addLine(cell.left, cell.top, cell.left, cell.bottom, c, 8)
+        -- Количество кандидатов
+        if #cell.candidates > 0 then
+            addLabel(cell.cx, cell.cy, tostring(#cell.candidates), c)
+        end
+    end
+    
+    -- Рисуем сектора (углы от центра)
+    local sectorColors = {
+        { r = 1.0, g = 0.2, b = 0.2 },
+        { r = 0.2, g = 1.0, b = 0.2 },
+        { r = 0.2, g = 0.6, b = 1.0 },
+        { r = 1.0, g = 1.0, b = 0.2 },
+        { r = 1.0, g = 0.2, b = 1.0 },
+        { r = 0.2, g = 1.0, b = 1.0 },
+        { r = 1.0, g = 0.5, b = 0.2 },
+        { r = 0.7, g = 0.7, b = 1.0 },
+    }
+    
+    local centerX = SW / 2
+    local centerY = SH / 2
+    
+    self:Echo(string.format("Кольцевая паутина: сетка %dx%d, выбрано клеток: %d", gridDim, gridDim, #chosenCells))
+    self:Echo(string.format("Выбрано якорей: %d (цель: %d)", #chosenAnchors, targetCount))
+    
+    for i, cell in ipairs(chosenCells) do
+        local color = sectorColors[((i - 1) % #sectorColors) + 1]
+        -- Линия от центра к клетке
+        addLine(centerX, centerY, cell.cx, cell.cy, { r = color.r * 0.5, g = color.g * 0.5, b = color.b * 0.5 }, 10)
+        
+        if cell.chosen then
+            highlightRect(cell.chosen, color)
+            local label = string.format("%d: %s [%d]", i, tostring(cell.chosen.name), #cell.candidates - 1)
+            addLabel(cell.chosen.cx, cell.chosen.top + 14, label, color)
+            
+            self:Echo(string.format("|cff%02x%02x%02xСектор %d:|r %s |cff888888(%.0f, %.0f)|r [альтернатив: |cffffff00%d|r]",
+                color.r * 255, color.g * 255, color.b * 255,
+                i, tostring(cell.chosen.name), cell.chosen.cx, cell.chosen.cy,
+                #cell.candidates - 1))
+        else
+            addLabel(cell.cx, cell.cy, "Пусто", { r = 1, g = 0.3, b = 0.3 })
+        end
+    end
+    
+    -- Строим ConvexHull для выбранных якорей
+    if #chosenAnchors >= 3 then
+        local points = {}
+        for _, item in ipairs(chosenAnchors) do
+            points[#points + 1] = { x = item.cx, y = item.cy, item = item }
+        end
+        local hull = self:NP_ConvexHull(points)
+        if hull and #hull >= 3 then
+            self:Echo(string.format("ConvexHull: %d точек (из %d выбранных)", #hull, #chosenAnchors))
+            -- Рисуем hull
+            local hullColor = { r = 1, g = 1, b = 1 }
+            for i = 1, #hull do
+                local p1 = hull[i]
+                local p2 = hull[(i % #hull) + 1]
+                addLine(p1.x, p1.y, p2.x, p2.y, hullColor, 4)
+            end
+        end
+    end
+    
+    -- Центр экрана
+    addDot(centerX, centerY, { r = 1, g = 1, b = 1 }, 10)
+    addLabel(centerX, centerY + 14, "ЦЕНТР", { r = 1, g = 1, b = 1 })
+    
+    self:Echo("Используй |cffffff00/nspringanchors clear|r для скрытия.")
+end
+
+if type(SlashCmdList) == "table" then
+    local cmdName = "NSPAUKRINGANCHORS"
+    if not SlashCmdList[cmdName] then
+        SlashCmdList[cmdName] = function(msg)
+            if NSPauk:IsPersistentlyDisabled() or not NSPauk.initialized then
+                NSPauk:Echo("Паук выключен.")
+                return
+            end
+            msg = type(msg) == "string" and msg or ""
+            msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
+            
+            if msg == "clear" or msg == "hide" then
+                NSPauk:NP_ClearRingAnchorsDebug()
+                return
+            end
+            
+            NSPauk:NP_DebugRingAnchors()
+        end
+        if _G then
+            _G["SLASH_" .. cmdName .. "1"] = "/nspringanchors"
+            _G["SLASH_" .. cmdName .. "2"] = "/paukringanchors"
+        end
+    end
+end
 
 
 
