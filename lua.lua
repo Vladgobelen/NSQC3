@@ -27633,15 +27633,22 @@ function UI:_CreateHelp()
         frame:StopMovingOrSizing()
     end)
 
-    -- Отслеживание наведения мыши для переключения страты
-    f:SetScript("OnUpdate", function()
-        local isOver = f:IsMouseOver()
+    -- Единый OnUpdate: отслеживание мыши + обработка отложенных лейаутов
+    f:SetScript("OnUpdate", function(frame)
+        -- 1. Динамическое изменение страты при наведении мыши
+        local isOver = frame:IsMouseOver()
         if isOver and not self._helpMouseOver then
             self._helpMouseOver = true
-            f:SetFrameStrata("FULLSCREEN")
+            frame:SetFrameStrata("FULLSCREEN")
         elseif not isOver and self._helpMouseOver then
             self._helpMouseOver = false
-            f:SetFrameStrata("DIALOG")
+            frame:SetFrameStrata("DIALOG")
+        end
+        
+        -- 2. Обработка отложенного лейаута (заменяет затирание OnUpdate)
+        if self._helpLayoutDirty then
+            self._helpLayoutDirty = false
+            self:LayoutHelp()
         end
     end)
 
@@ -27759,26 +27766,21 @@ end
 function UI:RenderHelp(raw)
     clearBlocks(self.helpBlocks)
     self.helpBlocks = {}
-
     for _, data in ipairs(parseContent(raw)) do
         local block
-
         if data.type == "code" then
             block = createCodeBlock(self.helpContent, data.content or "")
         else
             block = createTextBlock(self.helpContent, data.content or "")
         end
-
         table.insert(self.helpBlocks, block)
     end
-
     self:LayoutHelp()
     resetScroll(self.helpScroll, self.helpContent, self.helpBar)
-
-    self.helpFrame:SetScript("OnUpdate", function(f)
-        f:SetScript("OnUpdate", nil)
-        self:LayoutHelp()
-    end)
+    
+    -- Помечаем, что нужен повторный лейаут в следующем кадре
+    -- (вместо затирания OnUpdate, как было в оригинале)
+    self._helpLayoutDirty = true
 end
 
 function UI:_IsPracticeType(moduleType)
