@@ -28600,7 +28600,6 @@ function UI:_CreateCodeViewer()
     if self.codeViewerFrame then
         return
     end
-
     local f = CreateFrame("Frame", nil, UIParent)
     f:SetSize(720, 580)
     f:SetPoint("CENTER", -40, 0)
@@ -28608,7 +28607,6 @@ function UI:_CreateCodeViewer()
     f:SetMovable(true)
     f:SetClampedToScreen(true)
     f:SetFrameStrata("DIALOG")
-
     addBackgroundBorder(f)
 
     local titleBg = f:CreateTexture(nil, "ARTWORK")
@@ -28634,7 +28632,6 @@ function UI:_CreateCodeViewer()
     titleText:SetPoint("RIGHT", closeButton, "LEFT", -8, 0)
     titleText:SetPoint("TOP", titleBg, "TOP", 0, -5)
     titleText:SetText("Результаты других игроков")
-
     self.codeViewerTitle = titleText
 
     self.codeViewerScroll, self.codeViewerContent, self.codeViewerBar = createScrollArea(
@@ -28652,6 +28649,18 @@ function UI:_CreateCodeViewer()
     end)
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
+    end)
+
+    -- Отслеживание наведения мыши для переключения страты
+    f:SetScript("OnUpdate", function(frame)
+        local isOver = frame:IsMouseOver()
+        if isOver and not self._codeViewerMouseOver then
+            self._codeViewerMouseOver = true
+            frame:SetFrameStrata("FULLSCREEN")
+        elseif not isOver and self._codeViewerMouseOver then
+            self._codeViewerMouseOver = false
+            frame:SetFrameStrata("DIALOG")
+        end
     end)
 
     self.codeViewerFrame = f
