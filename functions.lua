@@ -12575,56 +12575,13 @@ end
 
 function NSPauk:NP_ChooseRingDiameter(anchors)
     local N = anchors and #anchors or 0
-
     if N < 2 then
         return 1, 2
     end
-
-    local bestScore = -math.huge
-    local bestA = 1
-    local bestB = 2
-
-    for i = 1, N do
-        for j = i + 1, N do
-            local a = anchors[i]
-            local b = anchors[j]
-
-            if a and b then
-                local dx = math.abs((a.cx or 0) - (b.cx or 0))
-                local dy = math.abs((a.cy or 0) - (b.cy or 0))
-                local dist = math.sqrt(dx * dx + dy * dy)
-
-                local score = dx * 2 + dist * 0.35
-
-                if dx >= dy then
-                    score = score + dist * 0.5
-                end
-
-                local idxDist = math.min(j - i, N - (j - i))
-                local ideal = N / 2
-
-                if ideal <= 0 then
-                    ideal = 1
-                end
-
-                local opposite = 1 - math.abs(idxDist - ideal) / ideal
-
-                if opposite < 0 then
-                    opposite = 0
-                end
-
-                score = score + opposite * 120
-
-                if score > bestScore then
-                    bestScore = score
-                    bestA = i
-                    bestB = j
-                end
-            end
-        end
-    end
-
-    return bestA, bestB
+    local i = math.random(1, N)
+    local j = math.random(1, N - 1)
+    if j >= i then j = j + 1 end
+    return i, j
 end
 
 function NSPauk:CreateRingInstance(targetCount, items)
