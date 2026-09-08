@@ -10384,19 +10384,19 @@ end
 }
 
 ns_llua['lua'][87] = {
-type = "commenttest",
-title = "Тест 83-4: функция BuildResourceMap",
-helpModules = {83, 65, 31, 44, 45},
-preloadVars = {
-{var = "BuildResourceMap", desc = "BuildResourceMap очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-{var = "test1", desc = "test1 очищается перед проверкой"},
-{var = "test2", desc = "test2 очищается перед проверкой"},
-{var = "test3", desc = "test3 очищается перед проверкой"},
-{var = "test4", desc = "test4 очищается перед проверкой"},
-},
-reportVars = {"checkError", "test1", "test2", "test3", "test4"},
-instruction = [=[
+    type = "commenttest",
+    title = "Тест 83-4: функция BuildResourceMap",
+    helpModules = {83, 65, 31, 44, 45},
+    preloadVars = {
+        {var = "BuildResourceMap", desc = "BuildResourceMap очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
 <h>Тест 83-4: функция BuildResourceMap</h>
 <t>Создай глобальную функцию <k>BuildResourceMap(units)</k>.</t>
 <t>Перед проверкой возьми в цель любого юнита: игрока или моба.</t>
@@ -10407,220 +10407,260 @@ instruction = [=[
 <t>Используй цикл, <k>UnitMana</k>, <k>UnitManaMax</k>, <k>math.floor</k> и накопление в таблицу.</t>
 <w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
+    initialCode = [=[
 function BuildResourceMap(units)
+
 end
 ]=],
-requireKeywords = {
-"BuildResourceMap",
-"function",
-"for",
-"UnitMana",
-"UnitManaMax",
-"math.floor",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-for i = 1, 4 do
-_G["test" .. i] = nil
-end
+    requireKeywords = {
+        "BuildResourceMap",
+        "function",
+        "for",
+        "UnitMana",
+        "UnitManaMax",
+        "math.floor",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 4 do
+            _G["test" .. i] = nil
+        end
 
-local function fail(msg)
-_G.checkError = msg
-return msg
-end
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
 
-if type(_G.BuildResourceMap) ~= "function" then
-return fail("BuildResourceMap не является глобальной функцией")
-end
+        if type(_G.BuildResourceMap) ~= "function" then
+            return fail("BuildResourceMap не является глобальной функцией")
+        end
 
-local okExists, exists = pcall(UnitExists, "target")
-if not okExists or not exists then
-return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
-end
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Возьми в цель любого юнита и нажми проверку снова.")
+        end
 
-local function livePercent(unit)
-if not UnitExists(unit) then
-return 0
-end
-local cur = UnitMana(unit) or 0
-local max = UnitManaMax(unit) or 0
-if max <= 0 then
-return 0
-end
-return math.floor(cur / max * 100)
-end
+        local function livePercent(unit)
+            if not UnitExists(unit) then
+                return 0
+            end
+            local cur = UnitMana(unit) or 0
+            local max = UnitManaMax(unit) or 0
+            if max <= 0 then
+                return 0
+            end
+            return math.floor(cur / max * 100)
+        end
 
-local function fmtMap(t)
-local keys = {}
-for k in pairs(t) do
-table.insert(keys, tostring(k))
-end
-table.sort(keys)
-local p = {}
-for _, k in ipairs(keys) do
-table.insert(p, k .. "=" .. tostring(t[k]))
-end
-return "{" .. table.concat(p, ", ") .. "}"
-end
+        local function fmtMap(t)
+            local keys = {}
+            for k in pairs(t) do
+                table.insert(keys, tostring(k))
+            end
+            table.sort(keys)
+            local p = {}
+            for _, k in ipairs(keys) do
+                table.insert(p, k .. "=" .. tostring(t[k]))
+            end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
 
-local tests = {
-{input = {"player", "target", "ns_invalid"}},
-{input = {"player", "player"}},
-{input = {}},
-{input = "bad"},
-}
+        local tests = {
+            {input = {"player", "target", "ns_invalid"}},
+            {input = {"player", "player"}},
+            {input = {}},
+            {input = "bad"},
+        }
 
-for i, test in ipairs(tests) do
-local ok, result = pcall(_G.BuildResourceMap, test.input)
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.BuildResourceMap, test.input)
+            
+            local expParts = {}
+            if type(test.input) == "table" then
+                for _, unit in ipairs(test.input) do
+                    expParts[unit] = livePercent(unit)
+                end
+            end
 
-local expParts = {}
-if type(test.input) == "table" then
-for _, unit in ipairs(test.input) do
-expParts[unit] = livePercent(unit)
-end
-end
-_G["test" .. i] = "Получено: " .. (type(result) == "table" and fmtMap(result) or tostring(result)) .. " | Ожидалось: " .. fmtMap(expParts)
+            _G["test" .. i] = "Получено: " .. (type(result) == "table" and fmtMap(result) or tostring(result)) .. " | Ожидалось: " .. fmtMap(expParts)
 
-if not ok then
-return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
-end
-if type(result) ~= "table" then
-return fail("Тест " .. i .. ": функция должна вернуть таблицу")
-end
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
 
-local expCount = 0
-for _ in pairs(expParts) do
-expCount = expCount + 1
-end
-local resCount = 0
-for _ in pairs(result) do
-resCount = resCount + 1
-end
-if resCount ~= expCount then
-return fail("Тест " .. i .. " не пройден")
-end
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
 
-for unit, exp in pairs(expParts) do
-local got = result[unit]
-if type(got) ~= "number" or math.abs(got - exp) > 5 then
-return fail("Тест " .. i .. " не пройден")
-end
-end
-end
+            local expCount = 0
+            for _ in pairs(expParts) do
+                expCount = expCount + 1
+            end
 
-return true
-end,
+            local resCount = 0
+            for _ in pairs(result) do
+                resCount = resCount + 1
+            end
+
+            if resCount ~= expCount then
+                return fail("Тест " .. i .. " не пройден")
+            end
+
+            for unit, exp in pairs(expParts) do
+                local got = result[unit]
+                -- got ~= got отлавливает NaN (-1.#IND), который возникает при делении 0/0
+                if type(got) ~= "number" or got ~= got or math.abs(got - exp) > 5 then
+                    return fail("Тест " .. i .. " не пройден")
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][88] = {
-type = "commenttest",
-title = "Тест 83-5: функция GetTargetSummary",
-helpModules = {83, 65, 77, 7, 45},
-preloadVars = {
-{var = "GetTargetSummary", desc = "GetTargetSummary очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {"checkError"},
-instruction = [=[
+    type = "commenttest",
+    title = "Тест 83-5: функция GetTargetSummary",
+    helpModules = {83, 65, 77, 7, 45},
+    preloadVars = {
+        {var = "GetTargetSummary", desc = "GetTargetSummary очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2"},
+    instruction = [=[
 <h>Тест 83-5: функция GetTargetSummary</h>
-<t>Создай глобальную функцию <k>GetTargetSummary()</k>.</t>
-<w>Перед проверкой обязательно возьми в цель моба или NPC. Цель не должна быть игроком.</w>
+<t>Создай глобальную функцию <k>GetTargetSummary(unit)</k>.</t>
 <t>Функция должна вернуть одну строку в формате:</t>
 <s>"Имя: Тралл, Тип: моб, HP: 100%, Ресурс: 0%"</s>
-<t>где:</t>
-<t>- имя — через <k>UnitName("target")</k>;</t>
-<t>- тип — <s>"игрок"</s>, если GUID начинается с <s>"0x0000"</s>, иначе <s>"моб"</s>;</t>
-<t>- HP — процент здоровья через <k>UnitHealth</k> / <k>UnitHealthMax</k>;</t>
-<t>- Ресурс — процент ресурса через <k>UnitMana</k> / <k>UnitManaMax</k> (нет ресурса — 0).</t>
-<t>Если цели нет, верни строку <s>"Нет цели"</s>.</t>
-<t>Собери строку через <k>string.format</k>, знак процента в шаблоне — <k>%%</k>. Все деления защищай от нуля.</t>
-<w>Ничего выводить не нужно.</w>
+<t>Тип: если юнит — игрок, выводи <s>"игрок"</s>, иначе — <s>"моб"</s>.</t>
+<w>Возьми в цель игрока, а в фокус — моба (или наоборот).</w>
+<w>Бонусная награда: если длина твоего кода составит 300 символов или меньше, ты получишь бонус!</w>
 ]=],
-initialCode = [=[
-function GetTargetSummary()
+    initialCode = [=[
+function GetTargetSummary(unit)
+    
 end
 ]=],
-requireKeywords = {
-"GetTargetSummary",
-"function",
-"UnitName",
-"UnitGUID",
-"string.sub",
-"UnitHealth",
-"UnitHealthMax",
-"UnitMana",
-"UnitManaMax",
-"string.format",
-"0x0000",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
+    requireKeywords = {
+        "GetTargetSummary",
+        "function",
+        "UnitGUID",
+        "UnitName",
+        "UnitHealth",
+        "UnitHealthMax",
+        "UnitMana",
+        "UnitManaMax",
+        "0x0000",
+        "return",
+        "unit"
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
 
-local function fail(msg)
-_G.checkError = msg
-return msg
-end
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
 
-if type(_G.GetTargetSummary) ~= "function" then
-return fail("GetTargetSummary не является глобальной функцией")
-end
+        if type(_G.GetTargetSummary) ~= "function" then
+            return fail("GetTargetSummary не является глобальной функцией")
+        end
 
-local okExists, exists = pcall(UnitExists, "target")
-if not okExists or not exists then
-return fail("Нет цели. Возьми в цель моба или NPC и нажми проверку снова.")
-end
+        local okTarget, targetExists = pcall(UnitExists, "target")
+        local okFocus, focusExists = pcall(UnitExists, "focus")
 
-local okGuid, guid = pcall(UnitGUID, "target")
-if not okGuid or type(guid) ~= "string" then
-return fail("Не удалось получить GUID цели.")
-end
+        if not okTarget or not targetExists then
+            return fail("Нет цели. Возьми кого-нибудь в цель.")
+        end
 
-if string.sub(guid, 1, 6) == "0x0000" then
-return fail("Цель не должна быть игроком. Возьми в цель моба или NPC.")
-end
+        if not okFocus or not focusExists then
+            return fail("Нет фокуса. Возьми кого-нибудь в фокус.")
+        end
 
-local ok, result = pcall(_G.GetTargetSummary)
-if not ok then
-return fail("Ошибка вызова GetTargetSummary: " .. tostring(result))
-end
-if type(result) ~= "string" then
-return fail("GetTargetSummary должна вернуть строку")
-end
+        local _, targetGuid = pcall(UnitGUID, "target")
+        local _, focusGuid = pcall(UnitGUID, "focus")
 
-local name, typ, hp, res = result:match("^Имя: (.-), Тип: (.-), HP: (%d+)%%, Ресурс: (%d+)%%$")
-if not name then
-return fail("Строка не похожа на 'Имя: X, Тип: Y, HP: N%, Ресурс: M%'")
-end
+        if type(targetGuid) ~= "string" or type(focusGuid) ~= "string" then
+            return fail("Не удалось получить GUID для target или focus.")
+        end
 
-if name ~= UnitName("target") then
-return fail("Имя цели не совпадает")
-end
-if typ ~= "моб" then
-return fail("Тип цели должен быть 'моб'")
-end
+        local targetIsPlayer = string.sub(targetGuid, 1, 6) == "0x0000"
+        local focusIsPlayer = string.sub(focusGuid, 1, 6) == "0x0000"
 
-local function livePercent(cur, max)
-if max <= 0 then
-return 0
-end
-return math.floor(cur / max * 100)
-end
+        if targetIsPlayer == focusIsPlayer then
+            return fail("Один из юнитов (target или focus) должен быть игроком, другой — нет.")
+        end
 
-local hpExp = livePercent(UnitHealth("target") or 0, UnitHealthMax("target") or 0)
-local resExp = livePercent(UnitMana("target") or 0, UnitManaMax("target") or 0)
+        local function livePercent(cur, max)
+            if max <= 0 then
+                return 0
+            end
+            return math.floor(cur / max * 100)
+        end
 
-if math.abs(tonumber(hp) - hpExp) > 5 then
-return fail("Процент HP не совпадает")
-end
-if math.abs(tonumber(res) - resExp) > 5 then
-return fail("Процент ресурса не совпадает")
-end
+        local function checkUnit(unit, testNum)
+            local ok, result = pcall(_G.GetTargetSummary, unit)
+            if not ok then
+                return fail("Ошибка вызова GetTargetSummary('" .. unit .. "'): " .. tostring(result))
+            end
 
-return true
-end,
+            if type(result) ~= "string" then
+                return fail("GetTargetSummary('" .. unit .. "') должна вернуть строку")
+            end
+
+            local name, typ, hp, res = result:match("^Имя: (.-), Тип: (.-), HP: (%d+)%%, Ресурс: (%d+)%%$")
+            
+            _G["test" .. testNum] = unit .. ": " .. result
+
+            if not name then
+                return fail("Строка для '" .. unit .. "' не похожа на 'Имя: X, Тип: Y, HP: N%, Ресурс: M%'")
+            end
+
+            local expectedName = UnitName(unit)
+            if name ~= expectedName then
+                return fail("Имя для '" .. unit .. "' не совпадает")
+            end
+
+            local _, guid = pcall(UnitGUID, unit)
+            local isPlayer = string.sub(guid, 1, 6) == "0x0000"
+            local expectedType = isPlayer and "игрок" or "моб"
+
+            if typ ~= expectedType then
+                return fail("Тип для '" .. unit .. "' должен быть '" .. expectedType .. "', получено '" .. typ .. "'")
+            end
+
+            local hpExp = livePercent(UnitHealth(unit) or 0, UnitHealthMax(unit) or 0)
+            local resExp = livePercent(UnitMana(unit) or 0, UnitManaMax(unit) or 0)
+
+            if math.abs(tonumber(hp) - hpExp) > 5 then
+                return fail("Процент HP для '" .. unit .. "' не совпадает")
+            end
+
+            if math.abs(tonumber(res) - resExp) > 5 then
+                return fail("Процент ресурса для '" .. unit .. "' не совпадает")
+            end
+
+            return true
+        end
+
+        local err1 = checkUnit("target", 1)
+        if err1 ~= true then
+            return err1
+        end
+
+        local err2 = checkUnit("focus", 2)
+        if err2 ~= true then
+            return err2
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][89] = {

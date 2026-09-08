@@ -19411,61 +19411,89 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
     if not inst or not inst.isNaturalRing or inst.torn then
         return false
     end
+
     if type(inst.conns) ~= "table" or #inst.conns == 0 then
         return false
     end
+
     for _, conn in ipairs(inst.conns) do
-        -- Проверяем только основные нити (у перемычек есть connA/connB)
+        -- Проверяем только основные нити.
+        -- У перемычек есть connA/connB, у основных нитей их нет.
         if not conn.connA and not conn.connB then
             if not self:NP_IsWebOwnerDrawn(conn) then
-                local anchorAlive = false
-                
-                if conn.isRingFrame then
-                    -- ПЕРИМЕТР: жив, если ОБА конца на месте (и старт, и финиш)
-                    local startOk = not conn.ringStartRect or self:ValidateAnchorRect(conn.ringStartRect)
-                    local targetOk = not conn.target or not conn.target.rect or self:ValidateAnchorRect(conn.target.rect)
-                    if startOk and targetOk then
-                        anchorAlive = true
+                if conn.alive then
+                    -- Живая нить, которая ещё не нарисована.
+                    -- Паук должен сначала нарисовать её.
+                    -- Проверяем, может ли она быть нарисована.
+                    local anchorAlive = false
+
+                    if conn.isRingFrame then
+                        local startOk = not conn.ringStartRect
+                            or self:ValidateAnchorRect(conn.ringStartRect)
+
+                        local targetOk = not conn.target
+                            or not conn.target.rect
+                            or self:ValidateAnchorRect(conn.target.rect)
+
+                        if startOk and targetOk then
+                            anchorAlive = true
+                        end
+
+                    elseif conn.isDiameter then
+                        local hubOk = not inst.hub
+                            or not inst.hub.rect
+                            or self:ValidateAnchorRect(inst.hub.rect)
+
+                        local startOk = not conn.ringStartRect
+                            or self:ValidateAnchorRect(conn.ringStartRect)
+
+                        local targetOk = not conn.target
+                            or not conn.target.rect
+                            or self:ValidateAnchorRect(conn.target.rect)
+
+                        if hubOk and startOk and targetOk then
+                            anchorAlive = true
+                        end
+
+                    elseif conn.isMidSpoke then
+                        if conn.perimeterConn and conn.perimeterConn.alive then
+                            anchorAlive = true
+                        end
+
+                    elseif conn.isSpoke then
+                        if conn.hubDepConn and conn.hubDepConn.alive then
+                            if conn.target and conn.target.rect then
+                                if self:ValidateAnchorRect(conn.target.rect) then
+                                    anchorAlive = true
+                                end
+                            else
+                                anchorAlive = true
+                            end
+                        end
+
+                    else
+                        if conn.target
+                            and conn.target.rect
+                            and self:ValidateAnchorRect(conn.target.rect) then
+                            anchorAlive = true
+                        end
                     end
-                    
-                elseif conn.isDiameter then
-                    -- ДИАМЕТР: жив, если хаб на месте И оба конца диаметра на месте
-                    local hubOk = not inst.hub or not inst.hub.rect or self:ValidateAnchorRect(inst.hub.rect)
-                    local startOk = not conn.ringStartRect or self:ValidateAnchorRect(conn.ringStartRect)
-                    local targetOk = not conn.target or not conn.target.rect or self:ValidateAnchorRect(conn.target.rect)
-                    if hubOk and startOk and targetOk then
-                        anchorAlive = true
+
+                    if anchorAlive then
+                        return false
                     end
-                    
-                elseif conn.isMidSpoke then
-                    -- СРЕДНЯЯ СПИЦА: жива, если жив её периметр
-                    if conn.perimeterConn and conn.perimeterConn.alive then
-                        anchorAlive = true
-                    end
-                    
-                elseif conn.isSpoke then
-                    -- ОБЫЧНАЯ СПИЦА: жива, если жив диаметр (их база)
-                    if conn.hubDepConn and conn.hubDepConn.alive then
-                        anchorAlive = true
-                    end
-                    
                 else
-                    -- ОБЫЧНАЯ НИТЬ: жива, если цель на месте
-                    if conn.target and conn.target.rect and self:ValidateAnchorRect(conn.target.rect) then
-                        anchorAlive = true
+                    -- Мёртвая нить.
+                    -- Если она может быть восстановлена, блокируем перемычки.
+                    -- Если не может быть восстановлена, пропускаем её.
+                    if self:NP_CanReviveRingConn(inst, conn) then
+                        return false
                     end
                 end
-                
-                -- Если якоря существуют, но нить не нарисована — блокируем перемычки,
-                -- пусть паук сначала восстановит/дорисует эту нить.
-                if anchorAlive then
-                    return false
-                end
-                -- Если хотя бы один якорь исчез (как у Нити 4 из-за мертвого старта) — 
-                -- пропускаем эту нить, она не блокирует систему.
             end
         end
     end
+
     return true
 end
 
