@@ -10674,12 +10674,12 @@ content = [=[
 <code>
 /run print(UnitIsDead("player"))
 /run print(UnitIsGhost("player"))
-/run print(UnitIsDeadOrGhost("player"))
 </code>
 <t>Если функция возвращает истинное значение, условие сработает. Если <k>nil</k> или <k>false</k> — не сработает.</t>
-<h>Пример</h>
+<h>Пример: мёртв или призрак</h>
+<t>Отдельной функции «мёртв или призрак» в 3.3.5 нет, поэтому используем <k>or</k>:</t>
 <code>
-/run if UnitIsDeadOrGhost("player") then print("Мёртв или призрак") else print("Жив") end
+/run if UnitIsDead("player") or UnitIsGhost("player") then print("Мёртв или призрак") else print("Жив") end
 </code>
 <h>Бой</h>
 <code>
@@ -10698,6 +10698,7 @@ content = [=[
 <c>UnitIsConnected</c> — юнит онлайн.
 <c>UnitIsAFK</c> — режим AFK.
 <c>UnitIsDND</c> — режим «не беспокоить».
+
 <h>Таблица статусов</h>
 <code>
 /run local status = { dead = UnitIsDead("player"), ghost = UnitIsGhost("player"), combat = UnitAffectingCombat("player") }; print(status.dead, status.ghost, status.combat)
