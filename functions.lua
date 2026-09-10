@@ -6712,14 +6712,17 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     if self.F_HIGH and f == self.F_HIGH then
         return nil
     end
+    
     local name = f.GetName and f:GetName()
     if name and C.EXCLUDE_FRAMES[name] then
         return nil
     end
+    
     local isChat = false
     if name and name:find("^ChatFrame") then
         isChat = true
     end
+    
     if not isChat then
         if not f.IsVisible or not f:IsVisible() then
             return nil
@@ -6729,6 +6732,7 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
             return nil
         end
     end
+    
     if not uiScale then
         uiScale = self:EffScale(UIParent)
     end
@@ -6744,29 +6748,23 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     if not scrH then
         scrH = ((GetScreenHeight and GetScreenHeight()) or UIParent:GetHeight() or 1) * uiScale
     end
+    
     local fs = self:EffScale(f)
     local draws = false
     local ul, ur, ub, ut
+    
     local function grow(l, r, b, t)
         if not ul then
             ul, ur, ub, ut = l, r, b, t
         else
-            if l < ul then
-                ul = l
-            end
-            if r > ur then
-                ur = r
-            end
-            if b < ub then
-                ub = b
-            end
-            if t > ut then
-                ut = t
-            end
+            if l < ul then ul = l end
+            if r > ur then ur = r end
+            if b < ub then ub = b end
+            if t > ut then ut = t end
         end
         draws = true
     end
-
+    
     if isChat then
         local l, r, b, t = f:GetLeft(), f:GetRight(), f:GetBottom(), f:GetTop()
         if l and r and b and t then
@@ -6779,9 +6777,16 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
                 grow(l * fs, r * fs, b * fs, t * fs)
             end
         end
+        
         local fallbackUsed = false
-        if f.GetRegions then
-            for _, region in ipairs({ f:GetRegions() }) do
+        
+        -- ОБЕРТЫВАЕМ В pcall ДЛЯ ЗАЩИТЫ ОТ STACK OVERFLOW В НЕДРАХ КЛИЕНТА
+        local hasRegions, regions = pcall(function() 
+            return { f:GetRegions() } 
+        end)
+        
+        if hasRegions and type(regions) == "table" then
+            for _, region in ipairs(regions) do
                 if region.IsVisible and region:IsVisible() then
                     local kind = region:GetObjectType()
                     local ok = false
@@ -6790,6 +6795,7 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
                     elseif kind == "FontString" then
                         ok = self:VisibleText(region)
                     end
+                    
                     if ok then
                         local l, r2, b, t
                         if region.GetLeft then
@@ -6798,6 +6804,7 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
                             b = region:GetBottom()
                             t = region:GetTop()
                         end
+                        
                         if l and r2 and b and t then
                             grow(l * fs, r2 * fs, b * fs, t * fs)
                         elseif not fallbackUsed then
@@ -6812,10 +6819,11 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
             end
         end
     end
-
+    
     if not draws then
         return nil
     end
+    
     local w = ur - ul
     local h = ut - ub
     if w < C.MIN_ANCHOR_SIZE or h < C.MIN_ANCHOR_SIZE then
@@ -6824,8 +6832,10 @@ function NSPauk:ComputeFrameVisibleRect(f, uiScale, baseX, baseY, scrW, scrH)
     if ur < baseX or ul > baseX + scrW or ut < baseY or ub > baseY + scrH then
         return nil
     end
+    
     local rawName = self:DisplayName(f)
     local family = self:NP_GetAnchorFamily(rawName)
+    
     return {
         name = family or rawName,
         family = family,
@@ -21779,7 +21789,7 @@ function NSPauk:NP_DrawSectorsDebug()
         end
     end
 
-    if sectorThreadCount > 12 then
+    if sectorThreadCount > 22 then
         self:Echo(string.format(
             "Слишком много секторных нитей (%d), визуализация отключена.",
             sectorThreadCount

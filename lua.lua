@@ -10713,278 +10713,553 @@ content = [=[
 }
 
 ns_llua['lua'][90] = {
-type = "vartest",
-title = "Тест 89-1: жизнь и подключение",
-helpModules = {89, 15},
-tasks = {
-{
-var = "playerDead",
-desc = 'Создай глобальную переменную playerDead = not not UnitIsDead("player")',
-check = function(value)
-return type(value) == "boolean"
-end,
-},
-{
-var = "playerConnected",
-desc = 'Создай глобальную переменную playerConnected = not not UnitIsConnected("player")',
-check = function(value)
-return type(value) == "boolean" and value == true
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 89-1: функция GetUnitStatusString",
+    helpModules = {89, 45, 17, 19},
+    preloadVars = {
+        {var = "GetUnitStatusString", desc = "GetUnitStatusString очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+    },
+    reportVars = {"checkError"},
+    instruction = [=[
+<h>Тест 89-1: функция GetUnitStatusString</h>
+<t>Создай глобальную функцию <k>GetUnitStatusString(unit)</k>.</t>
+<t>Функция должна вернуть одну строку, описывающую состояние юнита:</t>
+<s>"offline"</s> — если юнит не подключён.
+<s>"dead"</s> — если юнит мёртв.
+<s>"ghost"</s> — если юнит призрак.
+<s>"combat"</s> — если юнит в бою (но жив и не призрак).
+<s>"alive"</s> — в остальных случаях.
+<t>Если юнита не существует, верни <s>"unknown"</s>.</t>
+<t>Порядок проверок важен: сначала существование, потом подключение, потом смерть, потом призрак, потом бой.</t>
+<t>Используй:</t>
+<c>UnitExists</c>
+<c>UnitIsConnected</c>
+<c>UnitIsDead</c>
+<c>UnitIsGhost</c>
+<c>UnitAffectingCombat</c>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
+]=],
+    initialCode = [=[
+function GetUnitStatusString(unit)
+end
+]=],
+    requireKeywords = {
+        "GetUnitStatusString",
+        "function",
+        "UnitExists",
+        "UnitIsConnected",
+        "UnitIsDead",
+        "UnitIsGhost",
+        "UnitAffectingCombat",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetUnitStatusString) ~= "function" then
+            return fail("GetUnitStatusString не является глобальной функцией")
+        end
+
+        local oldExists = _G.UnitExists
+        local oldConn = _G.UnitIsConnected
+        local oldDead = _G.UnitIsDead
+        local oldGhost = _G.UnitIsGhost
+        local oldCombat = _G.UnitAffectingCombat
+
+        local mock = {
+            missing = {
+                exists = false, conn = false, dead = false, ghost = false, combat = false,
+                exp = "unknown",
+            },
+            offline = {
+                exists = true, conn = false, dead = false, ghost = false, combat = false,
+                exp = "offline",
+            },
+            dead = {
+                exists = true, conn = true, dead = true, ghost = false, combat = false,
+                exp = "dead",
+            },
+            ghost = {
+                exists = true, conn = true, dead = false, ghost = true, combat = false,
+                exp = "ghost",
+            },
+            combat = {
+                exists = true, conn = true, dead = false, ghost = false, combat = true,
+                exp = "combat",
+            },
+            alive = {
+                exists = true, conn = true, dead = false, ghost = false, combat = false,
+                exp = "alive",
+            },
+        }
+
+        local function applyMocks(unit)
+            local data = mock[unit] or mock.missing
+            _G.UnitExists = function(u) return data.exists end
+            _G.UnitIsConnected = function(u) return data.conn end
+            _G.UnitIsDead = function(u) return data.dead end
+            _G.UnitIsGhost = function(u) return data.ghost end
+            _G.UnitAffectingCombat = function(u) return data.combat end
+        end
+
+        local function restoreMocks()
+            _G.UnitExists = oldExists
+            _G.UnitIsConnected = oldConn
+            _G.UnitIsDead = oldDead
+            _G.UnitIsGhost = oldGhost
+            _G.UnitAffectingCombat = oldCombat
+        end
+
+        local cases = {"missing", "offline", "dead", "ghost", "combat", "alive"}
+        for _, unit in ipairs(cases) do
+            applyMocks(unit)
+            local ok, result = pcall(_G.GetUnitStatusString, unit)
+            restoreMocks()
+
+            if not ok then
+                return fail("Ошибка вызова GetUnitStatusString('" .. unit .. "'): " .. tostring(result))
+            end
+            if type(result) ~= "string" then
+                return fail("GetUnitStatusString('" .. unit .. "') должна вернуть строку, получено " .. type(result))
+            end
+            if result ~= mock[unit].exp then
+                return fail("Для '" .. unit .. "' ожидалось '" .. mock[unit].exp .. "', получено '" .. result .. "'")
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][91] = {
-type = "vartest",
-title = "Тест 89-2: бой и статус жизни",
-helpModules = {89, 17},
-tasks = {
-{
-var = "playerCombat",
-desc = 'Создай глобальную переменную playerCombat = not not UnitAffectingCombat("player")',
-check = function(value)
-return type(value) == "boolean"
-end,
-},
-{
-var = "playerStatusString",
-desc = 'Создай глобальную переменную playerStatusString: если UnitIsDeadOrGhost("player") истинно, то "dead", иначе "alive"',
-check = function(value)
-return value == "dead" or value == "alive"
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 89-2: функция IsDeadOrGhost",
+    helpModules = {89, 45, 21},
+    preloadVars = {
+        {var = "IsDeadOrGhost", desc = "IsDeadOrGhost очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+    },
+    reportVars = {"checkError"},
+    instruction = [=[
+<h>Тест 89-2: функция IsDeadOrGhost</h>
+<t>Создай глобальную функцию <k>IsDeadOrGhost(unit)</k>.</t>
+<t>Функция должна вернуть <k>true</k>, если юнит мёртв или призрак.</t>
+<t>Иначе вернуть <k>false</k>.</t>
+<t>Если юнита не существует, вернуть <k>false</k>.</t>
+<t>Используй <k>UnitExists</k>, <k>UnitIsDead</k>, <k>UnitIsGhost</k>.</t>
+<t>Результат должен быть чистым boolean — используй паттерн <k>and true or false</k>.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
+]=],
+    initialCode = [=[
+function IsDeadOrGhost(unit)
+end
+]=],
+    requireKeywords = {
+        "IsDeadOrGhost",
+        "function",
+        "UnitExists",
+        "UnitIsDead",
+        "UnitIsGhost",
+        "and",
+        "or",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.IsDeadOrGhost) ~= "function" then
+            return fail("IsDeadOrGhost не является глобальной функцией")
+        end
+
+        local oldExists = _G.UnitExists
+        local oldDead = _G.UnitIsDead
+        local oldGhost = _G.UnitIsGhost
+
+        local mock = {
+            alive = { exists = true, dead = false, ghost = false, exp = false },
+            dead  = { exists = true, dead = true,  ghost = false, exp = true },
+            ghost = { exists = true, dead = false, ghost = true,  exp = true },
+            missing = { exists = false, dead = false, ghost = false, exp = false },
+        }
+
+        local function applyMocks(unit)
+            local data = mock[unit] or mock.missing
+            _G.UnitExists = function(u) return data.exists end
+            _G.UnitIsDead = function(u) return data.dead end
+            _G.UnitIsGhost = function(u) return data.ghost end
+        end
+
+        local function restoreMocks()
+            _G.UnitExists = oldExists
+            _G.UnitIsDead = oldDead
+            _G.UnitIsGhost = oldGhost
+        end
+
+        local cases = {"alive", "dead", "ghost", "missing"}
+        for _, unit in ipairs(cases) do
+            applyMocks(unit)
+            local ok, result = pcall(_G.IsDeadOrGhost, unit)
+            restoreMocks()
+
+            if not ok then
+                return fail("Ошибка вызова IsDeadOrGhost('" .. unit .. "'): " .. tostring(result))
+            end
+            if type(result) ~= "boolean" then
+                return fail("IsDeadOrGhost('" .. unit .. "') должна вернуть boolean, получено " .. type(result))
+            end
+            if result ~= mock[unit].exp then
+                return fail("Для '" .. unit .. "' ожидалось " .. tostring(mock[unit].exp) .. ", получено " .. tostring(result))
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][92] = {
-type = "commenttest",
-title = "Тест 89-3: функция GetLifeState",
-helpModules = {89, 45, 19},
-preloadVars = {
-{var = "GetLifeState", desc = "GetLifeState очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 89-3: функция GetLifeState</h>
-<t>Создай глобальную функцию <k>GetLifeState(unit)</k>.</t>
-<t>Функция должна вернуть строку:</t>
-<c>"unknown"</c> — если юнита не существует.
-<c>"dead"</c> — если юнит мёртв.
-<c>"ghost"</c> — если юнит призрак.
-<c>"alive"</c> — в остальных случаях.
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitIsDead</c>
-<c>UnitIsGhost</c>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 89-3: функция GetTargetState",
+    helpModules = {89, 45, 7, 17},
+    preloadVars = {
+        {var = "GetTargetState", desc = "GetTargetState очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+    },
+    reportVars = {"checkError"},
+    instruction = [=[
+<h>Тест 89-3: функция GetTargetState</h>
+<t>Создай глобальную функцию <k>GetTargetState()</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита.</t>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>"Тралл: жив"</s>, <s>"Тралл: мёртв"</s> или <s>"Тралл: призрак"</s>.</t>
+<t>Если цели нет, верни строку <s>"Нет цели"</s>.</t>
+<t>Используй <k>UnitExists</k>, <k>UnitName</k>, <k>UnitIsDead</k>, <k>UnitIsGhost</k>.</t>
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetLifeState(unit)
+    initialCode = [=[
+function GetTargetState()
+end
 ]=],
-requireKeywords = {
-"GetLifeState",
-"function",
-"UnitExists",
-"UnitIsDead",
-"UnitIsGhost",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetLifeState) ~= "function" then
-_G.checkError = "GetLifeState не является глобальной функцией"
-return false
-end
-local validStates = {
-dead = true,
-ghost = true,
-alive = true,
-}
-local ok1, playerState = pcall(_G.GetLifeState, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetLifeState('player'): " .. tostring(playerState)
-return false
-end
-if type(playerState) ~= "string" or not validStates[playerState] then
-_G.checkError = "Для player функция должна вернуть dead, ghost или alive"
-return false
-end
-local ok2, invalidState = pcall(_G.GetLifeState, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetLifeState('ns_invalid_unit'): " .. tostring(invalidState)
-return false
-end
-if invalidState ~= "unknown" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть unknown"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetTargetState",
+        "function",
+        "UnitExists",
+        "UnitName",
+        "UnitIsDead",
+        "UnitIsGhost",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetTargetState) ~= "function" then
+            return fail("GetTargetState не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Возьми любого юнита в цель и нажми проверку снова.")
+        end
+
+        local ok, result = pcall(_G.GetTargetState)
+        if not ok then
+            return fail("Ошибка вызова GetTargetState: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("GetTargetState должна вернуть строку")
+        end
+
+        local expectedName = UnitName("target")
+        local expectedState
+        if UnitIsDead("target") then
+            expectedState = "мёртв"
+        elseif UnitIsGhost("target") then
+            expectedState = "призрак"
+        else
+            expectedState = "жив"
+        end
+        local expected = expectedName .. ": " .. expectedState
+
+        if result ~= expected then
+            return fail("Ожидалось '" .. expected .. "', получено '" .. result .. "'")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][93] = {
-type = "commenttest",
-title = "Тест 89-4: функция IsInCombat",
-helpModules = {89, 45, 21},
-preloadVars = {
-{var = "IsInCombat", desc = "IsInCombat очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 89-4: функция IsInCombat</h>
-<t>Создай глобальную функцию <k>IsInCombat(unit)</k>.</t>
-<t>Функция должна вернуть <k>true</k>, если юнит находится в бою.</t>
-<t>Иначе функция должна вернуть <k>false</k>.</t>
-<t>Используй:</t>
-<c>UnitAffectingCombat</c>
-<t>Чтобы результат был именно boolean, используй конструкцию:</t>
-<code>
-return UnitAffectingCombat(unit) and true or false
-</code>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 89-4: функция GetStatusTable",
+    helpModules = {89, 45, 44, 21},
+    preloadVars = {
+        {var = "GetStatusTable", desc = "GetStatusTable очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+    },
+    reportVars = {"checkError"},
+    instruction = [=[
+<h>Тест 89-4: функция GetStatusTable</h>
+<t>Создай глобальную функцию <k>GetStatusTable(unit)</k>.</t>
+<t>Функция должна вернуть хэш-таблицу с boolean-полями:</t>
+<c>exists</c> — юнит существует.
+<c>dead</c> — юнит мёртв.
+<c>ghost</c> — юнит призрак.
+<c>combat</c> — юнит в бою.
+<c>connected</c> — юнит онлайн.
+<t>Если юнита не существует, все поля кроме <k>exists</k> должны быть <k>false</k>.</t>
+<t>Все значения должны быть чистыми boolean (true/false) — используй <k>and true or false</k>.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию IsInCombat(unit)
+    initialCode = [=[
+function GetStatusTable(unit)
+end
 ]=],
-requireKeywords = {
-"IsInCombat",
-"function",
-"UnitAffectingCombat",
-"and",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.IsInCombat) ~= "function" then
-_G.checkError = "IsInCombat не является глобальной функцией"
-return false
-end
-local ok1, playerCombat = pcall(_G.IsInCombat, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова IsInCombat('player'): " .. tostring(playerCombat)
-return false
-end
-if type(playerCombat) ~= "boolean" then
-_G.checkError = "Для player функция должна вернуть boolean"
-return false
-end
-local ok2, invalidCombat = pcall(_G.IsInCombat, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова IsInCombat('ns_invalid_unit'): " .. tostring(invalidCombat)
-return false
-end
-if invalidCombat ~= false then
-_G.checkError = "Для несуществующего юнита функция должна вернуть false"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetStatusTable",
+        "function",
+        "UnitExists",
+        "UnitIsDead",
+        "UnitIsGhost",
+        "UnitAffectingCombat",
+        "UnitIsConnected",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetStatusTable) ~= "function" then
+            return fail("GetStatusTable не является глобальной функцией")
+        end
+
+        local oldExists = _G.UnitExists
+        local oldDead = _G.UnitIsDead
+        local oldGhost = _G.UnitIsGhost
+        local oldCombat = _G.UnitAffectingCombat
+        local oldConn = _G.UnitIsConnected
+
+        local mock = {
+            alive = {
+                exists = true, dead = false, ghost = false, combat = false, conn = true,
+                exp = { exists = true, dead = false, ghost = false, combat = false, connected = true },
+            },
+            dead_combat = {
+                exists = true, dead = true, ghost = false, combat = true, conn = true,
+                exp = { exists = true, dead = true, ghost = false, combat = true, connected = true },
+            },
+            ghost = {
+                exists = true, dead = false, ghost = true, combat = false, conn = true,
+                exp = { exists = true, dead = false, ghost = true, combat = false, connected = true },
+            },
+            afk_offline = {
+                exists = true, dead = false, ghost = false, combat = false, conn = false,
+                exp = { exists = true, dead = false, ghost = false, combat = false, connected = false },
+            },
+            missing = {
+                exists = false, dead = false, ghost = false, combat = false, conn = false,
+                exp = { exists = false, dead = false, ghost = false, combat = false, connected = false },
+            },
+        }
+
+        local function applyMocks(unit)
+            local data = mock[unit] or mock.missing
+            _G.UnitExists = function(u) return data.exists end
+            _G.UnitIsDead = function(u) return data.dead end
+            _G.UnitIsGhost = function(u) return data.ghost end
+            _G.UnitAffectingCombat = function(u) return data.combat end
+            _G.UnitIsConnected = function(u) return data.conn end
+        end
+
+        local function restoreMocks()
+            _G.UnitExists = oldExists
+            _G.UnitIsDead = oldDead
+            _G.UnitIsGhost = oldGhost
+            _G.UnitAffectingCombat = oldCombat
+            _G.UnitIsConnected = oldConn
+        end
+
+        local cases = {"alive", "dead_combat", "ghost", "afk_offline", "missing"}
+        for _, unit in ipairs(cases) do
+            applyMocks(unit)
+            local ok, result = pcall(_G.GetStatusTable, unit)
+            restoreMocks()
+
+            if not ok then
+                return fail("Ошибка вызова GetStatusTable('" .. unit .. "'): " .. tostring(result))
+            end
+            if type(result) ~= "table" then
+                return fail("Для '" .. unit .. "' ожидалась таблица, получено " .. type(result))
+            end
+
+            local exp = mock[unit].exp
+            for field, expectedValue in pairs(exp) do
+                if result[field] == nil then
+                    return fail("Для '" .. unit .. "' в таблице отсутствует поле '" .. field .. "'")
+                end
+                if type(result[field]) ~= "boolean" then
+                    return fail("Для '" .. unit .. "' поле '" .. field .. "' должно быть boolean, получено " .. type(result[field]))
+                end
+                if result[field] ~= expectedValue then
+                    return fail("Для '" .. unit .. "' поле '" .. field .. "': ожидалось " .. tostring(expectedValue) .. ", получено " .. tostring(result[field]))
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][94] = {
-type = "commenttest",
-title = "Тест 89-5: функция GetStatusTable",
-helpModules = {89, 45, 44},
-preloadVars = {
-{var = "GetStatusTable", desc = "GetStatusTable очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 89-5: функция GetStatusTable</h>
-<t>Создай глобальную функцию <k>GetStatusTable(unit)</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>exists</c> — <k>true</k>, если юнит существует, иначе <k>false</k>.
-<c>dead</c> — <k>true</k>, если юнит мёртв, иначе <k>false</k>.
-<c>combat</c> — <k>true</k>, если юнит в бою, иначе <k>false</k>.
-<c>connected</c> — <k>true</k>, если юнит онлайн, иначе <k>false</k>.
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitIsDead</c>
-<c>UnitAffectingCombat</c>
-<c>UnitIsConnected</c>
-<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 89-5: функция BuildStatusMap",
+    helpModules = {89, 45, 31, 44},
+    preloadVars = {
+        {var = "BuildStatusMap", desc = "BuildStatusMap очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3"},
+    instruction = [=[
+<h>Тест 89-5: функция BuildStatusMap</h>
+<t>Создай глобальную функцию <k>BuildStatusMap(units)</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита, а в фокус — другого.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна вернуть хэш-таблицу: ключ — UnitID, значение — строка состояния:</t>
+<c>"dead"</c> — юнит мёртв.
+<c>"ghost"</c> — юнит призрак.
+<c>"alive"</c> — юнит жив.
+<c>"unknown"</c> — юнит не существует.
+<t>Если аргумент не таблица, верни пустую таблицу.</t>
+<w>Ничего выводить не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetStatusTable(unit)
+    initialCode = [=[
+function BuildStatusMap(units)
+end
 ]=],
-requireKeywords = {
-"GetStatusTable",
-"function",
-"UnitExists",
-"UnitIsDead",
-"UnitAffectingCombat",
-"UnitIsConnected",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetStatusTable) ~= "function" then
-_G.checkError = "GetStatusTable не является глобальной функцией"
-return false
-end
-local ok1, playerReport = pcall(_G.GetStatusTable, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetStatusTable('player'): " .. tostring(playerReport)
-return false
-end
-if type(playerReport) ~= "table" then
-_G.checkError = "GetStatusTable('player') должна вернуть таблицу"
-return false
-end
-if playerReport.exists ~= true then
-_G.checkError = "Для player поле exists должно быть true"
-return false
-end
-if type(playerReport.dead) ~= "boolean" then
-_G.checkError = "Поле dead должно быть boolean"
-return false
-end
-if type(playerReport.combat) ~= "boolean" then
-_G.checkError = "Поле combat должно быть boolean"
-return false
-end
-if type(playerReport.connected) ~= "boolean" then
-_G.checkError = "Поле connected должно быть boolean"
-return false
-end
-local ok2, invalidReport = pcall(_G.GetStatusTable, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetStatusTable('ns_invalid_unit'): " .. tostring(invalidReport)
-return false
-end
-if type(invalidReport) ~= "table" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
-return false
-end
-if invalidReport.exists ~= false then
-_G.checkError = "Для несуществующего юнита поле exists должно быть false"
-return false
-end
-if invalidReport.dead ~= false then
-_G.checkError = "Для несуществующего юнита поле dead должно быть false"
-return false
-end
-if invalidReport.combat ~= false then
-_G.checkError = "Для несуществующего юнита поле combat должно быть false"
-return false
-end
-if invalidReport.connected ~= false then
-_G.checkError = "Для несуществующего юнита поле connected должно быть false"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "BuildStatusMap",
+        "function",
+        "for",
+        "UnitExists",
+        "UnitIsDead",
+        "UnitIsGhost",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 3 do
+            _G["test" .. i] = nil
+        end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.BuildStatusMap) ~= "function" then
+            return fail("BuildStatusMap не является глобальной функцией")
+        end
+
+        local okTarget, targetExists = pcall(UnitExists, "target")
+        local okFocus, focusExists = pcall(UnitExists, "focus")
+
+        if not okTarget or not targetExists then
+            return fail("Нет цели. Возьми любого юнита в цель.")
+        end
+        if not okFocus or not focusExists then
+            return fail("Нет фокуса. Возьми любого юнита в фокус.")
+        end
+
+        local function liveState(unit)
+            if not UnitExists(unit) then
+                return "unknown"
+            end
+            if UnitIsDead(unit) then
+                return "dead"
+            end
+            if UnitIsGhost(unit) then
+                return "ghost"
+            end
+            return "alive"
+        end
+
+        local function fmtMap(t)
+            if type(t) ~= "table" then
+                return tostring(t)
+            end
+            local keys = {}
+            for k in pairs(t) do
+                table.insert(keys, tostring(k))
+            end
+            table.sort(keys)
+            local p = {}
+            for _, k in ipairs(keys) do
+                table.insert(p, k .. "=" .. tostring(t[k]))
+            end
+            return "{" .. table.concat(p, ", ") .. "}"
+        end
+
+        local tests = {
+            {input = {"target", "focus", "ns_invalid"}},
+            {input = {"player", "target", "focus"}},
+            {input = "bad"},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.BuildStatusMap, test.input)
+
+            local expParts = {}
+            if type(test.input) == "table" then
+                for _, unit in ipairs(test.input) do
+                    expParts[unit] = liveState(unit)
+                end
+            end
+
+            _G["test" .. i] = "Получено: " .. fmtMap(result) .. " | Ожидалось: " .. fmtMap(expParts)
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            local expCount = 0
+            for _ in pairs(expParts) do expCount = expCount + 1 end
+            local resCount = 0
+            for _ in pairs(result) do resCount = resCount + 1 end
+
+            if resCount ~= expCount then
+                return fail("Тест " .. i .. " не пройден: не совпадает количество ключей")
+            end
+
+            for unit, exp in pairs(expParts) do
+                local got = result[unit]
+                if got ~= exp then
+                    return fail("Тест " .. i .. " не пройден: для '" .. unit .. "' ожидалось '" .. exp .. "', получено '" .. tostring(got) .. "'")
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][95] = {
