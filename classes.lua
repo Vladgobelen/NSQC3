@@ -13517,10 +13517,9 @@ function NSAuk.CreateAuctionFrame()
         end
     end)
 
-    -- Сохранение чекбокса точно как координат (на OnHide + OnClick)
     frame:SetScript("OnHide", function(self)
-        if self.autoDeductCB then 
-            db.settings.autoDeductGP = (self.autoDeductCB:GetChecked() == 1) 
+        if self.autoDeductCB then
+            db.settings.autoDeductGP = (self.autoDeductCB:GetChecked() == 1)
         end
         NSAuk.SaveWindowPosition(self, db.windowPosition)
         if self.customPanel then self.customPanel:Hide() end
@@ -13622,9 +13621,49 @@ function NSAuk.CreateAuctionFrame()
     autoDeductCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
     frame.autoDeductCB = autoDeductCB
 
+    -- Кнопка закрытия (крестик)
+    local closeBtn = CreateFrame("Button", "NSAukCloseBtn", frame, "UIPanelCloseButton")
+    closeBtn:SetSize(24, 24)
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetScript("OnClick", function()
+        local d = NSAuk.EnsureDB()
+        if not d.active then
+            frame:Hide()
+            return
+        end
+
+        local isStarter = (d.active.startedBy == UnitName("player"))
+
+        if isStarter then
+            SendAddonMessage("AUC_CANCEL", "", "RAID")
+        end
+
+        if closeTimerFrame then
+            closeTimerFrame:SetScript("OnUpdate", nil)
+            closeTimerFrame = nil
+        end
+
+        d.active = nil
+        isMinimized = false
+
+        NSAuk.DestroyAuctionWindow()
+        if minimapIcon then minimapIcon:Hide() end
+        checkFrame:SetScript("OnUpdate", nil)
+
+        print("|cff00ff00[NSAuk]|r Аукцион закрыт.")
+    end)
+    closeBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+        GameTooltip:SetText("Закрыть аукцион", 1, 0.82, 0)
+        GameTooltip:AddLine("Полностью закрывает окно и сбрасывает данные аукциона.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    closeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    frame.closeBtn = closeBtn
+
     local helpBtn = CreateFrame("Button", "NSAukHelpBtn", frame)
     helpBtn:SetSize(24, 24)
-    helpBtn:SetPoint("TOPRIGHT", -5, -5)
+    helpBtn:SetPoint("TOPRIGHT", -28, -5)
     helpBtn:RegisterForClicks("AnyUp")
     local helpText = helpBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     helpText:SetPoint("CENTER", 0, 1)
@@ -13655,7 +13694,7 @@ function NSAuk.CreateAuctionFrame()
 
     frame.itemTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     frame.itemTitle:SetPoint("TOPLEFT", 10, -30)
-    frame.itemTitle:SetPoint("TOPRIGHT", -10, -30)
+    frame.itemTitle:SetPoint("TOPRIGHT", -60, -30)
     frame.itemTitle:SetJustifyH("LEFT")
     frame.itemTitle:SetText(db.active and db.active.item or "Предмет")
     if db.active and db.active.itemLink then
@@ -13681,7 +13720,7 @@ function NSAuk.CreateAuctionFrame()
 
     frame.infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.infoText:SetPoint("TOPLEFT", 10, -50)
-    
+
     frame.countdownText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.countdownText:SetPoint("TOPRIGHT", -10, -50)
     frame.countdownText:SetJustifyH("RIGHT")
@@ -13719,14 +13758,14 @@ function NSAuk.CreateAuctionFrame()
         local myName = UnitName("player")
         local myBid = d.active.bids[myName]
         if myBid and myBid.passed then return end
-        
+
         local maxAmount = 0
         for _, b in pairs(d.active.bids) do if b.hasAction and not b.passed and b.amount > maxAmount then maxAmount = b.amount end end
         if myBid and myBid.hasAction and not myBid.passed and myBid.amount >= maxAmount and myBid.amount > 0 then
             print("Нельзя выйти из торгов, пока вы лидируете.")
             return
         end
-        
+
         NSAuk.BroadcastMyGP()
         SendAddonMessage("AUC_PASS", "", "RAID")
         if myBid then myBid.passed = true; myBid.amount = 0; myBid.hasAction = true end
@@ -13751,7 +13790,7 @@ function NSAuk.CreateAuctionFrame()
                 return
             end
             if (myBid.amount or 0) == mx and mx > 0 then print("Вы лидер"); return end
-            
+
             NSAuk.BroadcastMyGP()
             SendChatMessage(tostring(mx + d.active.step), "RAID")
         end
