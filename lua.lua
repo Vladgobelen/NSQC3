@@ -10714,38 +10714,36 @@ content = [=[
 
 ns_llua['lua'][90] = {
     type = "commenttest",
-    title = "Тест 89-1: функция GetUnitStatusString",
-    helpModules = {89, 45, 17, 19},
+    title = "Тест 89-1: функция GetUnitStatus",
+    helpModules = {89, 45, 44, 19},
     preloadVars = {
-        {var = "GetUnitStatusString", desc = "GetUnitStatusString очищается перед проверкой"},
+        {var = "GetUnitStatus", desc = "GetUnitStatus очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
     },
-    reportVars = {"checkError"},
+    reportVars = {"checkError", "test1", "test2"},
     instruction = [=[
-<h>Тест 89-1: функция GetUnitStatusString</h>
-<t>Создай глобальную функцию <k>GetUnitStatusString(unit)</k>.</t>
-<t>Функция должна вернуть одну строку, описывающую состояние юнита:</t>
-<s>"offline"</s> — если юнит не подключён.
-<s>"dead"</s> — если юнит мёртв.
-<s>"ghost"</s> — если юнит призрак.
-<s>"combat"</s> — если юнит в бою (но жив и не призрак).
-<s>"alive"</s> — в остальных случаях.
-<t>Если юнита не существует, верни <s>"unknown"</s>.</t>
-<t>Порядок проверок важен: сначала существование, потом подключение, потом смерть, потом призрак, потом бой.</t>
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitIsConnected</c>
-<c>UnitIsDead</c>
-<c>UnitIsGhost</c>
-<c>UnitAffectingCombat</c>
-<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
+<h>Тест 89-1: функция GetUnitStatus</h>
+<t>Создай глобальную функцию <k>GetUnitStatus(unit)</k>.</t>
+<t>Функция должна вернуть хэш-таблицу с boolean-полями:</t>
+<c>exists</c> — юнит существует.
+<c>connected</c> — юнит онлайн.
+<c>dead</c> — юнит мёртв.
+<c>ghost</c> — юнит призрак.
+<c>combat</c> — юнит в бою.
+<t>Все значения должны быть чистыми boolean (true/false).</t>
+<w>Возьми в цель любого юнита, а в фокус — другого.</w>
+<w>Тест проверит обоих юнитов (target и focus) и сравнит их состояния.</w>
+<w>Хотя бы одно поле должно различаться между target и focus, иначе тест попросит выбрать других юнитов.</w>
 ]=],
     initialCode = [=[
-function GetUnitStatusString(unit)
+function GetUnitStatus(unit)
+    
 end
 ]=],
     requireKeywords = {
-        "GetUnitStatusString",
+        "GetUnitStatus",
         "function",
         "UnitExists",
         "UnitIsConnected",
@@ -10756,80 +10754,91 @@ end
     },
     checkCode = function()
         _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.GetUnitStatusString) ~= "function" then
-            return fail("GetUnitStatusString не является глобальной функцией")
+        if type(_G.GetUnitStatus) ~= "function" then
+            return fail("GetUnitStatus не является глобальной функцией")
         end
 
-        local oldExists = _G.UnitExists
-        local oldConn = _G.UnitIsConnected
-        local oldDead = _G.UnitIsDead
-        local oldGhost = _G.UnitIsGhost
-        local oldCombat = _G.UnitAffectingCombat
+        local okTarget, targetExists = pcall(UnitExists, "target")
+        local okFocus, focusExists = pcall(UnitExists, "focus")
 
-        local mock = {
-            missing = {
-                exists = false, conn = false, dead = false, ghost = false, combat = false,
-                exp = "unknown",
-            },
-            offline = {
-                exists = true, conn = false, dead = false, ghost = false, combat = false,
-                exp = "offline",
-            },
-            dead = {
-                exists = true, conn = true, dead = true, ghost = false, combat = false,
-                exp = "dead",
-            },
-            ghost = {
-                exists = true, conn = true, dead = false, ghost = true, combat = false,
-                exp = "ghost",
-            },
-            combat = {
-                exists = true, conn = true, dead = false, ghost = false, combat = true,
-                exp = "combat",
-            },
-            alive = {
-                exists = true, conn = true, dead = false, ghost = false, combat = false,
-                exp = "alive",
-            },
-        }
-
-        local function applyMocks(unit)
-            local data = mock[unit] or mock.missing
-            _G.UnitExists = function(u) return data.exists end
-            _G.UnitIsConnected = function(u) return data.conn end
-            _G.UnitIsDead = function(u) return data.dead end
-            _G.UnitIsGhost = function(u) return data.ghost end
-            _G.UnitAffectingCombat = function(u) return data.combat end
+        if not okTarget or not targetExists then
+            return fail("Нет цели. Возьми любого юнита в цель.")
+        end
+        if not okFocus or not focusExists then
+            return fail("Нет фокуса. Возьми любого юнита в фокус.")
         end
 
-        local function restoreMocks()
-            _G.UnitExists = oldExists
-            _G.UnitIsConnected = oldConn
-            _G.UnitIsDead = oldDead
-            _G.UnitIsGhost = oldGhost
-            _G.UnitAffectingCombat = oldCombat
+        local function getExpectedStatus(unit)
+            return {
+                exists = not not UnitExists(unit),
+                connected = not not UnitIsConnected(unit),
+                dead = not not UnitIsDead(unit),
+                ghost = not not UnitIsGhost(unit),
+                combat = not not UnitAffectingCombat(unit),
+            }
         end
 
-        local cases = {"missing", "offline", "dead", "ghost", "combat", "alive"}
-        for _, unit in ipairs(cases) do
-            applyMocks(unit)
-            local ok, result = pcall(_G.GetUnitStatusString, unit)
-            restoreMocks()
+        local fields = {"exists", "connected", "dead", "ghost", "combat"}
 
+        local function checkUnit(unit, testNum)
+            local ok, result = pcall(_G.GetUnitStatus, unit)
+            
             if not ok then
-                return fail("Ошибка вызова GetUnitStatusString('" .. unit .. "'): " .. tostring(result))
+                return fail("Ошибка вызова GetUnitStatus('" .. unit .. "'): " .. tostring(result))
             end
-            if type(result) ~= "string" then
-                return fail("GetUnitStatusString('" .. unit .. "') должна вернуть строку, получено " .. type(result))
+
+            if type(result) ~= "table" then
+                return fail("GetUnitStatus('" .. unit .. "') должна вернуть таблицу, получено " .. type(result))
             end
-            if result ~= mock[unit].exp then
-                return fail("Для '" .. unit .. "' ожидалось '" .. mock[unit].exp .. "', получено '" .. result .. "'")
+
+            local expected = getExpectedStatus(unit)
+            local parts = {}
+
+            for _, field in ipairs(fields) do
+                if result[field] == nil then
+                    return fail("В таблице для '" .. unit .. "' отсутствует поле '" .. field .. "'")
+                end
+                if type(result[field]) ~= "boolean" then
+                    return fail("Поле '" .. field .. "' для '" .. unit .. "' должно быть boolean, получено " .. type(result[field]))
+                end
+                if result[field] ~= expected[field] then
+                    return fail("Поле '" .. field .. "' для '" .. unit .. "': ожидалось " .. tostring(expected[field]) .. ", получено " .. tostring(result[field]))
+                end
+                table.insert(parts, field .. "=" .. tostring(result[field]))
             end
+
+            _G["test" .. testNum] = unit .. ": {" .. table.concat(parts, ", ") .. "}"
+            
+            return true, result
+        end
+
+        local err1, resultTarget = checkUnit("target", 1)
+        if err1 ~= true then
+            return err1
+        end
+
+        local err2, resultFocus = checkUnit("focus", 2)
+        if err2 ~= true then
+            return err2
+        end
+
+        local differences = 0
+        for _, field in ipairs(fields) do
+            if resultTarget[field] ~= resultFocus[field] then
+                differences = differences + 1
+            end
+        end
+
+        if differences < 1 then
+            return fail("Состояния target и focus идентичны. Выбери юнитов с разными состояниями.")
         end
 
         return true
@@ -10838,89 +10847,137 @@ end
 
 ns_llua['lua'][91] = {
     type = "commenttest",
-    title = "Тест 89-2: функция IsDeadOrGhost",
-    helpModules = {89, 45, 21},
+    title = "Тест 89-2: функция FilterSafeUnits",
+    helpModules = {89, 45, 31, 29},
     preloadVars = {
-        {var = "IsDeadOrGhost", desc = "IsDeadOrGhost очищается перед проверкой"},
+        {var = "FilterSafeUnits", desc = "FilterSafeUnits очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
     },
-    reportVars = {"checkError"},
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
     instruction = [=[
-<h>Тест 89-2: функция IsDeadOrGhost</h>
-<t>Создай глобальную функцию <k>IsDeadOrGhost(unit)</k>.</t>
-<t>Функция должна вернуть <k>true</k>, если юнит мёртв или призрак.</t>
-<t>Иначе вернуть <k>false</k>.</t>
-<t>Если юнита не существует, вернуть <k>false</k>.</t>
-<t>Используй <k>UnitExists</k>, <k>UnitIsDead</k>, <k>UnitIsGhost</k>.</t>
-<t>Результат должен быть чистым boolean — используй паттерн <k>and true or false</k>.</t>
+<h>Тест 89-2: функция FilterSafeUnits</h>
+<t>Создай глобальную функцию <k>FilterSafeUnits(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна вернуть новый массив, содержащий только тех юнитов, которые:</t>
+<t>- существуют</t>
+<t>- живы (не мёртвы и не призраки)</t>
+<t>- не в бою</t>
+<t>Порядок юнитов в результирующем массиве должен совпадать с исходным.</t>
+<t>Если аргумент не таблица, верни пустой массив.</t>
 <w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
     initialCode = [=[
-function IsDeadOrGhost(unit)
+function FilterSafeUnits(units)
+    
 end
 ]=],
     requireKeywords = {
-        "IsDeadOrGhost",
+        "FilterSafeUnits",
         "function",
+        "for",
         "UnitExists",
         "UnitIsDead",
         "UnitIsGhost",
-        "and",
-        "or",
+        "UnitAffectingCombat",
         "return",
     },
     checkCode = function()
         _G.checkError = nil
+        for i = 1, 4 do
+            _G["test" .. i] = nil
+        end
+
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.IsDeadOrGhost) ~= "function" then
-            return fail("IsDeadOrGhost не является глобальной функцией")
+        if type(_G.FilterSafeUnits) ~= "function" then
+            return fail("FilterSafeUnits не является глобальной функцией")
         end
 
         local oldExists = _G.UnitExists
         local oldDead = _G.UnitIsDead
         local oldGhost = _G.UnitIsGhost
+        local oldCombat = _G.UnitAffectingCombat
 
         local mock = {
-            alive = { exists = true, dead = false, ghost = false, exp = false },
-            dead  = { exists = true, dead = true,  ghost = false, exp = true },
-            ghost = { exists = true, dead = false, ghost = true,  exp = true },
-            missing = { exists = false, dead = false, ghost = false, exp = false },
+            safe1 =   { exists = true,  dead = false, ghost = false, combat = false },
+            safe2 =   { exists = true,  dead = false, ghost = false, combat = false },
+            dead =    { exists = true,  dead = true,  ghost = false, combat = false },
+            ghost =   { exists = true,  dead = false, ghost = true,  combat = false },
+            combat =  { exists = true,  dead = false, ghost = false, combat = true  },
+            missing = { exists = false, dead = false, ghost = false, combat = false },
         }
 
-        local function applyMocks(unit)
-            local data = mock[unit] or mock.missing
-            _G.UnitExists = function(u) return data.exists end
-            _G.UnitIsDead = function(u) return data.dead end
-            _G.UnitIsGhost = function(u) return data.ghost end
+        local function applyMocks()
+            _G.UnitExists = function(u)
+                local data = mock[u] or mock.missing
+                return data.exists
+            end
+            _G.UnitIsDead = function(u)
+                local data = mock[u] or mock.missing
+                return data.dead
+            end
+            _G.UnitIsGhost = function(u)
+                local data = mock[u] or mock.missing
+                return data.ghost
+            end
+            _G.UnitAffectingCombat = function(u)
+                local data = mock[u] or mock.missing
+                return data.combat
+            end
         end
 
         local function restoreMocks()
             _G.UnitExists = oldExists
             _G.UnitIsDead = oldDead
             _G.UnitIsGhost = oldGhost
+            _G.UnitAffectingCombat = oldCombat
         end
 
-        local cases = {"alive", "dead", "ghost", "missing"}
-        for _, unit in ipairs(cases) do
-            applyMocks(unit)
-            local ok, result = pcall(_G.IsDeadOrGhost, unit)
-            restoreMocks()
+        local tests = {
+            {input = {"safe1", "dead", "safe2"},      exp = {"safe1", "safe2"}},
+            {input = {"combat", "safe1", "ghost"},    exp = {"safe1"}},
+            {input = {"missing", "dead", "combat"},   exp = {}},
+            {input = "bad",                           exp = {}},
+        }
+
+        applyMocks()
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.FilterSafeUnits, test.input)
+
+            _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
 
             if not ok then
-                return fail("Ошибка вызова IsDeadOrGhost('" .. unit .. "'): " .. tostring(result))
+                restoreMocks()
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
             end
-            if type(result) ~= "boolean" then
-                return fail("IsDeadOrGhost('" .. unit .. "') должна вернуть boolean, получено " .. type(result))
+
+            if type(result) ~= "table" then
+                restoreMocks()
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
             end
-            if result ~= mock[unit].exp then
-                return fail("Для '" .. unit .. "' ожидалось " .. tostring(mock[unit].exp) .. ", получено " .. tostring(result))
+
+            if #result ~= #test.exp then
+                restoreMocks()
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    restoreMocks()
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
             end
         end
 
+        restoreMocks()
         return true
     end,
 }
@@ -26972,6 +27029,19 @@ end
 
 local MAX_EDITOR_LINE_CHARS = 200
 
+local function StripLuaComments(s)
+    if type(s) ~= "string" or s == "" then
+        return ""
+    end
+
+    -- Длинные комментарии --[[ ... ]] (в т.ч. --[==[ ... ]==])
+    s = s:gsub("%-%-%[=*%[.-%]%=*%]", "")
+    -- Однострочные -- до конца строки
+    s = s:gsub("%-%-[^\n]*", "")
+
+    return s
+end
+
 local function CountEditorChars(s)
     if type(s) ~= "string" or s == "" then
         return 0
@@ -26986,6 +27056,10 @@ local function CountEditorChars(s)
     end
 
     return n
+end
+
+local function CountEditorCharsNoComments(s)
+    return CountEditorChars(StripLuaComments(s))
 end
 
 local function GetEditorTooLongLine(code)
@@ -27163,8 +27237,8 @@ local function createEditorBlock(parent, data, ui)
 
     local function updateCharCounter()
         local text = editBox:GetText() or ""
-        local totalChars = CountEditorChars(text)
-        local tooLong, lineNo, lineChars = GetEditorTooLongLine(text)
+        local totalChars = CountEditorCharsNoComments(text)          -- ← без комментариев
+        local tooLong, lineNo, lineChars = GetEditorTooLongLine(text) -- ← как было
 
         if tooLong then
             charCount:SetTextColor(1.0, 0.35, 0.35, 1)
@@ -29346,15 +29420,12 @@ local function CountSolutionChars(code)
         return 0
     end
 
-    local s = tostring(code)
-
+    local s = StripLuaComments(code)
     s = s:gsub("\r\n", "\n")
 
     local n = 0
-
     for i = 1, #s do
         local b = s:byte(i)
-
         if b < 128 or b >= 192 then
             n = n + 1
         end
