@@ -11409,245 +11409,610 @@ content = [=[
 }
 
 ns_llua['lua'][96] = {
-type = "vartest",
-title = "Тест 95-1: фракция игрока",
-helpModules = {95},
-tasks = {
-{
-var = "playerFaction",
-desc = 'Создай глобальную переменную playerFaction = UnitFactionGroup("player")',
-check = function(value)
-return type(value) == "string" and value ~= ""
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 95-1: функция GetRelationStatus",
+    helpModules = {95, 45, 44, 19},
+    preloadVars = {
+        {var = "GetRelationStatus", desc = "GetRelationStatus очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2"},
+    instruction = [=[
+<h>Тест 95-1: функция GetRelationStatus</h>
+<t>Создай глобальную функцию <k>GetRelationStatus(unit)</k>.</t>
+<t>Функция должна вернуть хэш-таблицу с boolean-полями:</t>
+<c>canAttack</c> — игрок может атаковать юнита.
+<c>isEnemy</c> — юнит враждебен.
+<c>isFriend</c> — юнит дружественен.
+<c>canCooperate</c> — с юнитом можно взаимодействовать.
+<c>isPvp</c> — у юнита включён PvP-флаг.
+<t>Все значения должны быть чистыми boolean (true/false).</t>
+<w>Возьми в цель любого юнита, а в фокус — другого.</w>
+<w>Тест проверит обоих юнитов (target и focus) и сравнит их состояния.</w>
+<w>Хотя бы одно поле должно различаться между target и focus, иначе тест попросит выбрать других юнитов.</w>
+]=],
+    initialCode = [=[
+function GetRelationStatus(unit)
+    
+end
+]=],
+    requireKeywords = {
+        "GetRelationStatus",
+        "function",
+        "UnitCanAttack",
+        "UnitIsEnemy",
+        "UnitIsFriend",
+        "UnitCanCooperate",
+        "UnitIsPVP",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.test1 = nil
+        _G.test2 = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetRelationStatus) ~= "function" then
+            return fail("GetRelationStatus не является глобальной функцией")
+        end
+
+        local okTarget, targetExists = pcall(UnitExists, "target")
+        local okFocus, focusExists = pcall(UnitExists, "focus")
+
+        if not okTarget or not targetExists then
+            return fail("Нет цели. Возьми любого юнита в цель.")
+        end
+        if not okFocus or not focusExists then
+            return fail("Нет фокуса. Возьми любого юнита в фокус.")
+        end
+
+        local function getExpectedStatus(unit)
+            return {
+                canAttack = not not UnitCanAttack("player", unit),
+                isEnemy = not not UnitIsEnemy("player", unit),
+                isFriend = not not UnitIsFriend("player", unit),
+                canCooperate = not not UnitCanCooperate("player", unit),
+                isPvp = not not UnitIsPVP(unit),
+            }
+        end
+
+        local fields = {"canAttack", "isEnemy", "isFriend", "canCooperate", "isPvp"}
+
+        local function checkUnit(unit, testNum)
+            local ok, result = pcall(_G.GetRelationStatus, unit)
+
+            if not ok then
+                return fail("Ошибка вызова GetRelationStatus('" .. unit .. "'): " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                return fail("GetRelationStatus('" .. unit .. "') должна вернуть таблицу, получено " .. type(result))
+            end
+
+            local expected = getExpectedStatus(unit)
+            local parts = {}
+
+            for _, field in ipairs(fields) do
+                if result[field] == nil then
+                    return fail("В таблице для '" .. unit .. "' отсутствует поле '" .. field .. "'")
+                end
+                if type(result[field]) ~= "boolean" then
+                    return fail("Поле '" .. field .. "' для '" .. unit .. "' должно быть boolean, получено " .. type(result[field]))
+                end
+                if result[field] ~= expected[field] then
+                    return fail("Поле '" .. field .. "' для '" .. unit .. "': ожидалось " .. tostring(expected[field]) .. ", получено " .. tostring(result[field]))
+                end
+                table.insert(parts, field .. "=" .. tostring(result[field]))
+            end
+
+            _G["test" .. testNum] = unit .. ": {" .. table.concat(parts, ", ") .. "}"
+
+            return true, result
+        end
+
+        local err1, resultTarget = checkUnit("target", 1)
+        if err1 ~= true then return err1 end
+
+        local err2, resultFocus = checkUnit("focus", 2)
+        if err2 ~= true then return err2 end
+
+        local differences = 0
+        for _, field in ipairs(fields) do
+            if resultTarget[field] ~= resultFocus[field] then
+                differences = differences + 1
+            end
+        end
+
+        if differences < 1 then
+            return fail("Состояния target и focus идентичны. Выбери юнитов с разными отношениями.")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][97] = {
-type = "vartest",
-title = "Тест 95-2: проверка цели",
-helpModules = {95, 15},
-tasks = {
-{
-var = "canAttackTarget",
-desc = 'Создай глобальную переменную canAttackTarget = not not UnitCanAttack("player", "target")',
-check = function(value)
-return type(value) == "boolean"
-end,
-},
-{
-var = "isTargetFriend",
-desc = 'Создай глобальную переменную isTargetFriend = not not UnitIsFriend("player", "target")',
-check = function(value)
-return type(value) == "boolean"
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 95-2: функция GetTargetRelation",
+    helpModules = {95, 45, 7, 17},
+    preloadVars = {
+        {var = "GetTargetRelation", desc = "GetTargetRelation очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 95-2: функция GetTargetRelation</h>
+<t>Создай глобальную функцию <k>GetTargetRelation()</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита.</t>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>"Имя: Тралл, Фракция: Орда, Отношение: враг, Атака: да"</s>
+<t>Поля строки:</t>
+<c>Имя</c> — через <k>UnitName("target")</k>.
+<c>Фракция</c> — <s>"Альянс"</s>, <s>"Орда"</s> или <s>"нейтрал"</s> (если фракции нет).
+<c>Отношение</c> — <s>"враг"</s>, если юнит враждебен; <s>"друг"</s>, если дружественен; <s>"нейтрал"</s> в остальных случаях.
+<c>Атака</c> — <s>"да"</s>, если игрок может атаковать цель, иначе <s>"нет"</s>.
+]=],
+    initialCode = [=[
+function GetTargetRelation()
+    
+end
+]=],
+    requireKeywords = {
+        "GetTargetRelation",
+        "function",
+        "UnitName",
+        "UnitFactionGroup",
+        "UnitIsEnemy",
+        "UnitIsFriend",
+        "UnitCanAttack",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetTargetRelation) ~= "function" then
+            return fail("GetTargetRelation не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Возьми любого юнита в цель и нажми проверку снова.")
+        end
+
+        local ok, result = pcall(_G.GetTargetRelation)
+
+        if ok then
+            _G.result = result
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова GetTargetRelation: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("GetTargetRelation должна вернуть строку")
+        end
+
+        local name, faction, relation, attack = result:match(
+            "^Имя: (.+), Фракция: (.+), Отношение: (.+), Атака: (.+)$"
+        )
+
+        if not name then
+            return fail("Строка не похожа на 'Имя: X, Фракция: Y, Отношение: Z, Атака: W'")
+        end
+
+        local expectedName = UnitName("target") or ""
+        if name ~= expectedName then
+            return fail("Имя не совпадает: ожидалось '" .. expectedName .. "', получено '" .. name .. "'")
+        end
+
+        local factionToken = UnitFactionGroup("target")
+        local expectedFaction
+        if factionToken == "Alliance" then
+            expectedFaction = "Альянс"
+        elseif factionToken == "Horde" then
+            expectedFaction = "Орда"
+        else
+            expectedFaction = "нейтрал"
+        end
+        if faction ~= expectedFaction then
+            return fail("Фракция не совпадает: ожидалось '" .. expectedFaction .. "', получено '" .. faction .. "'")
+        end
+
+        local expectedRelation
+        if UnitIsEnemy("player", "target") then
+            expectedRelation = "враг"
+        elseif UnitIsFriend("player", "target") then
+            expectedRelation = "друг"
+        else
+            expectedRelation = "нейтрал"
+        end
+        if relation ~= expectedRelation then
+            return fail("Отношение не совпадает: ожидалось '" .. expectedRelation .. "', получено '" .. relation .. "'")
+        end
+
+        local expectedAttack = UnitCanAttack("player", "target") and "да" or "нет"
+        if attack ~= expectedAttack then
+            return fail("Атака не совпадает: ожидалось '" .. expectedAttack .. "', получено '" .. attack .. "'")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][98] = {
-type = "commenttest",
-title = "Тест 95-3: функция CanAttackTarget",
-helpModules = {95, 45, 21},
-preloadVars = {
-{var = "CanAttackTarget", desc = "CanAttackTarget очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 95-3: функция CanAttackTarget</h>
-<t>Создай глобальную функцию <k>CanAttackTarget()</k>.</t>
-<t>Функция должна вернуть <k>true</k>, если игрок может атаковать текущую цель.</t>
-<t>Иначе функция должна вернуть <k>false</k>.</t>
-<t>Используй:</t>
-<c>UnitCanAttack("player", "target")</c>
-<t>Чтобы результат был именно boolean, используй конструкцию:</t>
-<code>
-return UnitCanAttack("player", "target") and true or false
-</code>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 95-3: функция FilterAttackableUnits",
+    helpModules = {95, 45, 31, 29},
+    preloadVars = {
+        {var = "FilterAttackableUnits", desc = "FilterAttackableUnits очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 95-3: функция FilterAttackableUnits</h>
+<t>Создай глобальную функцию <k>FilterAttackableUnits(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна вернуть новый массив, содержащий только тех юнитов, которых игрок может атаковать.</t>
+<t>Порядок юнитов в результирующем массиве должен совпадать с исходным.</t>
+<t>Если аргумент не таблица, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию CanAttackTarget()
+    initialCode = [=[
+function FilterAttackableUnits(units)
+    
+end
 ]=],
-requireKeywords = {
-"CanAttackTarget",
-"function",
-"UnitCanAttack",
-"and",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.CanAttackTarget) ~= "function" then
-_G.checkError = "CanAttackTarget не является глобальной функцией"
-return false
-end
-local ok, result = pcall(_G.CanAttackTarget)
-if not ok then
-_G.checkError = "Ошибка вызова CanAttackTarget: " .. tostring(result)
-return false
-end
-if type(result) ~= "boolean" then
-_G.checkError = "Функция должна вернуть boolean"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "FilterAttackableUnits",
+        "function",
+        "for",
+        "UnitCanAttack",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 4 do
+            _G["test" .. i] = nil
+        end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.FilterAttackableUnits) ~= "function" then
+            return fail("FilterAttackableUnits не является глобальной функцией")
+        end
+
+        local oldCanAttack = _G.UnitCanAttack
+
+        local mock = {
+            enemy1   = { canAttack = true  },
+            enemy2   = { canAttack = true  },
+            friend1  = { canAttack = false },
+            friend2  = { canAttack = false },
+            neutral  = { canAttack = false },
+            missing  = { canAttack = false },
+        }
+
+        _G.UnitCanAttack = function(attacker, u)
+            local data = mock[u] or mock.missing
+            return data.canAttack
+        end
+
+        local function restoreMocks()
+            _G.UnitCanAttack = oldCanAttack
+        end
+
+        local tests = {
+            {input = {"enemy1", "friend1", "enemy2"}, exp = {"enemy1", "enemy2"}},
+            {input = {"friend1", "enemy1", "neutral"}, exp = {"enemy1"}},
+            {input = {"friend1", "friend2", "neutral"}, exp = {}},
+            {input = "bad", exp = {}},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.FilterAttackableUnits, test.input)
+
+            _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
+
+            if not ok then
+                restoreMocks()
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                restoreMocks()
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            if #result ~= #test.exp then
+                restoreMocks()
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    restoreMocks()
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
+            end
+        end
+
+        restoreMocks()
+        return true
+    end,
 }
 
 ns_llua['lua'][99] = {
-type = "commenttest",
-title = "Тест 95-4: функция GetRelationReport",
-helpModules = {95, 45, 44},
-preloadVars = {
-{var = "GetRelationReport", desc = "GetRelationReport очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 95-4: функция GetRelationReport</h>
-<t>Создай глобальную функцию <k>GetRelationReport(unit)</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>canAttack</c> — <k>true</k>, если игрок может атаковать юнита, иначе <k>false</k>.
-<c>isEnemy</c> — <k>true</k>, если юнит враждебен, иначе <k>false</k>.
-<c>isFriend</c> — <k>true</k>, если юнит дружественен, иначе <k>false</k>.
-<t>Используй:</t>
-<c>UnitCanAttack("player", unit)</c>
-<c>UnitIsEnemy("player", unit)</c>
-<c>UnitIsFriend("player", unit)</c>
-<t>Для boolean-значений используй приведение через <k>and true or false</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 95-4: функция CompareTargets",
+    helpModules = {95, 45, 17, 7},
+    preloadVars = {
+        {var = "CompareTargets", desc = "CompareTargets очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 95-4: функция CompareTargets</h>
+<t>Создай глобальную функцию <k>CompareTargets()</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита, а в фокус — другого.</t>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>"Цель: враг, Фокус: друг, Атаковать: цель"</s>
+<t>Поля строки:</t>
+<c>Цель</c> — отношение к цели (<s>"враг"</s>, <s>"друг"</s> или <s>"нейтрал"</s>).
+<c>Фокус</c> — отношение к фокусу (<s>"враг"</s>, <s>"друг"</s> или <s>"нейтрал"</s>).
+<c>Атаковать</c> — кого из двух юнитов игрок может атаковать. Если обоих — <s>"оба"</s>. Если никого — <s>"никто"</s>. Если только одного — <s>"цель"</s> или <s>"фокус"</s>.
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetRelationReport(unit)
+    initialCode = [=[
+function CompareTargets()
+    
+end
 ]=],
-requireKeywords = {
-"GetRelationReport",
-"function",
-"UnitCanAttack",
-"UnitIsEnemy",
-"UnitIsFriend",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetRelationReport) ~= "function" then
-_G.checkError = "GetRelationReport не является глобальной функцией"
-return false
-end
-local ok1, playerReport = pcall(_G.GetRelationReport, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetRelationReport('player'): " .. tostring(playerReport)
-return false
-end
-if type(playerReport) ~= "table" then
-_G.checkError = "GetRelationReport('player') должна вернуть таблицу"
-return false
-end
-if type(playerReport.canAttack) ~= "boolean" then
-_G.checkError = "Поле canAttack должно быть boolean"
-return false
-end
-if type(playerReport.isEnemy) ~= "boolean" then
-_G.checkError = "Поле isEnemy должно быть boolean"
-return false
-end
-if type(playerReport.isFriend) ~= "boolean" then
-_G.checkError = "Поле isFriend должно быть boolean"
-return false
-end
-local ok2, invalidReport = pcall(_G.GetRelationReport, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetRelationReport('ns_invalid_unit'): " .. tostring(invalidReport)
-return false
-end
-if type(invalidReport) ~= "table" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
-return false
-end
-if invalidReport.canAttack ~= false then
-_G.checkError = "Для несуществующего юнита поле canAttack должно быть false"
-return false
-end
-if invalidReport.isEnemy ~= false then
-_G.checkError = "Для несуществующего юнита поле isEnemy должно быть false"
-return false
-end
-if invalidReport.isFriend ~= false then
-_G.checkError = "Для несуществующего юнита поле isFriend должно быть false"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "CompareTargets",
+        "function",
+        "UnitIsEnemy",
+        "UnitIsFriend",
+        "UnitCanAttack",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.CompareTargets) ~= "function" then
+            return fail("CompareTargets не является глобальной функцией")
+        end
+
+        local okTarget, targetExists = pcall(UnitExists, "target")
+        local okFocus, focusExists = pcall(UnitExists, "focus")
+
+        if not okTarget or not targetExists then
+            return fail("Нет цели. Возьми любого юнита в цель.")
+        end
+        if not okFocus or not focusExists then
+            return fail("Нет фокуса. Возьми любого юнита в фокус.")
+        end
+
+        local ok, result = pcall(_G.CompareTargets)
+
+        if ok then
+            _G.result = result
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова CompareTargets: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("CompareTargets должна вернуть строку")
+        end
+
+        local targetRel, focusRel, attackTarget = result:match(
+            "^Цель: (.+), Фокус: (.+), Атаковать: (.+)$"
+        )
+
+        if not targetRel then
+            return fail("Строка не похожа на 'Цель: X, Фокус: Y, Атаковать: Z'")
+        end
+
+        local function getRelation(unit)
+            if UnitIsEnemy("player", unit) then
+                return "враг"
+            elseif UnitIsFriend("player", unit) then
+                return "друг"
+            else
+                return "нейтрал"
+            end
+        end
+
+        local expectedTargetRel = getRelation("target")
+        local expectedFocusRel = getRelation("focus")
+
+        if targetRel ~= expectedTargetRel then
+            return fail("Отношение к цели не совпадает: ожидалось '" .. expectedTargetRel .. "', получено '" .. targetRel .. "'")
+        end
+        if focusRel ~= expectedFocusRel then
+            return fail("Отношение к фокусу не совпадает: ожидалось '" .. expectedFocusRel .. "', получено '" .. focusRel .. "'")
+        end
+
+        local canAttackTarget = not not UnitCanAttack("player", "target")
+        local canAttackFocus = not not UnitCanAttack("player", "focus")
+
+        local expectedAttack
+        if canAttackTarget and canAttackFocus then
+            expectedAttack = "оба"
+        elseif canAttackTarget then
+            expectedAttack = "цель"
+        elseif canAttackFocus then
+            expectedAttack = "фокус"
+        else
+            expectedAttack = "никто"
+        end
+
+        if attackTarget ~= expectedAttack then
+            return fail("Атаковать не совпадает: ожидалось '" .. expectedAttack .. "', получено '" .. attackTarget .. "'")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][100] = {
-type = "commenttest",
-title = "Тест 95-5: функция IsPvpActive",
-helpModules = {95, 45, 21},
-preloadVars = {
-{var = "IsPvpActive", desc = "IsPvpActive очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 95-5: функция IsPvpActive</h>
-<t>Создай глобальную функцию <k>IsPvpActive(unit)</k>.</t>
-<t>Функция должна вернуть <k>true</k>, если у юнита включён PvP-флаг.</t>
-<t>Иначе функция должна вернуть <k>false</k>.</t>
-<t>Используй:</t>
-<c>UnitIsPVP</c>
-<t>Чтобы результат был именно boolean, используй конструкцию:</t>
-<code>
-return UnitIsPVP(unit) and true or false
-</code>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 95-5: функция GetGroupThreat",
+    helpModules = {95, 45, 31, 44, 52},
+    preloadVars = {
+        {var = "GetGroupThreat", desc = "GetGroupThreat очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+        {var = "test5", desc = "test5 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4", "test5"},
+    instruction = [=[
+<h>Тест 95-5: функция GetGroupThreat</h>
+<t>Создай глобальную функцию <k>GetGroupThreat(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID (условная группа).</t>
+<t>Функция должна оценить группу по отношению к игроку и вернуть одно слово-статус по приоритету (сверху вниз):</t>
+<s>"empty"</s> — если массив пустой или аргумент не таблица.
+<s>"hostile"</s> — если есть хотя бы один враг, которого можно атаковать.
+<s>"friendly"</s> — если все существующие юниты — друзья.
+<s>"mixed"</s> — если есть и друзья, и нейтралы (но нет атакующихся врагов).
+<s>"neutral"</s> — если все существующие юниты нейтральны.
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию IsPvpActive(unit)
+    initialCode = [=[
+function GetGroupThreat(units)
+    
+end
 ]=],
-requireKeywords = {
-"IsPvpActive",
-"function",
-"UnitIsPVP",
-"and",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.IsPvpActive) ~= "function" then
-_G.checkError = "IsPvpActive не является глобальной функцией"
-return false
-end
-local ok1, playerPvp = pcall(_G.IsPvpActive, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова IsPvpActive('player'): " .. tostring(playerPvp)
-return false
-end
-if type(playerPvp) ~= "boolean" then
-_G.checkError = "Для player функция должна вернуть boolean"
-return false
-end
-local ok2, invalidPvp = pcall(_G.IsPvpActive, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова IsPvpActive('ns_invalid_unit'): " .. tostring(invalidPvp)
-return false
-end
-if invalidPvp ~= false then
-_G.checkError = "Для несуществующего юнита функция должна вернуть false"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetGroupThreat",
+        "function",
+        "for",
+        "UnitCanAttack",
+        "UnitIsEnemy",
+        "UnitIsFriend",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 5 do
+            _G["test" .. i] = nil
+        end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetGroupThreat) ~= "function" then
+            return fail("GetGroupThreat не является глобальной функцией")
+        end
+
+        local oldCanAttack = _G.UnitCanAttack
+        local oldEnemy = _G.UnitIsEnemy
+        local oldFriend = _G.UnitIsFriend
+
+        local mock = {
+            enemy1    = { canAttack = true,  enemy = true,  friend = false },
+            enemy2    = { canAttack = true,  enemy = true,  friend = false },
+            friend1   = { canAttack = false, enemy = false, friend = true  },
+            friend2   = { canAttack = false, enemy = false, friend = true  },
+            neutral1  = { canAttack = false, enemy = false, friend = false },
+            neutral2  = { canAttack = false, enemy = false, friend = false },
+        }
+
+        local function applyMocks()
+            _G.UnitCanAttack = function(attacker, u)
+                local data = mock[u]
+                if not data then return false end
+                return data.canAttack
+            end
+            _G.UnitIsEnemy = function(attacker, u)
+                local data = mock[u]
+                if not data then return false end
+                return data.enemy
+            end
+            _G.UnitIsFriend = function(attacker, u)
+                local data = mock[u]
+                if not data then return false end
+                return data.friend
+            end
+        end
+
+        local function restoreMocks()
+            _G.UnitCanAttack = oldCanAttack
+            _G.UnitIsEnemy = oldEnemy
+            _G.UnitIsFriend = oldFriend
+        end
+
+        local tests = {
+            {input = {"enemy1", "friend1", "neutral1"},  exp = "hostile",   label = "Есть атакующийся враг"},
+            {input = {"friend1", "friend2"},             exp = "friendly",   label = "Все друзья"},
+            {input = {"friend1", "neutral1"},            exp = "mixed",      label = "Друзья и нейтралы"},
+            {input = {"neutral1", "neutral2"},           exp = "neutral",    label = "Все нейтралы"},
+            {input = "bad",                              exp = "empty",       label = "Не таблица"},
+        }
+
+        applyMocks()
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(_G.GetGroupThreat, test.input)
+
+            _G["test" .. i] = test.label .. " | Получено: '" .. tostring(result) .. "' | Ожидалось: '" .. test.exp .. "'"
+
+            if not ok then
+                restoreMocks()
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "string" then
+                restoreMocks()
+                return fail("Тест " .. i .. ": функция должна вернуть строку, получено " .. type(result))
+            end
+
+            if result ~= test.exp then
+                restoreMocks()
+                return fail("Тест " .. i .. " не пройден")
+            end
+        end
+
+        restoreMocks()
+        return true
+    end,
 }
 
 ns_llua['lua'][101] = {
