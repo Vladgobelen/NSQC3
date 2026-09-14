@@ -10195,7 +10195,6 @@ ns_llua['lua'][86] = {
 
 <t>Во время проверки система подставит свои тестовые значения для <k>UnitExists</k>, <k>UnitMana</k> и <k>UnitManaMax</k>.</t>
 <t>Поэтому брать цель или искать конкретного юнита не нужно.</t>
-
 ]=],
     initialCode = [=[
 function CompareResourcePercent(unitA, unitB)
@@ -10210,48 +10209,72 @@ end
         "UnitManaMax",
         "return",
     },
-    checkCode = function()
+
+    -- Моки, подставляемые в изолированное окружение.
+    -- _G не трогается, taint не появляется.
+    mockGlobals = {
+        UnitExists = function(unit)
+            local mock = {
+                player  = true,
+                target  = true,
+                boss    = true,
+                empty   = true,
+                missing = false,
+            }
+
+            return mock[unit] == true
+        end,
+
+        UnitMana = function(unit)
+            local mock = {
+                player  = 50,
+                target  = 25,
+                boss    = 80,
+                empty   = 0,
+                missing = 0,
+            }
+
+            return mock[unit] or 0
+        end,
+
+        UnitManaMax = function(unit)
+            local mock = {
+                player  = 100,
+                target  = 100,
+                boss    = 200,
+                empty   = 0,
+                missing = 0,
+            }
+
+            return mock[unit] or 0
+        end,
+    },
+
+    checkCode = function(env)
         _G.checkError = nil
 
         for i = 1, 7 do
             _G["test" .. i] = nil
         end
 
-        if type(_G.CompareResourcePercent) ~= "function" then
+        if type(env) ~= "table" then
+            _G.checkError = "Внутренняя ошибка: окружение не передано"
+            return _G.checkError
+        end
+
+        local fn = env.CompareResourcePercent
+
+        if type(fn) ~= "function" then
             _G.checkError = "CompareResourcePercent не является глобальной функцией"
             return _G.checkError
         end
 
-        local oldExists = _G.UnitExists
-        local oldMana = _G.UnitMana
-        local oldManaMax = _G.UnitManaMax
-
         local mock = {
-            player = {
-                exists = true,
-                cur = 50,
-                max = 100,
-            },
-            target = {
-                exists = true,
-                cur = 25,
-                max = 100,
-            },
-            boss = {
-                exists = true,
-                cur = 80,
-                max = 200,
-            },
-            empty = {
-                exists = true,
-                cur = 0,
-                max = 0,
-            },
-            missing = {
-                exists = false,
-                cur = 0,
-                max = 0,
-            },
+            player  = {exists = true,  cur = 50, max = 100},
+            target  = {exists = true,  cur = 25, max = 100},
+            boss    = {exists = true,  cur = 80, max = 200},
+            empty   = {exists = true,  cur = 0,  max = 0},
+            missing = {exists = false, cur = 0,  max = 0},
         }
 
         local function mockPercent(unit)
@@ -10287,91 +10310,47 @@ end
         local details = {}
         local allOk = true
 
-        local function applyMocks()
-            _G.UnitExists = function(unit)
-                local data = mock[unit]
-                return type(data) == "table" and data.exists == true
+        for i, test in ipairs(tests) do
+            local unitA = test[1]
+            local unitB = test[2]
+
+            local percentA = mockPercent(unitA)
+            local percentB = mockPercent(unitB)
+
+            local expected
+
+            if math.abs(percentA - percentB) < 0.001 then
+                expected = "same"
+            elseif percentA > percentB then
+                expected = "A"
+            else
+                expected = "B"
             end
 
-            _G.UnitMana = function(unit)
-                local data = mock[unit]
+            local ok, result = pcall(fn, unitA, unitB)
 
-                if type(data) ~= "table" then
-                    return 0
-                end
+            local resultText
 
-                return data.cur or 0
+            if ok then
+                resultText = tostring(result)
+            else
+                resultText = "ошибка: " .. tostring(result)
             end
 
-            _G.UnitManaMax = function(unit)
-                local data = mock[unit]
+            _G["test" .. i] = string.format(
+                "%s vs %s | A=%s, B=%s | Получено: %s | Ожидалось: %s",
+                unitA,
+                unitB,
+                fmtPct(percentA),
+                fmtPct(percentB),
+                resultText,
+                expected
+            )
 
-                if type(data) ~= "table" then
-                    return 0
-                end
-
-                return data.max or 0
+            if not ok or result ~= expected then
+                allOk = false
+                table.insert(details, _G["test" .. i])
             end
-        end
-
-        local function restoreMocks()
-            _G.UnitExists = oldExists
-            _G.UnitMana = oldMana
-            _G.UnitManaMax = oldManaMax
-        end
-
-        local okRun, runErr = pcall(function()
-            applyMocks()
-
-            for i, test in ipairs(tests) do
-                local unitA = test[1]
-                local unitB = test[2]
-
-                local percentA = mockPercent(unitA)
-                local percentB = mockPercent(unitB)
-
-                local expected
-
-                if math.abs(percentA - percentB) < 0.001 then
-                    expected = "same"
-                elseif percentA > percentB then
-                    expected = "A"
-                else
-                    expected = "B"
-                end
-
-                local ok, result = pcall(_G.CompareResourcePercent, unitA, unitB)
-
-                local resultText
-
-                if ok then
-                    resultText = tostring(result)
-                else
-                    resultText = "ошибка: " .. tostring(result)
-                end
-
-                _G["test" .. i] = string.format(
-                    "%s vs %s | A=%s, B=%s | Получено: %s | Ожидалось: %s",
-                    unitA,
-                    unitB,
-                    fmtPct(percentA),
-                    fmtPct(percentB),
-                    resultText,
-                    expected
-                )
-
-                if not ok or result ~= expected then
-                    allOk = false
-                    table.insert(details, _G["test" .. i])
-                end
-            end
-        end)
-
-        restoreMocks()
-
-        if not okRun then
-            _G.checkError = "Ошибка проверки: " .. tostring(runErr)
-            return _G.checkError
         end
 
         if not allOk then
@@ -30299,6 +30278,7 @@ function Logic:InstallRunScript()
 
     if type(self._originalRunScript) == "function" then
         RunScript = function(code)
+                print("NSQC3: RunScript перехвачен! Код:", tostring(code):sub(1, 100))
             resetIfModuleChanged()
 
             code = tostring(code or "")
@@ -31496,19 +31476,42 @@ function Logic:CheckCode(editorName, code)
         return table.concat(out, "\n")
     end
 
-    local function ExecuteSource(source)
+    -- Изолированное окружение с моками модуля (если заданы).
+    local env = nil
+
+    if type(m.mockGlobals) == "table" then
+        env = setmetatable({}, {__index = _G})
+
+        for name, fn in pairs(m.mockGlobals) do
+            env[name] = fn
+        end
+    end
+
+    local function ExecuteSource(source, useEnv)
         local output = {}
 
         local oldPrint = print
 
-        print = function(...)
-            local parts = {}
+        if useEnv and env then
+            env.print = function(...)
+                local parts = {}
 
-            for i = 1, select("#", ...) do
-                parts[i] = tostring(select(i, ...))
+                for i = 1, select("#", ...) do
+                    parts[i] = tostring(select(i, ...))
+                end
+
+                table.insert(output, table.concat(parts, " "))
             end
+        else
+            print = function(...)
+                local parts = {}
 
-            table.insert(output, table.concat(parts, " "))
+                for i = 1, select("#", ...) do
+                    parts[i] = tostring(select(i, ...))
+                end
+
+                table.insert(output, table.concat(parts, " "))
+            end
         end
 
         local fn, compileErr
@@ -31522,12 +31525,18 @@ function Logic:CheckCode(editorName, code)
         local ok, runErr = false, nil
 
         if fn then
+            if useEnv and env and setfenv then
+                setfenv(fn, env)
+            end
+
             ok, runErr = pcall(fn)
         else
             runErr = compileErr
         end
 
-        print = oldPrint
+        if not useEnv then
+            print = oldPrint
+        end
 
         return ok, runErr, table.concat(output, "\n")
     end
@@ -31606,9 +31615,11 @@ function Logic:CheckCode(editorName, code)
         end
     end
 
+    local useEnv = (env ~= nil)
+
     local instrumentedCode = InstrumentCode(code)
 
-    local ok, runErr, rawOutput = ExecuteSource(instrumentedCode)
+    local ok, runErr, rawOutput = ExecuteSource(instrumentedCode, useEnv)
 
     if not ok and instrumentedCode ~= code then
         iterationLines = {}
@@ -31617,7 +31628,7 @@ function Logic:CheckCode(editorName, code)
 
         ResetInputs()
 
-        ok, runErr, rawOutput = ExecuteSource(code)
+        ok, runErr, rawOutput = ExecuteSource(code, useEnv)
     end
 
     _G.__ns_trace_loop = oldTraceLoop or function() end
@@ -31680,7 +31691,7 @@ function Logic:CheckCode(editorName, code)
         if not ok then
             runtimeOk = false
         else
-            local success, result = pcall(m.checkCode)
+            local success, result = pcall(m.checkCode, env)
 
             if success and result == true then
                 runtimeOk = true
@@ -31728,7 +31739,13 @@ function Logic:CheckCode(editorName, code)
     local finalLines = {}
 
     for _, name in ipairs(candidateOrder) do
-        local newValue = _G[name]
+        local newValue
+
+        if useEnv and env then
+            newValue = env[name]
+        else
+            newValue = _G[name]
+        end
 
         if type(newValue) ~= "function" and newValue ~= nil then
             table.insert(finalLines, name .. " = " .. FormatValue(newValue))
