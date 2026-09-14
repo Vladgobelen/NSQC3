@@ -10864,59 +10864,58 @@ end
         "UnitAffectingCombat",
         "return",
     },
-    checkCode = function()
+
+    mockGlobals = {
+        UnitExists = function(u)
+            local mock = {
+                safe1 = true, safe2 = true,
+                dead = true, ghost = true, combat = true,
+                missing = false,
+            }
+            return mock[u] == true
+        end,
+        UnitIsDead = function(u)
+            local mock = {
+                safe1 = false, safe2 = false,
+                dead = true, ghost = false, combat = false,
+                missing = false,
+            }
+            return mock[u] == true
+        end,
+        UnitIsGhost = function(u)
+            local mock = {
+                safe1 = false, safe2 = false,
+                dead = false, ghost = true, combat = false,
+                missing = false,
+            }
+            return mock[u] == true
+        end,
+        UnitAffectingCombat = function(u)
+            local mock = {
+                safe1 = false, safe2 = false,
+                dead = false, ghost = false, combat = true,
+                missing = false,
+            }
+            return mock[u] == true
+        end,
+    },
+
+    checkCode = function(env)
         _G.checkError = nil
-        for i = 1, 4 do
-            _G["test" .. i] = nil
-        end
+        for i = 1, 4 do _G["test" .. i] = nil end
 
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.FilterSafeUnits) ~= "function" then
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.FilterSafeUnits
+        if type(fn) ~= "function" then
             return fail("FilterSafeUnits не является глобальной функцией")
-        end
-
-        local oldExists = _G.UnitExists
-        local oldDead = _G.UnitIsDead
-        local oldGhost = _G.UnitIsGhost
-        local oldCombat = _G.UnitAffectingCombat
-
-        local mock = {
-            safe1 =   { exists = true,  dead = false, ghost = false, combat = false },
-            safe2 =   { exists = true,  dead = false, ghost = false, combat = false },
-            dead =    { exists = true,  dead = true,  ghost = false, combat = false },
-            ghost =   { exists = true,  dead = false, ghost = true,  combat = false },
-            combat =  { exists = true,  dead = false, ghost = false, combat = true  },
-            missing = { exists = false, dead = false, ghost = false, combat = false },
-        }
-
-        local function applyMocks()
-            _G.UnitExists = function(u)
-                local data = mock[u] or mock.missing
-                return data.exists
-            end
-            _G.UnitIsDead = function(u)
-                local data = mock[u] or mock.missing
-                return data.dead
-            end
-            _G.UnitIsGhost = function(u)
-                local data = mock[u] or mock.missing
-                return data.ghost
-            end
-            _G.UnitAffectingCombat = function(u)
-                local data = mock[u] or mock.missing
-                return data.combat
-            end
-        end
-
-        local function restoreMocks()
-            _G.UnitExists = oldExists
-            _G.UnitIsDead = oldDead
-            _G.UnitIsGhost = oldGhost
-            _G.UnitAffectingCombat = oldCombat
         end
 
         local tests = {
@@ -10926,37 +10925,30 @@ end
             {input = "bad",                           exp = {}},
         }
 
-        applyMocks()
-
         for i, test in ipairs(tests) do
-            local ok, result = pcall(_G.FilterSafeUnits, test.input)
+            local ok, result = pcall(fn, test.input)
 
             _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
 
             if not ok then
-                restoreMocks()
                 return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
             end
 
             if type(result) ~= "table" then
-                restoreMocks()
                 return fail("Тест " .. i .. ": функция должна вернуть таблицу")
             end
 
             if #result ~= #test.exp then
-                restoreMocks()
                 return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
             end
 
             for j = 1, #result do
                 if result[j] ~= test.exp[j] then
-                    restoreMocks()
                     return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
                 end
             end
         end
 
-        restoreMocks()
         return true
     end,
 }
@@ -11247,62 +11239,66 @@ end
         "UnitAffectingCombat",
         "return",
     },
-    checkCode = function()
+
+    mockGlobals = {
+        UnitExists = function(u)
+            local mock = {
+                alive1=true, alive2=true, alive3=true,
+                combat1=true, combat2=true,
+                dead1=true, dead2=true,
+                ghost1=true,
+                missing=false,
+            }
+            return mock[u] == true
+        end,
+        UnitIsDead = function(u)
+            local mock = {
+                alive1=false, alive2=false, alive3=false,
+                combat1=false, combat2=false,
+                dead1=true, dead2=true,
+                ghost1=false,
+                missing=false,
+            }
+            return mock[u] == true
+        end,
+        UnitIsGhost = function(u)
+            local mock = {
+                alive1=false, alive2=false, alive3=false,
+                combat1=false, combat2=false,
+                dead1=false, dead2=false,
+                ghost1=true,
+                missing=false,
+            }
+            return mock[u] == true
+        end,
+        UnitAffectingCombat = function(u)
+            local mock = {
+                alive1=false, alive2=false, alive3=false,
+                combat1=true, combat2=true,
+                dead1=false, dead2=false,
+                ghost1=false,
+                missing=false,
+            }
+            return mock[u] == true
+        end,
+    },
+
+    checkCode = function(env)
         _G.checkError = nil
-        for i = 1, 5 do
-            _G["test" .. i] = nil
-        end
+        for i = 1, 5 do _G["test" .. i] = nil end
 
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.GetGroupAlarm) ~= "function" then
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.GetGroupAlarm
+        if type(fn) ~= "function" then
             return fail("GetGroupAlarm не является глобальной функцией")
-        end
-
-        local oldExists = _G.UnitExists
-        local oldDead = _G.UnitIsDead
-        local oldGhost = _G.UnitIsGhost
-        local oldCombat = _G.UnitAffectingCombat
-
-        local mock = {
-            alive1  = { exists = true,  dead = false, ghost = false, combat = false },
-            alive2  = { exists = true,  dead = false, ghost = false, combat = false },
-            alive3  = { exists = true,  dead = false, ghost = false, combat = false },
-            combat1 = { exists = true,  dead = false, ghost = false, combat = true  },
-            combat2 = { exists = true,  dead = false, ghost = false, combat = true  },
-            dead1   = { exists = true,  dead = true,  ghost = false, combat = false },
-            dead2   = { exists = true,  dead = true,  ghost = false, combat = false },
-            ghost1  = { exists = true,  dead = false, ghost = true,  combat = false },
-            missing = { exists = false, dead = false, ghost = false, combat = false },
-        }
-
-        local function applyMocks()
-            _G.UnitExists = function(u)
-                local data = mock[u] or mock.missing
-                return data.exists
-            end
-            _G.UnitIsDead = function(u)
-                local data = mock[u] or mock.missing
-                return data.dead
-            end
-            _G.UnitIsGhost = function(u)
-                local data = mock[u] or mock.missing
-                return data.ghost
-            end
-            _G.UnitAffectingCombat = function(u)
-                local data = mock[u] or mock.missing
-                return data.combat
-            end
-        end
-
-        local function restoreMocks()
-            _G.UnitExists = oldExists
-            _G.UnitIsDead = oldDead
-            _G.UnitIsGhost = oldGhost
-            _G.UnitAffectingCombat = oldCombat
         end
 
         local tests = {
@@ -11313,30 +11309,24 @@ end
             {input = {"missing", "missing"},                 exp = "empty",  label = "Все отсутствуют"},
         }
 
-        applyMocks()
-
         for i, test in ipairs(tests) do
-            local ok, result = pcall(_G.GetGroupAlarm, test.input)
+            local ok, result = pcall(fn, test.input)
 
             _G["test" .. i] = test.label .. " | Получено: '" .. tostring(result) .. "' | Ожидалось: '" .. test.exp .. "'"
 
             if not ok then
-                restoreMocks()
                 return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
             end
 
             if type(result) ~= "string" then
-                restoreMocks()
                 return fail("Тест " .. i .. ": функция должна вернуть строку, получено " .. type(result))
             end
 
             if result ~= test.exp then
-                restoreMocks()
                 return fail("Тест " .. i .. " не пройден")
             end
         end
 
-        restoreMocks()
         return true
     end,
 }
@@ -11533,7 +11523,7 @@ ns_llua['lua'][97] = {
 <t>Функция должна вернуть одну строку в формате:</t>
 <s>"Имя: Тралл, Фракция: Орда, Отношение: враг, Атака: да"</s>
 <t>Поля строки:</t>
-<c>Имя</c> — через <k>UnitName("target")</k>.
+<c>Имя</c> — имя цели.
 <c>Фракция</c> — <s>"Альянс"</s>, <s>"Орда"</s> или <s>"нейтрал"</s> (если фракции нет).
 <c>Отношение</c> — <s>"враг"</s>, если юнит враждебен; <s>"друг"</s>, если дружественен; <s>"нейтрал"</s> в остальных случаях.
 <c>Атака</c> — <s>"да"</s>, если игрок может атаковать цель, иначе <s>"нет"</s>.
@@ -11668,77 +11658,67 @@ end
         "UnitCanAttack",
         "return",
     },
-    checkCode = function()
+
+    mockGlobals = {
+        UnitCanAttack = function(attacker, u)
+            local mock = {
+                enemy1 = true, enemy2 = true,
+                friend1 = false, friend2 = false,
+                neutral = false,
+            }
+            return mock[u] == true
+        end,
+    },
+
+    checkCode = function(env)
         _G.checkError = nil
-        for i = 1, 4 do
-            _G["test" .. i] = nil
-        end
+        for i = 1, 4 do _G["test" .. i] = nil end
 
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.FilterAttackableUnits) ~= "function" then
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.FilterAttackableUnits
+        if type(fn) ~= "function" then
             return fail("FilterAttackableUnits не является глобальной функцией")
         end
 
-        local oldCanAttack = _G.UnitCanAttack
-
-        local mock = {
-            enemy1   = { canAttack = true  },
-            enemy2   = { canAttack = true  },
-            friend1  = { canAttack = false },
-            friend2  = { canAttack = false },
-            neutral  = { canAttack = false },
-            missing  = { canAttack = false },
-        }
-
-        _G.UnitCanAttack = function(attacker, u)
-            local data = mock[u] or mock.missing
-            return data.canAttack
-        end
-
-        local function restoreMocks()
-            _G.UnitCanAttack = oldCanAttack
-        end
-
         local tests = {
-            {input = {"enemy1", "friend1", "enemy2"}, exp = {"enemy1", "enemy2"}},
-            {input = {"friend1", "enemy1", "neutral"}, exp = {"enemy1"}},
+            {input = {"enemy1", "friend1", "enemy2"},   exp = {"enemy1", "enemy2"}},
+            {input = {"friend1", "enemy1", "neutral"},  exp = {"enemy1"}},
             {input = {"friend1", "friend2", "neutral"}, exp = {}},
-            {input = "bad", exp = {}},
+            {input = "bad",                             exp = {}},
         }
 
         for i, test in ipairs(tests) do
-            local ok, result = pcall(_G.FilterAttackableUnits, test.input)
+            local ok, result = pcall(fn, test.input)
 
             _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
 
             if not ok then
-                restoreMocks()
                 return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
             end
 
             if type(result) ~= "table" then
-                restoreMocks()
                 return fail("Тест " .. i .. ": функция должна вернуть таблицу")
             end
 
             if #result ~= #test.exp then
-                restoreMocks()
                 return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
             end
 
             for j = 1, #result do
                 if result[j] ~= test.exp[j] then
-                    restoreMocks()
                     return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
                 end
             end
         end
 
-        restoreMocks()
         return true
     end,
 }
@@ -11906,90 +11886,78 @@ end
         "UnitIsFriend",
         "return",
     },
-    checkCode = function()
+
+    mockGlobals = {
+        UnitCanAttack = function(attacker, u)
+            local mock = {
+                enemy1=true, enemy2=true,
+                friend1=false, friend2=false,
+                neutral1=false, neutral2=false,
+            }
+            return mock[u] == true
+        end,
+        UnitIsEnemy = function(attacker, u)
+            local mock = {
+                enemy1=true, enemy2=true,
+                friend1=false, friend2=false,
+                neutral1=false, neutral2=false,
+            }
+            return mock[u] == true
+        end,
+        UnitIsFriend = function(attacker, u)
+            local mock = {
+                enemy1=false, enemy2=false,
+                friend1=true, friend2=true,
+                neutral1=false, neutral2=false,
+            }
+            return mock[u] == true
+        end,
+    },
+
+    checkCode = function(env)
         _G.checkError = nil
-        for i = 1, 5 do
-            _G["test" .. i] = nil
-        end
+        for i = 1, 5 do _G["test" .. i] = nil end
 
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.GetGroupThreat) ~= "function" then
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.GetGroupThreat
+        if type(fn) ~= "function" then
             return fail("GetGroupThreat не является глобальной функцией")
         end
 
-        local oldCanAttack = _G.UnitCanAttack
-        local oldEnemy = _G.UnitIsEnemy
-        local oldFriend = _G.UnitIsFriend
-
-        local mock = {
-            enemy1    = { canAttack = true,  enemy = true,  friend = false },
-            enemy2    = { canAttack = true,  enemy = true,  friend = false },
-            friend1   = { canAttack = false, enemy = false, friend = true  },
-            friend2   = { canAttack = false, enemy = false, friend = true  },
-            neutral1  = { canAttack = false, enemy = false, friend = false },
-            neutral2  = { canAttack = false, enemy = false, friend = false },
-        }
-
-        local function applyMocks()
-            _G.UnitCanAttack = function(attacker, u)
-                local data = mock[u]
-                if not data then return false end
-                return data.canAttack
-            end
-            _G.UnitIsEnemy = function(attacker, u)
-                local data = mock[u]
-                if not data then return false end
-                return data.enemy
-            end
-            _G.UnitIsFriend = function(attacker, u)
-                local data = mock[u]
-                if not data then return false end
-                return data.friend
-            end
-        end
-
-        local function restoreMocks()
-            _G.UnitCanAttack = oldCanAttack
-            _G.UnitIsEnemy = oldEnemy
-            _G.UnitIsFriend = oldFriend
-        end
-
         local tests = {
-            {input = {"enemy1", "friend1", "neutral1"},  exp = "hostile",   label = "Есть атакующийся враг"},
-            {input = {"friend1", "friend2"},             exp = "friendly",   label = "Все друзья"},
-            {input = {"friend1", "neutral1"},            exp = "mixed",      label = "Друзья и нейтралы"},
-            {input = {"neutral1", "neutral2"},           exp = "neutral",    label = "Все нейтралы"},
-            {input = "bad",                              exp = "empty",       label = "Не таблица"},
+            {input = {"enemy1", "friend1", "neutral1"}, exp = "hostile",  label = "Есть атакующийся враг"},
+            {input = {"friend1", "friend2"},            exp = "friendly",  label = "Все друзья"},
+            {input = {"friend1", "neutral1"},           exp = "mixed",     label = "Друзья и нейтралы"},
+            {input = {"neutral1", "neutral2"},          exp = "neutral",   label = "Все нейтралы"},
+            {input = "bad",                             exp = "empty",      label = "Не таблица"},
         }
-
-        applyMocks()
 
         for i, test in ipairs(tests) do
-            local ok, result = pcall(_G.GetGroupThreat, test.input)
+            local ok, result = pcall(fn, test.input)
 
             _G["test" .. i] = test.label .. " | Получено: '" .. tostring(result) .. "' | Ожидалось: '" .. test.exp .. "'"
 
             if not ok then
-                restoreMocks()
                 return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
             end
 
             if type(result) ~= "string" then
-                restoreMocks()
                 return fail("Тест " .. i .. ": функция должна вернуть строку, получено " .. type(result))
             end
 
             if result ~= test.exp then
-                restoreMocks()
                 return fail("Тест " .. i .. " не пройден")
             end
         end
 
-        restoreMocks()
         return true
     end,
 }
