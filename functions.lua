@@ -6892,6 +6892,17 @@ function NSPauk:ComputeFrameVisibleInner(frame)
         self:LoadConstants()
     end
 
+    -- Кэш на 0.5 секунды. ValidateAnchorRect вызывается из горячих циклов
+    -- (NP_AreAllRingMainsBuilt, NP_CanReviveRingConn и т.д.), и без кэша
+    -- каждый вызов тянет EnumerateFrames() по всему UI.
+    local S = self.S
+    local now = GetTime()
+    S.nspInnerCache = S.nspInnerCache or {}
+    local cacheEntry = S.nspInnerCache[frame]
+    if cacheEntry and (now - cacheEntry.t) < 0.5 then
+        return cacheEntry.rect
+    end
+
     if frame == UIParent then
         local sw, sh = self:GetScreenSize()
 
@@ -6922,15 +6933,18 @@ function NSPauk:ComputeFrameVisibleInner(frame)
             inner.name = "UIParent"
         end
 
+        S.nspInnerCache[frame] = { t = now, rect = inner }
         return inner
     end
 
     local rect = self:ComputeFrameVisibleRect(frame)
-    if not rect then
-        return nil
+    local result = nil
+    if rect then
+        result = self:MakeInnerRect(rect)
     end
 
-    return self:MakeInnerRect(rect)
+    S.nspInnerCache[frame] = { t = now, rect = result }
+    return result
 end
 
 function NSPauk:MakeUIParentCocoonItem()
@@ -7722,7 +7736,7 @@ function NSPauk:ValidateAnchorRect(rect)
         and entry.rectRight == rect.right
         and entry.rectBottom == rect.bottom
         and entry.rectTop == rect.top
-        and (now - (entry.t or 0)) < 0.25 then
+        and (now - (entry.t or 0)) < 0.5 then
         return entry.ok
     end
     local cur = self:ComputeFrameVisibleInner(frame)
@@ -11128,7 +11142,7 @@ function NSPauk:NP_PostUpdate()
             and not S.nspQueueRebuildRunning then
 
             if type(S.nspRingRepairAt) ~= "number"
-                or (now - S.nspRingRepairAt) >= 1.0 then
+                or (now - S.nspRingRepairAt) >= 3.0 then
 
                 S.nspRingRepairAt = now
 
@@ -17685,28 +17699,20 @@ function NSPauk:NP_NormalizeRingCrossSegs(inst)
     end
 
     local C = self.C or {}
-
-    local spacing = tonumber(C.CROSS_ROW_SPACING) or 20
-    if spacing < 0.5 then
-        spacing = 0.5
-    end
-
-    local minCross = tonumber(C.MIN_CROSS_LEN) or 4
-    if minCross < 0 then
-        minCross = 4
-    end
+    local spacing = math.max(tonumber(C.CROSS_ROW_SPACING) or 20, 0.5)
+    local minCross = math.max(tonumber(C.MIN_CROSS_LEN) or 4, 0)
 
     local sectors = self:NP_GetValidTriangleSectors(inst)
+    if not sectors or #sectors == 0 then return false end
+
     inst.webSectors = sectors
 
+    -- Пул таблиц для избежания создания мусора в циклах
     local needed = {}
     local changed = false
 
     local function ensureLen(conn)
-        if conn
-            and conn.thread
-            and (not conn.arcLength or conn.arcLength <= 0) then
-
+        if conn and conn.thread and (not conn.arcLength or conn.arcLength <= 0) then
             local samples, total = self:BuildArcSamples(conn.thread)
             conn.arcSamples = samples
             conn.arcLength = total
@@ -17714,178 +17720,88 @@ function NSPauk:NP_NormalizeRingCrossSegs(inst)
     end
 
     local function segArcOf(seg, connA)
-        if type(seg.planArcLen) == "number"
-            and seg.planArcLen == seg.planArcLen
-            and seg.planArcLen > 0 then
-            return seg.planArcLen
-        end
+        if seg.planArcLen and seg.planArcLen > 0 then return seg.planArcLen end
+        if seg.recheckArcLen and seg.recheckArcLen > 0 then return seg.recheckArcLen end
 
-        if type(seg.recheckArcLen) == "number"
-            and seg.recheckArcLen == seg.recheckArcLen
-            and seg.recheckArcLen > 0 then
-            return seg.recheckArcLen
-        end
-
-        local p = nil
-
-        if seg.connA == connA then
-            p = seg.thread.p0
-        elseif seg.connB == connA then
-            p = seg.thread.p2
-        end
-
+        local p = (seg.connA == connA) and seg.thread.p0 or ((seg.connB == connA) and seg.thread.p2)
         if p and connA.thread then
             local t, d = self:NP_NearestThreadT(connA.thread, p.x, p.y)
-
-            if type(d) == "number" and d <= 12 then
+            if t and d and d <= 12 then
                 return t * (connA.arcLength or 0)
             end
         end
-
         return nil
-    end
-
-    local function findBest(connA, connB, arcLen)
-        local candidates = {}
-        local maxDiff = spacing * 0.6
-
-        for _, seg in ipairs(inst.crossSegs or {}) do
-            if seg.thread and not seg.isInterCross then
-                local direct = seg.connA == connA and seg.connB == connB
-                local reverse = seg.connA == connB and seg.connB == connA
-
-                if direct or reverse then
-                    local segArc = segArcOf(seg, connA)
-
-                    if type(segArc) == "number"
-                        and segArc == segArc
-                        and segArc > 0 then
-
-                        local diff = math.abs(segArc - arcLen)
-
-                        if diff <= maxDiff then
-                            candidates[#candidates + 1] = {
-                                seg = seg,
-                                diff = diff,
-                            }
-                        end
-                    end
-                end
-            end
-        end
-
-        if #candidates == 0 then
-            return nil, {}
-        end
-
-        table.sort(candidates, function(a, b)
-            if a.diff ~= b.diff then
-                return a.diff < b.diff
-            end
-
-            local aa = a.seg.alive and 1 or 0
-            local bb = b.seg.alive and 1 or 0
-
-            if aa ~= bb then
-                return aa > bb
-            end
-
-            local da = self:NP_IsWebOwnerDrawn(a.seg) and 1 or 0
-            local db = self:NP_IsWebOwnerDrawn(b.seg) and 1 or 0
-
-            if da ~= db then
-                return da > db
-            end
-
-            return false
-        end)
-
-        local best = candidates[1].seg
-        local extras = {}
-
-        for i = 2, #candidates do
-            extras[#extras + 1] = candidates[i].seg
-        end
-
-        return best, extras
-    end
-
-    local function quietKill(seg)
-        if seg.alive then
-            seg.alive = false
-
-            if seg.textures and #seg.textures > 0 then
-                self:StartLocalFade(seg.textures, self.C.TEAR_FADE_DURATION)
-                seg.textures = {}
-            end
-
-            changed = true
-        end
     end
 
     for _, sector in ipairs(sectors) do
         local connA = inst.conns[sector.a]
         local connB = inst.conns[sector.b]
 
-        if connA
-            and connB
-            and connA.alive
-            and connB.alive then
-
-            ensureLen(connA)
-            ensureLen(connB)
+        if connA and connB and connA.alive and connB.alive then
+            ensureLen(connA); ensureLen(connB)
 
             local rowArcs = self:NP_GetSectorRowArcs(connA, connB)
+            if rowArcs then
+                for i = 1, #rowArcs do
+                    local arcLen = rowArcs[i]
+                    if arcLen and arcLen >= minCross then
+                        local targetA = math.min(arcLen, connA.arcLength or 0)
+                        local targetB = math.min(arcLen, connB.arcLength or 0)
 
-            for _, arcLen in ipairs(rowArcs) do
-                if type(arcLen) == "number"
-                    and arcLen == arcLen
-                    and arcLen >= minCross then
+                        if targetA > 0 and targetB > 0 then
+                            local best, extras = nil, {}
+                            local maxDiff = spacing * 0.6
 
-                    local targetA = math.min(arcLen, connA.arcLength or 0)
-                    local targetB = math.min(arcLen, connB.arcLength or 0)
-
-                    if targetA > 0 and targetB > 0 then
-                        local best, extras = findBest(connA, connB, arcLen)
-
-                        for _, extra in ipairs(extras) do
-                            if not self:NP_IsWebOwnerDrawn(extra) then
-                                quietKill(extra)
-                            end
-                        end
-
-                        local seg = best
-
-                        if seg and not seg.alive then
-                            seg.alive = true
-                            seg._nspRingRestored = true
-                            changed = true
-                        end
-
-                        if not seg then
-                            local tA = self:ThreadTAtLength(connA, targetA)
-                            local tB = self:ThreadTAtLength(connB, targetB)
-
-                            if tA and tB then
-                                seg = self:CreateCrossSegArc(
-                                    inst,
-                                    connA,
-                                    connB,
-                                    tA,
-                                    tB,
-                                    minCross
-                                )
-
-                                if seg then
-                                    changed = true
+                            -- Поиск лучшего сегмента среди существующих
+                            for _, seg in ipairs(inst.crossSegs or {}) do
+                                if seg.thread and not seg.isInterCross and ((seg.connA==connA and seg.connB==connB) or (seg.connA==connB and seg.connB==connA)) then
+                                    local segArc = segArcOf(seg, connA)
+                                    if segArc and segArc > 0 then
+                                        local diff = math.abs(segArc - arcLen)
+                                        if diff <= maxDiff then
+                                            table.insert(extras, {seg=seg, diff=diff})
+                                        end
+                                    end
                                 end
                             end
-                        end
 
-                        if seg then
-                            seg.planSectorKey = sector.key
-                            seg.planArcLen = arcLen
-                            needed[seg] = true
+                            if #extras > 0 then
+                                table.sort(extras, function(a,b)
+                                    if a.diff ~= b.diff then return a.diff < b.diff end
+                                    local aa, bb = (a.seg.alive and 1 or 0), (b.seg.alive and 1 or 0)
+                                    if aa ~= bb then return aa > bb end
+                                    local da, db = (self:NP_IsWebOwnerDrawn(a.seg) and 1 or 0), (self:NP_IsWebOwnerDrawn(b.seg) and 1 or 0)
+                                    return da > db
+                                end)
+                                best = extras[1].seg
+                                for i = 2, #extras do
+                                    local extra = extras[i].seg
+                                    if not self:NP_IsWebOwnerDrawn(extra) then
+                                        if extra.alive then extra.alive = false; changed = true end
+                                        if extra.textures and #extra.textures > 0 then
+                                            self:StartLocalFade(extra.textures, self.C.TEAR_FADE_DURATION)
+                                            extra.textures = {}
+                                        end
+                                    end
+                                end
+                            end
+
+                            if best and not best.alive then
+                                best.alive = true; best._nspRingRestored = true; changed = true
+                            elseif not best then
+                                local tA = self:ThreadTAtLength(connA, targetA)
+                                local tB = self:ThreadTAtLength(connB, targetB)
+                                if tA and tB then
+                                    local newSeg = self:CreateCrossSegArc(inst, connA, connB, tA, tB, minCross)
+                                    if newSeg then best = newSeg; changed = true end
+                                end
+                            end
+
+                            if best then
+                                best.planSectorKey = sector.key
+                                best.planArcLen = arcLen
+                                needed[best] = true
+                            end
                         end
                     end
                 end
@@ -17893,12 +17809,14 @@ function NSPauk:NP_NormalizeRingCrossSegs(inst)
         end
     end
 
+    -- Удаление ненужных сегментов
     for _, seg in ipairs(inst.crossSegs or {}) do
-        if not seg.isInterCross
-            and seg.alive
-            and not needed[seg]
-            and not self:NP_IsWebOwnerDrawn(seg) then
-            quietKill(seg)
+        if not seg.isInterCross and seg.alive and not needed[seg] and not self:NP_IsWebOwnerDrawn(seg) then
+            seg.alive = false; changed = true
+            if seg.textures and #seg.textures > 0 then
+                self:StartLocalFade(seg.textures, self.C.TEAR_FADE_DURATION)
+                seg.textures = {}
+            end
         end
     end
 
@@ -17923,27 +17841,38 @@ end
 function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
     local S = self.S
 
-    if not inst or not inst.isNaturalRing or inst.torn then
-        return false
-    end
+    if not inst or not inst.isNaturalRing or inst.torn then return false end
+    if S.nspDrag then return false end
+    if S.phase ~= "task" and S.phase ~= "instanceComplete" then return false end
 
-    if S.nspDrag then
-        return false
+    -- КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Throttling
+    -- Не даем этой тяжелой функции срабатывать чаще, чем раз в N секунд во время активной стройки.
+    -- GetTime() предполагается существующей функцией движка (как в Don't Starve Together).
+    local currentTime = GetTime()
+    if inst._lastRebuildTime and (currentTime - inst._lastRebuildTime) < 0.1 then
+        -- Запрос проигнорирован из-за частоты. Возвращаем true, чтобы показать, что запрос "принят".
+        return true
     end
+    inst._lastRebuildTime = currentTime
 
-    if S.phase ~= "task" and S.phase ~= "instanceComplete" then
-        return false
-    end
-
+    -- Опираемся на оптимизированную версию NP_AreAllRingMainsBuilt (O(1))
     if not self:NP_AreAllRingMainsBuilt(inst) then
+        -- Если основы не готовы, ставим флаг ожидания, но не строим очередь.
+        -- Это предотвратит попытки строить перемычки поверх дыр.
+        S.tasks = {}; S.taskIdx = 1; S.currentTask = nil; S.phase = "waiting_for_mains"
         return false
     end
 
-    self:NP_NormalizeRingCrossSegs(inst)
+    -- Нормализация нужна только если геометрия изменилась.
+    -- Она сама вернет 'true', если были изменения.
+    if not self:NP_NormalizeRingCrossSegs(inst) then
+         -- Если нормализация ничего не изменила, возможно, структура сети стабильна.
+         -- Можно пропустить полную регенерацию задач, если фаза была нарушена кратковременно.
+         if S.phase == "task" then return true end
+    end
 
     local priority = prioritySeg
-    if priority
-        and (not priority.alive or self:NP_IsWebOwnerDrawn(priority)) then
+    if priority and (not priority.alive or self:NP_IsWebOwnerDrawn(priority)) then
         priority = self:NP_FindRingPriorityReplacement(inst, priority)
     end
 
@@ -17958,7 +17887,6 @@ function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
             S.moveT = 0
             S.lastTaskT = 0
             S.phase = "task"
-
             self:AdvanceTask()
         else
             S.tasks = tasks
@@ -17968,6 +17896,7 @@ function NSPauk:NP_RebuildRingCrossQueue(inst, prioritySeg)
             S.completeTimer = 0
         end
 
+        -- Флаг грязности сбрасывается только ПОСЛЕ успешной генерации новых задач.
         inst.nspRingCrossQueueDirty = false
         return true
     end
@@ -18984,24 +18913,20 @@ end
 function NSPauk:NP_RequestQueueResume(inst, priorityOwner)
     local S = self.S
 
-    if type(S) ~= "table" then
-        return
-    end
+    if type(S) ~= "table" then return end
+    if not inst or inst.torn or inst.isCocoon or inst.isMoth then return end
+    -- Проверяем, является ли паутина текущей целью для симуляции постройки
+    if inst ~= S.currentInstance then return end
 
-    if not inst or inst.torn or inst.isCocoon or inst.isMoth then
-        return
-    end
-
-    if inst ~= S.currentInstance then
-        return
-    end
-
-    S.nspQueueResumePending = true
-    S.nspQueueResumeInst = inst
-
+    -- Если пауза вызвана конкретным сегментом, сохраняем его приоритет
     if priorityOwner then
         S.nspQueueResumePriority = priorityOwner
     end
+
+    -- Устанавливаем флаг отложенного действия вместо мгновенной перестройки.
+    -- Сама перестройка произойдет в основном цикле Update/OnUpdate контроллера.
+    S.nspQueueResumePending = true
+    S.nspQueueResumeInst = inst
 end
 
 function NSPauk:NP_ProcessQueueResume()
@@ -19426,17 +19351,32 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
         return false
     end
 
+    -- Кэш результата на 1 секунду. Функция вызывается из горячих мест
+    -- (NP_RepairRingDeadOwners каждую секунду, NP_RebuildRingCrossQueue,
+    -- NP_HasRequiredWebPending, NP_ProcessQueueResume), и каждый вызов
+    -- без кэша делает O(N) обход с ValidateAnchorRect внутри.
+    local now = GetTime()
+    if inst._nspMainsBuiltCache ~= nil
+        and (now - (inst._nspMainsBuiltAt or 0)) < 1.0
+        and not inst.nspRingCrossQueueDirty then
+        return inst._nspMainsBuiltCache
+    end
+
+    -- Хаб валидируем один раз на весь обход, а не N раз.
+    local hubOk = self:ValidateAnchorRect(inst.hub.rect)
+
+    local result = true
+
     for _, conn in ipairs(inst.conns) do
         -- Проверяем только основные нити.
         -- У перемычек есть connA/connB, у основных нитей их нет.
         if not conn.connA and not conn.connB then
-            if not self:NP_IsWebOwnerDrawn(conn) then
-                if conn.alive then
-                    -- Живая нить, которая ещё не нарисована.
-                    -- Паук должен сначала нарисовать её.
-                    -- Проверяем, может ли она быть нарисована.
-                    local anchorAlive = false
+            if self:NP_IsWebOwnerDrawn(conn) then
+                -- уже нарисована — ок
+            elseif conn.alive then
+                local anchorAlive = false
 
+                if hubOk then
                     if conn.isRingFrame then
                         local startOk = not conn.ringStartRect
                             or self:ValidateAnchorRect(conn.ringStartRect)
@@ -19445,15 +19385,9 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
                             or not conn.target.rect
                             or self:ValidateAnchorRect(conn.target.rect)
 
-                        if startOk and targetOk then
-                            anchorAlive = true
-                        end
+                        anchorAlive = startOk and targetOk
 
                     elseif conn.isDiameter then
-                        local hubOk = not inst.hub
-                            or not inst.hub.rect
-                            or self:ValidateAnchorRect(inst.hub.rect)
-
                         local startOk = not conn.ringStartRect
                             or self:ValidateAnchorRect(conn.ringStartRect)
 
@@ -19461,52 +19395,47 @@ function NSPauk:NP_AreAllRingMainsBuilt(inst)
                             or not conn.target.rect
                             or self:ValidateAnchorRect(conn.target.rect)
 
-                        if hubOk and startOk and targetOk then
-                            anchorAlive = true
-                        end
+                        anchorAlive = startOk and targetOk
 
                     elseif conn.isMidSpoke then
-                        if conn.perimeterConn and conn.perimeterConn.alive then
-                            anchorAlive = true
-                        end
+                        anchorAlive = conn.perimeterConn
+                            and conn.perimeterConn.alive
 
                     elseif conn.isSpoke then
-                        if conn.hubDepConn and conn.hubDepConn.alive then
-                            if conn.target and conn.target.rect then
-                                if self:ValidateAnchorRect(conn.target.rect) then
-                                    anchorAlive = true
-                                end
-                            else
-                                anchorAlive = true
-                            end
-                        end
+                        anchorAlive = conn.hubDepConn
+                            and conn.hubDepConn.alive
+                            and (
+                                not conn.target
+                                or not conn.target.rect
+                                or self:ValidateAnchorRect(conn.target.rect)
+                            )
 
                     else
-                        if conn.target
-                            and conn.target.rect
-                            and self:ValidateAnchorRect(conn.target.rect) then
-                            anchorAlive = true
-                        end
+                        anchorAlive = true
                     end
+                end
 
-                    if anchorAlive then
-                        return false
-                    end
-                else
-                    -- Мёртвая нить.
-                    -- Если она может быть восстановлена, блокируем перемычки.
-                    -- Если не может быть восстановлена, пропускаем её.
-                    if self:NP_CanReviveRingConn(inst, conn) then
-                        return false
-                    end
+                if anchorAlive then
+                    result = false
+                    break
+                end
+
+            else
+                -- Мёртвая нить. NP_CanReviveRingConn тоже зовёт ValidateAnchorRect,
+                -- но только для конкретной нити, не для всех.
+                if self:NP_CanReviveRingConn(inst, conn) then
+                    result = false
+                    break
                 end
             end
         end
     end
 
-    return true
-end
+    inst._nspMainsBuiltCache = result
+    inst._nspMainsBuiltAt = now
 
+    return result
+end
 function NSPauk:RestoreMothStateImmediate(saved)
     local S = self.S
 
@@ -19743,6 +19672,8 @@ function NSPauk:ClearAllVisuals()
     S.nspFrameCache = nil
     S.nspSupportCache = nil
     S.nspLastRoute = nil
+    S.nspInnerCache = nil
+    S.nspAnchorRectCache = nil
 
     if not S.suppressSettle then
         for _, inst in ipairs(S.instances) do
