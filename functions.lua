@@ -16962,13 +16962,21 @@ function NSPauk:NP_FlushSessionBurst()
         return
     end
 
+    -- Считаем накопленное.
     local count = math.floor((tonumber(S.sessionBurstPoints) or 0) + 0.5)
 
-    S.sessionBurstPoints = 0
+    -- Если счётчик пуст, но паутина жива — берём текущее количество точек.
+    -- Это спасает опыт, если sessionBurstPoints не успел накопиться.
+    if count <= 0 then
+        count = math.floor((tonumber(S.webAliveCount) or 0) + 0.5)
+    end
 
     if count <= 0 then
         return
     end
+
+    -- Обнуляем только после проверки.
+    S.sessionBurstPoints = 0
 
     if type(S.session) ~= "table" then
         self:ResetSessionRecord()
@@ -18302,13 +18310,15 @@ function NSPauk:StartNewInstance(preferredHub)
 end
 
 function NSPauk:Interrupt()
-
-    self:NP_FlushSessionBurst()
-
-    self:ClearAllVisuals()
-
     local S = self.S
 
+    -- 1. Засчитываем опыт ДО очистки.
+    self:NP_FlushSessionBurst()
+
+    -- 2. Убираем паутину (мгновенный Hide + порционная очистка).
+    self:ClearAllVisuals()
+
+    -- 3. Паук в режим ожидания.
     S.phase = "watch"
     S.stillTimer = 0
     S.speedTimer = 0
@@ -19783,6 +19793,10 @@ end
 function NSPauk:ClearAllVisuals()
     local S = self.S
 
+    if S.nspClearWorker then
+        return
+    end
+
     if S.moth and S.moth.active then
         self:AbortMothHunt(true, true, true)
     end
@@ -19825,38 +19839,61 @@ function NSPauk:ClearAllVisuals()
 
     self:AbortCocoon()
     self:RestoreDigestedFrames()
-
     self:CancelUIParentRestore(true)
 
-    -- Собираем текстуры из инстансов и возвращаем в пул.
+    -- Собираем текстуры и СРАЗУ прячем их.
+    -- Hide() дешёвый, поэтому 40 000 Hide() за кадр — не проблема.
+    local queue = {}
+
+    local function collectAndHide(list)
+        if not list or #list == 0 then
+            return
+        end
+
+        for i = 1, #list do
+            local texture = list[i]
+            if texture then
+                texture:Hide()
+            end
+        end
+
+        queue[#queue + 1] = list
+    end
+
     for _, inst in ipairs(S.instances) do
         for _, conn in ipairs(inst.conns) do
-            self:RecycleTextures(conn.textures)
+            collectAndHide(conn.textures)
+            conn.textures = {}
             conn.alive = false
         end
 
         for _, seg in ipairs(inst.crossSegs) do
-            self:RecycleTextures(seg.textures)
+            collectAndHide(seg.textures)
+            seg.textures = {}
             seg.alive = false
         end
     end
 
-    -- Гасим fade'ы.
     for i = #S.fades, 1, -1 do
-        self:RecycleTextures(S.fades[i].textures)
+        local fade = S.fades[i]
+        if fade and fade.textures then
+            collectAndHide(fade.textures)
+        end
         S.fades[i] = nil
     end
 
-    -- Прячем всё, что накопилось в пуле, чтобы старые текстуры
-    -- не оставались видимыми на старых координатах.
-    if type(S.webPool) == "table" then
-        for _, texture in ipairs(S.webPool) do
-            if texture and texture.Hide then
+    -- Прячем активный drag, если он ещё висит.
+    if S.nspDrag then
+        local dragTextures = S.nspDrag.textures or {}
+        for i = 1, #dragTextures do
+            local texture = dragTextures[i]
+            if texture then
                 texture:Hide()
             end
         end
     end
 
+    -- Сразу сбрасываем состояние, чтобы новая паутина не ждала очистки.
     S.instances = {}
     S.currentInstance = nil
     S.tasks = {}
@@ -19873,6 +19910,91 @@ function NSPauk:ClearAllVisuals()
     S.limitHomePoint = nil
 
     self:HideSpider()
+
+    -- Если очередь пуста — просто прячем пул и выходим.
+    if #queue == 0 then
+        if type(S.webPool) == "table" then
+            for _, texture in ipairs(S.webPool) do
+                if texture and texture.Hide then
+                    texture:Hide()
+                end
+            end
+        end
+        return
+    end
+
+    -- Теперь порционно делаем "тяжёлую" часть:
+    -- ClearAllPoints + SetPoint + возврат в пул.
+    -- Визуально это уже не срочно — текстуры спрятаны.
+    local worker = {
+        queue = queue,
+        listIdx = 1,
+        texIdx = 1,
+        perFrame = 200,
+    }
+
+    S.nspClearWorker = worker
+
+    local frame = CreateFrame("Frame")
+    worker.frame = frame
+
+    frame:SetScript("OnUpdate", function()
+        local w = S.nspClearWorker
+        if not w then
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+            return
+        end
+
+        local processed = 0
+        local limit = w.perFrame
+
+        while processed < limit and w.listIdx <= #w.queue do
+            local list = w.queue[w.listIdx]
+
+            while processed < limit and w.texIdx <= #list do
+                local texture = list[w.texIdx]
+                w.texIdx = w.texIdx + 1
+                processed = processed + 1
+
+                if texture then
+                    if texture._nspAlive then
+                        texture._nspAlive = false
+                    end
+
+                    texture:ClearAllPoints()
+                    texture:SetPoint("CENTER", UIParent, "BOTTOMLEFT", -10000, -10000)
+
+                    if not texture._nspInPool then
+                        texture._nspInPool = true
+                        table.insert(S.webPool, texture)
+                    end
+                end
+            end
+
+            if w.texIdx > #list then
+                w.listIdx = w.listIdx + 1
+                w.texIdx = 1
+            end
+        end
+
+        if w.listIdx > #w.queue then
+            S.nspClearWorker = nil
+
+            if type(S.webPool) == "table" then
+                for _, texture in ipairs(S.webPool) do
+                    if texture and texture.Hide then
+                        texture:Hide()
+                    end
+                end
+            end
+
+            frame:SetScript("OnUpdate", nil)
+            frame:Hide()
+        end
+    end)
+
+    frame:Show()
 end
 
 function NSPauk:OnSpiderClick(button)

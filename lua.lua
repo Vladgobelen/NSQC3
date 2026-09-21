@@ -12017,257 +12017,504 @@ content = [=[
 }
 
 ns_llua['lua'][102] = {
-type = "vartest",
-title = "Тест 101-1: уровень и токен класса",
-helpModules = {101},
-tasks = {
-{
-var = "myLevel",
-desc = 'Создай глобальную переменную myLevel = UnitLevel("player")',
-check = function(value)
-return type(value) == "number" and value > 0
-end,
-},
-{
-var = "myClassToken",
-desc = 'Создай глобальную переменную myClassToken = select(2, UnitClass("player"))',
-check = function(value)
-return type(value) == "string"
-and value ~= ""
-and value == value:upper()
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 101-1: функция GetTargetDescription",
+    helpModules = {101, 45, 44, 7},
+    preloadVars = {
+        {var = "GetTargetDescription", desc = "GetTargetDescription очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 101-1: функция GetTargetDescription</h>
+<t>Создай глобальную функцию <k>GetTargetDescription()</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита.</t>
+<t>Функция должна вернуть таблицу с полями:</t>
+<c>name</c> — имя цели.
+<c>level</c> — уровень цели (число).
+<c>classToken</c> — токен класса цели (строка).
+<c>raceToken</c> — токен расы цели (строка).
+<t>Если поле получить нельзя, используй <k>nil</k>.</t>
+<w>Тест проверит, что данные соответствуют реальной цели.</w>
+]=],
+    initialCode = [=[
+function GetTargetDescription()
+    
+end
+]=],
+    requireKeywords = {
+        "GetTargetDescription",
+        "function",
+        "UnitName",
+        "UnitLevel",
+        "UnitClass",
+        "UnitRace",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetTargetDescription) ~= "function" then
+            return fail("GetTargetDescription не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Возьми любого юнита в цель и нажми проверку снова.")
+        end
+
+        local ok, result = pcall(_G.GetTargetDescription)
+
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова GetTargetDescription: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("GetTargetDescription должна вернуть таблицу")
+        end
+
+        local expectedName = UnitName("target")
+        if result.name ~= expectedName then
+            return fail("Имя не совпадает: ожидалось '" .. tostring(expectedName) .. "', получено '" .. tostring(result.name) .. "'")
+        end
+
+        local expectedLevel = UnitLevel("target")
+        if result.level ~= expectedLevel then
+            return fail("Уровень не совпадает: ожидалось " .. tostring(expectedLevel) .. ", получено " .. tostring(result.level))
+        end
+
+        local _, expectedClassToken = UnitClass("target")
+        if result.classToken ~= expectedClassToken then
+            return fail("Токен класса не совпадает: ожидалось '" .. tostring(expectedClassToken) .. "', получено '" .. tostring(result.classToken) .. "'")
+        end
+
+        local _, expectedRaceToken = UnitRace("target")
+        if result.raceToken ~= expectedRaceToken then
+            return fail("Токен расы не совпадает: ожидалось '" .. tostring(expectedRaceToken) .. "', получено '" .. tostring(result.raceToken) .. "'")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][103] = {
-type = "vartest",
-title = "Тест 101-2: раса и классификация",
-helpModules = {101},
-tasks = {
-{
-var = "myRaceToken",
-desc = 'Создай глобальную переменную myRaceToken = select(2, UnitRace("player"))',
-check = function(value)
-return type(value) == "string"
-and value ~= ""
-and value == value:upper()
-end,
-},
-{
-var = "playerClassification",
-desc = 'Создай глобальную переменную playerClassification = UnitClassification("player") or "unknown"',
-check = function(value)
-return type(value) == "string" and value ~= ""
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 101-2: функция FilterByClass",
+    helpModules = {101, 45, 31, 29},
+    preloadVars = {
+        {var = "FilterByClass", desc = "FilterByClass очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 101-2: функция FilterByClass</h>
+<t>Создай глобальную функцию <k>FilterByClass(units, classToken)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Аргумент <k>classToken</k> — токен класса (например, <s>"MAGE"</s>, <s>"WARRIOR"</s>).</t>
+<t>Функция должна вернуть новый массив, содержащий только тех юнитов, у которых токен класса совпадает с <k>classToken</k>.</t>
+<t>Порядок юнитов в результирующем массиве должен совпадать с исходным.</t>
+<t>Если аргумент не таблица или <k>classToken</k> не строка, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
+]=],
+    initialCode = [=[
+function FilterByClass(units, classToken)
+    
+end
+]=],
+    requireKeywords = {
+        "FilterByClass",
+        "function",
+        "for",
+        "UnitClass",
+        "return",
+    },
+
+    mockGlobals = {
+        UnitClass = function(u)
+            local mock = {
+                mage1 = {"Маг", "MAGE"},
+                mage2 = {"Маг", "MAGE"},
+                warrior1 = {"Воин", "WARRIOR"},
+                warrior2 = {"Воин", "WARRIOR"},
+                priest1 = {"Жрец", "PRIEST"},
+                missing = {nil, nil},
+            }
+            local data = mock[u] or mock.missing
+            return data[1], data[2]
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.FilterByClass
+        if type(fn) ~= "function" then
+            return fail("FilterByClass не является глобальной функцией")
+        end
+
+        local tests = {
+            {units = {"mage1", "warrior1", "mage2"}, token = "MAGE", exp = {"mage1", "mage2"}},
+            {units = {"warrior1", "priest1", "warrior2"}, token = "WARRIOR", exp = {"warrior1", "warrior2"}},
+            {units = {"priest1", "mage1"}, token = "ROGUE", exp = {}},
+            {units = "bad", token = "MAGE", exp = {}},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.units, test.token)
+
+            _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            if #result ~= #test.exp then
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][104] = {
-type = "commenttest",
-title = "Тест 101-3: функция GetClassToken",
-helpModules = {101, 45},
-preloadVars = {
-{var = "GetClassToken", desc = "GetClassToken очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 101-3: функция GetClassToken</h>
-<t>Создай глобальную функцию <k>GetClassToken(unit)</k>.</t>
-<t>Функция должна вернуть токен класса юнита.</t>
-<t>Используй:</t>
-<c>UnitClass(unit)</c>
-<c>select(2, ...)</c>
-<t>Если токен получить нельзя, функция может вернуть <k>nil</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 101-3: функция CompareLevels",
+    helpModules = {101, 45, 17},
+    preloadVars = {
+        {var = "CompareLevels", desc = "CompareLevels очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 101-3: функция CompareLevels</h>
+<t>Создай глобальную функцию <k>CompareLevels()</k>.</t>
+<t>Перед проверкой возьми в цель любого юнита, а в фокус — другого.</t>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>"Цель: 80, Фокус: 75, Разница: 5"</s>
+<t>Поля строки:</t>
+<c>Цель</c> — уровень цели (число).
+<c>Фокус</c> — уровень фокуса (число).
+<c>Разница</c> — абсолютная разница между уровнями (всегда положительное число или 0).
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetClassToken(unit)
+    initialCode = [=[
+function CompareLevels()
+    
+end
 ]=],
-requireKeywords = {
-"GetClassToken",
-"function",
-"UnitClass",
-"select",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetClassToken) ~= "function" then
-_G.checkError = "GetClassToken не является глобальной функцией"
-return false
-end
-local ok1, playerToken = pcall(_G.GetClassToken, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetClassToken('player'): " .. tostring(playerToken)
-return false
-end
-if type(playerToken) ~= "string" or playerToken == "" then
-_G.checkError = "Для player функция должна вернуть строку с токеном класса"
-return false
-end
-local ok2, invalidToken = pcall(_G.GetClassToken, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetClassToken('ns_invalid_unit'): " .. tostring(invalidToken)
-return false
-end
-if invalidToken ~= nil then
-_G.checkError = "Для несуществующего юнита функция должна вернуть nil"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "CompareLevels",
+        "function",
+        "UnitLevel",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.CompareLevels) ~= "function" then
+            return fail("CompareLevels не является глобальной функцией")
+        end
+
+        local okTarget, targetExists = pcall(UnitExists, "target")
+        local okFocus, focusExists = pcall(UnitExists, "focus")
+
+        if not okTarget or not targetExists then
+            return fail("Нет цели. Возьми любого юнита в цель.")
+        end
+        if not okFocus or not focusExists then
+            return fail("Нет фокуса. Возьми любого юнита в фокус.")
+        end
+
+        local ok, result = pcall(_G.CompareLevels)
+
+        if ok then
+            _G.result = result
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова CompareLevels: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("CompareLevels должна вернуть строку")
+        end
+
+        local targetLevel, focusLevel, diff = result:match(
+            "^Цель: (%-?%d+), Фокус: (%-?%d+), Разница: (%d+)$"
+        )
+
+        if not targetLevel then
+            return fail("Строка не похожа на 'Цель: X, Фокус: Y, Разница: Z'")
+        end
+
+        local expectedTargetLevel = UnitLevel("target") or 0
+        local expectedFocusLevel = UnitLevel("focus") or 0
+        local expectedDiff = math.abs(expectedTargetLevel - expectedFocusLevel)
+
+        if tonumber(targetLevel) ~= expectedTargetLevel then
+            return fail("Уровень цели не совпадает: ожидалось " .. expectedTargetLevel .. ", получено " .. targetLevel)
+        end
+        if tonumber(focusLevel) ~= expectedFocusLevel then
+            return fail("Уровень фокуса не совпадает: ожидалось " .. expectedFocusLevel .. ", получено " .. focusLevel)
+        end
+        if tonumber(diff) ~= expectedDiff then
+            return fail("Разница не совпадает: ожидалось " .. expectedDiff .. ", получено " .. diff)
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][105] = {
-type = "commenttest",
-title = "Тест 101-4: функция GetLevelSafe",
-helpModules = {101, 65, 45},
-preloadVars = {
-{var = "GetLevelSafe", desc = "GetLevelSafe очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 101-4: функция GetLevelSafe</h>
-<t>Создай глобальную функцию <k>GetLevelSafe(unit)</k>.</t>
-<t>Если юнита не существует, функция должна вернуть <n>0</n>.</t>
-<t>Если юнит существует, функция должна вернуть его уровень через <k>UnitLevel(unit)</k>.</t>
-<t>Если <k>UnitLevel</k> вернул <k>nil</k>, используй <k>or 0</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 101-4: функция FindBosses",
+    helpModules = {101, 45, 31, 29},
+    preloadVars = {
+        {var = "FindBosses", desc = "FindBosses очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 101-4: функция FindBosses</h>
+<t>Создай глобальную функцию <k>FindBosses(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна вернуть новый массив, содержащий только тех юнитов, у которых уровень равен <n>-1</n> (боссы).</t>
+<t>Порядок юнитов в результирующем массиве должен совпадать с исходным.</t>
+<t>Если аргумент не таблица, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetLevelSafe(unit)
+    initialCode = [=[
+function FindBosses(units)
+    
+end
 ]=],
-requireKeywords = {
-"GetLevelSafe",
-"function",
-"UnitExists",
-"UnitLevel",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetLevelSafe) ~= "function" then
-_G.checkError = "GetLevelSafe не является глобальной функцией"
-return false
-end
-local ok1, playerLevel = pcall(_G.GetLevelSafe, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetLevelSafe('player'): " .. tostring(playerLevel)
-return false
-end
-if type(playerLevel) ~= "number" or playerLevel <= 0 then
-_G.checkError = "Для player функция должна вернуть число больше нуля"
-return false
-end
-local ok2, invalidLevel = pcall(_G.GetLevelSafe, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetLevelSafe('ns_invalid_unit'): " .. tostring(invalidLevel)
-return false
-end
-if invalidLevel ~= 0 then
-_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "FindBosses",
+        "function",
+        "for",
+        "UnitLevel",
+        "return",
+    },
+
+    mockGlobals = {
+        UnitLevel = function(u)
+            local mock = {
+                boss1 = -1,
+                boss2 = -1,
+                mob1 = 80,
+                mob2 = 75,
+                elite = 82,
+                missing = nil,
+            }
+            return mock[u]
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.FindBosses
+        if type(fn) ~= "function" then
+            return fail("FindBosses не является глобальной функцией")
+        end
+
+        local tests = {
+            {input = {"boss1", "mob1", "boss2"}, exp = {"boss1", "boss2"}},
+            {input = {"mob1", "elite", "mob2"}, exp = {}},
+            {input = {"boss1", "boss2"}, exp = {"boss1", "boss2"}},
+            {input = "bad", exp = {}},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.input)
+
+            _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            if #result ~= #test.exp then
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][106] = {
-type = "commenttest",
-title = "Тест 101-5: функция GetDescription",
-helpModules = {101, 45, 44},
-preloadVars = {
-{var = "GetDescription", desc = "GetDescription очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 101-5: функция GetDescription</h>
-<t>Создай глобальную функцию <k>GetDescription(unit)</k>.</t>
-<t>Функция должна вернуть таблицу с полями:</t>
-<c>level</c> — уровень юнита или <n>0</n>, если юнита нет.
-<c>classToken</c> — токен класса или <k>nil</k>, если получить нельзя.
-<c>raceToken</c> — токен расы или <k>nil</k>, если получить нельзя.
-<t>Используй:</t>
-<c>UnitExists</c>
-<c>UnitLevel</c>
-<c>UnitClass</c>
-<c>UnitRace</c>
-<c>select(2, ...)</c>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 101-5: функция GetRaidClassReport",
+    helpModules = {101, 45, 44, 31, 7},
+    preloadVars = {
+        {var = "GetRaidClassReport", desc = "GetRaidClassReport очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 101-5: функция GetRaidClassReport</h>
+<t>Создай глобальную функцию <k>GetRaidClassReport()</k>.</t>
+<t>Функция должна собрать отчёт по всем участникам рейда и вернуть массив строк.</t>
+<t>Формат каждой строки:</t>
+<s>"Имя: Тралл, Уровень: 80, Класс: WARRIOR"</s>
+<t>Массив должен быть отсортирован по алфавиту имён (от А до Я).</t>
+<t>Несуществующих юнитов пропускай.</t>
+<w>Перед проверкой собери рейд минимум из 3 человек.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetDescription(unit)
+    initialCode = [=[
+function GetRaidClassReport()
+    
+end
 ]=],
-requireKeywords = {
-"GetDescription",
-"function",
-"UnitExists",
-"UnitLevel",
-"UnitClass",
-"UnitRace",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetDescription) ~= "function" then
-_G.checkError = "GetDescription не является глобальной функцией"
-return false
-end
-local ok1, playerReport = pcall(_G.GetDescription, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова GetDescription('player'): " .. tostring(playerReport)
-return false
-end
-if type(playerReport) ~= "table" then
-_G.checkError = "GetDescription('player') должна вернуть таблицу"
-return false
-end
-if type(playerReport.level) ~= "number" or playerReport.level <= 0 then
-_G.checkError = "Для player поле level должно быть числом больше нуля"
-return false
-end
-if type(playerReport.classToken) ~= "string" or playerReport.classToken == "" then
-_G.checkError = "Для player поле classToken должно быть строкой"
-return false
-end
-if type(playerReport.raceToken) ~= "string" or playerReport.raceToken == "" then
-_G.checkError = "Для player поле raceToken должно быть строкой"
-return false
-end
-local ok2, invalidReport = pcall(_G.GetDescription, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова GetDescription('ns_invalid_unit'): " .. tostring(invalidReport)
-return false
-end
-if type(invalidReport) ~= "table" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть таблицу"
-return false
-end
-if invalidReport.level ~= 0 then
-_G.checkError = "Для несуществующего юнита поле level должно быть 0"
-return false
-end
-if invalidReport.classToken ~= nil then
-_G.checkError = "Для несуществующего юнита поле classToken должно быть nil"
-return false
-end
-if invalidReport.raceToken ~= nil then
-_G.checkError = "Для несуществующего юнита поле raceToken должно быть nil"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetRaidClassReport",
+        "function",
+        "GetNumRaidMembers",
+        "for",
+        "UnitName",
+        "UnitLevel",
+        "UnitClass",
+        "table.sort",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetRaidClassReport) ~= "function" then
+            return fail("GetRaidClassReport не является глобальной функцией")
+        end
+
+        local numRaid = GetNumRaidMembers()
+        if numRaid < 3 then
+            return fail("Нет рейда или мало игроков (" .. numRaid .. "/3). Собери рейд минимум из 3 человек и нажми проверку снова.")
+        end
+
+        local ok, result = pcall(_G.GetRaidClassReport)
+
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова GetRaidClassReport: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("GetRaidClassReport должна вернуть массив (таблицу)")
+        end
+
+        local expected = {}
+        for i = 1, numRaid do
+            local unit = "raid" .. i
+            if UnitExists(unit) then
+                local name = UnitName(unit) or "Unknown"
+                local level = UnitLevel(unit) or 0
+                local _, classToken = UnitClass(unit)
+                classToken = classToken or "UNKNOWN"
+
+                local line = string.format("Имя: %s, Уровень: %d, Класс: %s", name, level, classToken)
+                table.insert(expected, {name = name, line = line})
+            end
+        end
+
+        table.sort(expected, function(a, b)
+            return a.name < b.name
+        end)
+
+        if #result ~= #expected then
+            return fail("Количество строк не совпадает: ожидалось " .. #expected .. ", получено " .. #result)
+        end
+
+        for i = 1, #expected do
+            if result[i] ~= expected[i].line then
+                return fail("Строка " .. i .. " не совпадает. Ожидалось: '" .. expected[i].line .. "', получено: '" .. tostring(result[i]) .. "'")
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][107] = {
