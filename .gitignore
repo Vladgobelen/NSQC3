@@ -17,6 +17,7 @@
 !nstdc.lua
 !FilteredChat.lua
 !lua.lua
+!Гипотеза.lua
 
 # Рекурсивно разрешить всё внутри libs/
 !libs/
