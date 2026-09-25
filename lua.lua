@@ -12563,324 +12563,533 @@ content = [=[
 }
 
 ns_llua['lua'][108] = {
-type = "commenttest",
-title = "Тест 107-1: функция CountUnitBuffs",
-helpModules = {107, 45, 32},
-preloadVars = {
-{var = "CountUnitBuffs", desc = "CountUnitBuffs очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 107-1: функция CountUnitBuffs</h>
-<t>Создай глобальную функцию <k>CountUnitBuffs(unit)</k>.</t>
-<t>Функция должна вернуть количество баффов на юните.</t>
-<t>Используй <k>UnitBuff(unit, index)</k>.</t>
-<t>Перебирай индексы, пока функция не вернёт <k>nil</k>.</t>
-<t>Для несуществующего юнита функция должна вернуть <n>0</n>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 107-1: функция CountAuras",
+    helpModules = {107, 45, 44},
+    preloadVars = {
+        {var = "CountAuras", desc = "CountAuras очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 107-1: функция CountAuras</h>
+<t>Создай глобальную функцию <k>CountAuras(unit)</k>.</t>
+<t>Функция должна посчитать количество баффов и дебаффов на юните и вернуть таблицу с двумя полями:</t>
+<c>buffs</c> — количество баффов.
+<c>debuffs</c> — количество дебаффов.
+<t>Перебирай индексы от 1, пока функция не вернёт <k>nil</k>.</t>
+<t>Если юнита не существует, верни <s>{buffs = 0, debuffs = 0}</s>.</t>
+<w>Перед проверкой возьми в цель любого юнита.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию CountUnitBuffs(unit)
+    initialCode = [=[
+function CountAuras(unit)
+    
+end
 ]=],
-requireKeywords = {
-"CountUnitBuffs",
-"function",
-"UnitBuff",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.CountUnitBuffs) ~= "function" then
-_G.checkError = "CountUnitBuffs не является глобальной функцией"
-return false
-end
-local ok1, playerCount = pcall(_G.CountUnitBuffs, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова CountUnitBuffs('player'): " .. tostring(playerCount)
-return false
-end
-if type(playerCount) ~= "number" or playerCount < 0 then
-_G.checkError = "Для player функция должна вернуть число больше или равное нулю"
-return false
-end
-local ok2, invalidCount = pcall(_G.CountUnitBuffs, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова CountUnitBuffs('ns_invalid_unit'): " .. tostring(invalidCount)
-return false
-end
-if invalidCount ~= 0 then
-_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "CountAuras",
+        "function",
+        "UnitBuff",
+        "UnitDebuff",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.CountAuras) ~= "function" then
+            return fail("CountAuras не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Возьми любого юнита в цель и нажми проверку снова.")
+        end
+
+        local ok, result = pcall(_G.CountAuras, "target")
+
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова CountAuras: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("CountAuras должна вернуть таблицу")
+        end
+
+        local expectedBuffs = 0
+        local expectedDebuffs = 0
+        local i = 1
+        while UnitBuff("target", i) do
+            expectedBuffs = expectedBuffs + 1
+            i = i + 1
+        end
+        i = 1
+        while UnitDebuff("target", i) do
+            expectedDebuffs = expectedDebuffs + 1
+            i = i + 1
+        end
+
+        if result.buffs ~= expectedBuffs then
+            return fail("Баффов ожидалось " .. expectedBuffs .. ", получено " .. tostring(result.buffs))
+        end
+        if result.debuffs ~= expectedDebuffs then
+            return fail("Дебаффов ожидалось " .. expectedDebuffs .. ", получено " .. tostring(result.debuffs))
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][109] = {
-type = "commenttest",
-title = "Тест 107-2: функция CountUnitDebuffs",
-helpModules = {107, 45, 32},
-preloadVars = {
-{var = "CountUnitDebuffs", desc = "CountUnitDebuffs очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 107-2: функция CountUnitDebuffs</h>
-<t>Создай глобальную функцию <k>CountUnitDebuffs(unit)</k>.</t>
-<t>Функция должна вернуть количество дебаффов на юните.</t>
-<t>Используй <k>UnitDebuff(unit, index)</k>.</t>
-<t>Перебирай индексы, пока функция не вернёт <k>nil</k>.</t>
-<t>Для несуществующего юнита функция должна вернуть <n>0</n>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 107-2: функция GetExpiringBuffs",
+    helpModules = {107, 45, 31, 29},
+    preloadVars = {
+        {var = "GetExpiringBuffs", desc = "GetExpiringBuffs очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 107-2: функция GetExpiringBuffs</h>
+<t>Создай глобальную функцию <k>GetExpiringBuffs(unit, threshold)</k>.</t>
+<t>Аргумент <k>unit</k> — UnitID, <k>threshold</k> — порог в секундах.</t>
+<t>Функция должна вернуть массив имён баффов, у которых осталось меньше <k>threshold</k> секунд.</t>
+<t>Оставшееся время считается как <k>expirationTime - GetTime()</k>.</t>
+<t>Если у баффа нет таймера (<k>expirationTime</k> равно 0), он не попадает в результат.</t>
+<t>Порядок имён в результирующем массиве должен совпадать с порядком баффов на юните.</t>
+<t>Если <k>threshold</k> не число или <= 0, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию CountUnitDebuffs(unit)
+    initialCode = [=[
+function GetExpiringBuffs(unit, threshold)
+    
+end
 ]=],
-requireKeywords = {
-"CountUnitDebuffs",
-"function",
-"UnitDebuff",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.CountUnitDebuffs) ~= "function" then
-_G.checkError = "CountUnitDebuffs не является глобальной функцией"
-return false
-end
-local ok1, playerCount = pcall(_G.CountUnitDebuffs, "player")
-if not ok1 then
-_G.checkError = "Ошибка вызова CountUnitDebuffs('player'): " .. tostring(playerCount)
-return false
-end
-if type(playerCount) ~= "number" or playerCount < 0 then
-_G.checkError = "Для player функция должна вернуть число больше или равное нулю"
-return false
-end
-local ok2, invalidCount = pcall(_G.CountUnitDebuffs, "ns_invalid_unit")
-if not ok2 then
-_G.checkError = "Ошибка вызова CountUnitDebuffs('ns_invalid_unit'): " .. tostring(invalidCount)
-return false
-end
-if invalidCount ~= 0 then
-_G.checkError = "Для несуществующего юнита функция должна вернуть 0"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetExpiringBuffs",
+        "function",
+        "UnitBuff",
+        "GetTime",
+        "return",
+    },
+
+    mockGlobals = {
+        GetTime = function() return 1000 end,
+        UnitBuff = function(u, i)
+            local mock = {
+                player = {
+                    {name = "Щит", duration = 30, expiration = 1025},
+                    {name = "Ярость", duration = 10, expiration = 1005},
+                    {name = "Благословение", duration = 60, expiration = 0},
+                    {name = "Ускорение", duration = 8, expiration = 1003},
+                },
+                target = {
+                    {name = "Регенерация", duration = 20, expiration = 1015},
+                    {name = "Магический доспех", duration = 5, expiration = 1002},
+                },
+            }
+            local list = mock[u]
+            if not list or not list[i] then return nil end
+            local b = list[i]
+            return b.name, "icon", 1, nil, b.duration, b.expiration
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.GetExpiringBuffs
+        if type(fn) ~= "function" then
+            return fail("GetExpiringBuffs не является глобальной функцией")
+        end
+
+        local currentTime = 1000
+
+        local tests = {
+            {unit = "player", threshold = 10, exp = {"Ярость", "Ускорение"}},
+            {unit = "player", threshold = 30, exp = {"Щит", "Ярость", "Ускорение"}},
+            {unit = "target", threshold = 5, exp = {"Магический доспех"}},
+            {unit = "player", threshold = 0, exp = {}},
+        }
+
+        local function formatBuffs(unit)
+            local parts = {}
+            local i = 1
+            while true do
+                local name, _, _, _, duration, expiration = UnitBuff(unit, i)
+                if not name then break end
+                local remaining = expiration > 0 and (expiration - currentTime) or "нет таймера"
+                table.insert(parts, name .. "(" .. tostring(remaining) .. "с)")
+                i = i + 1
+            end
+            return table.concat(parts, ", ")
+        end
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.unit, test.threshold)
+
+            local buffsInfo = formatBuffs(test.unit)
+            _G["test" .. i] = "Баффы: {" .. buffsInfo .. "} | Порог: " .. test.threshold .. "с | Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            if #result ~= #test.exp then
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][110] = {
-type = "commenttest",
-title = "Тест 107-3: функция GetAuraName",
-helpModules = {107, 65, 45},
-preloadVars = {
-{var = "GetAuraName", desc = "GetAuraName очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 107-3: функция GetAuraName</h>
-<t>Создай глобальную функцию <k>GetAuraName(unit, index)</k>.</t>
-<t>Функция должна вернуть имя баффа через <k>UnitBuff(unit, index)</k>.</t>
-<t>Если баффа нет, функция должна вернуть строку:</t>
-<s>"нет"</s>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 107-3: функция FindBuffContaining",
+    helpModules = {107, 45, 33, 17},
+    preloadVars = {
+        {var = "FindBuffContaining", desc = "FindBuffContaining очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3"},
+    instruction = [=[
+<h>Тест 107-3: функция FindBuffContaining</h>
+<t>Создай глобальную функцию <k>FindBuffContaining(unit, text)</k>.</t>
+<t>Функция должна найти первый бафф на юните, в имени которого есть подстрока <k>text</k>, и вернуть его имя.</t>
+<t>Если такого баффа нет, вернуть <k>nil</k>.</t>
+<t>Если <k>text</k> не строка или пустая строка, вернуть <k>nil</k>.</t>
+<t>Поиск должен быть регистронезависимым.</t>
+<w>Перед проверкой возьми в цель любого юнита.</w>
+<w>Тест проверит поиск по трём разным подстрокам.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetAuraName(unit, index)
+    initialCode = [=[
+function FindBuffContaining(unit, text)
+    
+end
 ]=],
-requireKeywords = {
-"GetAuraName",
-"function",
-"UnitBuff",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetAuraName) ~= "function" then
-_G.checkError = "GetAuraName не является глобальной функцией"
-return false
-end
-local ok1, playerName = pcall(_G.GetAuraName, "player", 1)
-if not ok1 then
-_G.checkError = "Ошибка вызова GetAuraName('player', 1): " .. tostring(playerName)
-return false
-end
-if type(playerName) ~= "string" or playerName == "" then
-_G.checkError = "Функция должна вернуть строку"
-return false
-end
-local ok2, invalidName = pcall(_G.GetAuraName, "ns_invalid_unit", 1)
-if not ok2 then
-_G.checkError = "Ошибка вызова GetAuraName('ns_invalid_unit', 1): " .. tostring(invalidName)
-return false
-end
-if invalidName ~= "нет" then
-_G.checkError = "Для несуществующего юнита функция должна вернуть 'нет'"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "FindBuffContaining",
+        "function",
+        "UnitBuff",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        for i = 1, 3 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.FindBuffContaining) ~= "function" then
+            return fail("FindBuffContaining не является глобальной функцией")
+        end
+
+        local okExists, exists = pcall(UnitExists, "target")
+        if not okExists or not exists then
+            return fail("Нет цели. Возьми любого юнита в цель и нажми проверку снова.")
+        end
+
+        local buffNames = {}
+        local i = 1
+        while true do
+            local name = UnitBuff("target", i)
+            if not name then break end
+            table.insert(buffNames, name)
+            i = i + 1
+        end
+
+        local testStrings = {}
+        if #buffNames >= 2 then
+            table.insert(testStrings, string.sub(buffNames[1], 1, 3))
+            table.insert(testStrings, string.sub(buffNames[2], 1, 3))
+            table.insert(testStrings, "zzz_nonexistent_string_zzz")
+        else
+            table.insert(testStrings, "")
+            table.insert(testStrings, "any")
+            table.insert(testStrings, "xyz")
+        end
+
+        for i, text in ipairs(testStrings) do
+            local ok, result = pcall(_G.FindBuffContaining, "target", text)
+
+            local expected = nil
+            if type(text) == "string" and text ~= "" then
+                local lowerText = string.lower(text)
+                for _, name in ipairs(buffNames) do
+                    if string.find(string.lower(name), lowerText, 1, true) then
+                        expected = name
+                        break
+                    end
+                end
+            end
+
+            _G["test" .. i] = "Подстрока '" .. text .. "' | Получено: " .. tostring(result) .. " | Ожидалось: " .. tostring(expected)
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            local resultMatch = (result == expected)
+            if not resultMatch and type(result) == "string" and type(expected) == "string" then
+                resultMatch = string.find(string.lower(result), string.lower(expected), 1, true) ~= nil
+                    and string.find(string.lower(expected), string.lower(result), 1, true) ~= nil
+            end
+
+            if not resultMatch then
+                return fail("Тест " .. i .. " не пройден")
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][111] = {
-type = "commenttest",
-title = "Тест 107-4: функция HasAuraWithName",
-helpModules = {107, 33, 45, 31},
-preloadVars = {
-{var = "HasAuraWithName", desc = "HasAuraWithName очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 107-4: функция HasAuraWithName</h>
-<t>Создай глобальную функцию <k>HasAuraWithName(unit, text)</k>.</t>
-<t>Функция должна вернуть <k>true</k>, если среди баффов юнита есть бафф, в названии которого есть подстрока <k>text</k>.</t>
-<t>Иначе функция должна вернуть <k>false</k>.</t>
-<t>Используй:</t>
-<c>UnitBuff</c>
-<c>string.find</c>
-<t>Если <k>text</k> не строка или пустая строка, верни <k>false</k>.</t>
-<t>Проверяй баффы с индексами от 1 до 40.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 107-4: функция GetStrongestBuff",
+    helpModules = {107, 45, 17},
+    preloadVars = {
+        {var = "GetStrongestBuff", desc = "GetStrongestBuff очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3"},
+    instruction = [=[
+<h>Тест 107-4: функция GetStrongestBuff</h>
+<t>Создай глобальную функцию <k>GetStrongestBuff(unit)</k>.</t>
+<t>Функция должна вернуть имя баффа с наибольшим количеством стаков (третий параметр <k>UnitBuff</k>).</t>
+<t>Если у нескольких баффов одинаковое максимальное количество стаков, вернуть первый из них.</t>
+<t>Если у юнита нет баффов, вернуть <k>nil</k>.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию HasAuraWithName(unit, text)
+    initialCode = [=[
+function GetStrongestBuff(unit)
+    
+end
 ]=],
-requireKeywords = {
-"HasAuraWithName",
-"function",
-"UnitBuff",
-"string.find",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.HasAuraWithName) ~= "function" then
-_G.checkError = "HasAuraWithName не является глобальной функцией"
-return false
-end
-local ok1, result1 = pcall(_G.HasAuraWithName, "player", "zzz_no_such_aura_zzz")
-if not ok1 then
-_G.checkError = "Ошибка вызова HasAuraWithName('player', ...): " .. tostring(result1)
-return false
-end
-if result1 ~= false then
-_G.checkError = "Для несуществующей подстроки функция должна вернуть false"
-return false
-end
-local ok2, result2 = pcall(_G.HasAuraWithName, "ns_invalid_unit", "zzz_no_such_aura_zzz")
-if not ok2 then
-_G.checkError = "Ошибка вызова HasAuraWithName('ns_invalid_unit', ...): " .. tostring(result2)
-return false
-end
-if result2 ~= false then
-_G.checkError = "Для несуществующего юнита функция должна вернуть false"
-return false
-end
-local ok3, result3 = pcall(_G.HasAuraWithName, "player", "")
-if not ok3 then
-_G.checkError = "Ошибка вызова HasAuraWithName('player', ''): " .. tostring(result3)
-return false
-end
-if result3 ~= false then
-_G.checkError = "Для пустой строки функция должна вернуть false"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetStrongestBuff",
+        "function",
+        "UnitBuff",
+        "return",
+    },
+
+    mockGlobals = {
+        UnitBuff = function(u, i)
+            local mock = {
+                player = {
+                    {name = "Щит", count = 1},
+                    {name = "Ярость", count = 5},
+                    {name = "Благословение", count = 3},
+                },
+                target = {
+                    {name = "Регенерация", count = 2},
+                    {name = "Магический доспех", count = 2},
+                },
+                empty = {},
+            }
+            local list = mock[u] or {}
+            if not list[i] then return nil end
+            local b = list[i]
+            return b.name, "icon", b.count
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 3 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.GetStrongestBuff
+        if type(fn) ~= "function" then
+            return fail("GetStrongestBuff не является глобальной функцией")
+        end
+
+        local tests = {
+            {unit = "player", exp = "Ярость", label = "Максимум 5 стаков"},
+            {unit = "target", exp = "Регенерация", label = "Первый из равных (2 стаков)"},
+            {unit = "empty", exp = nil, label = "Нет баффов"},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.unit)
+
+            _G["test" .. i] = test.label .. " | Получено: " .. tostring(result) .. " | Ожидалось: " .. tostring(test.exp)
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if result ~= test.exp then
+                return fail("Тест " .. i .. " не пройден")
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][112] = {
-type = "commenttest",
-title = "Тест 107-5: функция GetBuffList",
-helpModules = {107, 44, 45, 31},
-preloadVars = {
-{var = "GetBuffList", desc = "GetBuffList очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 107-5: функция GetBuffList</h>
-<t>Создай глобальную функцию <k>GetBuffList(unit, max)</k>.</t>
-<t>Функция должна вернуть таблицу с именами баффов юнита.</t>
-<t>Собери не больше <k>max</k> баффов.</t>
-<t>Если бафф не найден, прекрати перебор.</t>
-<t>Если <k>max</k> не число или меньше либо равно нулю, верни пустую таблицу.</t>
-<t>Используй:</t>
-<c>UnitBuff</c>
-<c>table.insert</c>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 107-5: функция FindLowestBuffedRaidMember",
+    helpModules = {107, 45, 31, 17, 7},
+    preloadVars = {
+        {var = "FindLowestBuffedRaidMember", desc = "FindLowestBuffedRaidMember очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 107-5: функция FindLowestBuffedRaidMember</h>
+<t>Создай глобальную функцию <k>FindLowestBuffedRaidMember()</k>.</t>
+<t>Функция должна найти участника рейда с наименьшим количеством баффов и вернуть одну строку в формате:</t>
+<s>"Имя: Тралл, Баффов: 3"</s>
+<t>Если у нескольких участников одинаковое минимальное количество баффов, вернуть первого из них (по порядку в рейде).</t>
+<w>Перед проверкой собери рейд минимум из 3 человек.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetBuffList(unit, max)
+    initialCode = [=[
+function FindLowestBuffedRaidMember()
+    
+end
 ]=],
-requireKeywords = {
-"GetBuffList",
-"function",
-"UnitBuff",
-"table.insert",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetBuffList) ~= "function" then
-_G.checkError = "GetBuffList не является глобальной функцией"
-return false
-end
-local ok1, playerList = pcall(_G.GetBuffList, "player", 5)
-if not ok1 then
-_G.checkError = "Ошибка вызова GetBuffList('player', 5): " .. tostring(playerList)
-return false
-end
-if type(playerList) ~= "table" then
-_G.checkError = "GetBuffList('player', 5) должна вернуть таблицу"
-return false
-end
-if #playerList > 5 then
-_G.checkError = "Функция не должна возвращать больше баффов, чем max"
-return false
-end
-for i, name in ipairs(playerList) do
-if type(name) ~= "string" or name == "" then
-_G.checkError = "Каждый элемент списка баффов должен быть строкой"
-return false
-end
-end
-local ok2, invalidList = pcall(_G.GetBuffList, "ns_invalid_unit", 5)
-if not ok2 then
-_G.checkError = "Ошибка вызова GetBuffList('ns_invalid_unit', 5): " .. tostring(invalidList)
-return false
-end
-if type(invalidList) ~= "table" or #invalidList ~= 0 then
-_G.checkError = "Для несуществующего юнита функция должна вернуть пустую таблицу"
-return false
-end
-local ok3, badMaxList = pcall(_G.GetBuffList, "player", 0)
-if not ok3 then
-_G.checkError = "Ошибка вызова GetBuffList('player', 0): " .. tostring(badMaxList)
-return false
-end
-if type(badMaxList) ~= "table" or #badMaxList ~= 0 then
-_G.checkError = "Для max = 0 функция должна вернуть пустую таблицу"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "FindLowestBuffedRaidMember",
+        "function",
+        "GetNumRaidMembers",
+        "UnitBuff",
+        "UnitName",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.FindLowestBuffedRaidMember) ~= "function" then
+            return fail("FindLowestBuffedRaidMember не является глобальной функцией")
+        end
+
+        local numRaid = GetNumRaidMembers()
+        if numRaid < 3 then
+            return fail("Нет рейда или мало игроков (" .. numRaid .. "/3). Собери рейд минимум из 3 человек и нажми проверку снова.")
+        end
+
+        local ok, result = pcall(_G.FindLowestBuffedRaidMember)
+
+        if ok then
+            _G.result = result
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова FindLowestBuffedRaidMember: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("Функция должна вернуть строку")
+        end
+
+        local function countBuffs(unit)
+            local n = 0
+            local i = 1
+            while UnitBuff(unit, i) do
+                n = n + 1
+                i = i + 1
+            end
+            return n
+        end
+
+        local minBuffs = math.huge
+        local minName = nil
+        for i = 1, numRaid do
+            local unit = "raid" .. i
+            if UnitExists(unit) then
+                local c = countBuffs(unit)
+                if c < minBuffs then
+                    minBuffs = c
+                    minName = UnitName(unit) or "Unknown"
+                end
+            end
+        end
+
+        if not minName then
+            return fail("В рейде не найдено ни одного существующего участника")
+        end
+
+        local expected = string.format("Имя: %s, Баффов: %d", minName, minBuffs)
+        local name, buffs = result:match("^Имя: (.+), Баффов: (%d+)$")
+
+        if not name then
+            return fail("Строка не похожа на 'Имя: X, Баффов: Y'")
+        end
+
+        if name ~= minName then
+            return fail("Имя не совпадает. Ожидалось: '" .. minName .. "', получено: '" .. name .. "'")
+        end
+        if tonumber(buffs) ~= minBuffs then
+            return fail("Количество баффов не совпадает. Ожидалось: " .. minBuffs .. ", получено: " .. buffs)
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][113] = {
