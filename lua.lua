@@ -13136,213 +13136,520 @@ content = [=[
 }
 
 ns_llua['lua'][114] = {
-type = "vartest",
-title = "Тест 113-1: количество участников группы",
-helpModules = {113},
-tasks = {
-{
-var = "partyCount",
-desc = 'Создай глобальную переменную partyCount = GetNumPartyMembers() or 0',
-check = function(value)
-return type(value) == "number" and value >= 0 and value <= 4
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 113-1: функция GetPartyReport",
+    helpModules = {113, 45, 44, 7, 17},
+    preloadVars = {
+        {var = "GetPartyReport", desc = "GetPartyReport очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 113-1: функция GetPartyReport</h>
+<t>Создай глобальную функцию <k>GetPartyReport()</k>.</t>
+<t>Функция должна собрать отчёт по всем участникам группы и вернуть массив строк.</t>
+<t>Формат каждой строки:</t>
+<s>"Имя: Вася, Уровень: 80, Класс: WARRIOR"</s>
+<t>Перебирай юниты party1, party2, party3, party4.</t>
+<t>Массив должен быть отсортирован по алфавиту имён (от А до Я).</t>
+<t>Несуществующих юнитов пропускай.</t>
+<w>Перед проверкой собери группу минимум из 2 человек.</w>
+]=],
+    initialCode = [=[
+function GetPartyReport()
+    
+end
+]=],
+    requireKeywords = {
+        "GetPartyReport",
+        "function",
+        "for",
+        "UnitExists",
+        "UnitName",
+        "UnitLevel",
+        "UnitClass",
+        "table.sort",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetPartyReport) ~= "function" then
+            return fail("GetPartyReport не является глобальной функцией")
+        end
+
+        local numParty = GetNumPartyMembers()
+        if numParty < 2 then
+            return fail("Нет группы или мало игроков (" .. numParty .. "/2). Собери группу минимум из 2 человек.")
+        end
+
+        local ok, result = pcall(_G.GetPartyReport)
+
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова GetPartyReport: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("GetPartyReport должна вернуть массив (таблицу)")
+        end
+
+        local expected = {}
+        for i = 1, 4 do
+            local unit = "party" .. i
+            if UnitExists(unit) then
+                local name = UnitName(unit) or "Unknown"
+                local level = UnitLevel(unit) or 0
+                local _, classToken = UnitClass(unit)
+                classToken = classToken or "UNKNOWN"
+
+                local line = string.format("Имя: %s, Уровень: %d, Класс: %s", name, level, classToken)
+                table.insert(expected, {name = name, line = line})
+            end
+        end
+
+        table.sort(expected, function(a, b)
+            return a.name < b.name
+        end)
+
+        if #result ~= #expected then
+            return fail("Количество строк не совпадает: ожидалось " .. #expected .. ", получено " .. #result)
+        end
+
+        for i = 1, #expected do
+            if result[i] ~= expected[i].line then
+                return fail("Строка " .. i .. " не совпадает. Ожидалось: '" .. expected[i].line .. "', получено: '" .. tostring(result[i]) .. "'")
+            end
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][115] = {
-type = "vartest",
-title = "Тест 113-2: таблица party-юнитов",
-helpModules = {113, 44},
-tasks = {
-{
-var = "partyUnits",
-desc = 'Создай глобальную таблицу partyUnits = {"party1", "party2", "party3", "party4"}',
-check = function(value)
-return type(value) == "table"
-and #value == 4
-and value[1] == "party1"
-and value[2] == "party2"
-and value[3] == "party3"
-and value[4] == "party4"
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 113-2: функция FilterPartyByLevel",
+    helpModules = {113, 45, 31, 29},
+    preloadVars = {
+        {var = "FilterPartyByLevel", desc = "FilterPartyByLevel очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест 113-2: функция FilterPartyByLevel</h>
+<t>Создай глобальную функцию <k>FilterPartyByLevel(minLevel)</k>.</t>
+<t>Аргумент <k>minLevel</k> — минимальный уровень.</t>
+<t>Функция должна вернуть массив UnitID участников группы (party1-party4), у которых уровень больше или равен <k>minLevel</k>.</t>
+<t>Порядок юнитов в результирующем массиве должен совпадать с порядком в группе.</t>
+<t>Если <k>minLevel</k> не число, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, собирать группу не нужно.</w>
+]=],
+    initialCode = [=[
+function FilterPartyByLevel(minLevel)
+    
+end
+]=],
+    requireKeywords = {
+        "FilterPartyByLevel",
+        "function",
+        "for",
+        "UnitExists",
+        "UnitLevel",
+        "return",
+    },
+
+    mockGlobals = {
+        UnitExists = function(u)
+            local mock = {
+                party1 = true,
+                party2 = true,
+                party3 = true,
+                party4 = false,
+            }
+            return mock[u] == true
+        end,
+        UnitLevel = function(u)
+            local mock = {
+                party1 = 80,
+                party2 = 75,
+                party3 = 60,
+                party4 = 0,
+            }
+            return mock[u] or 0
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.FilterPartyByLevel
+        if type(fn) ~= "function" then
+            return fail("FilterPartyByLevel не является глобальной функцией")
+        end
+
+        local tests = {
+            {minLevel = 70, exp = {"party1", "party2"}},
+            {minLevel = 80, exp = {"party1"}},
+            {minLevel = 50, exp = {"party1", "party2", "party3"}},
+            {minLevel = "bad", exp = {}},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.minLevel)
+
+            _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            if #result ~= #test.exp then
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
+            end
+        end
+
+        return true
+    end,
 }
 
-ns_llua['lua'][116] = {
-type = "commenttest",
-title = "Тест 113-3: функция GetPartyUnitList",
-helpModules = {113, 45},
-preloadVars = {
-{var = "GetPartyUnitList", desc = "GetPartyUnitList очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 113-3: функция GetPartyUnitList</h>
-<t>Создай глобальную функцию <k>GetPartyUnitList()</k>.</t>
-<t>Функция должна вернуть таблицу из четырёх строк:</t>
-<c>"party1"</c>
-<c>"party2"</c>
-<c>"party3"</c>
-<c>"party4"</c>
-<t>Ничего выводить не нужно.</t>
+nns_llua['lua'][116] = {
+    type = "commenttest",
+    title = "Тест 113-3: функция GetPartyLeaderInfo",
+    helpModules = {113, 45, 17, 7},
+    preloadVars = {
+        {var = "GetPartyLeaderInfo", desc = "GetPartyLeaderInfo очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 113-3: функция GetPartyLeaderInfo</h>
+<t>Создай глобальную функцию <k>GetPartyLeaderInfo()</k>.</t>
+<t>Функция должна вернуть информацию о лидере группы в формате:</t>
+<s>"Лидер: Вася, Уровень: 80"</s>
+<t>Если лидера нет или индекс меньше либо равен нулю, вернуть строку:</t>
+<s>"Лидер не найден"</s>
+<w>Перед проверкой собери группу минимум из 2 человек.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetPartyUnitList()
+    initialCode = [=[
+function GetPartyLeaderInfo()
+    
+end
 ]=],
-requireKeywords = {
-"GetPartyUnitList",
-"function",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetPartyUnitList) ~= "function" then
-_G.checkError = "GetPartyUnitList не является глобальной функцией"
-return false
-end
-local ok, list = pcall(_G.GetPartyUnitList)
-if not ok then
-_G.checkError = "Ошибка вызова GetPartyUnitList: " .. tostring(list)
-return false
-end
-if type(list) ~= "table" then
-_G.checkError = "GetPartyUnitList должна вернуть таблицу"
-return false
-end
-if #list ~= 4 then
-_G.checkError = "В таблице должно быть 4 элемента"
-return false
-end
-if list[1] ~= "party1" or list[2] ~= "party2" or list[3] ~= "party3" or list[4] ~= "party4" then
-_G.checkError = "Таблица должна содержать party1, party2, party3, party4"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetPartyLeaderInfo",
+        "function",
+        "GetPartyLeaderIndex",
+        "UnitName",
+        "UnitLevel",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.GetPartyLeaderInfo) ~= "function" then
+            return fail("GetPartyLeaderInfo не является глобальной функцией")
+        end
+
+        local numParty = GetNumPartyMembers()
+        if numParty < 2 then
+            return fail("Нет группы или мало игроков (" .. numParty .. "/2). Собери группу минимум из 2 человек.")
+        end
+
+        local ok, result = pcall(_G.GetPartyLeaderInfo)
+
+        if ok then
+            _G.result = result
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова GetPartyLeaderInfo: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("Функция должна вернуть строку")
+        end
+
+        local leaderIndex = GetPartyLeaderIndex()
+        local expected
+
+        if not leaderIndex or leaderIndex <= 0 then
+            expected = "Лидер не найден"
+        else
+            local unit = "party" .. leaderIndex
+            if UnitExists(unit) then
+                local name = UnitName(unit) or "Unknown"
+                local level = UnitLevel(unit) or 0
+                expected = string.format("Лидер: %s, Уровень: %d", name, level)
+            else
+                expected = "Лидер не найден"
+            end
+        end
+
+        if result ~= expected then
+            return fail("Результат не совпадает. Ожидалось: '" .. expected .. "', получено: '" .. result .. "'")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][117] = {
-type = "commenttest",
-title = "Тест 113-4: функция CountExistingPartyMembers",
-helpModules = {113, 45, 31},
-preloadVars = {
-{var = "CountExistingPartyMembers", desc = "CountExistingPartyMembers очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 113-4: функция CountExistingPartyMembers</h>
-<t>Создай глобальную функцию <k>CountExistingPartyMembers()</k>.</t>
-<t>Функция должна вернуть количество существующих участников группы.</t>
-<t>Проверь юниты:</t>
-<c>"party1"</c>
-<c>"party2"</c>
-<c>"party3"</c>
-<c>"party4"</c>
-<t>Используй цикл и <k>UnitExists</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 113-4: функция GetPartyStats",
+    helpModules = {113, 45, 44, 31},
+    preloadVars = {
+        {var = "GetPartyStats", desc = "GetPartyStats очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 113-4: функция GetPartyStats</h>
+<t>Создай глобальную функцию <k>GetPartyStats()</k>.</t>
+<t>Функция должна вернуть таблицу со статистикой по группе:</t>
+<c>total</c> — общее количество существующих участников.
+<c>avgLevel</c> — средний уровень (округлённый вниз через <k>math.floor</k>).
+<c>minLevel</c> — минимальный уровень.
+<c>maxLevel</c> — максимальный уровень.
+<t>Если в группе нет ни одного существующего участника, вернуть <s>{total = 0, avgLevel = 0, minLevel = 0, maxLevel = 0}</s>.</t>
+<w>Во время проверки система подставит свои тестовые значения, собирать группу не нужно.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию CountExistingPartyMembers()
+    initialCode = [=[
+function GetPartyStats()
+    
+end
 ]=],
-requireKeywords = {
-"CountExistingPartyMembers",
-"function",
-"UnitExists",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.CountExistingPartyMembers) ~= "function" then
-_G.checkError = "CountExistingPartyMembers не является глобальной функцией"
-return false
-end
-local ok, count = pcall(_G.CountExistingPartyMembers)
-if not ok then
-_G.checkError = "Ошибка вызова CountExistingPartyMembers: " .. tostring(count)
-return false
-end
-if type(count) ~= "number" then
-_G.checkError = "Функция должна вернуть число"
-return false
-end
-if count < 0 or count > 4 then
-_G.checkError = "Количество участников группы должно быть от 0 до 4"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "GetPartyStats",
+        "function",
+        "for",
+        "UnitExists",
+        "UnitLevel",
+        "math.floor",
+        "return",
+    },
+
+    mockGlobals = {
+        UnitExists = function(u)
+            local mock = {
+                party1 = true,
+                party2 = true,
+                party3 = true,
+                party4 = false,
+            }
+            return mock[u] == true
+        end,
+        UnitLevel = function(u)
+            local mock = {
+                party1 = 80,
+                party2 = 75,
+                party3 = 60,
+                party4 = 0,
+            }
+            return mock[u] or 0
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.GetPartyStats
+        if type(fn) ~= "function" then
+            return fail("GetPartyStats не является глобальной функцией")
+        end
+
+        local ok, result = pcall(fn)
+
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова GetPartyStats: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("GetPartyStats должна вернуть таблицу")
+        end
+
+        local expected = {
+            total = 3,
+            avgLevel = math.floor((80 + 75 + 60) / 3),
+            minLevel = 60,
+            maxLevel = 80,
+        }
+
+        if result.total ~= expected.total then
+            return fail("total не совпадает: ожидалось " .. expected.total .. ", получено " .. tostring(result.total))
+        end
+        if result.avgLevel ~= expected.avgLevel then
+            return fail("avgLevel не совпадает: ожидалось " .. expected.avgLevel .. ", получено " .. tostring(result.avgLevel))
+        end
+        if result.minLevel ~= expected.minLevel then
+            return fail("minLevel не совпадает: ожидалось " .. expected.minLevel .. ", получено " .. tostring(result.minLevel))
+        end
+        if result.maxLevel ~= expected.maxLevel then
+            return fail("maxLevel не совпадает: ожидалось " .. expected.maxLevel .. ", получено " .. tostring(result.maxLevel))
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][118] = {
-type = "commenttest",
-title = "Тест 113-5: функция GetPartyLeaderUnit",
-helpModules = {113, 45, 17},
-preloadVars = {
-{var = "GetPartyLeaderUnit", desc = "GetPartyLeaderUnit очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 113-5: функция GetPartyLeaderUnit</h>
-<t>Создай глобальную функцию <k>GetPartyLeaderUnit()</k>.</t>
-<t>Функция должна вернуть строку с UnitID лидера группы.</t>
-<t>Используй <k>GetPartyLeaderIndex()</k>.</t>
-<t>Если индекс лидера больше нуля, верни строку вида:</t>
-<s>"party1"</s>
-<s>"party2"</s>
-<s>"party3"</s>
-<s>"party4"</s>
-<t>Если лидера нет или индекс меньше либо равен нулю, верни строку:</t>
-<s>"none"</s>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 113-5: функция ComparePartyMembers",
+    helpModules = {113, 45, 17, 7},
+    preloadVars = {
+        {var = "ComparePartyMembers", desc = "ComparePartyMembers очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 113-5: функция ComparePartyMembers</h>
+<t>Создай глобальную функцию <k>ComparePartyMembers(index1, index2)</k>.</t>
+<t>Аргументы — индексы участников группы (числа от 1 до 4).</t>
+<t>Функция должна вернуть одну строку в формате:</t>
+<s>"party1: Вася (80), party2: Петя (75), Разница: 5"</s>
+<t>Поля строки:</t>
+<c>party1</c> — UnitID первого участника.
+<c>party2</c> — UnitID второго участника.
+<c>Разница</c> — абсолютная разница между уровнями.
+<t>Если один из индексов некорректен (не число, < 1, > 4) или юнит не существует, вернуть строку:</t>
+<s>"Некорректный индекс"</s>
+<w>Перед проверкой собери группу минимум из 2 человек.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetPartyLeaderUnit()
+    initialCode = [=[
+function ComparePartyMembers(index1, index2)
+    
+end
 ]=],
-requireKeywords = {
-"GetPartyLeaderUnit",
-"function",
-"GetPartyLeaderIndex",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetPartyLeaderUnit) ~= "function" then
-_G.checkError = "GetPartyLeaderUnit не является глобальной функцией"
-return false
-end
-local ok, leaderUnit = pcall(_G.GetPartyLeaderUnit)
-if not ok then
-_G.checkError = "Ошибка вызова GetPartyLeaderUnit: " .. tostring(leaderUnit)
-return false
-end
-if type(leaderUnit) ~= "string" then
-_G.checkError = "Функция должна вернуть строку"
-return false
-end
-local valid = {
-none = true,
-party1 = true,
-party2 = true,
-party3 = true,
-party4 = true,
-}
-if not valid[leaderUnit] then
-_G.checkError = "Функция должна вернуть none или party1-party4"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "ComparePartyMembers",
+        "function",
+        "UnitExists",
+        "UnitName",
+        "UnitLevel",
+        "math.abs",
+        "string.format",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.ComparePartyMembers) ~= "function" then
+            return fail("ComparePartyMembers не является глобальной функцией")
+        end
+
+        local numParty = GetNumPartyMembers()
+        if numParty < 2 then
+            return fail("Нет группы или мало игроков (" .. numParty .. "/2). Собери группу минимум из 2 человек.")
+        end
+
+        local ok, result = pcall(_G.ComparePartyMembers, 1, 2)
+
+        if ok then
+            _G.result = result
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            return fail("Ошибка вызова ComparePartyMembers: " .. tostring(result))
+        end
+        if type(result) ~= "string" then
+            return fail("Функция должна вернуть строку")
+        end
+
+        local unit1 = "party1"
+        local unit2 = "party2"
+
+        if not UnitExists(unit1) or not UnitExists(unit2) then
+            return fail("party1 или party2 не существуют. Собери группу минимум из 2 человек.")
+        end
+
+        local name1 = UnitName(unit1) or "Unknown"
+        local level1 = UnitLevel(unit1) or 0
+        local name2 = UnitName(unit2) or "Unknown"
+        local level2 = UnitLevel(unit2) or 0
+        local diff = math.abs(level1 - level2)
+
+        local expected = string.format("party1: %s (%d), party2: %s (%d), Разница: %d",
+            name1, level1, name2, level2, diff)
+
+        if result ~= expected then
+            return fail("Результат не совпадает. Ожидалось: '" .. expected .. "', получено: '" .. result .. "'")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][119] = {
