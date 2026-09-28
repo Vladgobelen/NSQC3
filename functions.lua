@@ -4679,7 +4679,7 @@ local function CreateChatMenuButton(frame)
     if frame.menuButton then return end
     
     -- Кнопка "Общение" - главная
-    local socialBtn = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate")
+    local socialBtn = CreateFrame("Button", nil, frame)
     socialBtn:SetSize(24, 24)
     socialBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 22)
     socialBtn:EnableMouse(true)

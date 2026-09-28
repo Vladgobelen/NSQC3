@@ -13649,269 +13649,583 @@ end
 }
 
 ns_llua['lua'][119] = {
-type = "info",
-title = "Рейд: raid1-raid40",
-helpModules = {113, 71},
-content = [=[
-<h>Рейд: raid1-raid40</h>
-<t>Если игрок находится в рейде, участники доступны через UnitID:</t>
-<c>"raid1"</c>
-<c>"raid2"</c>
-<c>"raid3"</c>
-<c>...</c>
-<c>"raid40"</c>
-<h>Количество участников рейда</h>
+    type = "info",
+    title = "Управление фреймами",
+    helpModules = {101, 45, 44, 31},
+    content = [=[
+<h>Управление фреймами</h>
+<t>В WoW весь интерфейс состоит из фреймов. Фрейм — это прямоугольная область, которая может содержать текстуры, текст, другие фреймы и реагировать на события.</t>
+
+<h>Создание фрейма</h>
 <code>
-/run print(GetNumRaidMembers())
+/run local f = CreateFrame("Frame", "MyTestFrame", UIParent); print(f:GetName())
 </code>
-<t>Если ты не в рейде, функция обычно возвращает <n>0</n>.</t>
-<h>Перебор рейда</h>
+<t>Параметры:</t>
+<c>"Frame"</c> — тип фрейма.
+<c>"MyTestFrame"</c> — глобальное имя (может быть <k>nil</k>).
+<c>UIParent</c> — родительский фрейм.
+
+<h>Размер и положение</h>
 <code>
-/run local count = GetNumRaidMembers() or 0; for i = 1, count do local unit = "raid" .. i; if UnitExists(unit) then print(UnitName(unit)) end end
+/run local f = CreateFrame("Frame", nil, UIParent); f:SetSize(200, 100); f:SetPoint("CENTER")
 </code>
-<t>Здесь строка <s>"raid"</s> склеивается с числом <k>i</k>, получаются <s>"raid1"</s>, <s>"raid2"</s> и так далее.</t>
-<h>GetRaidRosterInfo</h>
-<t>Функция возвращает информацию об участнике рейда по индексу.</t>
+<t><k>SetSize(width, height)</k> — устанавливает размеры.</t>
+<t><k>SetPoint(point, relativeTo, relativePoint, x, y)</k> — устанавливает положение.</t>
+<t>Основные точки: <s>"CENTER"</s>, <s>"TOPLEFT"</s>, <s>"BOTTOMRIGHT"</s> и так далее.</t>
+
+<h>Видимость</h>
 <code>
-/run local name, rank, subgroup, level, class = GetRaidRosterInfo(1); print(name, subgroup, level, class)
+/run MyTestFrame:Show()
+/run MyTestFrame:Hide()
+/run print(MyTestFrame:IsShown())
 </code>
-<t>Если игрок не в рейде или индекс неверный, значения могут быть <k>nil</k>.</t>
-<h>Таблица имён рейда</h>
+
+<h>Текстура фона</h>
 <code>
-/run raidNames = {}; local count = GetNumRaidMembers() or 0; for i = 1, count do local name = GetRaidRosterInfo(i); if name then table.insert(raidNames, name) end end; print("В рейде:", #raidNames)
+/run local f = CreateFrame("Frame", nil, UIParent); f:SetSize(100, 50); f:SetPoint("CENTER"); local t = f:CreateTexture(); t:SetTexture(1, 0, 0, 1); t:SetAllPoints(); f:Show()
 </code>
-<w>Важно:</w> в рейде не нужно использовать <c>"party1"</c> — <c>"party4"</c>. Для рейда используются <c>"raid1"</c> — <c>"raid40"</c>.
-<h>Безопасный шаблон</h>
+<t><k>CreateTexture()</k> — создаёт текстурный слой.</t>
+<t><k>SetTexture(r, g, b, a)</k> — устанавливает цвет (0-1).</t>
+<t><k>SetAllPoints()</k> — растягивает текстуру на весь фрейм.</t>
+
+<h>Текстовая метка</h>
 <code>
-/run local count = GetNumRaidMembers() or 0; if count > 0 then print("Рейд найден") else print("Рейда нет") end
+/run local f = CreateFrame("Frame", nil, UIParent); f:SetSize(200, 50); f:SetPoint("CENTER"); local s = f:CreateFontString(); s:SetFontObject("GameFontNormal"); s:SetText("Привет!"); s:SetPoint("CENTER"); f:Show()
 </code>
+<t><k>CreateFontString()</k> — создаёт текстовый слой.</t>
+<t><k>SetFontObject(name)</k> — устанавливает шрифт.</t>
+<t><k>SetText(text)</k> — устанавливает текст.</t>
+
+<h>Доступ к детям</h>
+<code>
+/run local children = {UIParent:GetChildren()}; print("Детей:", #children)
+</code>
+<t><k>GetChildren()</k> — возвращает все дочерние фреймы.</t>
+<t><k>GetRegions()</k> — возвращает все текстуры и текст внутри фрейма.</t>
+
+<h>Методы получения свойств</h>
+<code>
+/run local w, h = MyTestFrame:GetSize(); print(w, h)
+/run print(MyTestFrame:GetName())
+</code>
+
+<h>Скрипты</h>
+<code>
+/run local f = CreateFrame("Button", nil, UIParent); f:SetSize(100, 30); f:SetPoint("CENTER"); f:SetText("Жми"); f:SetScript("OnClick", function() print("Клик!") end); f:Show()
+</code>
+<t>Тип <s>"Button"</s> позволяет кликать по фрейму.</t>
+<t><k>SetScript(event, function)</k> — привязывает обработчик.</t>
 ]=],
 }
 
 ns_llua['lua'][120] = {
-type = "vartest",
-title = "Тест 119-1: количество участников рейда",
-helpModules = {119, 65},
-tasks = {
-{
-var = "raidCount",
-desc = 'Создай глобальную переменную raidCount = GetNumRaidMembers() or 0',
-check = function(value)
-return type(value) == "number" and value >= 0 and value <= 40
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 119-1: функция CreateBasicFrame",
+    helpModules = {119, 45, 17},
+    preloadVars = {
+        {var = "CreateBasicFrame", desc = "CreateBasicFrame очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 119-1: функция CreateBasicFrame</h>
+<t>Создай глобальную функцию <k>CreateBasicFrame(name, width, height)</k>.</t>
+<t>Функция должна создать и вернуть новый фрейм со следующими свойствами:</t>
+<c>Имя</c> — <k>name</k> (глобальное имя фрейма).
+<c>Родитель</c> — <k>UIParent</k>.
+<c>Размер</c> — <k>width</k> x <k>height</k>.
+<c>Положение</c> — по центру экрана (<s>"CENTER"</s>).
+<c>Видимость</c> — фрейм должен быть показан.
+<t>Если аргументы некорректны (name не строка, width или height не числа или <= 0), вернуть <k>nil</k>.</t>
+]=],
+    initialCode = [=[
+function CreateBasicFrame(name, width, height)
+    
+end
+]=],
+    requireKeywords = {
+        "CreateBasicFrame",
+        "function",
+        "CreateFrame",
+        "SetSize",
+        "SetPoint",
+        "Show",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.CreateBasicFrame) ~= "function" then
+            return fail("CreateBasicFrame не является глобальной функцией")
+        end
+
+        local testName = "LUA_TEST_FRAME_120_" .. math.random(100000, 999999)
+
+        local ok, result = pcall(_G.CreateBasicFrame, testName, 250, 150)
+
+        if ok then
+            _G.result = tostring(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+            return fail("Ошибка вызова CreateBasicFrame: " .. tostring(result))
+        end
+
+        if not result or type(result) ~= "table" then
+            return fail("CreateBasicFrame должен вернуть фрейм (таблицу), получено " .. type(result))
+        end
+
+        if result:GetName() ~= testName then
+            return fail("Имя фрейма не совпадает: ожидалось '" .. testName .. "', получено '" .. tostring(result:GetName()) .. "'")
+        end
+
+        local w, h = result:GetSize()
+        if math.abs(w - 250) > 0.01 or math.abs(h - 150) > 0.01 then
+            return fail("Размер не совпадает: ожидалось 250x150, получено " .. w .. "x" .. h)
+        end
+
+        if not result:IsShown() then
+            return fail("Фрейм должен быть показан (Show)")
+        end
+
+        local ok2, badResult = pcall(_G.CreateBasicFrame, "bad", -10, 50)
+        if ok2 and badResult ~= nil then
+            return fail("Для некорректных аргументов функция должна вернуть nil")
+        end
+
+        result:Hide()
+        return true
+    end,
 }
 
 ns_llua['lua'][121] = {
-type = "vartest",
-title = "Тест 119-2: строки raid-юнитов",
-helpModules = {119, 71},
-tasks = {
-{
-var = "raidUnitPrefix",
-desc = 'Создай глобальную переменную raidUnitPrefix = "raid"',
-check = function(value)
-return value == "raid"
-end,
-},
-{
-var = "raidUnit1",
-desc = 'Создай глобальную переменную raidUnit1 = "raid1"',
-check = function(value)
-return value == "raid1"
-end,
-},
-{
-var = "raidUnit40",
-desc = 'Создай глобальную переменную raidUnit40 = "raid40"',
-check = function(value)
-return value == "raid40"
-end,
-},
-},
+    type = "commenttest",
+    title = "Тест 119-2: функция CreateLabeledFrame",
+    helpModules = {119, 45, 17},
+    preloadVars = {
+        {var = "CreateLabeledFrame", desc = "CreateLabeledFrame очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 119-2: функция CreateLabeledFrame</h>
+<t>Создай глобальную функцию <k>CreateLabeledFrame(name, width, height, labelText)</k>.</t>
+<t>Функция должна создать фрейм с текстовым заголовком внутри и вернуть его.</t>
+<t>Свойства фрейма:</t>
+<c>Имя</c> — <k>name</k>.
+<c>Родитель</c> — <k>UIParent</k>.
+<c>Размер</c> — <k>width</k> x <k>height</k>.
+<c>Положение</c> — по центру.
+<c>Видимость</c> — показан.
+<t>Свойства заголовка (FontString):</t>
+<c>Текст</c> — <k>labelText</k>.
+<c>Шрифт</c> — <s>"GameFontNormal"</s>.
+<c>Положение</c> — по центру фрейма.
+]=],
+    initialCode = [=[
+function CreateLabeledFrame(name, width, height, labelText)
+    
+end
+]=],
+    requireKeywords = {
+        "CreateLabeledFrame",
+        "function",
+        "CreateFrame",
+        "CreateFontString",
+        "SetFontObject",
+        "SetText",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.CreateLabeledFrame) ~= "function" then
+            return fail("CreateLabeledFrame не является глобальной функцией")
+        end
+
+        local testName = "LUA_TEST_LABELED_" .. math.random(100000, 999999)
+        local testLabel = "Тестовая метка"
+
+        local ok, result = pcall(_G.CreateLabeledFrame, testName, 300, 100, testLabel)
+
+        if ok then
+            _G.result = tostring(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+            return fail("Ошибка вызова: " .. tostring(result))
+        end
+
+        if not result or type(result) ~= "table" then
+            return fail("Функция должна вернуть фрейм")
+        end
+
+        local w, h = result:GetSize()
+        if math.abs(w - 300) > 0.01 or math.abs(h - 100) > 0.01 then
+            return fail("Размер не совпадает: ожидалось 300x100, получено " .. w .. "x" .. h)
+        end
+
+        if not result:IsShown() then
+            return fail("Фрейм должен быть показан")
+        end
+
+        local foundLabel = false
+        local regions = {result:GetRegions()}
+        for _, region in ipairs(regions) do
+            if region.GetText and region:GetText() == testLabel then
+                foundLabel = true
+                break
+            end
+        end
+
+        if not foundLabel then
+            return fail("Внутри фрейма не найдена метка с текстом '" .. testLabel .. "'")
+        end
+
+        result:Hide()
+        return true
+    end,
 }
 
 ns_llua['lua'][122] = {
-type = "commenttest",
-title = "Тест 119-3: функция GetRaidUnit",
-helpModules = {119, 45, 17},
-preloadVars = {
-{var = "GetRaidUnit", desc = "GetRaidUnit очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 119-3: функция GetRaidUnit</h>
-<t>Создай глобальную функцию <k>GetRaidUnit(index)</k>.</t>
-<t>Если <k>index</k> — целое число от 1 до 40, функция должна вернуть строку вида:</t>
-<s>"raid1"</s>
-<s>"raid2"</s>
-<s>"raid40"</s>
-<t>Во всех остальных случаях функция должна вернуть строку:</t>
-<s>"invalid"</s>
-<t>Используй:</t>
-<c>type</c>
-<c>math.floor</c>
-<c>конкатенацию</c>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 119-3: функция ApplyStyle",
+    helpModules = {119, 45, 31, 44},
+    preloadVars = {
+        {var = "ApplyStyle", desc = "ApplyStyle очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3"},
+    instruction = [=[
+<h>Тест 119-3: функция ApplyStyle</h>
+<t>Создай глобальную функцию <k>ApplyStyle(frame, style)</k>.</t>
+<t>Аргумент <k>frame</k> — фрейм, <k>style</k> — таблица со свойствами.</t>
+<t>Функция должна применить стиль к фрейму и вернуть <k>true</k>.</t>
+<t>Поддерживаемые поля стиля:</t>
+<c>width</c>, <c>height</c> — установить размер через <k>SetSize</k>.
+<c>visible</c> — показать (<k>true</k>) или скрыть (<k>false</k>) через <k>Show</k>/<k>Hide</k>.
+<t>Поля, которых нет в <k>style</k>, трогать не нужно.</t>
+<t>Если <k>frame</k> не таблица или <k>style</k> не таблица, вернуть <k>false</k>.</t>
+<w>Во время проверки система подставит свои тестовые фреймы и стили.</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetRaidUnit(index)
+    initialCode = [=[
+function ApplyStyle(frame, style)
+    
+end
 ]=],
-requireKeywords = {
-"GetRaidUnit",
-"function",
-"type",
-"math.floor",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetRaidUnit) ~= "function" then
-_G.checkError = "GetRaidUnit не является глобальной функцией"
-return false
-end
-local tests = {
-{input = 1, expected = "raid1"},
-{input = 40, expected = "raid40"},
-{input = 0, expected = "invalid"},
-{input = 41, expected = "invalid"},
-{input = "bad", expected = "invalid"},
-{input = 1.5, expected = "invalid"},
-}
-for i, test in ipairs(tests) do
-local ok, result = pcall(_G.GetRaidUnit, test.input)
-if not ok or result ~= test.expected then
-_G.checkError = "Тест " .. i .. " функции GetRaidUnit не пройден"
-return false
-end
-end
-return true
-end,
+    requireKeywords = {
+        "ApplyStyle",
+        "function",
+        "type",
+        "return",
+    },
+
+    mockGlobals = {},
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 3 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.ApplyStyle
+        if type(fn) ~= "function" then
+            return fail("ApplyStyle не является глобальной функцией")
+        end
+
+        local function makeMockFrame()
+            local frame = {
+                _size = {0, 0},
+                _shown = false,
+                SetSize = function(self, w, h)
+                    self._size = {w, h}
+                end,
+                Show = function(self) self._shown = true end,
+                Hide = function(self) self._shown = false end,
+            }
+            return frame
+        end
+
+        local tests = {
+            {
+                style = {width = 200, height = 100, visible = true},
+                check = function(f)
+                    local w, h = f._size[1], f._size[2]
+                    return w == 200 and h == 100 and f._shown == true
+                end,
+                desc = "Размер + показать",
+            },
+            {
+                style = {visible = false},
+                check = function(f)
+                    return f._shown == false
+                end,
+                desc = "Только скрыть",
+            },
+            {
+                style = {width = 50},
+                check = function(f)
+                    return f._size[1] == 50
+                end,
+                desc = "Только ширина",
+            },
+        }
+
+        for i, test in ipairs(tests) do
+            local frame = makeMockFrame()
+            local ok, result = pcall(fn, frame, test.style)
+
+            _G["test" .. i] = test.desc .. " | Результат: " .. tostring(result)
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if result ~= true then
+                return fail("Тест " .. i .. ": функция должна вернуть true")
+            end
+
+            if not test.check(frame) then
+                return fail("Тест " .. i .. " не пройден: стиль не применён корректно")
+            end
+        end
+
+        local badOk, badResult = pcall(fn, "not_a_frame", {})
+        if badOk and badResult ~= false then
+            return fail("Для не-фрейма функция должна вернуть false")
+        end
+
+        return true
+    end,
 }
 
 ns_llua['lua'][123] = {
-type = "commenttest",
-title = "Тест 119-4: функция CountExistingRaidMembers",
-helpModules = {119, 45, 31},
-preloadVars = {
-{var = "CountExistingRaidMembers", desc = "CountExistingRaidMembers очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 119-4: функция CountExistingRaidMembers</h>
-<t>Создай глобальную функцию <k>CountExistingRaidMembers()</k>.</t>
-<t>Функция должна вернуть количество существующих участников рейда.</t>
-<t>Проверь юниты от <c>"raid1"</c> до <c>"raid40"</c>.</t>
-<t>Используй цикл и <k>UnitExists</k>.</t>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 119-4: функция FindVisibleChildren",
+    helpModules = {119, 45, 31, 29},
+    preloadVars = {
+        {var = "FindVisibleChildren", desc = "FindVisibleChildren очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 119-4: функция FindVisibleChildren</h>
+<t>Создай глобальную функцию <k>FindVisibleChildren(parent)</k>.</t>
+<t>Функция должна вернуть массив всех видимых дочерних фреймов переданного родителя.</t>
+<t>Видимость определяется через метод <k>IsShown()</k>.</t>
+<t>Порядок фреймов в результате должен совпадать с порядком, в котором их вернул <k>GetChildren()</k>.</t>
+<t>Если <k>parent</k> не таблица или не имеет метода <k>GetChildren</k>, вернуть пустой массив.</t>
+<w>Во время проверки система создаст временного родителя с несколькими детьми (часть видимых, часть скрытых).</w>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию CountExistingRaidMembers()
+    initialCode = [=[
+function FindVisibleChildren(parent)
+    
+end
 ]=],
-requireKeywords = {
-"CountExistingRaidMembers",
-"function",
-"UnitExists",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.CountExistingRaidMembers) ~= "function" then
-_G.checkError = "CountExistingRaidMembers не является глобальной функцией"
-return false
-end
-local ok, count = pcall(_G.CountExistingRaidMembers)
-if not ok then
-_G.checkError = "Ошибка вызова CountExistingRaidMembers: " .. tostring(count)
-return false
-end
-if type(count) ~= "number" then
-_G.checkError = "Функция должна вернуть число"
-return false
-end
-if count < 0 or count > 40 then
-_G.checkError = "Количество участников рейда должно быть от 0 до 40"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "FindVisibleChildren",
+        "function",
+        "GetChildren",
+        "IsShown",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.FindVisibleChildren) ~= "function" then
+            return fail("FindVisibleChildren не является глобальной функцией")
+        end
+
+        local testParent = CreateFrame("Frame", nil, UIParent)
+        local visible1 = CreateFrame("Frame", nil, testParent)
+        local hidden1 = CreateFrame("Frame", nil, testParent)
+        local visible2 = CreateFrame("Frame", nil, testParent)
+        local hidden2 = CreateFrame("Frame", nil, testParent)
+        local visible3 = CreateFrame("Frame", nil, testParent)
+
+        visible1:SetSize(10, 10)
+        hidden1:SetSize(10, 10)
+        visible2:SetSize(10, 10)
+        hidden2:SetSize(10, 10)
+        visible3:SetSize(10, 10)
+
+        visible1:Show()
+        hidden1:Hide()
+        visible2:Show()
+        hidden2:Hide()
+        visible3:Show()
+
+        local ok, result = pcall(_G.FindVisibleChildren, testParent)
+
+        if ok and type(result) == "table" then
+            _G.result = "Найдено фреймов: " .. #result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+        end
+
+        if not ok then
+            testParent:Hide()
+            return fail("Ошибка вызова FindVisibleChildren: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            testParent:Hide()
+            return fail("Функция должна вернуть таблицу")
+        end
+
+        local expected = {visible1, visible2, visible3}
+        if #result ~= #expected then
+            testParent:Hide()
+            return fail("Ожидалось " .. #expected .. " видимых фреймов, получено " .. #result)
+        end
+
+        for i, expFrame in ipairs(expected) do
+            if result[i] ~= expFrame then
+                testParent:Hide()
+                return fail("Элемент " .. i .. " не совпадает")
+            end
+        end
+
+        local badOk, badResult = pcall(_G.FindVisibleChildren, "not_a_frame")
+        if badOk and (type(badResult) ~= "table" or #badResult ~= 0) then
+            testParent:Hide()
+            return fail("Для не-фрейма функция должна вернуть пустой массив")
+        end
+
+        testParent:Hide()
+        return true
+    end,
 }
 
 ns_llua['lua'][124] = {
-type = "commenttest",
-title = "Тест 119-5: функция GetRaidMemberName",
-helpModules = {119, 65, 77},
-preloadVars = {
-{var = "GetRaidMemberName", desc = "GetRaidMemberName очищается перед проверкой"},
-{var = "checkError", desc = "checkError очищается перед проверкой"},
-},
-reportVars = {
-"checkError",
-},
-instruction = [=[
-<h>Тест 119-5: функция GetRaidMemberName</h>
-<t>Создай глобальную функцию <k>GetRaidMemberName(index)</k>.</t>
-<t>Если <k>index</k> не является целым числом от 1 до 40, функция должна вернуть строку:</t>
-<s>"Нет участника"</s>
-<t>Иначе функция должна вернуть имя участника рейда через:</t>
-<code>
-UnitName("raid" .. index)
-</code>
-<t>Если имени нет, функция должна вернуть строку:</t>
-<s>"Нет участника"</s>
-<t>Используй:</t>
-<c>type</c>
-<c>math.floor</c>
-<c>UnitName</c>
-<c>or</c>
-<t>Ничего выводить не нужно.</t>
+    type = "commenttest",
+    title = "Тест 119-5: функция CreateFrameRow",
+    helpModules = {119, 45, 31, 44},
+    preloadVars = {
+        {var = "CreateFrameRow", desc = "CreateFrameRow очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "result", desc = "result очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "result"},
+    instruction = [=[
+<h>Тест 119-5: функция CreateFrameRow</h>
+<t>Создай глобальную функцию <k>CreateFrameRow(parent, count, frameWidth, frameHeight, spacing)</k>.</t>
+<t>Функция должна создать ряд из <k>count</k> одинаковых фреймов внутри <k>parent</k> и вернуть массив созданных фреймов.</t>
+<t>Свойства каждого фрейма:</t>
+<c>Размер</c> — <k>frameWidth</k> x <k>frameHeight</k>.
+<c>Родитель</c> — <k>parent</k>.
+<c>Положение</c> — первый фрейм прижат к левому краю родителя (<s>"LEFT"</s>), каждый следующий расположен справа от предыдущего с отступом <k>spacing</k>.
+<c>Видимость</c> — все фреймы показаны.
+<t>Если <k>count</k> не число или <= 0, вернуть пустой массив.</t>
 ]=],
-initialCode = [=[
--- Создай глобальную функцию GetRaidMemberName(index)
+    initialCode = [=[
+function CreateFrameRow(parent, count, frameWidth, frameHeight, spacing)
+    
+end
 ]=],
-requireKeywords = {
-"GetRaidMemberName",
-"function",
-"type",
-"math.floor",
-"UnitName",
-"or",
-"return",
-},
-checkCode = function()
-_G.checkError = nil
-if type(_G.GetRaidMemberName) ~= "function" then
-_G.checkError = "GetRaidMemberName не является глобальной функцией"
-return false
-end
-local ok1, invalid1 = pcall(_G.GetRaidMemberName, 0)
-if not ok1 or invalid1 ~= "Нет участника" then
-_G.checkError = "Для index = 0 функция должна вернуть 'Нет участника'"
-return false
-end
-local ok2, invalid2 = pcall(_G.GetRaidMemberName, 41)
-if not ok2 or invalid2 ~= "Нет участника" then
-_G.checkError = "Для index = 41 функция должна вернуть 'Нет участника'"
-return false
-end
-local ok3, first = pcall(_G.GetRaidMemberName, 1)
-if not ok3 then
-_G.checkError = "Ошибка вызова GetRaidMemberName(1): " .. tostring(first)
-return false
-end
-if type(first) ~= "string" or first == "" then
-_G.checkError = "Для index = 1 функция должна вернуть строку"
-return false
-end
-return true
-end,
+    requireKeywords = {
+        "CreateFrameRow",
+        "function",
+        "CreateFrame",
+        "SetSize",
+        "SetPoint",
+        "for",
+        "return",
+    },
+    checkCode = function()
+        _G.checkError = nil
+        _G.result = nil
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
+        end
+
+        if type(_G.CreateFrameRow) ~= "function" then
+            return fail("CreateFrameRow не является глобальной функцией")
+        end
+
+        local testParent = CreateFrame("Frame", nil, UIParent)
+        testParent:SetSize(1000, 100)
+        testParent:SetPoint("CENTER")
+
+        local ok, result = pcall(_G.CreateFrameRow, testParent, 4, 50, 50, 10)
+
+        if ok and type(result) == "table" then
+            _G.result = "Создано фреймов: " .. #result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
+        else
+            _G.result = "ОШИБКА: " .. tostring(result)
+            testParent:Hide()
+            return fail("Ошибка вызова: " .. tostring(result))
+        end
+
+        if type(result) ~= "table" then
+            testParent:Hide()
+            return fail("Функция должна вернуть таблицу")
+        end
+
+        if #result ~= 4 then
+            testParent:Hide()
+            return fail("Ожидалось 4 фрейма, получено " .. #result)
+        end
+
+        for i, frame in ipairs(result) do
+            if type(frame) ~= "table" or not frame.GetSize then
+                testParent:Hide()
+                return fail("Элемент " .. i .. " не является фреймом")
+            end
+            local w, h = frame:GetSize()
+            if math.abs(w - 50) > 0.01 or math.abs(h - 50) > 0.01 then
+                testParent:Hide()
+                return fail("Фрейм " .. i .. " имеет неверный размер: " .. w .. "x" .. h)
+            end
+            if not frame:IsShown() then
+                testParent:Hide()
+                return fail("Фрейм " .. i .. " должен быть показан")
+            end
+        end
+
+        local badOk, badResult = pcall(_G.CreateFrameRow, testParent, 0, 50, 50, 10)
+        if badOk and (type(badResult) ~= "table" or #badResult ~= 0) then
+            testParent:Hide()
+            return fail("Для count = 0 функция должна вернуть пустой массив")
+        end
+
+        testParent:Hide()
+        return true
+    end,
 }
 
 ns_llua['lua'][125] = {
