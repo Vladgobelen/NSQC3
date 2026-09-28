@@ -13365,8 +13365,6 @@ ns_llua['lua'][116] = {
 <t>Создай глобальную функцию <k>GetPartyLeaderInfo()</k>.</t>
 <t>Функция должна вернуть информацию о лидере группы в формате:</t>
 <s>"Лидер: Вася, Уровень: 80"</s>
-<t>Если лидера нет или индекс меньше либо равен нулю, вернуть строку:</t>
-<s>"Лидер не найден"</s>
 <w>Перед проверкой собери группу минимум из 2 человек.</w>
 ]=],
     initialCode = [=[
@@ -13417,20 +13415,23 @@ end
         end
 
         local leaderIndex = GetPartyLeaderIndex()
-        local expected
-
-        if not leaderIndex or leaderIndex <= 0 then
-            expected = "Лидер не найден"
-        else
-            local unit = "party" .. leaderIndex
-            if UnitExists(unit) then
-                local name = UnitName(unit) or "Unknown"
-                local level = UnitLevel(unit) or 0
-                expected = string.format("Лидер: %s, Уровень: %d", name, level)
-            else
-                expected = "Лидер не найден"
-            end
+        local unit
+        
+        -- Лидер может быть самим игроком (индекс 0 в некоторых версиях API)
+        -- или одним из party1-party4
+        if leaderIndex and leaderIndex > 0 and leaderIndex <= 4 then
+            unit = "party" .. leaderIndex
+        elseif leaderIndex == 0 then
+            unit = "player"
         end
+        
+        if not unit or not UnitExists(unit) then
+            return fail("Не удалось определить лидера группы")
+        end
+        
+        local name = UnitName(unit) or "Unknown"
+        local level = UnitLevel(unit) or 0
+        local expected = string.format("Лидер: %s, Уровень: %d", name, level)
 
         if result ~= expected then
             return fail("Результат не совпадает. Ожидалось: '" .. expected .. "', получено: '" .. result .. "'")
@@ -13576,8 +13577,6 @@ ns_llua['lua'][118] = {
 <c>party1</c> — UnitID первого участника.
 <c>party2</c> — UnitID второго участника.
 <c>Разница</c> — абсолютная разница между уровнями.
-<t>Если один из индексов некорректен (не число, < 1, > 4) или юнит не существует, вернуть строку:</t>
-<s>"Некорректный индекс"</s>
 <w>Перед проверкой собери группу минимум из 2 человек.</w>
 ]=],
     initialCode = [=[
@@ -13588,11 +13587,8 @@ end
     requireKeywords = {
         "ComparePartyMembers",
         "function",
-        "UnitExists",
         "UnitName",
         "UnitLevel",
-        "math.abs",
-        "string.format",
         "return",
     },
     checkCode = function()
@@ -13613,6 +13609,13 @@ end
             return fail("Нет группы или мало игроков (" .. numParty .. "/2). Собери группу минимум из 2 человек.")
         end
 
+        local unit1 = "party1"
+        local unit2 = "party2"
+
+        if not UnitExists(unit1) or not UnitExists(unit2) then
+            return fail("party1 или party2 не существуют. Собери группу минимум из 2 человек.")
+        end
+
         local ok, result = pcall(_G.ComparePartyMembers, 1, 2)
 
         if ok then
@@ -13626,13 +13629,6 @@ end
         end
         if type(result) ~= "string" then
             return fail("Функция должна вернуть строку")
-        end
-
-        local unit1 = "party1"
-        local unit2 = "party2"
-
-        if not UnitExists(unit1) or not UnitExists(unit2) then
-            return fail("party1 или party2 не существуют. Собери группу минимум из 2 человек.")
         end
 
         local name1 = UnitName(unit1) or "Unknown"
