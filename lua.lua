@@ -13350,7 +13350,7 @@ end
     end,
 }
 
-nns_llua['lua'][116] = {
+ns_llua['lua'][116] = {
     type = "commenttest",
     title = "Тест 113-3: функция GetPartyLeaderInfo",
     helpModules = {113, 45, 17, 7},
