@@ -13649,108 +13649,34 @@ end
 }
 
 ns_llua['lua'][119] = {
-    type = "info",
-    title = "Управление фреймами",
-    helpModules = {101, 45, 44, 31},
-    content = [=[
-<h>Управление фреймами</h>
-<t>В WoW весь интерфейс состоит из фреймов. Фрейм — это прямоугольная область, которая может содержать текстуры, текст, другие фреймы и реагировать на события.</t>
-
-<h>Создание фрейма</h>
-<code>
-/run local f = CreateFrame("Frame", "MyTestFrame", UIParent); print(f:GetName())
-</code>
-<t>Параметры:</t>
-<c>"Frame"</c> — тип фрейма.
-<c>"MyTestFrame"</c> — глобальное имя (может быть <k>nil</k>).
-<c>UIParent</c> — родительский фрейм.
-
-<h>Размер и положение</h>
-<code>
-/run local f = CreateFrame("Frame", nil, UIParent); f:SetSize(200, 100); f:SetPoint("CENTER")
-</code>
-<t><k>SetSize(width, height)</k> — устанавливает размеры.</t>
-<t><k>SetPoint(point, relativeTo, relativePoint, x, y)</k> — устанавливает положение.</t>
-<t>Основные точки: <s>"CENTER"</s>, <s>"TOPLEFT"</s>, <s>"BOTTOMRIGHT"</s> и так далее.</t>
-
-<h>Видимость</h>
-<code>
-/run MyTestFrame:Show()
-/run MyTestFrame:Hide()
-/run print(MyTestFrame:IsShown())
-</code>
-
-<h>Текстура фона</h>
-<code>
-/run local f = CreateFrame("Frame", nil, UIParent); f:SetSize(100, 50); f:SetPoint("CENTER"); local t = f:CreateTexture(); t:SetTexture(1, 0, 0, 1); t:SetAllPoints(); f:Show()
-</code>
-<t><k>CreateTexture()</k> — создаёт текстурный слой.</t>
-<t><k>SetTexture(r, g, b, a)</k> — устанавливает цвет (0-1).</t>
-<t><k>SetAllPoints()</k> — растягивает текстуру на весь фрейм.</t>
-
-<h>Текстовая метка</h>
-<code>
-/run local f = CreateFrame("Frame", nil, UIParent); f:SetSize(200, 50); f:SetPoint("CENTER"); local s = f:CreateFontString(); s:SetFontObject("GameFontNormal"); s:SetText("Привет!"); s:SetPoint("CENTER"); f:Show()
-</code>
-<t><k>CreateFontString()</k> — создаёт текстовый слой.</t>
-<t><k>SetFontObject(name)</k> — устанавливает шрифт.</t>
-<t><k>SetText(text)</k> — устанавливает текст.</t>
-
-<h>Доступ к детям</h>
-<code>
-/run local children = {UIParent:GetChildren()}; print("Детей:", #children)
-</code>
-<t><k>GetChildren()</k> — возвращает все дочерние фреймы.</t>
-<t><k>GetRegions()</k> — возвращает все текстуры и текст внутри фрейма.</t>
-
-<h>Методы получения свойств</h>
-<code>
-/run local w, h = MyTestFrame:GetSize(); print(w, h)
-/run print(MyTestFrame:GetName())
-</code>
-
-<h>Скрипты</h>
-<code>
-/run local f = CreateFrame("Button", nil, UIParent); f:SetSize(100, 30); f:SetPoint("CENTER"); f:SetText("Жми"); f:SetScript("OnClick", function() print("Клик!") end); f:Show()
-</code>
-<t>Тип <s>"Button"</s> позволяет кликать по фрейму.</t>
-<t><k>SetScript(event, function)</k> — привязывает обработчик.</t>
-]=],
-}
-
-ns_llua['lua'][120] = {
     type = "commenttest",
-    title = "Тест 119-1: функция CreateBasicFrame",
-    helpModules = {119, 45, 17},
+    title = "Тест: функция GetPartyClassSummary",
+    helpModules = {101, 113, 45, 44},
     preloadVars = {
-        {var = "CreateBasicFrame", desc = "CreateBasicFrame очищается перед проверкой"},
+        {var = "GetPartyClassSummary", desc = "GetPartyClassSummary очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
         {var = "result", desc = "result очищается перед проверкой"},
     },
     reportVars = {"checkError", "result"},
     instruction = [=[
-<h>Тест 119-1: функция CreateBasicFrame</h>
-<t>Создай глобальную функцию <k>CreateBasicFrame(name, width, height)</k>.</t>
-<t>Функция должна создать и вернуть новый фрейм со следующими свойствами:</t>
-<c>Имя</c> — <k>name</k> (глобальное имя фрейма).
-<c>Родитель</c> — <k>UIParent</k>.
-<c>Размер</c> — <k>width</k> x <k>height</k>.
-<c>Положение</c> — по центру экрана (<s>"CENTER"</s>).
-<c>Видимость</c> — фрейм должен быть показан.
-<t>Если аргументы некорректны (name не строка, width или height не числа или <= 0), вернуть <k>nil</k>.</t>
+<h>Тест: функция GetPartyClassSummary</h>
+<t>Создай глобальную функцию <k>GetPartyClassSummary()</k>.</t>
+<t>Функция должна собрать статистику по участникам группы и вернуть таблицу, где ключи — токены классов, а значения — количество участников этого класса.</t>
+<t>Пример результата:</t>
+<code>{MAGE = 2, WARRIOR = 1, PRIEST = 1}</code>
+<w>Перед проверкой собери группу минимум из 2 человек.</w>
 ]=],
     initialCode = [=[
-function CreateBasicFrame(name, width, height)
+function GetPartyClassSummary()
     
 end
 ]=],
     requireKeywords = {
-        "CreateBasicFrame",
+        "GetPartyClassSummary",
         "function",
-        "CreateFrame",
-        "SetSize",
-        "SetPoint",
-        "Show",
+        "GetNumPartyMembers",
+        "for",
+        "UnitClass",
         "return",
     },
     checkCode = function()
@@ -13762,85 +13688,195 @@ end
             return msg
         end
 
-        if type(_G.CreateBasicFrame) ~= "function" then
-            return fail("CreateBasicFrame не является глобальной функцией")
+        if type(_G.GetPartyClassSummary) ~= "function" then
+            return fail("GetPartyClassSummary не является глобальной функцией")
         end
 
-        local testName = "LUA_TEST_FRAME_120_" .. math.random(100000, 999999)
+        local numParty = GetNumPartyMembers()
+        if numParty < 2 then
+            return fail("Нет группы или мало игроков (" .. numParty .. "/2). Собери группу минимум из 2 человек.")
+        end
 
-        local ok, result = pcall(_G.CreateBasicFrame, testName, 250, 150)
+        local ok, result = pcall(_G.GetPartyClassSummary)
 
-        if ok then
-            _G.result = tostring(result)
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
         else
             _G.result = "ОШИБКА: " .. tostring(result)
-            return fail("Ошибка вызова CreateBasicFrame: " .. tostring(result))
         end
 
-        if not result or type(result) ~= "table" then
-            return fail("CreateBasicFrame должен вернуть фрейм (таблицу), получено " .. type(result))
+        if not ok then
+            return fail("Ошибка вызова GetPartyClassSummary: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("GetPartyClassSummary должна вернуть таблицу")
         end
 
-        if result:GetName() ~= testName then
-            return fail("Имя фрейма не совпадает: ожидалось '" .. testName .. "', получено '" .. tostring(result:GetName()) .. "'")
+        local expected = {}
+        for i = 1, numParty do
+            local unit = "party" .. i
+            local _, classToken = UnitClass(unit)
+            expected[classToken] = (expected[classToken] or 0) + 1
         end
 
-        local w, h = result:GetSize()
-        if math.abs(w - 250) > 0.01 or math.abs(h - 150) > 0.01 then
-            return fail("Размер не совпадает: ожидалось 250x150, получено " .. w .. "x" .. h)
+        local expectedCount = 0
+        for _ in pairs(expected) do expectedCount = expectedCount + 1 end
+
+        local resultCount = 0
+        for _ in pairs(result) do resultCount = resultCount + 1 end
+
+        if resultCount ~= expectedCount then
+            return fail("Количество классов не совпадает: ожидалось " .. expectedCount .. ", получено " .. resultCount)
         end
 
-        if not result:IsShown() then
-            return fail("Фрейм должен быть показан (Show)")
+        for classToken, count in pairs(expected) do
+            if result[classToken] ~= count then
+                return fail("Для класса " .. classToken .. " ожидалось " .. count .. ", получено " .. tostring(result[classToken]))
+            end
         end
 
-        local ok2, badResult = pcall(_G.CreateBasicFrame, "bad", -10, 50)
-        if ok2 and badResult ~= nil then
-            return fail("Для некорректных аргументов функция должна вернуть nil")
+        return true
+    end,
+}
+
+ns_llua['lua'][120] = {
+    type = "commenttest",
+    title = "Тест: функция FindDebuffedUnits",
+    helpModules = {107, 45, 31, 29},
+    preloadVars = {
+        {var = "FindDebuffedUnits", desc = "FindDebuffedUnits очищается перед проверкой"},
+        {var = "checkError", desc = "checkError очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
+        {var = "test4", desc = "test4 очищается перед проверкой"},
+    },
+    reportVars = {"checkError", "test1", "test2", "test3", "test4"},
+    instruction = [=[
+<h>Тест: функция FindDebuffedUnits</h>
+<t>Создай глобальную функцию <k>FindDebuffedUnits(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна вернуть новый массив, содержащий только тех юнитов, у которых есть хотя бы один дебафф.</t>
+<t>Порядок юнитов в результирующем массиве должен совпадать с исходным.</t>
+<t>Если аргумент не таблица, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
+]=],
+    initialCode = [=[
+function FindDebuffedUnits(units)
+    
+end
+]=],
+    requireKeywords = {
+        "FindDebuffedUnits",
+        "function",
+        "for",
+        "UnitDebuff",
+        "return",
+    },
+
+    mockGlobals = {
+        UnitDebuff = function(u, i)
+            local mock = {
+                debuff1 = {"Яд"},
+                debuff2 = {"Замедление", "Боль"},
+                clean = {},
+                missing = {},
+            }
+            local list = mock[u] or {}
+            if not list[i] then return nil end
+            return list[i]
+        end,
+    },
+
+    checkCode = function(env)
+        _G.checkError = nil
+        for i = 1, 4 do _G["test" .. i] = nil end
+
+        local function fail(msg)
+            _G.checkError = msg
+            return msg
         end
 
-        result:Hide()
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
+        end
+
+        local fn = env.FindDebuffedUnits
+        if type(fn) ~= "function" then
+            return fail("FindDebuffedUnits не является глобальной функцией")
+        end
+
+        local tests = {
+            {input = {"debuff1", "clean", "debuff2"}, exp = {"debuff1", "debuff2"}},
+            {input = {"clean", "clean"}, exp = {}},
+            {input = {"debuff1", "debuff2"}, exp = {"debuff1", "debuff2"}},
+            {input = "bad", exp = {}},
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.input)
+
+            _G["test" .. i] = "Получено: {" .. table.concat(result or {}, ", ") .. "} | Ожидалось: {" .. table.concat(test.exp, ", ") .. "}"
+
+            if not ok then
+                return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
+            end
+
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
+            end
+
+            if #result ~= #test.exp then
+                return fail("Тест " .. i .. " не пройден: не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                if result[j] ~= test.exp[j] then
+                    return fail("Тест " .. i .. " не пройден: элемент " .. j .. " не совпадает")
+                end
+            end
+        end
+
         return true
     end,
 }
 
 ns_llua['lua'][121] = {
     type = "commenttest",
-    title = "Тест 119-2: функция CreateLabeledFrame",
-    helpModules = {119, 45, 17},
+    title = "Тест: функция SortPartyByLevel",
+    helpModules = {113, 101, 45, 44, 7},
     preloadVars = {
-        {var = "CreateLabeledFrame", desc = "CreateLabeledFrame очищается перед проверкой"},
+        {var = "SortPartyByLevel", desc = "SortPartyByLevel очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
         {var = "result", desc = "result очищается перед проверкой"},
     },
     reportVars = {"checkError", "result"},
     instruction = [=[
-<h>Тест 119-2: функция CreateLabeledFrame</h>
-<t>Создай глобальную функцию <k>CreateLabeledFrame(name, width, height, labelText)</k>.</t>
-<t>Функция должна создать фрейм с текстовым заголовком внутри и вернуть его.</t>
-<t>Свойства фрейма:</t>
-<c>Имя</c> — <k>name</k>.
-<c>Родитель</c> — <k>UIParent</k>.
-<c>Размер</c> — <k>width</k> x <k>height</k>.
-<c>Положение</c> — по центру.
-<c>Видимость</c> — показан.
-<t>Свойства заголовка (FontString):</t>
-<c>Текст</c> — <k>labelText</k>.
-<c>Шрифт</c> — <s>"GameFontNormal"</s>.
-<c>Положение</c> — по центру фрейма.
+<h>Тест: функция SortPartyByLevel</h>
+<t>Создай глобальную функцию <k>SortPartyByLevel()</k>.</t>
+<t>Функция должна отсортировать участников группы по уровню (от старшего к младшему) и вернуть массив строк в формате:</t>
+<s>"party1: Вася (80)"</s>
+<s>"party2: Петя (75)"</s>
+<s>"party3: Сидр (60)"</s>
+<t>Если у двух участников одинаковый уровень, сохранить исходный порядок.</t>
+<w>Перед проверкой собери группу минимум из 2 человек.</w>
 ]=],
     initialCode = [=[
-function CreateLabeledFrame(name, width, height, labelText)
+function SortPartyByLevel()
     
 end
 ]=],
     requireKeywords = {
-        "CreateLabeledFrame",
+        "SortPartyByLevel",
         "function",
-        "CreateFrame",
-        "CreateFontString",
-        "SetFontObject",
-        "SetText",
+        "GetNumPartyMembers",
+        "for",
+        "UnitName",
+        "UnitLevel",
+        "table.sort",
+        "string.format",
         "return",
     },
     checkCode = function()
@@ -13852,59 +13888,65 @@ end
             return msg
         end
 
-        if type(_G.CreateLabeledFrame) ~= "function" then
-            return fail("CreateLabeledFrame не является глобальной функцией")
+        if type(_G.SortPartyByLevel) ~= "function" then
+            return fail("SortPartyByLevel не является глобальной функцией")
         end
 
-        local testName = "LUA_TEST_LABELED_" .. math.random(100000, 999999)
-        local testLabel = "Тестовая метка"
+        local numParty = GetNumPartyMembers()
+        if numParty < 2 then
+            return fail("Нет группы или мало игроков (" .. numParty .. "/2). Собери группу минимум из 2 человек.")
+        end
 
-        local ok, result = pcall(_G.CreateLabeledFrame, testName, 300, 100, testLabel)
+        local ok, result = pcall(_G.SortPartyByLevel)
 
-        if ok then
-            _G.result = tostring(result)
+        if ok and type(result) == "table" then
+            _G.result = result
+        elseif ok then
+            _G.result = "ОШИБКА: функция вернула " .. type(result)
         else
             _G.result = "ОШИБКА: " .. tostring(result)
-            return fail("Ошибка вызова: " .. tostring(result))
         end
 
-        if not result or type(result) ~= "table" then
-            return fail("Функция должна вернуть фрейм")
+        if not ok then
+            return fail("Ошибка вызова SortPartyByLevel: " .. tostring(result))
+        end
+        if type(result) ~= "table" then
+            return fail("SortPartyByLevel должна вернуть массив (таблицу)")
         end
 
-        local w, h = result:GetSize()
-        if math.abs(w - 300) > 0.01 or math.abs(h - 100) > 0.01 then
-            return fail("Размер не совпадает: ожидалось 300x100, получено " .. w .. "x" .. h)
+        local expected = {}
+        for i = 1, numParty do
+            local unit = "party" .. i
+            local name = UnitName(unit) or "Unknown"
+            local level = UnitLevel(unit) or 0
+            local line = string.format("%s: %s (%d)", unit, name, level)
+            table.insert(expected, {unit = unit, level = level, line = line})
         end
 
-        if not result:IsShown() then
-            return fail("Фрейм должен быть показан")
+        table.sort(expected, function(a, b)
+            return a.level > b.level
+        end)
+
+        if #result ~= #expected then
+            return fail("Количество строк не совпадает: ожидалось " .. #expected .. ", получено " .. #result)
         end
 
-        local foundLabel = false
-        local regions = {result:GetRegions()}
-        for _, region in ipairs(regions) do
-            if region.GetText and region:GetText() == testLabel then
-                foundLabel = true
-                break
+        for i = 1, #expected do
+            if result[i] ~= expected[i].line then
+                return fail("Строка " .. i .. " не совпадает. Ожидалось: '" .. expected[i].line .. "', получено: '" .. tostring(result[i]) .. "'")
             end
         end
 
-        if not foundLabel then
-            return fail("Внутри фрейма не найдена метка с текстом '" .. testLabel .. "'")
-        end
-
-        result:Hide()
         return true
     end,
 }
 
 ns_llua['lua'][122] = {
     type = "commenttest",
-    title = "Тест 119-3: функция ApplyStyle",
-    helpModules = {119, 45, 31, 44},
+    title = "Тест: функция DescribeAttackableUnits",
+    helpModules = {95, 101, 45, 31, 44},
     preloadVars = {
-        {var = "ApplyStyle", desc = "ApplyStyle очищается перед проверкой"},
+        {var = "DescribeAttackableUnits", desc = "DescribeAttackableUnits очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
         {var = "test1", desc = "test1 очищается перед проверкой"},
         {var = "test2", desc = "test2 очищается перед проверкой"},
@@ -13912,30 +13954,74 @@ ns_llua['lua'][122] = {
     },
     reportVars = {"checkError", "test1", "test2", "test3"},
     instruction = [=[
-<h>Тест 119-3: функция ApplyStyle</h>
-<t>Создай глобальную функцию <k>ApplyStyle(frame, style)</k>.</t>
-<t>Аргумент <k>frame</k> — фрейм, <k>style</k> — таблица со свойствами.</t>
-<t>Функция должна применить стиль к фрейму и вернуть <k>true</k>.</t>
-<t>Поддерживаемые поля стиля:</t>
-<c>width</c>, <c>height</c> — установить размер через <k>SetSize</k>.
-<c>visible</c> — показать (<k>true</k>) или скрыть (<k>false</k>) через <k>Show</k>/<k>Hide</k>.
-<t>Поля, которых нет в <k>style</k>, трогать не нужно.</t>
-<t>Если <k>frame</k> не таблица или <k>style</k> не таблица, вернуть <k>false</k>.</t>
-<w>Во время проверки система подставит свои тестовые фреймы и стили.</w>
+<h>Тест: функция DescribeAttackableUnits</h>
+<t>Создай глобальную функцию <k>DescribeAttackableUnits(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна отфильтровать только тех юнитов, которых игрок может атаковать, и вернуть массив таблиц с описанием каждого.</t>
+<t>Каждая таблица должна содержать поля:</t>
+<c>name</c> — имя юнита.
+<c>level</c> — уровень юнита.
+<c>classToken</c> — токен класса юнита.
+<t>Порядок юнитов в результирующем массиве должен совпадать с исходным.</t>
+<t>Если аргумент не таблица, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
     initialCode = [=[
-function ApplyStyle(frame, style)
+function DescribeAttackableUnits(units)
     
 end
 ]=],
     requireKeywords = {
-        "ApplyStyle",
+        "DescribeAttackableUnits",
         "function",
-        "type",
+        "for",
+        "UnitCanAttack",
+        "UnitName",
+        "UnitLevel",
+        "UnitClass",
         "return",
     },
 
-    mockGlobals = {},
+    mockGlobals = {
+        UnitCanAttack = function(attacker, u)
+            local mock = {
+                enemy1 = true,
+                enemy2 = true,
+                friend1 = false,
+                neutral = false,
+            }
+            return mock[u] == true
+        end,
+        UnitName = function(u)
+            local mock = {
+                enemy1 = "Злодей",
+                enemy2 = "Бандит",
+                friend1 = "Друг",
+                neutral = "Нейтрал",
+            }
+            return mock[u]
+        end,
+        UnitLevel = function(u)
+            local mock = {
+                enemy1 = 80,
+                enemy2 = 75,
+                friend1 = 80,
+                neutral = 70,
+            }
+            return mock[u]
+        end,
+        UnitClass = function(u)
+            local mock = {
+                enemy1 = {"Воин", "WARRIOR"},
+                enemy2 = {"Разбойник", "ROGUE"},
+                friend1 = {"Маг", "MAGE"},
+                neutral = {"Охотник", "HUNTER"},
+            }
+            local data = mock[u]
+            if not data then return nil, nil end
+            return data[1], data[2]
+        end,
+    },
 
     checkCode = function(env)
         _G.checkError = nil
@@ -13950,71 +14036,53 @@ end
             return fail("Внутренняя ошибка: окружение не передано")
         end
 
-        local fn = env.ApplyStyle
+        local fn = env.DescribeAttackableUnits
         if type(fn) ~= "function" then
-            return fail("ApplyStyle не является глобальной функцией")
-        end
-
-        local function makeMockFrame()
-            local frame = {
-                _size = {0, 0},
-                _shown = false,
-                SetSize = function(self, w, h)
-                    self._size = {w, h}
-                end,
-                Show = function(self) self._shown = true end,
-                Hide = function(self) self._shown = false end,
-            }
-            return frame
+            return fail("DescribeAttackableUnits не является глобальной функцией")
         end
 
         local tests = {
-            {
-                style = {width = 200, height = 100, visible = true},
-                check = function(f)
-                    local w, h = f._size[1], f._size[2]
-                    return w == 200 and h == 100 and f._shown == true
-                end,
-                desc = "Размер + показать",
-            },
-            {
-                style = {visible = false},
-                check = function(f)
-                    return f._shown == false
-                end,
-                desc = "Только скрыть",
-            },
-            {
-                style = {width = 50},
-                check = function(f)
-                    return f._size[1] == 50
-                end,
-                desc = "Только ширина",
-            },
+            {input = {"enemy1", "friend1", "enemy2"}, exp = {
+                {name = "Злодей", level = 80, classToken = "WARRIOR"},
+                {name = "Бандит", level = 75, classToken = "ROGUE"},
+            }},
+            {input = {"friend1", "neutral"}, exp = {}},
+            {input = "bad", exp = {}},
         }
 
         for i, test in ipairs(tests) do
-            local frame = makeMockFrame()
-            local ok, result = pcall(fn, frame, test.style)
-
-            _G["test" .. i] = test.desc .. " | Результат: " .. tostring(result)
+            local ok, result = pcall(fn, test.input)
 
             if not ok then
                 return fail("Тест " .. i .. ": ошибка вызова: " .. tostring(result))
             end
 
-            if result ~= true then
-                return fail("Тест " .. i .. ": функция должна вернуть true")
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. ": функция должна вернуть таблицу")
             end
 
-            if not test.check(frame) then
-                return fail("Тест " .. i .. " не пройден: стиль не применён корректно")
+            if #result ~= #test.exp then
+                return fail("Тест " .. i .. " не пройден: ожидалось " .. #test.exp .. " элементов, получено " .. #result)
             end
-        end
 
-        local badOk, badResult = pcall(fn, "not_a_frame", {})
-        if badOk and badResult ~= false then
-            return fail("Для не-фрейма функция должна вернуть false")
+            for j = 1, #result do
+                local r = result[j]
+                local e = test.exp[j]
+                if type(r) ~= "table" then
+                    return fail("Тест " .. i .. ": элемент " .. j .. " должен быть таблицей")
+                end
+                if r.name ~= e.name then
+                    return fail("Тест " .. i .. ": элемент " .. j .. ", name не совпадает")
+                end
+                if r.level ~= e.level then
+                    return fail("Тест " .. i .. ": элемент " .. j .. ", level не совпадает")
+                end
+                if r.classToken ~= e.classToken then
+                    return fail("Тест " .. i .. ": элемент " .. j .. ", classToken не совпадает")
+                end
+            end
+
+            _G["test" .. i] = "Пройден: " .. #result .. " элементов"
         end
 
         return true
@@ -14023,33 +14091,41 @@ end
 
 ns_llua['lua'][123] = {
     type = "commenttest",
-    title = "Тест 119-4: функция FindVisibleChildren",
-    helpModules = {119, 45, 31, 29},
+    title = "Тест: функция GetRaidOnlineReport",
+    helpModules = {101, 45, 17, 7, 44},
     preloadVars = {
-        {var = "FindVisibleChildren", desc = "FindVisibleChildren очищается перед проверкой"},
+        {var = "GetRaidOnlineReport", desc = "GetRaidOnlineReport очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
         {var = "result", desc = "result очищается перед проверкой"},
     },
     reportVars = {"checkError", "result"},
     instruction = [=[
-<h>Тест 119-4: функция FindVisibleChildren</h>
-<t>Создай глобальную функцию <k>FindVisibleChildren(parent)</k>.</t>
-<t>Функция должна вернуть массив всех видимых дочерних фреймов переданного родителя.</t>
-<t>Видимость определяется через метод <k>IsShown()</k>.</t>
-<t>Порядок фреймов в результате должен совпадать с порядком, в котором их вернул <k>GetChildren()</k>.</t>
-<t>Если <k>parent</k> не таблица или не имеет метода <k>GetChildren</k>, вернуть пустой массив.</t>
-<w>Во время проверки система создаст временного родителя с несколькими детьми (часть видимых, часть скрытых).</w>
+<h>Тест: функция GetRaidOnlineReport</h>
+<t>Создай глобальную функцию <k>GetRaidOnlineReport()</k>.</t>
+<t>Функция должна собрать отчёт по всем участникам рейда и вернуть массив строк в формате:</t>
+<s>"Имя: Вася, Уровень: 80, Класс: WARRIOR, Статус: онлайн"</s>
+<s>"Имя: Петя, Уровень: 75, Класс: MAGE, Статус: офлайн"</s>
+<t>Порядок вывода:</t>
+<t>1. Сначала все онлайновые участники, отсортированные по уровню (от старшего к младшему). При равном уровне — по алфавиту токена класса.</t>
+<t>2. Затем все офлайновые участники, отсортированные по тем же правилам.</t>
+<w>Перед проверкой собери рейд минимум из 3 человек.</w>
 ]=],
     initialCode = [=[
-function FindVisibleChildren(parent)
+function GetRaidOnlineReport()
     
 end
 ]=],
     requireKeywords = {
-        "FindVisibleChildren",
+        "GetRaidOnlineReport",
         "function",
-        "GetChildren",
-        "IsShown",
+        "GetNumRaidMembers",
+        "for",
+        "UnitName",
+        "UnitLevel",
+        "UnitClass",
+        "UnitIsConnected",
+        "table.sort",
+        "string.format",
         "return",
     },
     checkCode = function()
@@ -14061,33 +14137,19 @@ end
             return msg
         end
 
-        if type(_G.FindVisibleChildren) ~= "function" then
-            return fail("FindVisibleChildren не является глобальной функцией")
+        if type(_G.GetRaidOnlineReport) ~= "function" then
+            return fail("GetRaidOnlineReport не является глобальной функцией")
         end
 
-        local testParent = CreateFrame("Frame", nil, UIParent)
-        local visible1 = CreateFrame("Frame", nil, testParent)
-        local hidden1 = CreateFrame("Frame", nil, testParent)
-        local visible2 = CreateFrame("Frame", nil, testParent)
-        local hidden2 = CreateFrame("Frame", nil, testParent)
-        local visible3 = CreateFrame("Frame", nil, testParent)
+        local numRaid = GetNumRaidMembers()
+        if numRaid < 3 then
+            return fail("Нет рейда или мало игроков (" .. numRaid .. "/3). Собери рейд минимум из 3 человек.")
+        end
 
-        visible1:SetSize(10, 10)
-        hidden1:SetSize(10, 10)
-        visible2:SetSize(10, 10)
-        hidden2:SetSize(10, 10)
-        visible3:SetSize(10, 10)
-
-        visible1:Show()
-        hidden1:Hide()
-        visible2:Show()
-        hidden2:Hide()
-        visible3:Show()
-
-        local ok, result = pcall(_G.FindVisibleChildren, testParent)
+        local ok, result = pcall(_G.GetRaidOnlineReport)
 
         if ok and type(result) == "table" then
-            _G.result = "Найдено фреймов: " .. #result
+            _G.result = result
         elseif ok then
             _G.result = "ОШИБКА: функция вернула " .. type(result)
         else
@@ -14095,135 +14157,297 @@ end
         end
 
         if not ok then
-            testParent:Hide()
-            return fail("Ошибка вызова FindVisibleChildren: " .. tostring(result))
+            return fail("Ошибка вызова GetRaidOnlineReport: " .. tostring(result))
         end
         if type(result) ~= "table" then
-            testParent:Hide()
-            return fail("Функция должна вернуть таблицу")
+            return fail("GetRaidOnlineReport должна вернуть массив (таблицу)")
         end
 
-        local expected = {visible1, visible2, visible3}
-        if #result ~= #expected then
-            testParent:Hide()
-            return fail("Ожидалось " .. #expected .. " видимых фреймов, получено " .. #result)
-        end
+        local online = {}
+        local offline = {}
 
-        for i, expFrame in ipairs(expected) do
-            if result[i] ~= expFrame then
-                testParent:Hide()
-                return fail("Элемент " .. i .. " не совпадает")
+        for i = 1, numRaid do
+            local unit = "raid" .. i
+            if UnitExists(unit) then
+                local name = UnitName(unit) or "Unknown"
+                local level = UnitLevel(unit) or 0
+                local _, classToken = UnitClass(unit)
+                classToken = classToken or "UNKNOWN"
+                local isOnline = UnitIsConnected(unit)
+
+                local entry = {
+                    name = name,
+                    level = level,
+                    classToken = classToken,
+                    status = isOnline and "онлайн" or "офлайн",
+                }
+
+                if isOnline then
+                    table.insert(online, entry)
+                else
+                    table.insert(offline, entry)
+                end
             end
         end
 
-        local badOk, badResult = pcall(_G.FindVisibleChildren, "not_a_frame")
-        if badOk and (type(badResult) ~= "table" or #badResult ~= 0) then
-            testParent:Hide()
-            return fail("Для не-фрейма функция должна вернуть пустой массив")
+        local function sortByLevelAndClass(a, b)
+            if a.level ~= b.level then
+                return a.level > b.level
+            end
+            return a.classToken < b.classToken
         end
 
-        testParent:Hide()
+        table.sort(online, sortByLevelAndClass)
+        table.sort(offline, sortByLevelAndClass)
+
+        local expected = {}
+        for _, entry in ipairs(online) do
+            local line = string.format("Имя: %s, Уровень: %d, Класс: %s, Статус: %s",
+                entry.name, entry.level, entry.classToken, entry.status)
+            table.insert(expected, line)
+        end
+        for _, entry in ipairs(offline) do
+            local line = string.format("Имя: %s, Уровень: %d, Класс: %s, Статус: %s",
+                entry.name, entry.level, entry.classToken, entry.status)
+            table.insert(expected, line)
+        end
+
+        if #result ~= #expected then
+            return fail("Количество строк не совпадает: ожидалось " .. #expected .. ", получено " .. #result)
+        end
+
+        for i = 1, #expected do
+            if result[i] ~= expected[i] then
+                return fail("Строка " .. i .. " не совпадает. Ожидалось: '" .. expected[i] .. "', получено: '" .. tostring(result[i]) .. "'")
+            end
+        end
+
         return true
     end,
 }
 
 ns_llua['lua'][124] = {
     type = "commenttest",
-    title = "Тест 119-5: функция CreateFrameRow",
-    helpModules = {119, 45, 31, 44},
+    title = "Тест: функция GetHealingPriorityReport",
+    helpModules = {89, 107, 45, 31, 44},
     preloadVars = {
-        {var = "CreateFrameRow", desc = "CreateFrameRow очищается перед проверкой"},
+        {var = "GetHealingPriorityReport", desc = "GetHealingPriorityReport очищается перед проверкой"},
         {var = "checkError", desc = "checkError очищается перед проверкой"},
-        {var = "result", desc = "result очищается перед проверкой"},
+        {var = "test1", desc = "test1 очищается перед проверкой"},
+        {var = "test2", desc = "test2 очищается перед проверкой"},
+        {var = "test3", desc = "test3 очищается перед проверкой"},
     },
-    reportVars = {"checkError", "result"},
+    reportVars = {"checkError", "test1", "test2", "test3"},
     instruction = [=[
-<h>Тест 119-5: функция CreateFrameRow</h>
-<t>Создай глобальную функцию <k>CreateFrameRow(parent, count, frameWidth, frameHeight, spacing)</k>.</t>
-<t>Функция должна создать ряд из <k>count</k> одинаковых фреймов внутри <k>parent</k> и вернуть массив созданных фреймов.</t>
-<t>Свойства каждого фрейма:</t>
-<c>Размер</c> — <k>frameWidth</k> x <k>frameHeight</k>.
-<c>Родитель</c> — <k>parent</k>.
-<c>Положение</c> — первый фрейм прижат к левому краю родителя (<s>"LEFT"</s>), каждый следующий расположен справа от предыдущего с отступом <k>spacing</k>.
-<c>Видимость</c> — все фреймы показаны.
-<t>Если <k>count</k> не число или <= 0, вернуть пустой массив.</t>
+<h>Тест: функция GetHealingPriorityReport</h>
+<t>Создай глобальную функцию <k>GetHealingPriorityReport(units)</k>.</t>
+<t>Аргумент <k>units</k> — массив строк UnitID.</t>
+<t>Функция должна оценить состояние каждого существующего юнита и вернуть массив таблиц, отсортированный по проценту здоровья (по возрастанию — кто в худшем состоянии, тот первый).</t>
+<t>Каждая таблица должна содержать поля:</t>
+<c>unit</c> — UnitID юнита (строка).
+<c>hpPercent</c> — процент здоровья (число от 0 до 100, округлённое вниз через <k>math.floor</k>).
+<c>debuffCount</c> — количество дебаффов на юните (число).
+<t>Несуществующих юнитов пропускай.</t>
+<t>Если у юнита максимальное здоровье 0 или меньше, процент считать равным 0.</t>
+<t>Если аргумент не таблица, верни пустой массив.</t>
+<w>Во время проверки система подставит свои тестовые значения, искать юнитов не нужно.</w>
 ]=],
     initialCode = [=[
-function CreateFrameRow(parent, count, frameWidth, frameHeight, spacing)
+function GetHealingPriorityReport(units)
     
 end
 ]=],
     requireKeywords = {
-        "CreateFrameRow",
+        "GetHealingPriorityReport",
         "function",
-        "CreateFrame",
-        "SetSize",
-        "SetPoint",
         "for",
+        "UnitExists",
+        "UnitHealth",
+        "UnitHealthMax",
+        "UnitDebuff",
+        "math.floor",
+        "table.sort",
         "return",
     },
-    checkCode = function()
+
+    mockGlobals = {
+        UnitExists = function(u)
+            local mock = {
+                tank = true,
+                healer = true,
+                dps1 = true,
+                dps2 = true,
+                dead = true,
+                missing = false,
+            }
+            return mock[u] == true
+        end,
+        UnitHealth = function(u)
+            local mock = {
+                tank = 5000,
+                healer = 1000,
+                dps1 = 3000,
+                dps2 = 200,
+                dead = 0,
+            }
+            return mock[u] or 0
+        end,
+        UnitHealthMax = function(u)
+            local mock = {
+                tank = 10000,
+                healer = 4000,
+                dps1 = 6000,
+                dps2 = 2000,
+                dead = 5000,
+            }
+            return mock[u] or 0
+        end,
+        UnitDebuff = function(u, i)
+            local mock = {
+                tank = {"Яд", "Замедление", "Боль"},
+                healer = {"Замедление"},
+                dps1 = {},
+                dps2 = {"Яд", "Проклятие"},
+                dead = {},
+            }
+            local list = mock[u] or {}
+            if not list[i] then return nil end
+            return list[i]
+        end,
+    },
+
+    checkCode = function(env)
         _G.checkError = nil
-        _G.result = nil
+        for i = 1, 3 do _G["test" .. i] = nil end
 
         local function fail(msg)
             _G.checkError = msg
             return msg
         end
 
-        if type(_G.CreateFrameRow) ~= "function" then
-            return fail("CreateFrameRow не является глобальной функцией")
+        if type(env) ~= "table" then
+            return fail("Внутренняя ошибка: окружение не передано")
         end
 
-        local testParent = CreateFrame("Frame", nil, UIParent)
-        testParent:SetSize(1000, 100)
-        testParent:SetPoint("CENTER")
-
-        local ok, result = pcall(_G.CreateFrameRow, testParent, 4, 50, 50, 10)
-
-        if ok and type(result) == "table" then
-            _G.result = "Создано фреймов: " .. #result
-        elseif ok then
-            _G.result = "ОШИБКА: функция вернула " .. type(result)
-        else
-            _G.result = "ОШИБКА: " .. tostring(result)
-            testParent:Hide()
-            return fail("Ошибка вызова: " .. tostring(result))
+        local fn = env.GetHealingPriorityReport
+        if type(fn) ~= "function" then
+            return fail("GetHealingPriorityReport не является глобальной функцией")
         end
 
-        if type(result) ~= "table" then
-            testParent:Hide()
-            return fail("Функция должна вернуть таблицу")
+        -- Локальные моки для checkCode (те же что и в mockGlobals)
+        local function mockUnitExists(u)
+            local mock = {
+                tank = true, healer = true, dps1 = true, dps2 = true,
+                dead = true, missing = false,
+            }
+            return mock[u] == true
         end
 
-        if #result ~= 4 then
-            testParent:Hide()
-            return fail("Ожидалось 4 фрейма, получено " .. #result)
+        local function mockUnitHealth(u)
+            local mock = {
+                tank = 5000, healer = 1000, dps1 = 3000, dps2 = 200, dead = 0,
+            }
+            return mock[u] or 0
         end
 
-        for i, frame in ipairs(result) do
-            if type(frame) ~= "table" or not frame.GetSize then
-                testParent:Hide()
-                return fail("Элемент " .. i .. " не является фреймом")
+        local function mockUnitHealthMax(u)
+            local mock = {
+                tank = 10000, healer = 4000, dps1 = 6000, dps2 = 2000, dead = 5000,
+            }
+            return mock[u] or 0
+        end
+
+        local function mockUnitDebuff(u, i)
+            local mock = {
+                tank = {"Яд", "Замедление", "Боль"},
+                healer = {"Замедление"},
+                dps1 = {},
+                dps2 = {"Яд", "Проклятие"},
+                dead = {},
+            }
+            local list = mock[u] or {}
+            if not list[i] then return nil end
+            return list[i]
+        end
+
+        local function countDebuffs(unit)
+            local n, i = 0, 1
+            while mockUnitDebuff(unit, i) do
+                n = n + 1
+                i = i + 1
             end
-            local w, h = frame:GetSize()
-            if math.abs(w - 50) > 0.01 or math.abs(h - 50) > 0.01 then
-                testParent:Hide()
-                return fail("Фрейм " .. i .. " имеет неверный размер: " .. w .. "x" .. h)
+            return n
+        end
+
+        local function calcHpPercent(unit)
+            local cur = mockUnitHealth(unit) or 0
+            local max = mockUnitHealthMax(unit) or 0
+            if max <= 0 then return 0 end
+            return math.floor(cur / max * 100)
+        end
+
+        local tests = {
+            {
+                input = {"tank", "healer", "dps1", "dps2"},
+                label = "Четыре живых юнита",
+            },
+            {
+                input = {"tank", "dead", "dps2"},
+                label = "Есть мёртвый юнит (HP 0%)",
+            },
+            {
+                input = "bad",
+                label = "Некорректный ввод",
+            },
+        }
+
+        for i, test in ipairs(tests) do
+            local ok, result = pcall(fn, test.input)
+
+            if not ok then
+                return fail("Тест " .. i .. " (" .. test.label .. "): ошибка вызова: " .. tostring(result))
             end
-            if not frame:IsShown() then
-                testParent:Hide()
-                return fail("Фрейм " .. i .. " должен быть показан")
+
+            if type(result) ~= "table" then
+                return fail("Тест " .. i .. " (" .. test.label .. "): функция должна вернуть таблицу")
+            end
+
+            local expected = {}
+            if type(test.input) == "table" then
+                for _, unit in ipairs(test.input) do
+                    if mockUnitExists(unit) then
+                        local hp = calcHpPercent(unit)
+                        local debuffs = countDebuffs(unit)
+                        table.insert(expected, {unit = unit, hpPercent = hp, debuffCount = debuffs})
+                    end
+                end
+                table.sort(expected, function(a, b) return a.hpPercent < b.hpPercent end)
+            end
+
+            _G["test" .. i] = test.label .. " | Получено: " .. #result .. " | Ожидалось: " .. #expected
+
+            if #result ~= #expected then
+                return fail("Тест " .. i .. " (" .. test.label .. "): не совпадает длина массива")
+            end
+
+            for j = 1, #result do
+                local r = result[j]
+                local e = expected[j]
+                if type(r) ~= "table" then
+                    return fail("Тест " .. i .. ": элемент " .. j .. " должен быть таблицей")
+                end
+                if r.unit ~= e.unit then
+                    return fail("Тест " .. i .. ": элемент " .. j .. ", unit не совпадает. Ожидалось '" .. e.unit .. "', получено '" .. tostring(r.unit) .. "'")
+                end
+                if r.hpPercent ~= e.hpPercent then
+                    return fail("Тест " .. i .. ": элемент " .. j .. " (" .. e.unit .. "), hpPercent не совпадает. Ожидалось " .. e.hpPercent .. ", получено " .. tostring(r.hpPercent))
+                end
+                if r.debuffCount ~= e.debuffCount then
+                    return fail("Тест " .. i .. ": элемент " .. j .. " (" .. e.unit .. "), debuffCount не совпадает. Ожидалось " .. e.debuffCount .. ", получено " .. tostring(r.debuffCount))
+                end
             end
         end
 
-        local badOk, badResult = pcall(_G.CreateFrameRow, testParent, 0, 50, 50, 10)
-        if badOk and (type(badResult) ~= "table" or #badResult ~= 0) then
-            testParent:Hide()
-            return fail("Для count = 0 функция должна вернуть пустой массив")
-        end
-
-        testParent:Hide()
         return true
     end,
 }
