@@ -2937,19 +2937,6 @@ end
 ---гитхаб
 
 
---- котики
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("PLAYER_TARGET_CHANGED")
-frame:SetScript("OnEvent", function()
-    local guid = UnitGUID("target")
-    if guid then
-        local id = guid:match("0x%x+")
-        if id then
-            SendAddonMessage("itsCat " .. UnitName("target"), id, "GUILD")
-        end
-    end
-end)
----
 
 
 

@@ -5,7 +5,7 @@
 -- @param isReload: Флаг, указывающий, что интерфейс был перезагружен
 local function OnEvent(self, event, isLogin, isReload)
     if arg1 == "NSQC3" then
-        NSQC3_version = 13; NSQC3_subversion = 0
+        NSQC3_version = 13; NSQC3_subversion = 1
         SendAddonMessage("NSQC_VERSION_REQUEST", "", "GUILD")
         nsDbc = nsDbc or {}
         ---
@@ -152,7 +152,7 @@ end
         -- end, true)
 
         C_Timer.NewTicker(100, function()
-            UpdateAddOnMemoryUsage()
+            
             time100()
         end)
     end
