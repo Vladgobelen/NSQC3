@@ -92,8 +92,6 @@ timerFrame:SetScript("OnUpdate", function(self, elapsed)
         sq:UpdateSkillTables()
         sq:ForceUpdateAllSpells()
         sq:ApplyDisplayMode()
-        nsDbc['frames'] = nsDbc['frames'] or {}
-        RestoreFramePositions(nsDbc['frames'])
         if NSTDc then
             nstdc = nstdc or NSTDc:new()
         end
